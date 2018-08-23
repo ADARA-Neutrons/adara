@@ -5,7 +5,7 @@
 	Stored in Git Repository at: git+ssh://trac.sns.gov/var/repos/config
 		- in the "sts-config" branch
 
-	Deployed to /SNS/lustre/stsdata/sts_config.xml
+	Deployed to /SNS/snfs1/stsdata/sts_config.xml
 
 	Please Commit Any Changes to Git...! Thanks! :-D
 -->
@@ -520,6 +520,82 @@
 			<element>
 				<pattern>:Mot:m1hu$</pattern>
 				<name>m1</name>
+			</element>
+		</condition>
+	</group>
+
+	<!-- Analyzer/Polarizer State Conditional Links (REF_M) -->
+	<group>
+		<name>DASlogs</name>
+		<path>/entry</path>
+		<type>NXcollection</type>
+		<!-- Analyzer State Conditional Links... -->
+		<!-- "Fan Analyzer and SF2" Conditional Analyzer Element -->
+		<condition>
+			<name>Fan Analyzer and SF2</name>
+			<pattern>:CS:ARConfig:AnalyzerSel$</pattern>
+			<pattern>:CS:Inst:AnalyzerSel$</pattern>
+			<pattern>^Analyzer$</pattern>
+			<value_string>Fan Analyzer and SF2</value_string><!-- 1 -->
+			<value_string>Fan Analyzer + SF2</value_string><!-- 1 -->
+			<element>
+				<pattern>SF2$</pattern>
+				<name>AnalyzerState</name>
+			</element>
+			<element>
+				<pattern>SF2_Veto$</pattern>
+				<name>AnalyzerVeto</name>
+			</element>
+		</condition>
+		<!-- "3He Analyzer" Conditional Analyzer Element -->
+		<condition>
+			<name>3He Analyzer</name>
+			<pattern>:CS:ARConfig:AnalyzerSel$</pattern>
+			<pattern>:CS:Inst:AnalyzerSel$</pattern>
+			<pattern>^Analyzer$</pattern>
+			<value_string>3He Analyzer</value_string><!-- 2 -->
+			<element>
+				<pattern>He3State$</pattern>
+				<name>AnalyzerState</name>
+			</element>
+			<element>
+				<pattern>He3_Veto$</pattern>
+				<name>AnalyzerVeto</name>
+			</element>
+		</condition>
+		<!-- (Unnecessary?) Polarizer State Conditional Links... -->
+		<!-- "Reflection Polarizer" Conditional Polarizer Element -->
+		<!-- (Formerly "Super Mirror Polarizer"...) -->
+		<condition>
+			<name>Reflection Polarizer</name>
+			<pattern>:CS:ARConfig:PolarizerSel$</pattern>
+			<pattern>:CS:Inst:PolarizerSel$</pattern>
+			<pattern>^Polarizer$</pattern>
+			<value_string>Reflection Polarizer</value_string><!-- 1 -->
+			<value_string>Super Mirror Polarizer</value_string><!-- 1 -->
+			<element>
+				<pattern>SF1$</pattern>
+				<name>PolarizerState</name>
+			</element>
+			<element>
+				<pattern>SF1_Veto$</pattern>
+				<name>PolarizerVeto</name>
+			</element>
+		</condition>
+		<!-- "Transmission Polarizer" Conditional Polarizer Element -->
+		<condition>
+			<name>Transmission Polarizer</name>
+			<pattern>:CS:ARConfig:PolarizerSel$</pattern>
+			<pattern>:CS:Inst:PolarizerSel$</pattern>
+			<pattern>^Polarizer$</pattern>
+			<value_string>Transmission Polarizer</value_string><!-- 2 -->
+			<element>
+				<pattern>SF1$</pattern>
+				<name>PolarizerState</name>
+			</element>
+			<element>
+				<pattern>SF1_Veto$</pattern>
+				<name>PolarizerVeto</name>
 			</element>
 		</condition>
 	</group>

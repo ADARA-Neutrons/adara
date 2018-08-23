@@ -169,6 +169,7 @@ public:
 
 	bool rxPacket(const ADARA::RTDLPkt &pkt);
 	bool rxPacket(const ADARA::BankedEventPkt &pkt);
+	bool rxPacket(const ADARA::BankedEventStatePkt &pkt);
 	bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
 	bool rxPacket(const ADARA::RunStatusPkt &pkt);
 	bool rxPacket(const ADARA::DeviceDescriptorPkt &pkt);
@@ -358,26 +359,70 @@ bool MungeParser::rxPacket(const ADARA::BankedEventPkt &pkt)
 			pkt.pulseEnergy(), pkt.vetoFlags());
 		if (pkt.flags()) {
 			printf("    flags");
-			if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
+			if (pkt.flags() & ADARA::ERROR_PIXELS)
 				printf(" ERROR");
-			if (pkt.flags() & ADARA::BankedEventPkt::PARTIAL_DATA)
+			if (pkt.flags() & ADARA::PARTIAL_DATA)
 				printf(" PARTIAL");
-			if (pkt.flags() & ADARA::BankedEventPkt::PULSE_VETO)
+			if (pkt.flags() & ADARA::PULSE_VETO)
 				printf(" VETO");
-			if (pkt.flags() & ADARA::BankedEventPkt::MISSING_RTDL)
+			if (pkt.flags() & ADARA::MISSING_RTDL)
 				printf(" NO_RTDL");
-			if (pkt.flags() & ADARA::BankedEventPkt::MAPPING_ERROR)
+			if (pkt.flags() & ADARA::MAPPING_ERROR)
 				printf(" MAPPING");
-			if (pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE)
+			if (pkt.flags() & ADARA::DUPLICATE_PULSE)
 				printf(" DUP_PULSE");
-			if (pkt.flags() & ADARA::BankedEventPkt::PCHARGE_UNCORRECTED)
+			if (pkt.flags() & ADARA::PCHARGE_UNCORRECTED)
 				printf(" PCHG_UNCOR");
-			if (pkt.flags() & ADARA::BankedEventPkt::VETO_UNCORRECTED)
+			if (pkt.flags() & ADARA::VETO_UNCORRECTED)
 				printf(" VETO_UNCOR");
-			if (pkt.flags() & ADARA::BankedEventPkt::GOT_METADATA)
+			if (pkt.flags() & ADARA::GOT_METADATA)
 				printf(" GOT_METADATA");
-			if (pkt.flags() & ADARA::BankedEventPkt::GOT_NEUTRONS)
+			if (pkt.flags() & ADARA::GOT_NEUTRONS)
 				printf(" GOT_NEUTRONS");
+			printf("\n");
+		}
+	}
+
+	// Save Last Packet Time as Potential "End of Run" Timestamp...
+	m_endtime_sec = (uint32_t) (pkt.pulseId() >> 32);
+	m_endtime_nsec = (uint32_t) pkt.pulseId();
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::BankedEventStatePkt &pkt)
+{
+	if ( !m_terse ) {
+		printf("%u.%09u BANKED EVENT STATE DATA (0x%x,v%u) [%u bytes]\n"
+			"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
+			pkt.pulseEnergy(), pkt.vetoFlags());
+		if (pkt.flags()) {
+			printf("    flags");
+			if (pkt.flags() & ADARA::ERROR_PIXELS)
+				printf(" ERROR");
+			if (pkt.flags() & ADARA::PARTIAL_DATA)
+				printf(" PARTIAL");
+			if (pkt.flags() & ADARA::PULSE_VETO)
+				printf(" VETO");
+			if (pkt.flags() & ADARA::MISSING_RTDL)
+				printf(" NO_RTDL");
+			if (pkt.flags() & ADARA::MAPPING_ERROR)
+				printf(" MAPPING");
+			if (pkt.flags() & ADARA::DUPLICATE_PULSE)
+				printf(" DUP_PULSE");
+			if (pkt.flags() & ADARA::PCHARGE_UNCORRECTED)
+				printf(" PCHG_UNCOR");
+			if (pkt.flags() & ADARA::VETO_UNCORRECTED)
+				printf(" VETO_UNCOR");
+			if (pkt.flags() & ADARA::GOT_METADATA)
+				printf(" GOT_METADATA");
+			if (pkt.flags() & ADARA::GOT_NEUTRONS)
+				printf(" GOT_NEUTRONS");
+			if (pkt.flags() & ADARA::HAS_STATES)
+				printf(" HAS_STATES");
 			printf("\n");
 		}
 	}
@@ -400,25 +445,25 @@ bool MungeParser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 			pkt.pulseEnergy(), pkt.vetoFlags());
 		if (pkt.flags()) {
 			printf("    flags");
-			if (pkt.flags() & ADARA::BankedEventPkt::ERROR_PIXELS)
+			if (pkt.flags() & ADARA::ERROR_PIXELS)
 				printf(" ERROR");
-			if (pkt.flags() & ADARA::BankedEventPkt::PARTIAL_DATA)
+			if (pkt.flags() & ADARA::PARTIAL_DATA)
 				printf(" PARTIAL");
-			if (pkt.flags() & ADARA::BankedEventPkt::PULSE_VETO)
+			if (pkt.flags() & ADARA::PULSE_VETO)
 				printf(" VETO");
-			if (pkt.flags() & ADARA::BankedEventPkt::MISSING_RTDL)
+			if (pkt.flags() & ADARA::MISSING_RTDL)
 				printf(" NO_RTDL");
-			if (pkt.flags() & ADARA::BankedEventPkt::MAPPING_ERROR)
+			if (pkt.flags() & ADARA::MAPPING_ERROR)
 				printf(" MAPPING");
-			if (pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE)
+			if (pkt.flags() & ADARA::DUPLICATE_PULSE)
 				printf(" DUP_PULSE");
-			if (pkt.flags() & ADARA::BankedEventPkt::PCHARGE_UNCORRECTED)
+			if (pkt.flags() & ADARA::PCHARGE_UNCORRECTED)
 				printf(" PCHG_UNCOR");
-			if (pkt.flags() & ADARA::BankedEventPkt::VETO_UNCORRECTED)
+			if (pkt.flags() & ADARA::VETO_UNCORRECTED)
 				printf(" VETO_UNCOR");
-			if (pkt.flags() & ADARA::BankedEventPkt::GOT_METADATA)
+			if (pkt.flags() & ADARA::GOT_METADATA)
 				printf(" GOT_METADATA");
-			if (pkt.flags() & ADARA::BankedEventPkt::GOT_NEUTRONS)
+			if (pkt.flags() & ADARA::GOT_NEUTRONS)
 				printf(" GOT_NEUTRONS");
 			printf("\n");
 		}

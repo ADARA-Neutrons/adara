@@ -38,19 +38,34 @@ private:
         NxBankInfo
         (
             uint16_t a_id,              ///< [in] ID of detector bank
+            uint16_t a_state,           ///< [in] State of detector bank
             uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
             uint32_t a_idx_buf_reserve, ///< [in] Index buffer initial capacity
             NxGen &a_nxgen              ///< [in] Parent NxGen instance
         )
         :
-            BankInfo(a_id, a_buf_reserve, a_idx_buf_reserve),
+            BankInfo(a_id, a_state, a_buf_reserve, a_idx_buf_reserve),
             m_nexus_init(false),
             m_event_cur_size(0),
             m_index_cur_size(0),
             m_nxgen(a_nxgen)
         {
-            m_name = std::string("bank")
-                + boost::lexical_cast<std::string>(a_id);
+            if ( a_id == (uint16_t) UNMAPPED_BANK ) {
+                m_name = std::string("bank_unmapped");
+            }
+            else if ( a_id == (uint16_t) ERROR_BANK ) {
+                m_name = std::string("bank_error");
+            }
+            else if ( a_state != 0 ) {
+                m_name = std::string("bank")
+                    + boost::lexical_cast<std::string>(a_id)
+                    + std::string("_state")
+                    + boost::lexical_cast<std::string>(a_state);
+            }
+            else {
+                m_name = std::string("bank")
+                    + boost::lexical_cast<std::string>(a_id);
+            }
 
             // Entry Instrument Path
 
@@ -244,25 +259,26 @@ private:
         /// NxPVInfo constructor
         NxPVInfo
         (
-            const std::string     &a_device_name,  ///< [in] Name of owning device
-            const std::string     &a_name,         ///< [in] Name of PV
-            const std::string     &a_internal_name,///< [in] Internal (Nexus) name of PV
-            const std::string     &a_connection,   ///< [in] PV Connection String
-            const std::string     &a_internal_connection, ///< [in] Internal (Nexus) PV Connection String
-            STS::Identifier        a_device_id,    ///< [in] ID of device that owns the PV
-            STS::Identifier        a_pv_id,        ///< [in] ID of the PV
-            STS::PVType            a_type,         ///< [in] Type of PV
+            const std::string   &a_device_name, ///< [in] Name of owning device
+            const std::string   &a_name,        ///< [in] Name of PV
+            const std::string   &a_internal_name, ///< [in] Internal (Nexus) name of PV
+            const std::string   &a_connection,  ///< [in] PV Connection String
+            const std::string   &a_internal_connection, ///< [in] Internal (Nexus) PV Connection String
+            STS::Identifier      a_device_id,   ///< [in] ID of device that owns the PV
+            STS::Identifier      a_pv_id,       ///< [in] ID of the PV
+            STS::PVType          a_type,        ///< [in] Type of PV
             std::vector<STS::PVEnumeratedType>
-                                  *a_enum_vector,  ///< [in] Enumerated Type Vector
-            uint32_t               a_enum_index,   ///< [in] Enumerated Type Index
-            const std::string     &a_units,        ///< [in] Units of PV (empty if not needed)
-            bool                   a_ignore,       ///< [in] PV Ignore Flag
-            NxGen                 &a_nxgen         ///< [in] NxGen instance needed for Nexus output
+                                *a_enum_vector, ///< [in] Enumerated Type Vector
+            uint32_t             a_enum_index,  ///< [in] Enumerated Type Index
+            const std::string   &a_units,       ///< [in] Units of PV (empty if not needed)
+            bool                 a_ignore,      ///< [in] PV Ignore Flag
+            bool                 a_duplicate,   ///< [in] PV is a Duplicate
+            NxGen               &a_nxgen        ///< [in] NxGen instance needed for Nexus output
         )
         :
             STS::PVInfo<T>( a_device_name, a_name, a_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-                a_units, a_ignore ),
+                a_units, a_ignore, a_duplicate ),
             m_nxgen(a_nxgen),
             m_internal_name(a_internal_name),
             m_internal_connection(a_internal_connection),
@@ -270,11 +286,12 @@ private:
             m_cur_size(0),
             m_full_buffer_count(0),
             m_value_enum_strings_max_len(-1),
-            m_value_enum_strings_not_found(0)
+            m_value_enum_strings_not_found(0),
+            m_finalized(false)
         {
             // If the PV Name and Connection String are the Same,
             // then there's No Alias, and No Need for a Distinct Link.
-            if ( m_internal_name == m_internal_connection )
+            if ( !(m_internal_name.compare( m_internal_connection )) )
             {
                 m_log_path =
                     m_nxgen.m_daslogs_path + "/" + m_internal_name;
@@ -291,6 +308,22 @@ private:
                 m_link_path = m_nxgen.m_daslogs_path
                     + "/" + m_internal_name;
             }
+
+            // Construct Handy Device/PV Strings for Logging... ;-D
+            std::stringstream device_ss;
+            device_ss << "Device " << this->m_device_name
+                << " (id=" << this->m_device_id << ")";
+            this->m_device_str = device_ss.str();
+
+            std::stringstream pv_ss;
+            pv_ss << "PV " << m_internal_name;
+            if ( m_internal_name.compare( m_internal_connection ) )
+                pv_ss << " (" << m_internal_connection << ")";
+            pv_ss << " (id=" << this->m_pv_id << ")";
+            this->m_pv_str = pv_ss.str();
+
+            this->m_device_pv_str =
+                "[" + this->m_device_str + " " + this->m_pv_str + "]";
         }
 
         /// NxPVInfo destructor
@@ -476,8 +509,8 @@ private:
                 max_len = 1;
 
             syslog( LOG_INFO,
-                "[%i] DASlogs String PV %s size=%lu max_len=%u",
-                g_pid, this->m_internal_name.c_str(),
+                "[%i] DASlogs String %s size=%lu max_len=%u",
+                g_pid, this->m_device_pv_str.c_str(),
                 value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
 
@@ -510,9 +543,9 @@ private:
             }
             else
             {
-                syslog( LOG_INFO, "[%i] %s PV %s, %s", g_pid,
+                syslog( LOG_INFO, "[%i] %s %s, %s", g_pid,
                     "No String Array Values for",
-                    this->m_internal_name.c_str(),
+                    this->m_device_pv_str.c_str(),
                     "Creating Empty String Value" );
                 usleep(30000); // give syslog a chance...
                 m_nxgen.makeDataset( m_log_path,
@@ -541,8 +574,8 @@ private:
                 max_len = 1;
 
             syslog( LOG_INFO,
-                "[%i] DASlogs Uint32 Array PV %s size=%lu max_len=%u",
-                g_pid, this->m_internal_name.c_str(),
+                "[%i] DASlogs Uint32 Array %s size=%lu max_len=%u",
+                g_pid, this->m_device_pv_str.c_str(),
                 value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
 
@@ -579,9 +612,9 @@ private:
             }
             else
             {
-                syslog( LOG_INFO, "[%i] %s PV %s, %s", g_pid,
+                syslog( LOG_INFO, "[%i] %s %s, %s", g_pid,
                     "No Uint32 Array Values for",
-                    this->m_internal_name.c_str(),
+                    this->m_device_pv_str.c_str(),
                     "Creating Empty Value Array" );
                 usleep(30000); // give syslog a chance...
                 m_nxgen.makeDataset( m_log_path,
@@ -610,8 +643,8 @@ private:
                 max_len = 1;
 
             syslog( LOG_INFO,
-                "[%i] DASlogs Double Array PV %s size=%lu max_len=%u",
-                g_pid, this->m_internal_name.c_str(),
+                "[%i] DASlogs Double Array %s size=%lu max_len=%u",
+                g_pid, this->m_device_pv_str.c_str(),
                 value_buffer.size(), max_len );
             usleep(30000); // give syslog a chance...
 
@@ -648,9 +681,9 @@ private:
             }
             else
             {
-                syslog( LOG_INFO, "[%i] %s PV %s, %s", g_pid,
+                syslog( LOG_INFO, "[%i] %s %s, %s", g_pid,
                     "No Double Array Values for",
-                    this->m_internal_name.c_str(),
+                    this->m_device_pv_str.c_str(),
                     "Creating Empty Value Array" );
                 usleep(30000); // give syslog a chance...
                 m_nxgen.makeDataset( m_log_path,
@@ -659,26 +692,78 @@ private:
         }
 
         /// Writes buffered PV values and time axis to Nexus file and performs finalization
-        void flushBuffers
+        int32_t flushBuffers
         (
-            struct STS::RunMetrics *a_run_metrics      ///< If non-zero, indicates finalization code should be executed for this PV
+            uint64_t start_time,    ///< 1st Pulse Time (nanosecs), if set
+            struct STS::RunMetrics *a_run_metrics   ///< If non-zero, indicates finalization code should be executed for this PV
         )
         {
+            int32_t num_values = -1;
+
             try
             {
-                std::stringstream device_ss;
-                device_ss << "Device " << this->m_device_name
-                    << " (id=" << this->m_device_id << ")";
-                std::string device_str = device_ss.str();
+                // Handle Not-Yet-Normalized Variable Value Update Times...
+                if ( this->m_has_non_normalized )
+                {
+                    // Have We Received Our 1st Pulse Yet...?
+                    // If So, Then Fix Non-Normalized Value Updates Now.
+                    if ( start_time )
+                    {
+                        syslog( LOG_ERR,
+                            "[%i] %s: %s %s %s %s, %s: %s",
+                            g_pid, "STS Error", "NxGen::flushBuffers()",
+                            this->m_device_str.c_str(),
+                            "Normalizing PV Value Times",
+                            "with First Pulse Time",
+                            "Now Available",
+                            this->m_pv_str.c_str() );
+                        usleep(30000); // give syslog a chance...
 
-                std::string pv_str = "PV ";
-                pv_str += this->m_internal_name.c_str();
+                        this->normalizeTimestamps( start_time );
+                    }
+
+                    // Nope, No 1st Pulse Time to Normalize From Yet...
+                    // Not Soup Yet, Wait for Later...
+                    // (Tho Log Error About It, Lest We Swell Up & Pop!)
+                    else
+                    {
+                        // TODO Add Rate-Limiting...?
+                        syslog( LOG_ERR,
+                            "[%i] %s: %s %s %s %s, %s: %s",
+                            g_pid, "STS Error", "NxGen::flushBuffers()",
+                            this->m_device_str.c_str(),
+                            "Non-Normalized PV Buffer Full",
+                            "With No First Pulse Time Yet",
+                            "Deferring For Now",
+                            this->m_pv_str.c_str() );
+                        usleep(30000); // give syslog a chance...
+
+                        return( -1 );
+                    }
+                }
 
                 // Write PV Values to NeXus File _If_ We're Writing to
                 // NeXus and _If_ We Care About This PV (_Not_ Ignored!)
                 // :-D
                 if ( m_nxgen.m_gen_nexus && !(this->m_ignore) )
                 {
+                    // If This PV is Marked as a "Duplicate" of
+                    // Another PV Log, Hold Off Writing Its Values
+                    // to the NeXus file.
+                    // We Hope to Merge/Collapse All Duplicates
+                    // Just Prior to the Finalization Pass... ;-D
+                    if ( this->m_duplicate )
+                    {
+                        // TODO Add Rate-Limiting...?
+                        syslog( LOG_WARNING, "[%i] %s: %s: %s for %s",
+                            g_pid, "Warning", "NxGen::flushBuffers()",
+                            "Deferring Write of Duplicate PV Log",
+                            this->m_device_pv_str.c_str() );
+                        usleep(30000); // give syslog a chance...
+
+                        return( -1 );
+                    }
+
                     // Wait for End of Run to Dump String/Array PV Types...
                     // (Need to Determine Max String Length for 2D Array)
                     if ( !a_run_metrics &&
@@ -690,14 +775,16 @@ private:
                         if ( !(this->m_full_buffer_count++ % 1000) )
                         {
                             syslog( LOG_ERR,
-                                "[%i] %s: %s - %s, %s: %s",
-                                g_pid, "STS Error", device_str.c_str(),
+                                "[%i] %s: %s %s: %s, %s: %s",
+                                g_pid, "STS Error",
+                                "NxGen::flushBuffers()",
+                                this->m_device_str.c_str(),
                                 "String/Array PV Buffer Full",
                                 "Deferring to Run End",
-                                this->m_internal_name.c_str() );
+                                this->m_pv_str.c_str() );
                             usleep(30000); // give syslog a chance...
                         }
-                        return;
+                        return( -1 );
                     }
 
                     // Create log if no data has been written yet
@@ -709,7 +796,7 @@ private:
                         // [Need this check because _Always_ called
                         //    in finalizeStreamProcessing() now... ;-]
                         if ( !(this->m_value_buffer.size()) )
-                            return;
+                            return( 0 );
 
                         m_nxgen.makeGroup( m_log_path, "NXlog" );
 
@@ -748,22 +835,27 @@ private:
                         m_cur_size += this->m_value_buffer.size();
                     }
 
-                    if ( a_run_metrics )
+                    num_values = this->m_value_buffer.size();
+
+                    // Do Final Statistics & Links Pass
+                    // (Unless We've Already Done It, Duplicate Keys...)
+                    if ( a_run_metrics && !(this->m_finalized) )
                     {
                         // Add start time (offset) properties
                         // to all time axis in DAS logs
                         std::string time = timeToISO8601(
-                            a_run_metrics->start_time );
+                            a_run_metrics->run_start_time );
                         std::string time_path = m_log_path + "/time";
                         m_nxgen.writeStringAttribute( time_path,
                             "start", time );
                         m_nxgen.writeScalarAttribute( time_path,
                             "offset_seconds",
-                            (uint32_t)a_run_metrics->start_time.tv_sec
+                            (uint32_t)a_run_metrics->run_start_time.tv_sec
                                 - ADARA::EPICS_EPOCH_OFFSET );
                         m_nxgen.writeScalarAttribute( time_path,
                             "offset_nanoseconds",
-                            (uint32_t)a_run_metrics->start_time.tv_nsec );
+                            (uint32_t)a_run_metrics->run_start_time.tv_nsec
+                        );
 
                         if ( m_cur_size
                                 // No Statistics for Strings!
@@ -802,9 +894,11 @@ private:
                             std::stringstream ss_dst;
                             ss_dst << m_log_path << "/" << "enum";
 
-                            syslog( LOG_INFO,
-                                "[%i] Linking Enum Group %s to %s",
-                                g_pid, ss_src.str().c_str(),
+                            syslog( LOG_INFO, "[%i] %s %s: %s %s to %s",
+                                g_pid, "NxGen::flushBuffers()",
+                                this->m_device_pv_str.c_str(),
+                                "Linking Enum Group",
+                                ss_src.str().c_str(),
                                 ss_dst.str().c_str() );
                             usleep(30000); // give syslog a chance...
 
@@ -819,11 +913,14 @@ private:
                                 if ( m_value_enum_strings_not_found > 0 )
                                 {
                                     syslog( LOG_ERR,
-                                        "[%i] %s: %d %s Not Found For %s!",
+                                        "[%i] %s: %s %s: %d %s %s %s!",
                                         g_pid, "STS Error",
+                                        "NxGen::flushBuffers()",
+                                        this->m_device_str.c_str(),
                                         m_value_enum_strings_not_found,
                                         "Enumerated Type Value Strings",
-                                        pv_str.c_str() );
+                                        "Not Found For",
+                                        this->m_pv_str.c_str() );
                                     usleep(30000); // give syslog a chance
                                 }
 
@@ -837,10 +934,13 @@ private:
                                 }
 
                                 syslog( LOG_ERR,
-                                    "[%i] %s for %s size=%lu max_len=%u",
-                                    g_pid, "Enumerated Type Value Strings",
-                                    pv_str.c_str(),
-                                    m_value_enum_strings.size(),
+                                    "[%i] %s %s: %s for %s %s=%lu %s=%u",
+                                    g_pid, "NxGen::flushBuffers()",
+                                    this->m_device_str.c_str(),
+                                    "Enumerated Type Value Strings",
+                                    this->m_pv_str.c_str(),
+                                    "size", m_value_enum_strings.size(),
+                                    "max_len",
                                     m_value_enum_strings_max_len );
                                 usleep(30000); // give syslog a chance...
 
@@ -876,10 +976,12 @@ private:
                             else
                             {
                                 syslog( LOG_ERR,
-                                    "[%i] %s: %s for %s - %s",
+                                    "[%i] %s: %s %s: %s for %s - %s",
                                     g_pid, "STS Error",
+                                    "NxGen::flushBuffers()",
+                                    this->m_device_str.c_str(),
                                     "Empty Enumerated Type Value Strings",
-                                    pv_str.c_str(),
+                                    this->m_pv_str.c_str(),
                                     "Creating Dummy Value Strings" );
                                 usleep(30000); // give syslog a chance...
 
@@ -892,8 +994,11 @@ private:
                         if ( !m_link_path.empty() )
                         {
                             syslog( LOG_INFO,
-                                "[%i] Linking PV Channel %s to Alias %s",
-                                g_pid, m_log_path.c_str(),
+                                "[%i] %s %s: %s %s to Alias %s",
+                                g_pid, "NxGen::flushBuffers()",
+                                this->m_device_pv_str.c_str(),
+                                "Linking PV Channel",
+                                m_log_path.c_str(),
                                 m_link_path.c_str() );
                             usleep(30000); // give syslog a chance...
 
@@ -914,8 +1019,10 @@ private:
                             else
                             {
                                 syslog( LOG_INFO,
-                                    "[%i] PV Channel %s %s - %s",
-                                    g_pid, m_log_path.c_str(),
+                                    "[%i] %s %s: PV Channel %s %s - %s",
+                                    g_pid, "NxGen::flushBuffers()",
+                                    this->m_device_pv_str.c_str(),
+                                    m_log_path.c_str(),
                                     "Already Has Target Group Link String",
                                     "Skipping..." );
                                 usleep(30000); // give syslog a chance...
@@ -927,14 +1034,99 @@ private:
 
                         // Search STS Config for Associated Groups
                         if ( m_nxgen.m_config_groups.size() )
-                            createSTSConfigGroups( device_str, pv_str );
+                            createSTSConfigGroups();
+
+                        // Done, We've Finalized This PV Log.
+                        this->m_finalized = true;
+                    }
+
+                    // Log That We had a Duplicate Key & Finalized "Twice"
+                    else if ( a_run_metrics && this->m_finalized )
+                    {
+                        syslog( LOG_WARNING,
+                            "[%i] Warning in %s: %s: PV %s",
+                            g_pid, "NxGen::flushBuffers()",
+                            this->m_device_pv_str.c_str(),
+                            "Was Already Finalized, Duplicate Key...?" );
+                        usleep(30000); // give syslog a chance...
                     }
                 }
+
+                // Else Ignore This PV...
+                // (or Maybe It's a Subsumed Duplicate?)
                 else if ( this->m_ignore )
                 {
-                    syslog( LOG_INFO, "[%i] %s - Ignoring %s",
-                        g_pid, device_str.c_str(), pv_str.c_str() );
+                    syslog( LOG_INFO, "[%i] %s %s - Ignoring %s%s",
+                        g_pid, "NxGen::flushBuffers()",
+                        this->m_device_str.c_str(),
+                        ( ( this->m_duplicate ) ? "Duplicate " : "" ),
+                        this->m_pv_str.c_str() );
                     usleep(30000); // give syslog a chance...
+                    num_values = 0;
+
+                    // For Subsumed Duplicate PV Logs, We May
+                    // Still Need to Create Any Alias Links on Final Pass
+                    // (Unless We've Already Done It, Duplicate Keys...)
+                    if ( this->m_duplicate && a_run_metrics
+                            && !(this->m_finalized)
+                            && !m_link_path.empty() )
+                    {
+                        syslog( LOG_INFO,
+                            "[%i] %s %s: %s %s to Alias %s",
+                            g_pid, "NxGen::flushBuffers()",
+                            this->m_device_pv_str.c_str(),
+                            "Linking Duplicate PV Channel",
+                            m_log_path.c_str(),
+                            m_link_path.c_str() );
+                        usleep(30000); // give syslog a chance...
+
+                        // Only Create "Target" String for Group Links
+                        // if we haven't already done so... ;-D
+                        // (For a Duplicate PV, We Have to Manually Check!)
+                        bool exists = false;
+                        m_nxgen.checkDataset(
+                            m_log_path, "target", exists );
+                        if ( !m_has_link && !exists )
+                        {
+                            // Manually Create "Target" String for
+                            // Group Link (as per makeGroupLink usage)
+                            m_nxgen.writeString( m_log_path,
+                                "target", m_log_path );
+
+                            // Mark This PV as Having Created the
+                            // "Target" String for Group Links!
+                            // (so we only do it _Once_!)
+                            m_has_link = true;
+                        }
+                        else
+                        {
+                            syslog( LOG_INFO,
+                                "[%i] %s %s: %s PV Channel %s %s - %s",
+                                g_pid, "NxGen::flushBuffers()",
+                                this->m_device_pv_str.c_str(),
+                                "Duplicate", m_log_path.c_str(),
+                                "Already Has Target Group Link String",
+                                "Skipping..." );
+                            usleep(30000); // give syslog a chance...
+                        }
+
+                        m_nxgen.makeGroupLink(
+                            m_log_path, m_link_path );
+
+                        // Search STS Config for Associated Groups
+                        // NOTE: All of This will "Still Work" for
+                        // Any Subsumed Duplicate PVs "By Alias",
+                        // _Except_ for Any Links to the "Last PV Value",
+                        // which may Erroneously Grab _This Duplicate PV's_
+                        // Last Value, Rather than the Overall Last
+                        // Value for the Combined PV Log... ;-b
+                        // (This could be fixed, but probably unnecessary.)
+                        if ( m_nxgen.m_config_groups.size() )
+                            createSTSConfigGroups();
+
+                        // Done, We've Finalized This PV Log.
+                        this->m_finalized = true;
+                    }
                 }
             }
             catch( TraceException &e )
@@ -946,6 +1138,8 @@ private:
 
             this->m_value_buffer.clear();
             this->m_time_buffer.clear();
+
+            return( num_values );
         }
 
         /// Compare Uint32 PV Value to Conditional STS Config Group Strings
@@ -1364,13 +1558,9 @@ private:
         (
             struct GroupInfo *G,                        ///< Config Group
             std::vector<struct ElementInfo> &elements,  ///< Elements
-            std::string device_str,                     ///< Device String
-            std::string pv_str,                         ///< PV String
             std::string label                           ///< Logging Label
         )
         {
-            std::string dev_pv_str = device_str + " " + pv_str;
-
             // REMOVE ME...
             //syslog( LOG_INFO, "[%i] Checking for Group \"%s\"...",
                 //g_pid, G->name.c_str() );
@@ -1407,7 +1597,8 @@ private:
                     {
                         // REMOVE ME...
                         syslog( LOG_INFO, "[%i] %s %s in %s \"%s\" %s",
-                            g_pid, "Pattern Match for", dev_pv_str.c_str(),
+                            g_pid, "Pattern Match for",
+                            this->m_device_pv_str.c_str(),
                             "Group", G->name.c_str(), patt_str.c_str() );
                         // give syslog a chance...
                         usleep(30000);
@@ -1470,7 +1661,7 @@ private:
                                         g_pid, "STS Error:",
                                         "Index Not Found in Group Name",
                                         G->name.c_str(),
-                                        dev_pv_str.c_str(),
+                                        this->m_device_pv_str.c_str(),
                                         patt_str.c_str() );
                                     // give syslog a chance...
                                     usleep(30000);
@@ -1493,7 +1684,7 @@ private:
                                         "[%i] %s %s as %s \"%s\" %s",
                                         g_pid,
                                         "Indexed Group Name Found for",
-                                        dev_pv_str.c_str(),
+                                        this->m_device_pv_str.c_str(),
                                         "Group", indexedName.c_str(),
                                         patt_str.c_str() );
                                     // give syslog a chance...
@@ -1510,7 +1701,7 @@ private:
                                     "[%i] %s %s %s in %s \"%s\" %s",
                                     g_pid, "STS Error:",
                                     "No Index Found for",
-                                    dev_pv_str.c_str(),
+                                    this->m_device_pv_str.c_str(),
                                     "Group", G->name.c_str(),
                                     patt_str.c_str() );
                                 // give syslog a chance...
@@ -1519,7 +1710,7 @@ private:
                                 continue;
                             }
 
-                            // Create Group if Not Yet Created...
+                            // Create Group If Not Yet Created...
                             if ( G->createdIndices.find( indexedName )
                                     == G->createdIndices.end() )
                             {
@@ -1535,8 +1726,8 @@ private:
                                         << " Provided in RunInfo"
                                         << " - Skipping Indexed Group"
                                         << " \"" << indexedName << "\""
-                                        << " for " << device_str
-                                        << " " << pv_str;
+                                        << " for "
+                                        << this->m_device_pv_str;
                                     syslog( LOG_ERR,
                                         "[%i] %s %s, %s=[%s] %s=[%s]",
                                         g_pid, "STS Error:",
@@ -1549,17 +1740,42 @@ private:
                                     continue;
                                 }
 
-                                syslog( LOG_INFO,
-                                    "[%i] %s \"%s\", %s=[%s] %s=[%s]",
-                                    g_pid,
-                                    "Creating Indexed Group",
-                                    indexedName.c_str(),
-                                    "path", group_path.c_str(),
-                                    "type", G->type.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                // Allow Group Elements to Be Created
+                                // Directly in Top-Level DASlogs Group...
+                                // (Just Skip Creating the Group Though!)
+                                if ( ! group_path.compare(
+                                        m_nxgen.m_daslogs_path ) )
+                                {
+                                    std::stringstream ss;
+                                    ss << "Skip Creation of Indexed Group"
+                                        << " for Top-Level DASlogs Usage"
+                                        << " - \"" << indexedName << "\""
+                                        << " for "
+                                        << this->m_device_pv_str;
+                                    syslog( LOG_INFO,
+                                        "[%i] %s, %s=[%s] %s=[%s]",
+                                        g_pid, ss.str().c_str(),
+                                        "path", group_path.c_str(),
+                                        "type", G->type.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
 
-                                m_nxgen.makeGroup( group_path, G->type );
+                                else
+                                {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s \"%s\", %s=[%s] %s=[%s]",
+                                        g_pid,
+                                        "Creating Indexed Group",
+                                        indexedName.c_str(),
+                                        "path", group_path.c_str(),
+                                        "type", G->type.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    m_nxgen.makeGroup( group_path,
+                                        G->type );
+                                }
 
                                 G->createdIndices.insert( indexedName );
                             }
@@ -1585,8 +1801,8 @@ private:
                                         << " Provided in RunInfo"
                                         << " - Skipping Group"
                                         << " \"" << G->name << "\""
-                                        << " for " << device_str
-                                        << " " << pv_str;
+                                        << " for "
+                                        << this->m_device_pv_str;
                                     syslog( LOG_ERR,
                                         "[%i] %s %s, %s=[%s] %s=[%s]",
                                         g_pid, "STS Error:",
@@ -1599,16 +1815,41 @@ private:
                                     continue;
                                 }
 
-                                syslog( LOG_INFO,
-                                    "[%i] %s \"%s\", %s=[%s] %s=[%s]",
-                                    g_pid,
-                                    "Creating Group", G->name.c_str(),
-                                    "path", group_path.c_str(),
-                                    "type", G->type.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                // Allow Group Elements to Be Created
+                                // Directly in Top-Level DASlogs Group...
+                                // (Just Skip Creating the Group Though!)
+                                if ( ! group_path.compare(
+                                        m_nxgen.m_daslogs_path ) )
+                                {
+                                    std::stringstream ss;
+                                    ss << "Skip Creation of Group"
+                                        << " for Top-Level DASlogs Usage"
+                                        << " - \"" << G->name << "\""
+                                        << " for "
+                                        << this->m_device_pv_str;
+                                    syslog( LOG_INFO,
+                                        "[%i] %s, %s=[%s] %s=[%s]",
+                                        g_pid, ss.str().c_str(),
+                                        "path", group_path.c_str(),
+                                        "type", G->type.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
 
-                                m_nxgen.makeGroup( group_path, G->type );
+                                else
+                                {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s \"%s\", %s=[%s] %s=[%s]",
+                                        g_pid,
+                                        "Creating Group", G->name.c_str(),
+                                        "path", group_path.c_str(),
+                                        "type", G->type.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    m_nxgen.makeGroup( group_path,
+                                        G->type );
+                                }
 
                                 G->created = true;
                             }
@@ -1835,7 +2076,7 @@ private:
                             syslog( LOG_INFO,
                                 "[%i] %s %s in %s \"%s\" %s, %s \"%s\"",
                                 g_pid, "Pattern Match for",
-                                dev_pv_str.c_str(),
+                                this->m_device_pv_str.c_str(),
                                 "Group", G->name.c_str(),
                                 units_patt_str.c_str(),
                                 "Capturing Units Value as",
@@ -1853,7 +2094,8 @@ private:
                                 g_pid, "STS Error:",
                                 "*** DUPLICATE Element Units Value for",
                                 units_patt_str.c_str(),
-                                "Ignoring", dev_pv_str.c_str() );
+                                "Ignoring",
+                                this->m_device_pv_str.c_str() );
                             // give syslog a chance...
                             usleep(30000);
                         }
@@ -1863,15 +2105,11 @@ private:
         }
 
         /// Search STS Config for Associated Groups & Create...
-        void createSTSConfigGroups
-        (
-            std::string device_str, ///< Device String
-            std::string pv_str      ///< PV String
-        )
+        void createSTSConfigGroups()
         {
             // REMOVE ME...
-            //syslog( LOG_INFO, "[%i] Checking %s %s for %s",
-                //g_pid, device_str.c_str(), pv_str.c_str(),
+            //syslog( LOG_INFO, "[%i] Checking %s for %s",
+                //g_pid, this->m_device_pv_str.c_str(),
                 //"Config Group Membership..." );
             //usleep(30000); // give syslog a chance...
 
@@ -1883,7 +2121,7 @@ private:
 
                 // Check for Element Pattern Matches...
                 createSTSConfigGroupMatchingElements(
-                    G, G->elements, device_str, pv_str, "" );
+                    G, G->elements, "" );
 
                 // Skip Conditional Value Checks if No PV Values Set...
                 if ( !(this->m_last_value_set) )
@@ -1922,9 +2160,9 @@ private:
                         {
                             // REMOVE ME...
                             syslog( LOG_INFO,
-                        "[%i] %s %s %s in %s \"%s\" %s \"%s\" %s \"%s\"",
+                            "[%i] %s %s in %s \"%s\" %s \"%s\" %s \"%s\"",
                                 g_pid, "Pattern Match for",
-                                device_str.c_str(), pv_str.c_str(),
+                                this->m_device_pv_str.c_str(),
                                 "Group", G->name.c_str(),
                                 "Conditional", C->name.c_str(),
                                 "Pattern", P.c_str());
@@ -1950,9 +2188,9 @@ private:
                                 info += "\"" + C->name + "\"";
                                 info += " Set to True for";
                                 syslog( LOG_INFO,
-                                    "[%i] %s %s %s in %s \"%s\" %s \"%s\"",
+                                    "[%i] %s %s in %s \"%s\" %s \"%s\"",
                                     g_pid, info.c_str(),
-                                    device_str.c_str(), pv_str.c_str(),
+                                    this->m_device_pv_str.c_str(),
                                     "Group", G->name.c_str(),
                                     "Conditional Pattern", P.c_str());
                                 // give syslog a chance...
@@ -1978,19 +2216,11 @@ private:
 
             try
             {
-                std::stringstream device_ss;
-                device_ss << "Device " << this->m_device_name
-                    << " (id=" << this->m_device_id << ")";
-                std::string device_str = device_ss.str();
-
-                std::string pv_str = "PV ";
-                pv_str += this->m_internal_name.c_str();
-
                 // Search for Activated STS Config Conditional Groups
 
                 // REMOVE ME...
-                //syslog( LOG_INFO, "[%i] Checking %s %s for %s",
-                    //g_pid, device_str.c_str(), pv_str.c_str(),
+                //syslog( LOG_INFO, "[%i] Checking %s for %s",
+                    //g_pid, this->m_device_pv_str.c_str(),
                     //"STS Config Conditional Group Membership..." );
                 //usleep(30000); // give syslog a chance...
 
@@ -2020,8 +2250,7 @@ private:
                             std::string label = "Condition ";
                             label += "\"" + C->name + "\" ";
                             createSTSConfigGroupMatchingElements(
-                                G, C->elements, device_str, pv_str,
-                                label );
+                                G, C->elements, label );
                         }
                     }
                 }
@@ -2047,6 +2276,7 @@ private:
                         m_value_enum_strings;   ///< Vector of Enumerated Type Value Strings
         uint32_t        m_value_enum_strings_max_len;   ///< Max Length of Enumerated Type Value Strings
         uint32_t        m_value_enum_strings_not_found;   ///< Number of Enumerated Type Value Strings Not Found
+        bool            m_finalized;    ///< Flag to Indicate PV Log has been Finalized
     };
 
     // Nexus Marker types should correspond to ADARA marker types, but we want to
@@ -2083,7 +2313,8 @@ public:
 protected:
 
     void                initialize(void);
-    void                finalize( const STS::RunMetrics &a_run_metrics );
+    void                finalize( const STS::RunMetrics &a_run_metrics,
+                            const STS::RunInfo &a_run_info );
     STS::PVInfoBase*    makePVInfo( const std::string &a_device_name,
                             const std::string &a_name,
                             const std::string &a_connection,
@@ -2095,7 +2326,7 @@ protected:
                             uint32_t a_enum_index,
                             const std::string &a_units,
                             bool a_ignore );
-    STS::BankInfo*      makeBankInfo( uint16_t a_id,
+    STS::BankInfo*      makeBankInfo( uint16_t a_id, uint32_t a_state,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve );
     void                initializeNxBank( NxBankInfo *a_bi,
@@ -2174,6 +2405,9 @@ private:
     void                writeString( const std::string &a_path,
                             const std::string &a_dataset,
                             const std::string &a_value );
+    void                checkDataset( const std::string &a_path,
+                            const std::string &a_dataset,
+                            bool &a_exists );
     void                writeStringAttribute( const std::string &a_path,
                             const std::string &a_attrib,
                             const std::string &a_value );
@@ -2277,6 +2511,7 @@ private:
     std::string         m_daslogs_path;         ///< Path to Nexus DAS Logs
     std::string         m_daslogs_freq_path;    ///< Path to Nexus Frequency DAS Log
     std::string         m_daslogs_pchg_path;    ///< Path to Nexus Proton Charge DAS Log
+    std::string         m_software_path;        ///< Path to Software Provenance Collection
     std::string         m_pid_name;             ///< Name of PID data in Nexus file
     std::string         m_tof_name;             ///< Name of TOF data in Nexus file
     std::string         m_index_name;           ///< Name of Event Index data in Nexus file
@@ -2306,7 +2541,7 @@ private:
     uint64_t                    m_total_counts;         /// Total Run Event Counts
     uint64_t                    m_total_uncounts;       /// Total Run Event Uncounts
     uint64_t                    m_total_non_counts;     /// Total Run Event Non-Counts (Monitor)
-    struct timespec             m_sts_start_time;       /// STS Start of Processing Time
+    struct timespec             m_sts_run_start_time;   /// STS Start of Processing Time
 };
 
 #endif // NXGEN_H

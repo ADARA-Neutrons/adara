@@ -443,8 +443,6 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		return S_casApp_noSupport;
 
 	if (m_ctrl->setRecording(v)) {
-		notify();
-		changed();
 		return S_casApp_success;
 	}
 

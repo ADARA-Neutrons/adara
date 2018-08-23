@@ -139,6 +139,7 @@ public:
         m_pulse_pcharge_uncorrected = 0;
         m_got_metadata_count        = 0;
         m_got_neutrons_count        = 0;
+        m_has_states_count          = 0;
         m_total_pulses_count        = 0;
     }
 
@@ -153,6 +154,7 @@ public:
     uint32_t        m_pulse_pcharge_uncorrected;
     uint32_t        m_got_metadata_count;
     uint32_t        m_got_neutrons_count;
+    uint32_t        m_has_states_count;
     uint32_t        m_total_pulses_count;
 };
 

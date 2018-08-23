@@ -297,6 +297,35 @@ BankedEventPkt::BankedEventPkt(const BankedEventPkt &pkt) :
 
 /* -------------------------------------------------------------------- */
 
+BankedEventStatePkt::BankedEventStatePkt(
+		const uint8_t *data, uint32_t len) :
+	Packet(data, len), m_fields((const uint32_t *)payload())
+{
+	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " BankedEventState V0 packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version > ADARA::PacketType::BANKED_EVENT_STATE_VERSION
+			&& m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer BankedEventState packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+}
+
+BankedEventStatePkt::BankedEventStatePkt(const BankedEventStatePkt &pkt) :
+	Packet(pkt), m_fields((const uint32_t *)payload())
+{}
+
+/* -------------------------------------------------------------------- */
+
 BeamMonitorPkt::BeamMonitorPkt(const uint8_t *data, uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
 {

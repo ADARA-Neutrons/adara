@@ -84,6 +84,12 @@ bool SMSControl::m_notesCommentAutoReset;
 
 uint32_t SMSControl::m_intermittentDataThreshold;
 
+uint32_t SMSControl::m_neutronEventStateBits;
+uint32_t SMSControl::m_neutronEventStateMask;
+bool SMSControl::m_neutronEventSortByState;
+
+bool SMSControl::m_ignoreInterleavedSawtooth;
+
 class PopPulseBufferPV : public smsInt32PV {
 public:
 	PopPulseBufferPV(const std::string &name) :
@@ -224,6 +230,31 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	INFO("Setting Intermittent Data Threshold to "
 		<< m_intermittentDataThreshold << ".");
 
+	m_neutronEventStateBits =
+			conf.get<uint32_t>("sms.neutron_event_state_bits", 0);
+	INFO("Setting Neutron Event State Bits to "
+		<< m_neutronEventStateBits << "."
+		<< ( (m_neutronEventStateBits > 0) ? " STATES ACTIVATED!" : "" ) );
+
+	// Set Neutron Event State Mask Based on Number of Bits...
+	if ( m_neutronEventStateBits > 0 ) {
+		m_neutronEventStateMask =
+			( ((uint32_t) -1) << (28 - m_neutronEventStateBits) )
+				& 0x0FFFFFFF;
+		INFO("Setting Neutron Event State Mask to 0x"
+			<< std::hex << m_neutronEventStateMask << std::dec << ".");
+	}
+
+	m_neutronEventSortByState =
+			conf.get<bool>("sms.neutron_event_sort_by_state", false);
+	INFO("Setting Neutron Event Sort By State to "
+		<< m_neutronEventSortByState << ".");
+
+	m_ignoreInterleavedSawtooth =
+		conf.get<bool>("sms.ignore_interleaved_sawtooth", true);
+	INFO("Setting Ignore-Interleaved-Global-SAWTOOTH Flag to "
+		<< ( ( m_ignoreInterleavedSawtooth ) ? "True" : "False" ));
+
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
 	if (!m_beamlineShortName.length())
@@ -307,6 +338,7 @@ void SMSControl::addSource(const std::string &name,
 	uint32_t data_timeout_retry;
 	unsigned int chunk_size;
 	bool ignore_eop;
+	bool ignore_local_sawtooth;
 	bool mixed_data_packets;
 	uint32_t rtdlNoDataThresh;
 	bool save_input_stream;
@@ -336,6 +368,7 @@ void SMSControl::addSource(const std::string &name,
 	data_timeout = info.get<double>("data_timeout", 3.0);
 	data_timeout_retry = info.get<uint32_t>("data_timeout_retry", 3);
 	ignore_eop = info.get<bool>("ignore_eop", false);
+	ignore_local_sawtooth = info.get<bool>("ignore_local_sawtooth", false);
 	mixed_data_packets = info.get<bool>("mixed_data_packets", false);
 	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
 	save_input_stream = info.get<bool>("save_input_stream", false);
@@ -352,6 +385,13 @@ void SMSControl::addSource(const std::string &name,
 	if (ignore_eop) {
 		DEBUG("Ignore-EOP Flag Set to True for " << name
 			<< " - Self Synchronizing Pulses!");
+	}
+
+	// Should probably let someone know if we're gonna
+	// Ignore Local SAWTOOTH Time Inconsistencies for this Data Source...
+	if (ignore_local_sawtooth) {
+		DEBUG("Ignore-Local-SAWTOOTH Flag Set to True for " << name
+			<< " - Ignoring Out-of-Time-Order Pulse Times!");
 	}
 
 	// Should probably let someone know if we're Mixing Data Packets
@@ -379,6 +419,7 @@ void SMSControl::addSource(const std::string &name,
 							 data_timeout,
 							 data_timeout_retry,
 							 ignore_eop,
+							 ignore_local_sawtooth,
 							 mixed_data_packets,
 							 chunk_size,
 							 rtdlNoDataThresh,
@@ -458,6 +499,21 @@ SMSControl::SMSControl() :
 							+ "IntermittentDataThreshold", 0, INT32_MAX,
 						/* AutoSave */ true));
 
+	m_pvNeutronEventStateBits = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "NeutronEventStateBits", 0, INT32_MAX,
+						/* AutoSave */ true));
+
+	m_pvNeutronEventSortByState = boost::shared_ptr<smsBooleanPV>(new
+						smsBooleanPV(prefix + ":Control:"
+							+ "NeutronEventSortByState",
+						/* AutoSave */ true));
+
+	m_pvIgnoreInterleavedSawtooth = boost::shared_ptr<smsBooleanPV>(new
+						smsBooleanPV(prefix + ":Control:"
+							+ "IgnoreInterleavedGlobalSAWTOOTH",
+						/* AutoSave */ true));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -482,6 +538,9 @@ SMSControl::SMSControl() :
 	addPV(m_pvDoPulsePchgCorrect);
 	addPV(m_pvDoPulseVetoCorrect);
 	addPV(m_pvIntermittentDataThreshold);
+	addPV(m_pvNeutronEventStateBits);
+	addPV(m_pvNeutronEventSortByState);
+	addPV(m_pvIgnoreInterleavedSawtooth);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
 	addPV(m_pvCleanShutdown);
@@ -535,9 +594,19 @@ SMSControl::SMSControl() :
 	m_pvDoPulsePchgCorrect->update(m_doPulsePchgCorrect, &now);
 	m_pvDoPulseVetoCorrect->update(m_doPulseVetoCorrect, &now);
 
-	// Initialize Intermittent Data	Threshold...
+	// Initialize Intermittent Data	Threshold PV...
 	m_pvIntermittentDataThreshold->update(
 		m_intermittentDataThreshold, &now);
+
+	// Initialize Neutron Event State Bits PV...
+	m_pvNeutronEventStateBits->update( m_neutronEventStateBits, &now);
+
+	// Initialize Neutron Event Sort By State PV...
+	m_pvNeutronEventSortByState->update( m_neutronEventSortByState, &now);
+
+	// Initialize Ignore Interleaved-Global-SAWTOOTH Flag...
+	m_pvIgnoreInterleavedSawtooth->update(
+		m_ignoreInterleavedSawtooth, &now );
 
 	// Initialize Fast "Last Pulse" Lookup...
 	PulseIdentifier m_lastPid(-1,-1);
@@ -585,6 +654,33 @@ SMSControl::SMSControl() :
 			m_pvIntermittentDataThreshold->getName(), uvalue, ts ) ) {
 		m_intermittentDataThreshold = uvalue;
 		m_pvIntermittentDataThreshold->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvNeutronEventStateBits->getName(), uvalue, ts ) ) {
+		m_neutronEventStateBits = uvalue;
+		m_pvNeutronEventStateBits->update(uvalue, &ts);
+
+		// Set Neutron Event State Mask Based on Number of Bits...
+		if ( m_neutronEventStateBits > 0 ) {
+			m_neutronEventStateMask =
+				( ((uint32_t) -1) << (28 - m_neutronEventStateBits) )
+					& 0x0FFFFFFF;
+			INFO("Setting Neutron Event State Mask to 0x"
+				<< std::hex << m_neutronEventStateMask << std::dec << ".");
+		}
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvNeutronEventSortByState->getName(), bvalue, ts ) ) {
+		m_neutronEventSortByState = bvalue;
+		m_pvNeutronEventSortByState->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvIgnoreInterleavedSawtooth->getName(), bvalue, ts ) ) {
+		m_ignoreInterleavedSawtooth = bvalue;
+		m_pvIgnoreInterleavedSawtooth->update(bvalue, &ts);
 	}
 
 	// Initialize Next Run Number...
@@ -1233,9 +1329,19 @@ uint32_t SMSControl::registerEventSource(uint32_t srcId, uint32_t hwId)
 
 void SMSControl::unregisterEventSource(uint32_t srcId, uint32_t smsId)
 {
-	DEBUG( ( m_recording ? "[RECORDING] " : "" )
-		<< "unregisterEventSource(): srcId=" << srcId
-		<< " smsId=" << smsId );
+	// Safety Check... ;-b
+	if ( smsId == (uint32_t) -1 ) {
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterEventSource(): INVALID SMS ID SNUCK THRU:"
+			<< " srcId=" << srcId << " smsId=" << smsId
+			<< " - Skipping Unregister..." );
+		return;
+	}
+	else {
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterEventSource():"
+			<< " srcId=" << srcId << " smsId=" << smsId );
+	}
 
 	PulseMap::iterator it, last, last_minus_buffer, last_recorded;
 
@@ -1250,7 +1356,7 @@ void SMSControl::unregisterEventSource(uint32_t srcId, uint32_t smsId)
 	for ( it = m_pulses.begin(); it != m_pulses.end(); it++ ) {
 		// Release Now-Partial Pulses...
 		if ( it->second->m_pending[smsId] ) {
-			it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+			it->second->m_flags |= ADARA::PARTIAL_DATA;
 			it->second->m_pending.reset(smsId);
 			marked_partial++;
 		}
@@ -1343,7 +1449,7 @@ void SMSControl::unregisterEventSource(uint32_t srcId, uint32_t smsId)
 		// been Marked Complete; the Pulses are Insertion-Sorted in
 		// Pulse Time Order, so if This Pulse is Complete, then
 		// All Preceding Pulses Should Also Be...!
-		// (Even Any "Sawtooth" Pulses that arrived Out of Time Order, as
+		// (Even Any "SAWTOOTH" Pulses that arrived Out of Time Order, as
 		// These should be Correctly Handled by Sufficient Buffer Size!)
 
 		DEBUG( ( m_recording ? "[RECORDING] " : "" )
@@ -1521,6 +1627,8 @@ void SMSControl::popPulseBuffer(int32_t pulse_index)
 SMSControl::PulseMap::iterator SMSControl::getPulse(
 		uint64_t id, uint32_t dup)
 {
+	static uint32_t cnt = 0;
+
 	PulseIdentifier pid(id, dup);
 	PulseMap::iterator it;
 
@@ -1538,11 +1646,19 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		return it;
 	}
 
+	// Infrequently Check Live Control PV for
+	// Ignore-Interleaved-Global-SAWTOOTH Flag...
+	// (Once Per Minute...)
+	if ( !(++cnt % 3600) ) {
+		m_ignoreInterleavedSawtooth =
+			m_pvIgnoreInterleavedSawtooth->value();
+	}
+
 	// New Pulse...! If Any Pulses in list, Check for SAWTOOTH...
 	// Note: Map is _Already_ Sorted by Pulse Time (PulseIdentifier),
 	// so we can just grab Min and Max Time from the "ends" of the list
 	// to check for any SAWTOOTH Pulses... ;-b
-	if (m_pulses.begin() != m_pulses.end()) {
+	if ( m_pulses.begin() != m_pulses.end() ) {
 
 		// Get Min Pulse Time
 		it = m_pulses.begin();
@@ -1553,7 +1669,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		uint64_t max_id = it->first.first;
 
 		// Log any SAWTOOTH pulses... :-o
-		if (id < min_id) {
+		if ( id < min_id ) {
 			/* Rate-limited logging of Global SAWTOOTH Pulse */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
@@ -1567,8 +1683,9 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					<< " max=0x" << max_id << std::dec);
 			}
 		}
-		else if (id >= min_id && id < max_id) {
-			/* Rate-limited logging of Global SAWTOOTH Pulse */
+		else if ( !m_ignoreInterleavedSawtooth
+				&& id >= min_id && id < max_id ) {
+			/* Rate-limited logging of Interleaved Global SAWTOOTH Pulse */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_INTERLEAVED_GLOBAL_SAWTOOTH, "none",
@@ -1609,11 +1726,11 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	// By Default, All New Pulses Have Yet to Have Their
 	// Proton Charge or Veto Flags Corrected...
 	// (Each Proton Charge/Veto Flag Usually Refers to *Previous* Pulse!)
-	new_pulse->m_flags |= ADARA::BankedEventPkt::PCHARGE_UNCORRECTED;
-	new_pulse->m_flags |= ADARA::BankedEventPkt::VETO_UNCORRECTED;
+	new_pulse->m_flags |= ADARA::PCHARGE_UNCORRECTED;
+	new_pulse->m_flags |= ADARA::VETO_UNCORRECTED;
 
 	if (dup)
-		new_pulse->m_flags |= ADARA::BankedEventPkt::DUPLICATE_PULSE;
+		new_pulse->m_flags |= ADARA::DUPLICATE_PULSE;
 
 	// [LESS FREQUENTLY] Check for Internal Pulse Buffer Size Overflow...
 	// (Happens when One or More of Multiple Event Sources suddenly
@@ -1623,12 +1740,11 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	// Some Pulses from Our Internal Pulse Buffer, so we Don't Swell Up
 	// and Pop...! ;-D
 
-	static uint32_t cnt = 0;
-
 	// Once Per Second...
 	uint32_t freq = 60;
 
-	if ( !(++cnt % freq) )
+	// ("cnt" already incremented above... :-)
+	if ( !(cnt % freq) )
 	{
 		// Update Max Pulse Buffer Size from PV...
 		m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
@@ -1656,7 +1772,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 				// Pulse will Never be Made Complete, Mark as Partial...
 				if (it->second->m_pending.any()) {
 					it->second->m_flags |=
-						ADARA::BankedEventPkt::PARTIAL_DATA;
+						ADARA::PARTIAL_DATA;
 				}
 				// Correct Proton Charge...
 				// (This Pulse's PCharge comes from _Next_ Pulse...!)
@@ -1714,7 +1830,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	}
 
 	// *NOW* Record the New Pulse... ;-D
-	it = m_pulses.insert( make_pair( pid, new_pulse ) ).first;
+	it = m_pulses.insert( std::make_pair( pid, new_pulse ) ).first;
 
 	// Save Last Pulse & Iterator...
 	m_lastPid = pid;
@@ -2027,6 +2143,8 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		bool is_mapped, bool mixed_data_packets,
 		uint32_t &event_count, uint32_t &meta_count, uint32_t &err_count )
 {
+	static uint32_t cnt = 0;
+
 	PulsePtr &pulse = getPulse(pkt.pulseId(), dup)->second;
 
 	if (!pulse->m_rtdl) {
@@ -2048,9 +2166,8 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		/* One hopes that an optimizing compiler would remove
 		 * the unneeded constructions and copies...
 		 */
-		EventSource new_src(pkt.intraPulseTime(), pkt.tofField(),
-				m_maxBanks);
-		SourceMap::value_type val(hwId, new_src);
+		EventSource new_src( pkt.intraPulseTime(), pkt.tofField() );
+		SourceMap::value_type val( hwId, new_src );
 		src = pulse->m_pulseSources.insert(val).first;
 	}
 
@@ -2083,11 +2200,39 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		pulse->m_charge = pkt.pulseCharge();
 	}
 
+	// Infrequently Check Live Control PV for Neutron Event State Handling
+	// (Once Per Minute...)
+	if ( !(++cnt % 3600) ) {
+		uint32_t tmp = m_pvNeutronEventStateBits->value();
+		if ( tmp != m_neutronEventStateBits ) {
+			ERROR("pulseEvents(): Number of Neutron Event State Bits"
+				<< " has been Changed from " << m_neutronEventStateBits
+				<< " to " << tmp
+				<< ": STATES are Now "
+				<< ( (tmp > 0) ? "ACTIVATED" : "DEACTIVATED" ) );
+			m_neutronEventStateBits = tmp;
+
+			// Set Neutron Event State Mask Based on Number of Bits...
+			if ( m_neutronEventStateBits > 0 ) {
+				m_neutronEventStateMask =
+					( ((uint32_t) -1) << (28 - m_neutronEventStateBits) )
+						& 0x0FFFFFFF;
+				INFO("Setting Neutron Event State Mask to 0x"
+					<< std::hex << m_neutronEventStateMask << std::dec
+					<< ".");
+			}
+		}
+		m_neutronEventSortByState = m_pvNeutronEventSortByState->value();
+	}
+
 	ADARA::Event translated;
 	const ADARA::Event *events = pkt.events();
 	uint32_t i, count = pkt.num_events();
-	uint32_t phys, logical;
+	uint32_t phys, base_phys, logical;
+	uint32_t state;
 	uint16_t bank = 0;
+
+	BankMap::iterator bsit;
 
 	bool got_neutrons = false;
 	bool got_metadata = false;
@@ -2095,6 +2240,8 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	for (i=0; i < count; i++) {
 
 		phys = events[i].pixel;
+
+		state = 0;
 
 		switch (phys >> 28) {
 
@@ -2122,14 +2269,28 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				continue;
 
 			case 0: // Detector Event
+				// Strip Off Any State Bits and Decode State...
+				if ( m_neutronEventStateBits > 0 ) {
+					state = ( phys & m_neutronEventStateMask )
+						>> (28 - m_neutronEventStateBits);
+					base_phys = phys & (~m_neutronEventStateMask);
+					// DEBUG("pulseEvents(): PixelId 0x"
+						// << std::hex << phys
+						// << " Decodes to State 0x" << state
+						// << " and Base PixelId 0x" << base_phys
+						// << std::dec);
+				}
+				else {
+					base_phys = phys;
+				}
 				// Already Mapped to Logical PixelId at Data Source...!
 				if (is_mapped) {
 					// PixelId Already Is Logical...!
 					logical = phys;
 					// Just Lookup Bank from Logical PixelId...
-					if (m_pixelMap->mapEventBank(logical, bank)) {
+					if (m_pixelMap->mapEventBank(base_phys, bank)) {
 						pulse->m_flags |=
-							ADARA::BankedEventPkt::MAPPING_ERROR;
+							ADARA::MAPPING_ERROR;
 					}
 					bank += PixelMap::REAL_BANK_OFFSET;
 				}
@@ -2137,9 +2298,9 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				// Map Physical PixelId to Logical PixelId
 				// and Identify Detector Bank...
 				else {
-					if (m_pixelMap->mapEvent(phys, logical, bank)) {
+					if (m_pixelMap->mapEvent(base_phys, logical, bank)) {
 						pulse->m_flags |=
-							ADARA::BankedEventPkt::MAPPING_ERROR;
+							ADARA::MAPPING_ERROR;
 					}
 					bank += PixelMap::REAL_BANK_OFFSET;
 				}
@@ -2184,12 +2345,31 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					( PixelMap::ERROR_BANK + PixelMap::REAL_BANK_OFFSET );
 						// Bank Index = 0...! :-D
 
-				pulse->m_flags |= ADARA::BankedEventPkt::ERROR_PIXELS;
+				pulse->m_flags |= ADARA::ERROR_PIXELS;
 				err_count++;
 
 		} // switch (phys >> 28)
 
-		if (src->second.m_banks[bank].empty()) {
+		if ( state > 0 )
+			pulse->m_flags |= ADARA::HAS_STATES;
+
+		// If _Not_ Sorting Neutron Events By State,
+		// Then Clamp All Events to State=0...!
+		if ( !m_neutronEventSortByState )
+			state = 0;
+
+		// Get the BankMap Iterator for This Bank+State... (If It Exists)
+
+		BankIndex bsindex = std::make_pair( (uint32_t) bank, state );
+
+		bsit = src->second.m_banks.find( bsindex );
+
+		if ( bsit == src->second.m_banks.end() ) {
+
+			// Bank+State Entry Doesn't Yet Exist - Insert It! :-D
+			bsit = src->second.m_banks.insert(
+					std::make_pair( bsindex, EventVector() ) ).first;
+
 			/* pulse->m_numBanks will double count banks if
 			 * their events arrive via two different HW sources.
 			 * This is good, as we'll need the room in the packet
@@ -2198,12 +2378,14 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 			pulse->m_numBanks++;
 			src->second.m_activeBanks++;
 
-			src->second.m_banks[bank].reserve(m_bankReserve);
+			bsit->second.reserve(m_bankReserve);
 		}
 
 		translated.pixel = logical;
 		translated.tof = events[i].tof;
-		src->second.m_banks[bank].push_back(translated);
+
+		bsit->second.push_back(translated);
+
 		pulse->m_numEvents++;
 	}
 
@@ -2220,14 +2402,14 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				&& ( !got_metadata || mixed_data_packets ) )
 			|| ( pkt.gotDataFlags()
 				&& pkt.dataFlags() & ADARA::DataFlags::GOT_NEUTRONS ) ) {
-		pulse->m_flags |= ADARA::BankedEventPkt::GOT_NEUTRONS;
+		pulse->m_flags |= ADARA::GOT_NEUTRONS;
 	}
 	// Also Note the Presence of Meta-Data Events, for Completeness
 	if ( got_metadata
 			|| ( !pkt.gotDataFlags() && mixed_data_packets )
 			|| ( pkt.gotDataFlags()
 				&& pkt.dataFlags() & ADARA::DataFlags::GOT_METADATA ) ) {
-		pulse->m_flags |= ADARA::BankedEventPkt::GOT_METADATA;
+		pulse->m_flags |= ADARA::GOT_METADATA;
 	}
 }
 
@@ -2246,9 +2428,9 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 	//    Version 1+ RTDLPkt Packets...!
 	if ( pkt.gotDataFlags() ) {
 		if ( pkt.dataFlags() & ADARA::DataFlags::GOT_NEUTRONS )
-			pulse->m_flags |= ADARA::BankedEventPkt::GOT_NEUTRONS;
+			pulse->m_flags |= ADARA::GOT_NEUTRONS;
 		if ( pkt.dataFlags() & ADARA::DataFlags::GOT_METADATA )
-			pulse->m_flags |= ADARA::BankedEventPkt::GOT_METADATA;
+			pulse->m_flags |= ADARA::GOT_METADATA;
 	}
 
 	/* Save off information about this pulse for the incoming pulse.
@@ -2305,7 +2487,7 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 
 		// Mark Pulse "Partial" Because there's No Event Data,
 		// but then go ahead and mark it "Complete" to record it, lol...!
-		pulse->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+		pulse->m_flags |= ADARA::PARTIAL_DATA;
 		markComplete(pkt.pulseId(), dup, -1);
 	}
 }
@@ -2314,7 +2496,7 @@ void SMSControl::markPartial(uint64_t pulseId, uint32_t dup)
 {
 	PulsePtr &pulse = getPulse(pulseId, dup)->second;
 
-	pulse->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+	pulse->m_flags |= ADARA::PARTIAL_DATA;
 }
 
 void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
@@ -2423,7 +2605,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		for ( it = m_pulses.begin(); it != current; it++ ) {
 			// Release Now-Partial Pulses...
 			if ( it->second->m_pending[smsId] ) {
-				it->second->m_flags |= ADARA::BankedEventPkt::PARTIAL_DATA;
+				it->second->m_flags |= ADARA::PARTIAL_DATA;
 				it->second->m_pending.reset(smsId);
 				marked_partial++;
 			}
@@ -2534,7 +2716,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// been Marked Complete; the Pulses are Insertion-Sorted in
 	// Pulse Time Order, so if This Pulse is Complete, then
 	// All Preceding Pulses Should Also Be...!
-	// (Even Any "Sawtooth" Pulses that arrived Out of Time Order, as
+	// (Even Any "SAWTOOTH" Pulses that arrived Out of Time Order, as
 	// These should be Correctly Handled by Sufficient Buffer Size!)
 
 	// Include "Last Complete Pulse" (With Any Buffering Adjustments)
@@ -2625,7 +2807,7 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 		if ( m_doPulsePchgCorrect )
 		{
 			// Reset the Pulse Proton Charge Uncorrected Flag
-			pulse->m_flags &= ~ADARA::BankedEventPkt::PCHARGE_UNCORRECTED;
+			pulse->m_flags &= ~ADARA::PCHARGE_UNCORRECTED;
 
 			// Set the Pulse Charge from the Next Pulse...
 			// (Since We Don't Set a Pulse's Charge until pulseEvents(),
@@ -2640,7 +2822,7 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 		if ( m_doPulseVetoCorrect )
 		{
 			// Reset the Pulse Veto Flags Uncorrected Flag
-			pulse->m_flags &= ~ADARA::BankedEventPkt::VETO_UNCORRECTED;
+			pulse->m_flags &= ~ADARA::VETO_UNCORRECTED;
 
 			// Set the Veto Flags from the Next Pulse
 			pulse->m_vetoFlags = next_pulse->m_vetoFlags;
@@ -2758,7 +2940,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			}
 
 			// Always Mark Pulse as Missing RTDL if it Doesn't Have One!
-			pulse->m_flags |= ADARA::BankedEventPkt::MISSING_RTDL;
+			pulse->m_flags |= ADARA::MISSING_RTDL;
 		}
 
 		// Properly Set Veto Bit in Flags, Based on Timing Master Header
@@ -2776,12 +2958,20 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			}
 		}
 		if ( is_veto ) {
-			pulse->m_flags |= ADARA::BankedEventPkt::PULSE_VETO;
+			pulse->m_flags |= ADARA::PULSE_VETO;
 		}
 
 		// Build Various Packets for Pulse...
 		buildMonitorPacket(pulse);
-		buildBankedPacket(pulse);
+
+		// Choose Between Polarization State vs. "Normal" Banked Events...
+		if ( pulse->m_flags & ADARA::HAS_STATES ) {
+			buildBankedStatePacket(pulse);
+		}
+		else {
+			buildBankedPacket(pulse);
+		}
+
 		buildChopperPackets(pulse);
 		buildFastMetaPackets(pulse);
 	} catch (std::runtime_error e) {
@@ -2828,7 +3018,7 @@ void SMSControl::buildMonitorPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulse->m_id.first);
 
 	/* Beam monitor event header */
-	if ( pulse->m_flags & ADARA::BankedEventPkt::GOT_NEUTRONS ) {
+	if ( pulse->m_flags & ADARA::GOT_NEUTRONS ) {
 		// Count This Pulse's Proton Charge - We Got Neutrons! :-D
 		// (Or at least we could have gotten some... :-)
 		m_hdrs.push_back(pulse->m_charge);
@@ -2899,8 +3089,8 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 	m_hdrs.push_back(pulse->m_id.first >> 32);
 	m_hdrs.push_back(pulse->m_id.first);
 
-	/* Banked event header */
-	if ( pulse->m_flags & ADARA::BankedEventPkt::GOT_NEUTRONS ) {
+	/* Banked Event Header */
+	if ( pulse->m_flags & ADARA::GOT_NEUTRONS ) {
 		// Count This Pulse's Proton Charge - We Got Neutrons! :-D
 		// (Or at least we could have gotten some... :-)
 		m_hdrs.push_back(pulse->m_charge);
@@ -2932,14 +3122,16 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 		m_hdrs.push_back(src.m_tofField);
 		m_hdrs.push_back(src.m_activeBanks);
 
-		for (uint32_t i = 0; i < src.m_banks.size(); i++) {
-
-			if (src.m_banks[i].empty())
-				continue;
+		BankMap::iterator bsIt;
+		
+		for ( bsIt = src.m_banks.begin();
+				bsIt != src.m_banks.end() ; ++bsIt ) {
 
 			iov.iov_base = &m_hdrs.front() + m_hdrs.size();
 			iov.iov_len = 2 * sizeof(uint32_t);
 			m_iovec.push_back(iov);
+
+			uint32_t bank = bsIt->first.first;
 
 			// Because we're using Unsigned Integers, we'll translate:
 			//    - Error Pixels to Bank -2
@@ -2947,11 +3139,105 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 			//    - Unmapped Pixels to Bank -1
 			//       (PixelMap::UNMAPPED_BANK = 0xffff -> 0xffffffff)
 			// All other bank ids will get their real number.
-			m_hdrs.push_back(i - PixelMap::REAL_BANK_OFFSET);
-			m_hdrs.push_back(src.m_banks[i].size());
+			m_hdrs.push_back( bank - PixelMap::REAL_BANK_OFFSET );
+			m_hdrs.push_back( bsIt->second.size() );
 
-			iov.iov_base = &src.m_banks[i].front();
-			iov.iov_len = src.m_banks[i].size();
+			iov.iov_base = &(bsIt->second.front());
+			iov.iov_len = bsIt->second.size();
+			iov.iov_len *= sizeof(ADARA::Event);
+			m_iovec.push_back(iov);
+		}
+	}
+
+	StorageManager::addPacket(m_iovec);
+}
+
+void SMSControl::buildBankedStatePacket(PulsePtr &pulse)
+{
+	m_iovec.clear();
+	m_hdrs.clear();
+
+	uint32_t size = 1 + pulse->m_numBanks * 3;
+	size += pulse->m_pulseSources.size() * 4;
+	m_iovec.reserve(size);
+
+	/* IMPORTANT: m_hdrs must be correctly sized, as we use pointers
+	 * into the vector in the iovec(s) we submit to
+	 * StorageManager::addPacket(). No reallocation is allowed after
+	 * we've reserved the proper size.
+	 */
+	size = 8 + pulse->m_pulseSources.size() * 4;
+	size += pulse->m_numBanks * 3;
+	m_hdrs.reserve(size);
+
+	/* Common ADARA packet header */
+	size *= sizeof(uint32_t);
+	size += pulse->m_numEvents * sizeof(ADARA::Event);
+	size -= sizeof(ADARA::Header);
+	m_hdrs.push_back(size);
+	m_hdrs.push_back( ADARA_PKT_TYPE(
+		ADARA::PacketType::BANKED_EVENT_STATE_TYPE,
+		ADARA::PacketType::BANKED_EVENT_STATE_VERSION ) );
+	m_hdrs.push_back(pulse->m_id.first >> 32);
+	m_hdrs.push_back(pulse->m_id.first);
+
+	/* Banked State Event Header */
+	if ( pulse->m_flags & ADARA::GOT_NEUTRONS ) {
+		// Count This Pulse's Proton Charge - We Got Neutrons! :-D
+		// (Or at least we could have gotten some... :-)
+		m_hdrs.push_back(pulse->m_charge);
+	} else {
+		// No Neutrons This Pulse, Don't Count This Pulse's Proton Charge
+		m_hdrs.push_back((uint32_t) 0);
+	}
+	m_hdrs.push_back(pulseEnergy(pulse->m_ringPeriod));
+	m_hdrs.push_back(pulse->m_cycle);
+
+	uint32_t flags = ( pulse->m_flags & 0xfffff )
+		+ ( ( pulse->m_vetoFlags & 0xfff ) << 20 );
+	m_hdrs.push_back(flags);
+
+	struct iovec iov;
+	iov.iov_base = &m_hdrs.front();
+	iov.iov_len = m_hdrs.size() * sizeof(uint32_t);
+	m_iovec.push_back(iov);
+
+	SourceMap::iterator sIt, sEnd = pulse->m_pulseSources.end();
+	for (sIt = pulse->m_pulseSources.begin(); sIt != sEnd; sIt++) {
+		iov.iov_base = &m_hdrs.front() + m_hdrs.size();
+		iov.iov_len = 4 * sizeof(uint32_t);
+		m_iovec.push_back(iov);
+
+		EventSource &src = sIt->second;
+		m_hdrs.push_back(sIt->first);
+		m_hdrs.push_back(src.m_intraPulseTime);
+		m_hdrs.push_back(src.m_tofField);
+		m_hdrs.push_back(src.m_activeBanks);
+
+		BankMap::iterator bsIt;
+		
+		for ( bsIt = src.m_banks.begin();
+				bsIt != src.m_banks.end() ; ++bsIt ) {
+
+			iov.iov_base = &m_hdrs.front() + m_hdrs.size();
+			iov.iov_len = 3 * sizeof(uint32_t);
+			m_iovec.push_back(iov);
+
+			uint32_t bank = bsIt->first.first;
+			uint32_t state = bsIt->first.second;
+
+			// Because we're using Unsigned Integers, we'll translate:
+			//    - Error Pixels to Bank -2
+			//       (PixelMap::ERROR_BANK = 0xfffe -> 0xfffffffe)
+			//    - Unmapped Pixels to Bank -1
+			//       (PixelMap::UNMAPPED_BANK = 0xffff -> 0xffffffff)
+			// All other bank ids will get their real number.
+			m_hdrs.push_back( bank - PixelMap::REAL_BANK_OFFSET );
+			m_hdrs.push_back( state );
+			m_hdrs.push_back( bsIt->second.size() );
+
+			iov.iov_base = &(bsIt->second.front());
+			iov.iov_len = bsIt->second.size();
 			iov.iov_len *= sizeof(ADARA::Event);
 			m_iovec.push_back(iov);
 		}

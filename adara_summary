@@ -114,6 +114,7 @@ declare -A nHostSMSDDataSourceTimedOutRetry
 declare -A nHostSMSDBogusRTDLDistantPast
 declare -A nHostSMSDBogusRTDLDistantFuture
 declare -A nHostSMSDNoRTDLForPulse
+declare -A nHostSMSDMissingRTDLForProtonCharge
 declare -A nHostSMSDNoMorePulsesForCorrect
 declare -A nHostSMSDNewChopperId
 declare -A nHostSMSDChopperEventSync
@@ -261,6 +262,7 @@ PARSE_LOG()
 		nHostSMSDBogusRTDLDistantPast[$host]=0
 		nHostSMSDBogusRTDLDistantFuture[$host]=0
 		nHostSMSDNoRTDLForPulse[$host]=0
+		nHostSMSDMissingRTDLForProtonCharge[$host]=0
 		nHostSMSDNoMorePulsesForCorrect[$host]=0
 		nHostSMSDNewChopperId[$host]=0
 		nHostSMSDChopperEventSync[$host]=0
@@ -649,6 +651,13 @@ PARSE_LOG()
 			#echo "NO RTDL for Pulse..."
 			nHostSMSDNoRTDLForPulse[$host]=$(( \
 				nHostSMSDNoRTDLForPulse[$host] + 1 ))
+
+		# "Missing RTDL for Setting Proton Charge" Log
+		elif [[ "$log" =~ \
+			Missing${S}RTDL${S}for${S}Setting${S}Proton${S}Charge ]]; then
+			#echo "Missing RTDL for Setting Proton Charge..."
+			nHostSMSDMissingRTDLForProtonCharge[$host]=$(( \
+				nHostSMSDMissingRTDLForProtonCharge[$host] + 1 ))
 
 		# "No More Pulses for Proton Charge/Veto Flags Correction" Log
 		elif [[ "$log" =~ \
@@ -1390,6 +1399,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDNoRTDLForPulse[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDNoRTDLForPulse[$h]} "
 		echo "SMSD \"NO RTDL for Pulse\" Logs"
+	fi
+	if [[ ${nHostSMSDMissingRTDLForProtonCharge[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSMSDMissingRTDLForProtonCharge[$h]} "
+		echo "SMSD \"Missing RTDL for Setting Proton Charge\" Logs"
 	fi
 	if [[ ${nHostSMSDNewChopperId[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDNewChopperId[$h]} "

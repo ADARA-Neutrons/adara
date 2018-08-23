@@ -803,6 +803,8 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 	}
 }
 
+extern std::string SMSD_VERSION;
+
 bool RunInfo::generatePacket(void)
 {
 	if (m_packetValid)
@@ -815,7 +817,15 @@ bool RunInfo::generatePacket(void)
 		"xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\" "
 		"xsi:schemaLocation=\"http://public.sns.gov/schema/runinfo.xsd "
 		"http://public.sns.gov/schema/runinfo.xsd\">\n";
-	xml += "   <das_version>ADARA v0.1</das_version>\n";
+	xml += "   <das_version>ADARA SMS ";
+	xml += SMSD_VERSION;
+	xml += ", Common ";
+	xml += ADARA::VERSION;
+	xml += ", ComBus ";
+	xml += ADARA::ComBus::VERSION;
+	xml += ", Tag ";
+	xml += ADARA::TAG_NAME;
+	xml += "</das_version>\n";
 	xml += "   <facility_name>";
 	xml += m_facility;
 	xml += "</facility_name>\n";

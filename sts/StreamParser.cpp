@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <syslog.h>
 #include <time.h>
+#include "NxGen.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
 
@@ -21,7 +22,7 @@ RateLimitedLogging::History RLLHistory_StreamParserH;
 #define RLL_PV_VALUE_UPDATE_WEIRD            0
 #define RLL_PV_VALUE_UPDATE_SAWTOOTH         1
 #define RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP   2
-#define RLL_PV_VALUE_UPDATE_PURGE_EARLY      3
+#define RLL_PV_VALUE_UPDATE_EARLY            3
 
 /// This sets the size of the ADARA parser stream buffer in bytes
 #define ADARA_IN_BUF_SIZE   0x3000000  // For PixelMap!
@@ -67,7 +68,7 @@ StreamParser::StreamParser
 {
     // Capture Default Run "Start Time"...
     // (In case there are No Neutron Pulses, for Faking It...! ;-D)
-    clock_gettime( CLOCK_REALTIME, &m_default_start_time );
+    clock_gettime( CLOCK_REALTIME, &m_default_run_start_time );
 
     if ( !a_adara_out_file.empty() )
     {
@@ -88,10 +89,10 @@ StreamParser::~StreamParser()
     if ( m_ofs_adara.is_open() )
         m_ofs_adara.close();
 
-    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+    for ( BankInfoMap::iterator ibi = m_banks.begin();
             ibi != m_banks.end(); ++ibi ) {
-        if ( *ibi )
-            delete *ibi;
+        if ( ibi->second )
+            delete ibi->second;
     }
 
     for ( vector<STS::DetectorBankSet *>::iterator dbs =
@@ -108,21 +109,20 @@ StreamParser::~StreamParser()
 
     m_monitor_config.clear();
 
-    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
-            ipv != m_pvs_by_key.end(); ++ipv ) {
-        if ( ipv->second ) {
+    for ( vector<PVInfoBase*>::iterator ipv = m_pvs_list.begin();
+            ipv != m_pvs_list.end(); ++ipv ) {
+        if ( *ipv ) {
             if ( m_verbose ) {
                 syslog( LOG_ERR,
-                    "[%i] %s: Erasing %d.%d - Device %s: %s (%s)",
+                    "[%i] %s: Erasing Device %s: %s (%s)",
                     g_pid, "~StreamParser()",
-                    ipv->first.first, ipv->first.second,
-                    ipv->second->m_device_name.c_str(),
-                    ipv->second->m_name.c_str(),
-                    ipv->second->m_connection.c_str() );
+                    (*ipv)->m_device_name.c_str(),
+                    (*ipv)->m_name.c_str(),
+                    (*ipv)->m_connection.c_str() );
                 // give syslog a chance...
                 usleep(30000);
             }
-            delete ipv->second;
+            delete *ipv;
         }
     }
 }
@@ -186,7 +186,7 @@ StreamParser::processStream()
                             m_pulse_info.start_time
                                 + m_pulse_info.last_time,
                             "Stream processing terminated abnormally." );
-                        m_run_metrics.end_time = nsec_to_timespec(
+                        m_run_metrics.run_end_time = nsec_to_timespec(
                             m_pulse_info.start_time
                                 + m_pulse_info.last_time );
                         finalizeStreamProcessing();
@@ -363,6 +363,7 @@ StreamParser::rxPacket
 
         // These packets shall only be processed during event processing
         case ADARA::PacketType::BANKED_EVENT_TYPE:
+        case ADARA::PacketType::BANKED_EVENT_STATE_TYPE:
         case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
             PROCESS_IN_STATES(PROCESSING_EVENTS)
 
@@ -428,7 +429,7 @@ StreamParser::rxPacket
         {
             // Run "end time" is defined as time of last pulse
             // (which is nanoseconds epoch offset)
-            m_run_metrics.end_time = nsec_to_timespec(
+            m_run_metrics.run_end_time = nsec_to_timespec(
                 m_pulse_info.start_time + m_pulse_info.last_time );
 
             finalizeStreamProcessing();
@@ -484,6 +485,10 @@ StreamParser::rxPacket
     const ADARA::PixelMappingAltPkt &a_pkt     ///< [in] ADARA PixelMappingAltPkt object to process
 )
 {
+    BankInfoMap::iterator isi;
+
+    BankIndex bsindex;
+
     const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
     const uint32_t *epos = (const uint32_t *)
         ( a_pkt.mappingData() + a_pkt.payload_length()
@@ -505,8 +510,6 @@ StreamParser::rxPacket
     // reserve bank container storage
 
     uint16_t bank_count = (uint16_t) a_pkt.numBanks();
-
-    m_banks.resize( bank_count + 1, 0 );
 
     syslog( LOG_INFO, "[%i] %s: Max Bank = %u", g_pid,
         "PixelMappingAltPkt", bank_count );
@@ -547,24 +550,31 @@ StreamParser::rxPacket
             continue;
         }
 
+        // For Initial Creation of BankInfo Map, Just Do All as State=0...
+        bsindex = std::make_pair( (uint32_t) bank_id, 0 );
+
+        isi = m_banks.find( bsindex );
+
         // Create New BankInfo...
-        if ( !m_banks[bank_id] )
+        if ( isi == m_banks.end() )
         {
             // Create BankInfo Instance
-            m_banks[bank_id] = makeBankInfo( bank_id,
+            BankInfo *bi = makeBankInfo( bank_id, 0,
                 m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
             // Try to Associate Any Detector Bank Sets that
             // Contain This Bank Id...
-            m_banks[bank_id]->m_bank_sets =
+            bi->m_bank_sets =
                 getDetectorBankSets( static_cast<uint32_t>(bank_id) );
+
+            isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
         }
 
         // Append This Section's Logical PixelIds...
         const uint32_t *epos2 = rpos + pix_count;
         tot_pix_count += pix_count;
         while ( rpos < epos2 ) {
-            m_banks[bank_id]->m_logical_pixelids.push_back(*rpos++);
+            isi->second->m_logical_pixelids.push_back(*rpos++);
         }
 
         section_count++;
@@ -574,10 +584,50 @@ StreamParser::rxPacket
             // g_pid, "PixelMappingAltPkt", "Done with Section",
             // "bank_id", bank_id, "base_physical", base_physical,
             // "Last Logical PixelId",
-            // m_banks[bank_id]->m_logical_pixelids.back(),
-            // pix_count, m_banks[bank_id]->m_logical_pixelids.size() );
+            // isi->second->m_logical_pixelids.back(),
+            // pix_count, isi->second->m_logical_pixelids.size() );
         // usleep(30000); // give syslog a chance...
     }
+
+    // Also Add Unmapped and Error BankInfo to Map, as State=0...
+
+    // Unmapped BankInfo
+
+    bsindex = std::make_pair( (uint32_t) UNMAPPED_BANK, 0 );
+
+    isi = m_banks.find( bsindex );
+
+    // Create New BankInfo...
+    if ( isi == m_banks.end() )
+    {
+        // Create BankInfo Instance
+        BankInfo *bi = makeBankInfo( (uint16_t) UNMAPPED_BANK, 0,
+            m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+        // No Detector Bank Sets for Unmapped Bank...
+
+        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+    }
+
+    // Error BankInfo
+
+    bsindex = std::make_pair( (uint32_t) ERROR_BANK, 0 );
+
+    isi = m_banks.find( bsindex );
+
+    // Create New BankInfo...
+    if ( isi == m_banks.end() )
+    {
+        // Create BankInfo Instance
+        BankInfo *bi = makeBankInfo( (uint16_t) ERROR_BANK, 0,
+            m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+        // No Detector Bank Sets for Error Bank...
+
+        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+    }
+
+    // Done
 
     syslog( LOG_INFO,
         "[%i] %s: %s, PixelIds Tot=%u Skip=%u, Sections Tot=%u Skip=%u",
@@ -609,6 +659,10 @@ StreamParser::rxPacket
     const ADARA::PixelMappingPkt &a_pkt     ///< [in] ADARA PixelMappingPkt object to process
 )
 {
+    BankInfoMap::iterator isi;
+
+    BankIndex bsindex;
+
     const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
     const uint32_t *epos = (const uint32_t *)
         ( a_pkt.mappingData() + a_pkt.payload_length() );
@@ -653,8 +707,6 @@ StreamParser::rxPacket
         rpos2 += pix_count;
     }
 
-    m_banks.resize( bank_count + 1, 0 );
-
     syslog( LOG_INFO,
         "[%i] %s: Max Bank = %u", g_pid, "PixelMappingPkt", bank_count );
     usleep(30000); // give syslog a chance...
@@ -675,35 +727,82 @@ StreamParser::rxPacket
             continue;
         }
 
+        // For Initial Creation of BankInfo Map, Just Do All as State=0...
+        bsindex = std::make_pair( (uint32_t) bank_id, 0 );
+
+        isi = m_banks.find( bsindex );
+
         // Create New BankInfo...
-        if ( !m_banks[bank_id] )
+        if ( isi == m_banks.end() )
         {
             // Create BankInfo Instance
-            m_banks[bank_id] = makeBankInfo( bank_id,
+            BankInfo *bi = makeBankInfo( bank_id, 0,
                 m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
             // Try to Associate Any Detector Bank Sets that
             // Contain This Bank Id...
-            m_banks[bank_id]->m_bank_sets =
+            bi->m_bank_sets =
                 getDetectorBankSets( static_cast<uint32_t>(bank_id) );
+
+            isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
         }
 
         // Append This Section's Logical PixelIds...
         for (uint32_t i=0 ; i < pix_count ; ++i)
         {
-            m_banks[bank_id]->m_logical_pixelids.push_back(
+            isi->second->m_logical_pixelids.push_back(
                 base_logical + i );
         }
 
         // syslog( LOG_INFO,
             // "[%i] %s: bank_id=%u base_logical=%u count=%u tot=%lu",
             // g_pid, "PixelMappingPkt", bank_id, base_logical, pix_count,
-            // m_banks[bank_id]->m_logical_pixelids.size() );
+            // isi->second->m_logical_pixelids.size() );
         // usleep(30000); // give syslog a chance...
 
         // Next Section
         rpos += pix_count;
     }
+
+    // Also Add Unmapped and Error BankInfo to Map, as State=0...
+
+    // Unmapped BankInfo
+
+    bsindex = std::make_pair( (uint32_t) UNMAPPED_BANK, 0 );
+
+    isi = m_banks.find( bsindex );
+
+    // Create New BankInfo...
+    if ( isi == m_banks.end() )
+    {
+        // Create BankInfo Instance
+        BankInfo *bi = makeBankInfo( (uint16_t) UNMAPPED_BANK, 0,
+            m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+        // No Detector Bank Sets for Unmapped Bank...
+
+        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+    }
+
+    // Error BankInfo
+
+    bsindex = std::make_pair( (uint32_t) ERROR_BANK, 0 );
+
+    isi = m_banks.find( bsindex );
+
+    // Create New BankInfo...
+    if ( isi == m_banks.end() )
+    {
+        // Create BankInfo Instance
+        BankInfo *bi = makeBankInfo( (uint16_t) ERROR_BANK, 0,
+            m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+        // No Detector Bank Sets for Error Bank...
+
+        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+    }
+
+    // Done
 
     // The receipt of a pixel mapping packet allows state to progress
     // to event processing
@@ -725,8 +824,10 @@ StreamParser::rxPacket
 /*! \brief This method processes Banked Event ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA Banked Event packets. The processPulseInfo() method is called by this method with the
- * pulse data attached to the received Banked Event packet. The payload of the Banked Event packet is parsed for neutron
+ * This method processes ADARA Banked Event packets.
+ * The processPulseInfo() method is called by this method with the
+ * pulse data attached to the received Banked Event packet.
+ * The payload of the Banked Event packet is parsed for neutron
  * events which are then handled by the processBankEvents() method.
  */
 bool
@@ -736,7 +837,7 @@ StreamParser::rxPacket
 )
 {
     // Ignore duplicate pulses
-    if ( a_pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE )
+    if ( a_pkt.flags() & ADARA::DUPLICATE_PULSE )
     {
         // Log Duplicate Pulse if it had Any Events...!
         uint32_t nbytes = a_pkt.payload_length() - 16;
@@ -808,7 +909,110 @@ StreamParser::rxPacket
         {
             bank_id = *rpos++;
             event_count = *rpos++;
-            processBankEvents( bank_id, event_count, rpos );
+            processBankEvents( bank_id, /* state */ 0, event_count, rpos );
+            rpos += event_count << 1;
+        }
+    }
+
+    return false;
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Banked Event State packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+/*! \brief This method processes Banked Event State ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA Banked Event State packets.
+ * The processPulseInfo() method is called by this method with the
+ * pulse data attached to the received Banked Event State packet.
+ * The payload of the Banked Event State packet is parsed for neutron
+ * events which are then handled by the processBankEvents() method.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::BankedEventStatePkt &a_pkt     ///< [in] ADARA BankedEventStatePkt object to process
+)
+{
+    // Ignore duplicate pulses
+    if ( a_pkt.flags() & ADARA::DUPLICATE_PULSE )
+    {
+        // Log Duplicate Pulse if it had Any Events...!
+        uint32_t nbytes = a_pkt.payload_length() - 16;
+        if ( nbytes > 16 ) // appears to be minimal "empty"-ish packet...
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %u.%09u with Events (%u %s) in %s - Ignoring!",
+                g_pid, "STS Error:", "Duplicate Pulse",
+                (uint32_t) a_pkt.timestamp().tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) a_pkt.timestamp().tv_nsec,
+                nbytes, "Payload Bytes",
+                "BankedEventStatePkt" );
+            usleep(30000); // give syslog a chance...
+        }
+        // Else Just Note the Dropped Duplicate Pulse
+        // (if for no other reason than diagnostics and testing :-)
+        else
+        {
+            syslog( LOG_INFO,
+                "[%i] %s %u.%09u (%u %s) in %s - Ignoring!",
+                g_pid, "Duplicate Pulse",
+                (uint32_t) a_pkt.timestamp().tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) a_pkt.timestamp().tv_nsec,
+                nbytes, "Payload Bytes",
+                "BankedEventStatePkt" );
+            usleep(30000); // give syslog a chance...
+        }
+        return false;
+    }
+
+    // Pulse flag should be 0 (no data processed yet) or 2 (monitor data processed)
+    // any other value indicates an error with SMS packet generation
+
+    if ( m_pulse_flag == 0 )
+    {
+        // First packet of new pulse - count it and set flag indicating it was counted
+        ++m_pulse_count;
+        m_pulse_flag |= 1;
+    }
+    else if ( m_pulse_flag == 2 )
+        m_pulse_flag = 0;
+    else
+        THROW_TRACE( ERR_UNEXPECTED_INPUT, "Invalid banked event state packet sequence received" )
+
+
+    processPulseInfo( a_pkt );
+
+    const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
+    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
+
+    rpos += 4; // Skip over pulse info
+
+    uint32_t source_id;
+    uint32_t bank_count;
+    uint32_t bank_id;
+    uint32_t state;
+    uint32_t event_count;
+
+    // Process banks per-source
+    while ( rpos < epos )
+    {
+        source_id = *rpos++;
+        rpos += 2; // TODO For now, skip over source-specific pulse info. Should eventually process this data
+        bank_count = *rpos++;
+
+        // Process events per-bank
+        while( bank_count-- )
+        {
+            bank_id = *rpos++;
+            state = *rpos++;
+            event_count = *rpos++;
+            processBankEvents( bank_id, state, event_count, rpos );
             rpos += event_count << 1;
         }
     }
@@ -855,6 +1059,8 @@ StreamParser::rxOversizePkt
 
         if ( hdr->base_type() == ADARA::PacketType::BANKED_EVENT_TYPE
                 || hdr->base_type()
+                    == ADARA::PacketType::BANKED_EVENT_STATE_TYPE
+                || hdr->base_type()
                     == ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE )
         {
             // Pulse flag should be 0 (no data processed yet) or 2 (monitor
@@ -867,7 +1073,9 @@ StreamParser::rxOversizePkt
                 // indicating it was counted
                 ++m_pulse_count;
                 if ( hdr->base_type()
-                        == ADARA::PacketType::BANKED_EVENT_TYPE )
+                        == ADARA::PacketType::BANKED_EVENT_TYPE
+                    || hdr->base_type()
+                        == ADARA::PacketType::BANKED_EVENT_STATE_TYPE )
                 {
                     m_pulse_flag |= 1;
                 }
@@ -877,8 +1085,10 @@ StreamParser::rxOversizePkt
                     m_pulse_flag |= 2;
                 }
             }
-            else if ( ( hdr->base_type()
+            else if ( ( ( hdr->base_type()
                             == ADARA::PacketType::BANKED_EVENT_TYPE
+                        || hdr->base_type()
+                            == ADARA::PacketType::BANKED_EVENT_STATE_TYPE )
                         && m_pulse_flag == 2 )
                     || ( hdr->base_type() ==
                             ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE
@@ -887,7 +1097,9 @@ StreamParser::rxOversizePkt
                 m_pulse_flag = 0;
             }
             else if ( hdr->base_type()
-                    == ADARA::PacketType::BANKED_EVENT_TYPE )
+                    == ADARA::PacketType::BANKED_EVENT_TYPE
+                || hdr->base_type()
+                    == ADARA::PacketType::BANKED_EVENT_STATE_TYPE )
             {
                 THROW_TRACE( ERR_UNEXPECTED_INPUT,
                     "Invalid banked event packet sequence received" )
@@ -970,7 +1182,79 @@ StreamParser::processPulseInfo
         // Freq stats ignores first point since it can't be calculated
 
         // Run "start time" is defined as time of first pulse
-        m_run_metrics.start_time = a_pkt.timestamp();
+        m_run_metrics.run_start_time = a_pkt.timestamp();
+    }
+
+    // Is is time to write pulse info?
+    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh )
+    {
+        pulseBuffersReady( m_pulse_info );
+
+        m_pulse_info.times.clear();
+        m_pulse_info.freqs.clear();
+        m_pulse_info.flags.clear();
+        m_pulse_info.charges.clear();
+    }
+}
+
+
+/*! \brief This method processes the neutron pulse data associated with a Banked Event State packet.
+ *
+ * This method accumulates pulse charge, time, and frequency data associated with a Banked Event State packet (the same but different from the Banked Event packet ;-D). The various
+ * data are collected in ancillary buffers until ready to be flushed to a subclassed stream adapter via the
+ * pulseBuffersReady() virtual method.
+ */
+void
+StreamParser::processPulseInfo
+(
+    const ADARA::BankedEventStatePkt &a_pkt      ///< [in] ADARA BankedEventStatePkt object to process
+)
+{
+    // accumulate pulse charge
+    double charge = a_pkt.pulseCharge()*10.0; // ADARA charge is in units of 10 pC
+    m_run_metrics.total_charge += charge;
+    m_pulse_info.charges.push_back( charge );
+    m_run_metrics.charge_stats.push( charge );
+
+    // Accumulate flags
+    m_pulse_info.flags.push_back( a_pkt.flags() );
+
+    // Handle time and frequency info
+    if ( m_pulse_info.start_time )
+    {
+        uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() );
+
+        // It is (or should be) considered a fatal error if
+        // pulse times are not monotonically increasing
+        if ( pulse_time < m_pulse_info.start_time )
+        {
+            syslog( LOG_INFO,
+                "[%i] Unexpected input: %s at pulse #%ld ID=0x%lx, %s.",
+                g_pid, "Pulse time went backwards",
+                m_pulse_info.times.size(), a_pkt.pulseId(),
+                "Clamping to zero" );
+            usleep(30000); // give syslog a chance...
+            pulse_time = 0;
+        }
+        else
+            pulse_time -= m_pulse_info.start_time;
+
+        m_pulse_info.times.push_back( pulse_time / NANO_PER_SECOND_D );
+        m_pulse_info.freqs.push_back( NANO_PER_SECOND_D
+            / ( pulse_time - m_pulse_info.last_time ) );
+        m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
+        m_pulse_info.last_time = pulse_time;
+    }
+    else
+    {
+        m_pulse_info.start_time = timespec_to_nsec( a_pkt.timestamp() );
+        m_pulse_info.last_time = 0;
+        m_pulse_info.times.push_back(0);
+        m_pulse_info.freqs.push_back(0);
+        // Freq stats ignores first point since it can't be calculated
+
+        // Run "start time" is defined as time of first pulse
+        m_run_metrics.run_start_time = a_pkt.timestamp();
     }
 
     // Is is time to write pulse info?
@@ -1001,14 +1285,74 @@ void
 StreamParser::processBankEvents
 (
     uint32_t        a_bank_id,        ///< [in] Bank ID of detector bank to be processed
+    uint32_t        a_state,          ///< [in] State of detector bank to be processed
     uint32_t        a_event_count,    ///< [in] Number of events contained in stream buffer
     const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
 )
 {
+    BankIndex bsindex = std::make_pair( a_bank_id, a_state );
+
+    BankInfoMap::iterator isi = m_banks.find( bsindex );
+
+    // No BankInfo for This Detector Bank ID/State Yet...?
+    if ( isi == m_banks.end() ) {
+
+        syslog( LOG_ERR,
+            "[%i] %s: No BankInfo Found for bank_id=%u state=%u",
+            g_pid, "StreamParser::processBankEvents()",
+            a_bank_id, a_state );
+        usleep(30000); // give syslog a chance...
+
+        // Search for the State=0 BankInfo...
+
+        BankIndex bsindex0 = std::make_pair( a_bank_id, 0 );
+
+        BankInfoMap::iterator isi0 = m_banks.find( bsindex0 );
+
+        // Valid State=0 Detector Bank ID...
+        if ( isi0 != m_banks.end() ) {
+
+            syslog( LOG_ERR,
+                "[%i] %s: Found State=0 BankInfo for bank_id=%u state=%u",
+                g_pid, "StreamParser::processBankEvents()",
+                a_bank_id, a_state );
+            usleep(30000); // give syslog a chance...
+
+            // Carefully "Clone" the Base State=0 BankInfo for This State
+
+            // Create BankInfo Instance
+            BankInfo *bi = makeBankInfo( a_bank_id, a_state,
+                m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+            // Try to Associate Any Detector Bank Sets that
+            // Contain This Bank Id...
+            bi->m_bank_sets =
+                getDetectorBankSets( static_cast<uint32_t>(a_bank_id) );
+
+            isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+
+            // Copy Any Saved Logical PixelIds for This Detector Bank...
+            isi->second->m_logical_pixelids =
+                isi0->second->m_logical_pixelids;
+
+            // Copy Any Saved Detector Bank Sets for This Detector Bank...
+            isi->second->m_bank_sets =
+                isi0->second->m_bank_sets;
+        }
+
+        else {
+            syslog( LOG_ERR,
+                "[%i] %s: No State=0 BankInfo Found! bank_id=%u state=%u",
+                g_pid, "StreamParser::processBankEvents()",
+                a_bank_id, a_state );
+            usleep(30000); // give syslog a chance...
+        }
+    }
+
     // Valid Detector Bank ID...
-    if ( a_bank_id < m_banks.size() )
+    if ( isi != m_banks.end() )
     {
-        BankInfo *bi = m_banks[a_bank_id];
+        BankInfo *bi = isi->second;
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
@@ -1084,7 +1428,10 @@ StreamParser::processBankEvents
                 bi->m_index_buffer.clear();
             }
 
-            m_run_metrics.events_counted += a_event_count;
+            if ( a_bank_id != UNMAPPED_BANK && a_bank_id != ERROR_BANK )
+                m_run_metrics.events_counted += a_event_count;
+            else
+                m_run_metrics.events_uncounted += a_event_count;
         }
 
         // Histogram-based Data Processing
@@ -1212,6 +1559,12 @@ StreamParser::processBankEvents
 
         }   // m_has_histo
 
+        // Collect Event Count Stats for Unmapped & Error Banks...!
+        if ( a_bank_id == UNMAPPED_BANK )
+            m_run_metrics.events_unmapped += a_event_count;
+        else if ( a_bank_id == ERROR_BANK )
+            m_run_metrics.events_error += a_event_count;
+
     }   // Valid Detector Bank ID...
 
     // Not a Valid Detector Bank ID...
@@ -1220,7 +1573,7 @@ StreamParser::processBankEvents
         // Add to Uncounted Events Count...
         m_run_metrics.events_uncounted += a_event_count;
 
-        // Also Add to Special Bank Ids Counts...
+        // Also Add to Special Bank Ids Counts... (REMOVE)
         if ( a_bank_id == UNMAPPED_BANK )
             m_run_metrics.events_unmapped += a_event_count;
         else if ( a_bank_id == ERROR_BANK )
@@ -1289,7 +1642,7 @@ StreamParser::rxPacket
 )
 {
     // Ignore duplicate pulses
-    if ( a_pkt.flags() & ADARA::BankedEventPkt::DUPLICATE_PULSE )
+    if ( a_pkt.flags() & ADARA::DUPLICATE_PULSE )
     {
         // Log Duplicate Pulse if it had Any Events...!
         uint32_t nevents = ( a_pkt.payload_length() / 4 ) - 4;
@@ -1629,6 +1982,11 @@ StreamParser::rxPacket
                         (const xmlChar*)"run_title" ) == 0 )
                 {
                     tmp_run_info.run_title = value;
+                }
+                else if (xmlStrcmp( node->name,
+                        (const xmlChar*) "das_version") == 0 )
+                {
+                    tmp_run_info.das_version = value;
                 }
                 else if (xmlStrcmp( node->name,
                         (const xmlChar*) "facility_name") == 0 )
@@ -2357,24 +2715,24 @@ StreamParser::associateDetectorBankSet
     // Look for Detector Banks that are Listed in This Set...
     //    - append to given BankInfo Bank Sets vector
 
-    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+    for ( BankInfoMap::iterator ibi = m_banks.begin();
             ibi != m_banks.end(); ++ibi )
     {
-        if ( !*ibi )
+        if ( !(ibi->second) )
             continue;
 
         for ( vector<uint32_t>::iterator b = a_bank_set->banklist.begin();
                 b != a_bank_set->banklist.end(); ++b )
         {
-            if ((*b) == (*ibi)->m_id)
+            if ( (*b) == ibi->second->m_id )
             {
                 syslog( LOG_INFO,
                     "[%i] %s: Bank Set \"%s\" Associated with Bank Id %d.",
                     g_pid, "StreamParser::associateDetectorBankSet()",
-                    a_bank_set->name.c_str(), (*ibi)->m_id );
+                    a_bank_set->name.c_str(), ibi->second->m_id );
                 usleep(30000); // give syslog a chance...
 
-                (*ibi)->m_bank_sets.push_back(a_bank_set);
+                ibi->second->m_bank_sets.push_back(a_bank_set);
             }
         }
     }
@@ -2434,7 +2792,7 @@ StreamParser::rxPacket
                     / NANO_PER_SECOND_D,
                 m_pulse_info.start_time + m_pulse_info.last_time,
                 "Stream processing terminated abnormally." );
-            m_run_metrics.end_time = nsec_to_timespec(
+            m_run_metrics.run_end_time = nsec_to_timespec(
                 m_pulse_info.start_time + m_pulse_info.last_time );
             finalizeStreamProcessing();
         }
@@ -2650,6 +3008,7 @@ StreamParser::rxPacket
                                 }
                             }
 
+                            // Found Enough Pieces to Make a Device/PV...!
                             if ( found == 7 )
                             {
                                 // Handle Various Name/Connection String
@@ -2690,7 +3049,7 @@ StreamParser::rxPacket
                                 // with the PV itself (name, type, units),
                                 // then the internal ID-to-name mapping
                                 // will be updated. However, if the type
-                                // or units of an previously defined PV
+                                // or units of a previously defined PV
                                 // ever change, then a new PV must be
                                 // dynamically created to prevent an error
                                 // in the Nexus output.
@@ -2731,33 +3090,43 @@ StreamParser::rxPacket
                                 // is a name conflict, the most recently
                                 // received definition will overwrite the
                                 // previous definition, and if value
-                                // updates are received for the
+                                // updates are received for the former
                                 // over-written definition, the STS will
                                 // throw an error.
 
                                 PVKey key(a_pkt.devId(),pv_id);
-                                map<PVKey,PVInfoBase*>::iterator ipv =
+                                map<PVKey,PVInfoBase*>::iterator ipk =
                                     m_pvs_by_key.find( key );
                                 map<string,PVKey>::iterator xref;
 
-                                if ( ipv == m_pvs_by_key.end() )
+                                // This is a NEW Device/PV Key...!
+                                if ( ipk == m_pvs_by_key.end() )
                                 {
-                                    // This is a NEW key - see if there is
-                                    // an existing entry (by dev:name)
-                                    // that matches this PV EXACTLY
+                                    // See if there is an existing
+                                    // Name XRef entry (by "dev:name:conn")
+                                    // that matches this PV EXACTLY...
 
                                     bool create = true;
-                                    xref = m_pv_name_xref.find(
+                                    xref = m_pvs_by_name_xref.find(
                                         dev_name + ":" + pv_name
                                             + ":" + pv_connection );
 
-                                    if ( xref != m_pv_name_xref.end() )
+                                    // Ok, We Found the Name XRef Entry
+                                    // for this Device/PV...
+                                    if ( xref != m_pvs_by_name_xref.end() )
                                     {
-                                        ipv = m_pvs_by_key.find(
+                                        // See if this XRef Points to a
+                                        // Valid PV-by-Key PVInfo Entry...
+                                        ipk = m_pvs_by_key.find(
                                             xref->second );
-                                        if ( ipv != m_pvs_by_key.end() )
+
+                                        // Yep, Found a PVInfo Instance...
+                                        if ( ipk != m_pvs_by_key.end() )
                                         {
-                                            if ( ipv->second->
+                                            // Does PVInfo Instance Match?
+                                            // If So, then the Device/PV
+                                            // Key was *Re-Numbered*...!
+                                            if ( ipk->second->
                                                 sameDefinition( dev_name,
                                                     pv_name,
                                                     pv_connection,
@@ -2769,8 +3138,10 @@ StreamParser::rxPacket
                                             {
                                                 // There is an existing
                                                 // PVInfo instance with
-                                                // EXACTLY the same
-                                                // definition.
+                                                // EXACTLY the same defn
+                                                // (yet with a Different
+                                                // Device/PV Key), i.e.
+                                                // it's been *Re-Numbered*.
                                                 // This will happen if
                                                 // PVSD restarts during
                                                 // a recording.
@@ -2779,11 +3150,18 @@ StreamParser::rxPacket
                                                 ss << "STS Error:"
                                                     << " PV ID Re-Numbered"
                                                     << " [Device "
-                                                    << dev_name
-                                                    << ": " << pv_name
+                                                    << ipk->second
+                                                        ->m_device_name
+                                                    << ": "
+                                                    << ipk->second->m_name
                                                     << " ("
-                                                    << pv_connection
+                                                    << ipk->second
+                                                        ->m_connection
                                                     << ")]"
+                                                    << " devId="
+                                                    << ipk->first.first
+                                                    << " pvId="
+                                                    << ipk->first.second
                                                     << " - Re-Use Existing"
                                                     << " Definition"
                                                     << " With New"
@@ -2796,45 +3174,51 @@ StreamParser::rxPacket
                                                 // give syslog a chance...
                                                 usleep(30000);
 
-                                                // Re-use this entry
+                                                // Re-Use this PVInfo Entry
                                                 create = false;
 
-                                                if ( m_verbose ) {
-                                                    stringstream ss2;
-                                                    ss2 << "Erasing Old "
-                                                        << ipv->first.first
-                                                        << "."
-                                                        << ipv->first
-                                                            .second
-                                                        << " - Device "
-                                                        << ipv->second
-                                                            ->m_device_name
-                                                        << ": "
-                                                        << ipv->second
-                                                            ->m_name
-                                                        << " ("
-                                                        << ipv->second
-                                                            ->m_connection
-                                                        << ")";
-                                                    syslog( LOG_ERR,
-                                                        "[%i] %s(%s): %s",
-                                                        g_pid,
-                                                        "rxPacket",
-                                                        "DeviceDescriptor",
-                                                        ss2.str().c_str()
-                                                    );
-                                                    // give syslog a chance
-                                                    usleep(30000);
-                                                }
-
-                                                // Update key mappings
+                                                // *ADD* Key Mapping from
+                                                // New Key to this Existing
+                                                // PVInfo Instance Entry...
                                                 m_pvs_by_key[key] =
-                                                    ipv->second;
-                                                m_pvs_by_key.erase( ipv );
+                                                    ipk->second;
 
-                                                // Update xref entry to
-                                                // point to new key
+                                                // Update Name XRef entry
+                                                // to point to New Key...
                                                 xref->second = key;
+
+                                                // *Don't* Erase Original
+                                                // Key Mapping Tho, Btw.
+                                                // Leave It Hanging Around
+                                                // for Any Straggling
+                                                // Variable Value Updates!
+
+                                                stringstream ss2;
+                                                ss2 << "NOTE:"
+                                                    << " Still Retaining"
+                                                    << " Original Mapping"
+                                                    << " to Device "
+                                                    << ipk->second
+                                                        ->m_device_name
+                                                    << ": "
+                                                    << ipk->second->m_name
+                                                    << " ("
+                                                    << ipk->second
+                                                        ->m_connection
+                                                    << ")"
+                                                    << " Under Former Key "
+                                                    << ipk->first.first
+                                                    << "."
+                                                    << ipk->first.second;
+                                                syslog( LOG_ERR,
+                                                    "[%i] %s(%s): %s",
+                                                    g_pid,
+                                                    "rxPacket",
+                                                    "DeviceDescriptor",
+                                                    ss2.str().c_str()
+                                                );
+                                                // give syslog a chance
+                                                usleep(30000);
                                             }
                                             else
                                             {
@@ -2849,19 +3233,23 @@ StreamParser::rxPacket
                                                 stringstream ss;
                                                 ss << "STS Error:"
                                                     << " PV ID Re-Defined"
-                                                    << " - Flush Values"
-                                                    << " for Former"
+                                                    << " - Former"
                                                     << " Definition"
                                                     << " [Device "
-                                                    << ipv->second
+                                                    << ipk->second
                                                         ->m_device_name
                                                     << ": "
-                                                    << ipv->second->m_name
+                                                    << ipk->second->m_name
                                                     << " ("
-                                                    << ipv->second
+                                                    << ipk->second
                                                         ->m_connection
-                                                    << ")],"
-                                                    << " Define New "
+                                                    << ")]"
+                                                    << " devId="
+                                                    << ipk->first.first
+                                                    << " pvId="
+                                                    << ipk->first.second
+                                                    << " Pushed Out of Way"
+                                                    << " by New"
                                                     << " [Device "
                                                     << dev_name
                                                     << ": " << pv_name
@@ -2877,48 +3265,112 @@ StreamParser::rxPacket
                                                 // give syslog a chance...
                                                 usleep(30000);
 
-                                                if ( m_verbose ) {
-                                                    stringstream ss2;
-                                                    ss2 << "Erasing Old "
-                                                        << ipv->first.first
-                                                        << "."
-                                                        << ipv->first
-                                                            .second
-                                                        << " - Device "
-                                                        << ipv->second
-                                                            ->m_device_name
-                                                        << ": "
-                                                        << ipv->second
-                                                            ->m_name
-                                                        << " ("
-                                                        << ipv->second
-                                                            ->m_connection
-                                                        << ")";
-                                                    syslog( LOG_ERR,
-                                                        "[%i] %s(%s): %s",
-                                                        g_pid,
-                                                        "rxPacket",
+                                                // Existing entry differs;
+                                                // *Don't* flush or delete
+                                                // old PVInfo entry, tho.
+                                                // Save it for later...
+                                                // (It could pop back up!)
+
+                                                // Now, Can We Find This
+                                                // PV's Definition in List,
+                                                // Already in Existence...?
+
+                                                bool found = false;
+
+                                                for ( vector<PVInfoBase*>
+                                                    ::iterator ipv =
+                                                        m_pvs_list.begin();
+                                                    ipv !=
+                                                        m_pvs_list.end();
+                                                    ++ipv )
+                                                {
+                                                    if ( (*ipv)->
+                                                        sameDefinition(
+                                                            dev_name,
+                                                            pv_name,
+                                                            pv_connection,
+                                                            pv_type,
+                                                            pv_enum_vector,
+                                                            pv_enum_index,
+                                                            pv_units,
+                                                            pv_ignore ) )
+                                                    {
+                                                        // Found Match!
+                                                        // Use Existing
+                                                        // PVInfo Instance
+                                                        // for New Key!
+
+                                                        stringstream ss2;
+                                                        ss2 << "Found"
+                                                            << " Exact"
+                                                            << " Match"
+                                                            << " With"
+                                                            << " Existing"
+                                                            << " PVInfo"
+                                                            << " - Re-Use"
+                                                            << " Device "
+                                                            << (*ipv)->
+                                                              m_device_name
+                                                            << ": "
+                                                            << (*ipv)->
+                                                                m_name
+                                                            << " ("
+                                                            << (*ipv)->
+                                                               m_connection
+                                                            << ")";
+                                                        syslog( LOG_ERR,
+                                                         "[%i] %s(%s): %s",
+                                                            g_pid,
+                                                            "rxPacket",
                                                         "DeviceDescriptor",
-                                                        ss2.str().c_str()
-                                                    );
-                                                    // give syslog a chance
-                                                    usleep(30000);
+                                                            ss2.str().
+                                                                c_str()
+                                                        );
+                                                        // give syslog
+                                                        // a chance...
+                                                        usleep(30000);
+
+                                                        // *Reset* Key
+                                                        // Mapping from
+                                                        // New Key to this
+                                                        // Existing PVInfo
+                                                        // Instance Entry
+                                                        m_pvs_by_key[key] =
+                                                            *ipv;
+
+                                                        // Update Name
+                                                        // XRef entry
+                                                        // to point to
+                                                        // New Key...
+                                                        xref->second = key;
+
+                                                        // Re-Use this
+                                                        // Existing PVInfo
+                                                        create = false;
+
+                                                        found = true;
+
+                                                        break;
+                                                    }
                                                 }
 
-                                                // Existing entry differs,
-                                                // flush and delete
-                                                // old entry
-                                                ipv->second->flushBuffers(
-                                                    0 );
-                                                delete ipv->second;
+                                                // No Matching PVInfo
+                                                // Found, Must Be New
+                                                // or Modified PV Defn...
+                                                if ( !found )
+                                                {
+                                                    // Just Update Maps
+                                                    // (Remove Old Key/Name
+                                                    // References...)
+                                                    m_pvs_by_key.erase(
+                                                        ipk );
+                                                    m_pvs_by_name_xref
+                                                        .erase( xref );
 
-                                                // Update maps
-                                                m_pvs_by_key.erase( ipv );
-                                                m_pv_name_xref.erase(
-                                                    xref );
-
-                                                // New PVInfo entry will
-                                                // be created below
+                                                    // New PVInfo entry
+                                                    // will be created
+                                                    // below...
+                                                }
                                             }
                                         }
                                         else
@@ -2948,7 +3400,98 @@ StreamParser::rxPacket
                                             usleep(30000);
 
                                             // Delete bad xref entry
-                                            m_pv_name_xref.erase( xref );
+                                            m_pvs_by_name_xref.erase(
+                                                xref );
+                                        }
+                                    }
+
+                                    // There's No Name XRef Entry
+                                    // for this Device/PV...
+                                    // So Must Be Totally New Key,
+                                    // No Record Of It Yet...
+                                    else
+                                    {
+                                        // Tho Perhaps Can We Find This
+                                        // PV's Definition in List,
+                                        // Already in Existence...?
+
+                                        for ( vector<PVInfoBase*>
+                                                ::iterator ipv =
+                                                    m_pvs_list.begin();
+                                                ipv !=
+                                                    m_pvs_list.end();
+                                                ++ipv )
+                                        {
+                                            if ( (*ipv)->
+                                                sameDefinition(
+                                                    dev_name,
+                                                    pv_name,
+                                                    pv_connection,
+                                                    pv_type,
+                                                    pv_enum_vector,
+                                                    pv_enum_index,
+                                                    pv_units,
+                                                    pv_ignore ) )
+                                            {
+                                                // Found Match!
+                                                // Use Existing PVInfo
+                                                // Instance for New Key!
+
+                                                stringstream ss2;
+                                                ss2 << "New Un-Used Key "
+                                                    << key.first
+                                                    << "."
+                                                    << key.second
+                                                    << ", But Found"
+                                                    << " Exact Match"
+                                                    << " With Existing"
+                                                    << " PVInfo"
+                                                    << " - Re-Use Device "
+                                                    << (*ipv)->
+                                                      m_device_name
+                                                    << ": "
+                                                    << (*ipv)->
+                                                        m_name
+                                                    << " ("
+                                                    << (*ipv)->
+                                                       m_connection
+                                                    << ")";
+                                                syslog( LOG_ERR,
+                                                    "[%i] %s(%s): %s",
+                                                    g_pid,
+                                                    "rxPacket",
+                                                    "DeviceDescriptor",
+                                                    ss2.str().
+                                                        c_str()
+                                                );
+                                                // give syslog a chance...
+                                                usleep(30000);
+
+                                                // *Reset* Key
+                                                // Mapping from
+                                                // New Key to this
+                                                // Existing PVInfo
+                                                // Instance Entry
+                                                m_pvs_by_key[key] =
+                                                    *ipv;
+
+                                                // Update Name
+                                                // XRef entry
+                                                // to point to
+                                                // New Key...
+                                                m_pvs_by_name_xref[
+                                                    dev_name + ":"
+                                                        + pv_name
+                                                        + ":"
+                                                        + pv_connection ]
+                                                    = key;
+
+                                                // Re-Use this
+                                                // Existing PVInfo
+                                                create = false;
+
+                                                break;
+                                            }
                                         }
                                     }
 
@@ -2990,15 +3533,18 @@ StreamParser::rxPacket
                                             // give syslog a chance...
                                             //usleep(30000);
 
+                                            m_pvs_list.push_back( info );
+
                                             m_pvs_by_key[key] = info;
-                                            m_pv_name_xref[
+
+                                            m_pvs_by_name_xref[
                                                 dev_name + ":" + pv_name
                                                     + ":" + pv_connection ]
                                                 = key;
 
                                             if ( m_verbose ) {
                                                 stringstream ss2;
-                                                ss2 << "Adding New "
+                                                ss2 << "Adding New Key "
                                                     << key.first
                                                     << "."
                                                     << key.second
@@ -3009,6 +3555,11 @@ StreamParser::rxPacket
                                                     << " ("
                                                     << info->m_connection
                                                     << ")";
+                                                // Note: PV Name and
+                                                // Connection String
+                                                // Could Have Been
+                                                // Modified in
+                                                // makePVInfo()...! :-D
                                                 syslog( LOG_ERR,
                                                     "[%i] %s(%s): %s",
                                                     g_pid,
@@ -3031,22 +3582,23 @@ StreamParser::rxPacket
                                         }
                                     }
                                 }
+
+                                // PV Key is already in use -
+                                // An existing key will be received
+                                // here when the SMS re-broadcasts
+                                // DDPs at file boundaries (in which
+                                // case the definitions will match).
+                                // They can also be received if pvsd
+                                // is reconfigured (in which case the
+                                // definition can be different).
+                                // Pvsd tries to keep ID-to-Name
+                                // mappings consistent across re-
+                                // configurations, but it may
+                                // not always be able to.
                                 else
                                 {
-                                    // PV Key is already in use -
-                                    // An existing key will be received
-                                    // here when the SMS re-broadcasts
-                                    // DDPs at file boundaries (in which
-                                    // case the definitions will match).
-                                    // They can also be received if pvsd
-                                    // is reconfigured (in which case the
-                                    // definition can be different).
-                                    // Pvsd tries to keep ID-to-Name
-                                    // mappings consistent accross re-
-                                    // configurations, but it may
-                                    // not always be able to.
-
-                                    if ( !ipv->second->sameDefinition(
+                                    // _Not_ the Same Definition...! Uh-Oh!
+                                    if ( !ipk->second->sameDefinition(
                                             dev_name,
                                             pv_name,
                                             pv_connection,
@@ -3059,23 +3611,27 @@ StreamParser::rxPacket
                                         stringstream ss;
                                         ss << "STS Error:"
                                             << " PV Dev/ID Key Re-Used!"
-                                            << " Flush Values for"
-                                            << " Previous Definition"
+                                            << " Former Definition"
                                             << " [Device "
-                                            << ipv->second->m_device_name
+                                            << ipk->second->m_device_name
                                             << ": "
-                                            << ipv->second->m_name
+                                            << ipk->second->m_name
                                             << " ("
-                                            << ipv->second->m_connection
+                                            << ipk->second->m_connection
                                             << ")"
                                             << " type="
-                                            << ipv->second->m_type
+                                            << ipk->second->m_type
                                             << " units="
-                                            << ipv->second->m_units
+                                            << ipk->second->m_units
                                             << " ignore="
-                                            << ipv->second->m_ignore
+                                            << ipk->second->m_ignore
                                             << "]"
-                                            << " Define New PV"
+                                            << " devId="
+                                            << ipk->first.first
+                                            << " pvId="
+                                            << ipk->first.second
+                                            << " Pushed Out of Way"
+                                            << " by New"
                                             << " [Device " << dev_name
                                             << ": " << pv_name
                                             << " (" << pv_connection
@@ -3094,26 +3650,28 @@ StreamParser::rxPacket
                                         usleep(30000);
 
                                         // Did the name change?
+                                        // Clean Up the Old XRef Entry...
                                         if ( dev_name !=
-                                                ipv->second->m_device_name
+                                                ipk->second->m_device_name
                                             || pv_name !=
-                                                ipv->second->m_name
+                                                ipk->second->m_name
                                             || pv_connection !=
-                                                ipv->second->m_connection )
+                                                ipk->second->m_connection )
                                         {
                                             // Delete existing name-key
                                             // xref entry
-                                            xref = m_pv_name_xref.find(
-                                                ipv->second->m_device_name
+                                            xref = m_pvs_by_name_xref.find(
+                                                ipk->second->m_device_name
                                                 + ":"
-                                                + ipv->second->m_name
+                                                + ipk->second->m_name
                                                 + ":"
-                                                + ipv->second->m_connection
+                                                + ipk->second->m_connection
                                             );
                                             if ( xref !=
-                                                    m_pv_name_xref.end() )
+                                                    m_pvs_by_name_xref
+                                                        .end() )
                                             {
-                                                m_pv_name_xref.erase(
+                                                m_pvs_by_name_xref.erase(
                                                     xref );
                                             }
 
@@ -3125,44 +3683,54 @@ StreamParser::rxPacket
                                             // (if PV type is supported)
                                         }
 
-                                        // PV definition has changed,
-                                        // flush and replace existing
-                                        // PVInfo object
-                                        ipv->second->flushBuffers(0);
-                                        delete ipv->second;
+                                        // A New PV is Steamrolling Us
+                                        // Using Our Device/PV Key...
+                                        // New PV definition is different;
+                                        // *Don't* flush or delete the
+                                        // old PVInfo entry, tho.
+                                        // Save it for later...
+                                        // (It could pop back up!)
 
-                                        // If PV type not supported,
-                                        // makePVInfo will return NULL
-                                        info = makePVInfo( dev_name,
-                                            pv_name,
-                                            pv_connection,
-                                            a_pkt.devId(),
-                                            pv_id,
-                                            pv_type,
-                                            pv_enum_vector,
-                                            pv_enum_index,
-                                            pv_units,
-                                            pv_ignore );
-                                        if ( info )
+                                        // Now, Can We Find This PV's
+                                        // Definition in List,
+                                        // Already in Existence...?
+
+                                        bool found = false;
+
+                                        for ( vector<PVInfoBase*>
+                                                ::iterator ipv =
+                                                    m_pvs_list.begin();
+                                                ipv !=
+                                                    m_pvs_list.end();
+                                                ++ipv )
                                         {
-                                            m_pvs_by_key[key] = info;
-                                            m_pv_name_xref[
-                                                dev_name + ":" + pv_name
-                                                    + ":" + pv_connection ]
-                                                = key;
+                                            if ( (*ipv)->sameDefinition(
+                                                    dev_name,
+                                                    pv_name,
+                                                    pv_connection,
+                                                    pv_type,
+                                                    pv_enum_vector,
+                                                    pv_enum_index,
+                                                    pv_units,
+                                                    pv_ignore ) )
+                                            {
+                                                // Found Match!
+                                                // Use Existing PVInfo
+                                                // Instance for Re-Used
+                                                // Key!
 
-                                            if ( m_verbose ) {
                                                 stringstream ss2;
-                                                ss2 << "Adding Revised "
-                                                    << key.first
-                                                    << "."
-                                                    << key.second
-                                                    << " - Device "
-                                                    << info->m_device_name
+                                                ss2 << "Found Exact Match"
+                                                    << " With Existing"
+                                                    << " PVInfo"
+                                                    << " - Re-Use Device "
+                                                    << (*ipv)->
+                                                        m_device_name
                                                     << ": "
-                                                    << info->m_name
+                                                    << (*ipv)->m_name
                                                     << " ("
-                                                    << info->m_connection
+                                                    << (*ipv)->
+                                                        m_connection
                                                     << ")";
                                                 syslog( LOG_ERR,
                                                     "[%i] %s(%s): %s",
@@ -3173,59 +3741,155 @@ StreamParser::rxPacket
                                                 );
                                                 // give syslog a chance...
                                                 usleep(30000);
+
+                                                // *Reset* Mapping from
+                                                // Re-Used Key to Existing
+                                                // PVInfo Instance
+                                                m_pvs_by_key[key] = *ipv;
+                                                // map[] = always
+                                                // overwrites!
+
+                                                // Update Name XRef entry
+                                                // to point to this Key...
+                                                m_pvs_by_name_xref[
+                                                    dev_name + ":"
+                                                        + pv_name
+                                                        + ":"
+                                                        + pv_connection ]
+                                                    = key;
+                                                // map[] = always
+                                                // overwrites!
+
+                                                found = true;
+
+                                                break;
                                             }
                                         }
-                                        else
+
+                                        // No Matching PVInfo Found,
+                                        // Must Be New or Modified
+                                        // PV Defn...
+                                        if ( !found )
                                         {
-                                            stringstream ss;
-                                            ss << "[Device "
-                                                << dev_name
-                                                << ": " << pv_name
-                                                << " ("
-                                                << pv_connection
-                                                << ")]"
-                                                << " devId="
-                                                << a_pkt.devId()
-                                                << " pvId=" << pv_id;
+                                            // Make New PVInfo object...
+                                            // If PV type bogus/not
+                                            // supported, makePVInfo will
+                                            // return NULL...!
+                                            // (Else, it should work... :-)
+                                            info = makePVInfo( dev_name,
+                                                pv_name,
+                                                pv_connection,
+                                                a_pkt.devId(),
+                                                pv_id,
+                                                pv_type,
+                                                pv_enum_vector,
+                                                pv_enum_index,
+                                                pv_units,
+                                                pv_ignore );
+                                            if ( info )
+                                            {
+                                                m_pvs_list.push_back(
+                                                    info );
 
-                                            syslog( LOG_ERR,
-                                                "[%i] %s %s", g_pid,
-                                                "Failed to Create New PV",
-                                                ss.str().c_str() );
-                                            // give syslog a chance...
-                                            usleep(30000);
+                                                m_pvs_by_key[key] = info;
+                                                // map[] = always
+                                                // overwrites!
 
-                                            if ( m_verbose ) {
+                                                m_pvs_by_name_xref[
+                                                    dev_name + ":"
+                                                        + pv_name
+                                                        + ":"
+                                                        + pv_connection ]
+                                                    = key;
+                                                // map[] = always
+                                                // overwrites!
+
+                                                if ( m_verbose ) {
+                                                    stringstream ss2;
+                                                    ss2 << "Adding"
+                                                        << " Revised Key "
+                                                        << key.first
+                                                        << "."
+                                                        << key.second
+                                                        << " - Device "
+                                                        << info->
+                                                            m_device_name
+                                                        << ": "
+                                                        << info->m_name
+                                                        << " ("
+                                                        << info
+                                                            ->m_connection
+                                                        << ")";
+                                                    // Note: PV Name and
+                                                    // Connection String
+                                                    // Could Have Been
+                                                    // Modified in
+                                                    // makePVInfo()...! :-D
+                                                    syslog( LOG_ERR,
+                                                        "[%i] %s(%s): %s",
+                                                        g_pid,
+                                                        "rxPacket",
+                                                        "DeviceDescriptor",
+                                                        ss2.str().c_str()
+                                                    );
+                                                    // give syslog a chance
+                                                    usleep(30000);
+                                                }
+                                            }
+                                            else
+                                            {
+                                                stringstream ss;
+                                                ss << "[Device "
+                                                    << dev_name
+                                                    << ": " << pv_name
+                                                    << " ("
+                                                    << pv_connection
+                                                    << ")]"
+                                                    << " devId="
+                                                    << a_pkt.devId()
+                                                    << " pvId=" << pv_id;
+
+                                                syslog( LOG_ERR,
+                                                    "[%i] %s %s %s", g_pid,
+                                                    "Failed to Create",
+                                                    "New PV",
+                                                    ss.str().c_str() );
+                                                // give syslog a chance...
+                                                usleep(30000);
+
                                                 stringstream ss2;
-                                                ss2 << "Erasing Old "
-                                                    << ipv->first.first
+                                                ss2 << "Erasing Old Key "
+                                                    << ipk->first.first
                                                     << "."
-                                                    << ipv->first.second
+                                                    << ipk->first.second
                                                     << " - Device "
-                                                    << ipv->second
+                                                    << ipk->second
                                                         ->m_device_name
                                                     << ": "
-                                                    << ipv->second->m_name
+                                                    << ipk->second->m_name
                                                     << " ("
-                                                    << ipv->second
+                                                    << ipk->second
                                                         ->m_connection
                                                     << ")";
                                                 syslog( LOG_ERR,
                                                     "[%i] %s(%s): %s",
-                                                    g_pid,
-                                                    "rxPacket",
+                                                    g_pid, "rxPacket",
                                                     "DeviceDescriptor",
                                                     ss2.str().c_str()
                                                 );
-                                                // give syslog a chance...
+                                                // give syslog a chance
                                                 usleep(30000);
-                                            }
 
-                                            m_pvs_by_key.erase( ipv );
+                                                m_pvs_by_key.erase( ipk );
+                                            }
                                         }
                                     }
+                                    // Else, Same Definition... That's Ok!
+                                    // Just Let It Ride... ;-D
                                 }
                             }
+
+                            // Not Enough Pieces Found for Device/PV...
                             else
                             {
                                 stringstream ss;
@@ -3515,15 +4179,15 @@ StreamParser::pvValueUpdate
 {
     PVKey   key(a_device_id,a_pv_id);
 
-    std::map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.find(key);
-    if ( ipv == m_pvs_by_key.end() )
+    std::map<PVKey,PVInfoBase*>::iterator ipk = m_pvs_by_key.find(key);
+    if ( ipk == m_pvs_by_key.end() )
     {
         THROW_TRACE( ERR_PV_NOT_DEFINED,
             "pvValueUpdate() failed - PV " << a_device_id << "." << a_pv_id
                 << " not defined." )
     }
 
-    PVInfo<T> *pvinfo = dynamic_cast<PVInfo<T>*>( ipv->second );
+    PVInfo<T> *pvinfo = dynamic_cast<PVInfo<T>*>( ipk->second );
     if ( !pvinfo )
     {
         THROW_TRACE( ERR_CAST_FAILED,
@@ -3558,37 +4222,6 @@ StreamParser::pvValueUpdate
         return;
     }
 
-    // Log Weird Leftover Case, "Just in Case", Lol... ;-D
-    // (But Still Pass Thru Any PV Value Data...!)
-    if ( ts_nano == pvinfo->m_last_time
-            && !(pvinfo->m_last_value_set) )
-    {
-        /* Rate-limited logging of weird update case */
-        std::stringstream ss;
-        ss << a_device_id << "." << a_pv_id;
-        std::string log_info;
-        if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
-                RLL_PV_VALUE_UPDATE_WEIRD, ss.str(),
-                60, 10, 100, log_info ) ) {
-            std::stringstream ssinfo;
-            ssinfo << "devId=" << a_device_id
-                << " (" << pvinfo->m_device_name << ")";
-            ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
-                << " [" << pvinfo->m_connection << "]" << ")";
-            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu [%s] %s",
-                g_pid, "STS Error:", log_info.c_str(),
-                "StreamParser::pvValueUpdate()",
-                "Variable Value Update WEIRD, Same Time But No Value Set!",
-                ssinfo.str().c_str(),
-                a_timestamp.tv_sec, a_timestamp.tv_nsec,
-                pvinfo->valueToString( pvinfo->m_last_value ).c_str(),
-                "- Ignoring PV Value Update...!"
-            );
-            // give syslog a chance...
-            usleep(30000);
-        }
-    }
-
     // Log Value Update if Time Stamp Goes into the Past...! ;-D
     // (But Still Pass Thru Any PV Value Data...!)
     else if ( ts_nano < pvinfo->m_last_time )
@@ -3605,15 +4238,21 @@ StreamParser::pvValueUpdate
                 << " (" << pvinfo->m_device_name << ")";
             ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
                 << " [" << pvinfo->m_connection << "]" << ")";
-            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu < %lu.%09lu %s",
+            ssinfo << " = " << pvinfo->valueToString( a_value ) << " @";
+            syslog( LOG_ERR,
+                "[%i] %s %s%s %s %s %lu.%09lu (%lu) < %lu.%09lu (%lu) %s",
                 g_pid, "STS Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update SAWTOOTH",
                 ssinfo.str().c_str(),
-                a_timestamp.tv_sec, a_timestamp.tv_nsec,
-                (unsigned long)(pvinfo->m_last_time / NANO_PER_SECOND_LL),
+                a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                a_timestamp.tv_nsec,
+                ts_nano,
+                (unsigned long)(pvinfo->m_last_time / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL),
-                "- Ignoring PV Value Update...!"
+                pvinfo->m_last_time,
+                "- Pass Thru Anyway..."
             );
             // give syslog a chance...
             usleep(30000);
@@ -3624,7 +4263,7 @@ StreamParser::pvValueUpdate
 
     // Relative time of update in seconds from first pulse of run.
     // Note: if first pulse has not arrived, truncate all PV times to 0.
-    double t = 0;
+    double t = 0.0;
 
     // First Pulse Has Arrived...
     if ( m_pulse_info.start_time )
@@ -3637,60 +4276,128 @@ StreamParser::pvValueUpdate
         }
 
         // Truncate Any Negative Time Offsets to 0...
-        // (Don't Purge Previous PV Values, Could be transient error...!)
-        // - Only Log Negative Time Truncation as Error After 1st PV Value.
-        // (otherwise we get spammed for nearly every PV in the run! ;-D)
+        // Only Purge _Initial_ Negative Time Offset PV Values:
+        // - Always Leave at Least *One* Pre-First-Pulse Value Tho...!
+        // (It Could be the Only Value We Get!)
+        // - Otherwise, any incidental Negative Time Offsets
+        // could simply be some transient error, pass it thru...
         else
         {
-            /* Rate-limited logging of truncated negative update times */
+            // For rate-limited logging...
             std::stringstream ss;
             ss << a_device_id << "." << a_pv_id;
             std::string log_info;
-            if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
-                    RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP, ss.str(),
-                    60, 10, 100, log_info ) ) {
-                std::string log_hdr = "";
-                int log_type = LOG_INFO;
-                if ( pvinfo->m_last_value_set ) {
-                    log_type = LOG_ERR;
-                    log_hdr = "STS Error: ";
+            std::stringstream ssinfo;
+            ssinfo << "Truncate Negative Variable Value Update";
+            ssinfo << " Time to Zero",
+            ssinfo << " devId=" << a_device_id
+                << " (" << pvinfo->m_device_name << ")";
+            ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+                << " [" << pvinfo->m_connection << "]" << ")";
+            ssinfo << " = " << pvinfo->valueToString( a_value ) << " @";
+
+            // If there Only *One* PV Value before this one,
+            // and it's _Also_ a Negative Time Offset, then
+            // throw That One away and keep This One instead... ;-D
+            if ( pvinfo->m_value_buffer.size() == 1
+                    && pvinfo->m_last_time < m_pulse_info.start_time )
+            {
+                // Rate-limited logging of truncated negative update times
+                if ( RateLimitedLogging::checkLog(
+                        RLLHistory_StreamParserH,
+                        RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP, ss.str(),
+                        60, 10, 100, log_info ) ) {
+                    // Only Log Negative Time Truncation as Error
+                    // After 1st PV Value...
+                    // (Otherwise we get spammed for nearly
+                    // every PV in the run! ;-D)
+                    std::string log_hdr = "";
+                    int log_type = LOG_INFO;
+                    if ( pvinfo->m_last_value_set ) {
+                        log_type = LOG_ERR;
+                        log_hdr = "STS Error: ";
+                    }
+                    std::stringstream ss2;
+                    ss2 << "Discard Previous Pre-First-Pulse Value ";
+                    ss2 << pvinfo->valueToString(
+                        pvinfo->m_value_buffer[0] );
+                    ss2 << " @ " << pvinfo->m_last_time;
+                    ss2 << " - Keep New Value";
+                    syslog( log_type,
+                    "[%i] %s%s%s %s: %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                        g_pid, log_hdr.c_str(), log_info.c_str(),
+                        "StreamParser::pvValueUpdate()",
+                        ss2.str().c_str(),
+                        ssinfo.str().c_str(),
+                        a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                        a_timestamp.tv_nsec,
+                        ts_nano,
+                        (unsigned long)(m_pulse_info.start_time
+                                / NANO_PER_SECOND_LL)
+                            - ADARA::EPICS_EPOCH_OFFSET,
+                        (unsigned long)(m_pulse_info.start_time
+                            % NANO_PER_SECOND_LL),
+                        m_pulse_info.start_time
+                    );
+                    usleep(30000); // give syslog a chance...
                 }
-                std::stringstream ssinfo;
-                ssinfo << "devId=" << a_device_id
-                    << " (" << pvinfo->m_device_name << ")";
-                ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
-                    << " [" << pvinfo->m_connection << "]" << ")";
-                syslog( log_type,
-                    "[%i] %s%s%s %s %s %lu.%09lu < %lu.%09lu",
-                    g_pid, log_hdr.c_str(), log_info.c_str(),
-                    "StreamParser::pvValueUpdate()",
-                    "Truncate Negative Variable Value Update Time to Zero",
-                    ssinfo.str().c_str(),
-                    a_timestamp.tv_sec, a_timestamp.tv_nsec,
-                    (unsigned long)(m_pulse_info.start_time
-                        / NANO_PER_SECOND_LL),
-                    (unsigned long)(m_pulse_info.start_time
-                        % NANO_PER_SECOND_LL)
-                );
-                // give syslog a chance...
-                usleep(30000);
+
+                // Purge Existing Pre-Pulse PV Data...
+                pvinfo->m_value_buffer.clear();
+                pvinfo->m_time_buffer.clear();
+                pvinfo->m_stats.reset();
+            }
+
+            else
+            {
+                // Rate-limited logging of truncated negative update times
+                if ( RateLimitedLogging::checkLog(
+                        RLLHistory_StreamParserH,
+                        RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP, ss.str(),
+                        60, 10, 100, log_info ) ) {
+                    // Only Log Negative Time Truncation as Error
+                    // After 1st PV Value...
+                    // (Otherwise we get spammed for nearly
+                    // every PV in the run! ;-D)
+                    std::string log_hdr = "";
+                    int log_type = LOG_INFO;
+                    if ( pvinfo->m_last_value_set ) {
+                        log_type = LOG_ERR;
+                        log_hdr = "STS Error: ";
+                    }
+                    syslog( log_type,
+                        "[%i] %s%s%s %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                        g_pid, log_hdr.c_str(), log_info.c_str(),
+                        "StreamParser::pvValueUpdate()",
+                        ssinfo.str().c_str(),
+                        a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                        a_timestamp.tv_nsec,
+                        ts_nano,
+                        (unsigned long)(m_pulse_info.start_time
+                                / NANO_PER_SECOND_LL)
+                            - ADARA::EPICS_EPOCH_OFFSET,
+                        (unsigned long)(m_pulse_info.start_time
+                            % NANO_PER_SECOND_LL),
+                        m_pulse_info.start_time
+                    );
+                    usleep(30000); // give syslog a chance...
+                }
             }
         }
     }
 
-    // No Pulse Has Arrived as Yet, Leave PV Time at 0...
-    // (And Only Save Last of Pre-Pulse PV Value Data...)
-    else if ( pvinfo->m_value_buffer.size() )
+    // No Pulse Has Arrived as Yet, So Save This Value Update Til Later...
+    // Set PV Time to -1.0, So We Know It's Not Yet Normalized...
+    // (Later, Will Only Save _Last_ of Pre-Pulse PV Value Data...)
+    else
     {
-        // If we recv multiple value updates before first pulse,
-        // keep only latest
-
-        /* Rate-limited logging of duplicate pulses */
+        /* Rate-limited logging of pre-pulse variable value updates */
+        // REMOVEME
         std::stringstream ss;
         ss << a_device_id << "." << a_pv_id;
         std::string log_info;
         if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
-                RLL_PV_VALUE_UPDATE_PURGE_EARLY, ss.str(),
+                RLL_PV_VALUE_UPDATE_EARLY, ss.str(),
                 60, 10, 100, log_info ) ) {
             // If Logging, Include Actual Purged PV Values...
             // (the times have all been zeroed out... ;-)
@@ -3699,30 +4406,22 @@ StreamParser::pvValueUpdate
                 << " (" << pvinfo->m_device_name << ")";
             ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
                 << " [" << pvinfo->m_connection << "]" << ")";
-            std::stringstream pvs;
-            pvs << "Purging Previous Values [";
-            for ( uint32_t i=0 ; i < pvinfo->m_value_buffer.size() ; i++ )
-            {
-                if ( i ) pvs << ", ";
-                pvs << pvinfo->valueToString( pvinfo->m_value_buffer[i] );
-            }
-            pvs << "]";
-            syslog( LOG_ERR, "[%i] %s %s%s %s %s %lu.%09lu - %s",
+            syslog( LOG_ERR, "[%i] %s %s%s %s %s = %s @ %lu.%09lu (%lu)",
                 g_pid, "STS Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Got Pre-Pulse Variable Value Update",
                 ssinfo.str().c_str(),
-                a_timestamp.tv_sec, a_timestamp.tv_nsec,
-                pvs.str().c_str()
+                pvinfo->valueToString( a_value ).c_str(),
+                a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                a_timestamp.tv_nsec,
+                ts_nano
             );
             // give syslog a chance...
             usleep(30000);
         }
 
-        // Purge Existing Pre-Pulse PV Data...
-        pvinfo->m_value_buffer.clear();
-        pvinfo->m_time_buffer.clear();
-        pvinfo->m_stats.reset();
+        pvinfo->m_has_non_normalized = true;
+        t = -1.0;
     }
 
     pvinfo->m_last_time = ts_nano;
@@ -3730,13 +4429,15 @@ StreamParser::pvValueUpdate
     pvinfo->m_last_value_set = true;
 
     pvinfo->m_value_buffer.push_back(a_value);
+    pvinfo->m_abs_time_buffer.push_back(ts_nano);
     pvinfo->m_time_buffer.push_back(t);
 
-    pvinfo->addToStats(a_value);
+    if ( t >= 0.0 )
+        pvinfo->addToStats(a_value);
 
     // Check for buffer write
     if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
-        pvinfo->flushBuffers(0);
+        pvinfo->flushBuffers( m_pulse_info.start_time, 0 );
 }
 
 template void StreamParser::pvValueUpdate<uint32_t>(
@@ -3894,7 +4595,7 @@ StreamParser::rxPacket
 {
     uint64_t tOrig = timespec_to_nsec( a_pkt.timestamp() );
 
-    double t = 0;
+    double t = 0.0;
 
     // Note: if first pulse has not arrived, truncate all PV times to 0
     if ( m_pulse_info.start_time )
@@ -4005,6 +4706,14 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.proposal_title.c_str() );
         usleep(30000); // give syslog a chance...
         m_run_info.proposal_title = a_run_info.proposal_title;
+    }
+    if ( m_run_info.das_version.compare( a_run_info.das_version ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STS Error:", "updateRunInfo()", "DAS Version",
+            m_run_info.das_version.c_str(),
+            a_run_info.das_version.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_run_info.das_version = a_run_info.das_version;
     }
     // ILLEGAL UPDATE (Meta-Data Used in Preliminary ComBus Messaging!)
     if ( m_run_info.facility_name.compare( a_run_info.facility_name ) ) {
@@ -4552,10 +5261,10 @@ StreamParser::finalizeStreamProcessing()
         }
 
         // Make Sure We Have "Reasonable" Run Time Values... (Fake It!)
-        struct timespec end_time;
-        clock_gettime( CLOCK_REALTIME, &end_time );
-        m_run_metrics.start_time = m_default_start_time;
-        m_run_metrics.end_time = end_time;
+        struct timespec run_end_time;
+        clock_gettime( CLOCK_REALTIME, &run_end_time );
+        m_run_metrics.run_start_time = m_default_run_start_time;
+        m_run_metrics.run_end_time = run_end_time;
     }
 
     // Write remaining pulse info and statistics
@@ -4570,21 +5279,35 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in bank buffers
 
-    for ( vector<BankInfo*>::iterator ibi = m_banks.begin();
+    for ( BankInfoMap::iterator ibi = m_banks.begin();
             ibi != m_banks.end(); ++ibi )
     {
-        if ( !*ibi )
+        if ( !(ibi->second) ) {
+            syslog( LOG_WARNING,
+              "[%i] %s: Can't Finalize Empty Detector Bank ID %u State %u",
+                g_pid, "StreamParser::finalizeStreamProcessing()",
+                ibi->first.first, ibi->first.second );
+            // give syslog a chance...
+            usleep(30000);
             continue;
+        }
+
+        syslog( LOG_INFO,
+            "[%i] %s: Finalizing Detector Bank ID %u State %u",
+            g_pid, "StreamParser::finalizeStreamProcessing()",
+            ibi->second->m_id, ibi->second->m_state );
+        // give syslog a chance...
+        usleep(30000);
 
         // Make Sure Data has been (Late) Initialized...
-        if ( !((*ibi)->m_initialized) )
-            (*ibi)->initializeBank( true );
+        if ( !(ibi->second->m_initialized) )
+            ibi->second->initializeBank( true );
 
         // Detect gaps in bank data and fill event index if present
-        if ( (*ibi)->m_last_pulse_with_data < m_pulse_count )
+        if ( ibi->second->m_last_pulse_with_data < m_pulse_count )
         {
-            handleBankPulseGap( **ibi,
-                m_pulse_count - (*ibi)->m_last_pulse_with_data );
+            handleBankPulseGap( *(ibi->second),
+                m_pulse_count - ibi->second->m_last_pulse_with_data );
         }
 
         // Write Bank Pid/TOF and Event Index Buffers Independently
@@ -4592,13 +5315,13 @@ StreamParser::finalizeStreamProcessing()
 
         // _Always_ Flush Pid/TOF bank buffers in the end,
         //    to create any Dummy/Empty Datasets...
-        bankPidTOFBuffersReady( **ibi );
+        bankPidTOFBuffersReady( *(ibi->second) );
 
         // _Always_ Flush Event Index bank buffers in the end,
         //    to create any Dummy/Empty Datasets...
-        bankIndexBuffersReady( **ibi, false );
+        bankIndexBuffersReady( *(ibi->second), false );
 
-        bankFinalize( **ibi );
+        bankFinalize( *(ibi->second) );
     }
 
     // Write any remaining data in monitor buffers
@@ -4632,6 +5355,9 @@ StreamParser::finalizeStreamProcessing()
         monitorFinalize( *imi->second );
     }
 
+    // Reconcile Any Duplicate PV Connection Logs...
+    collapseDuplicatePVs();
+
     // Write any Enumerated Types, per DeviceId, into logs...
 
     for ( map<Identifier,std::vector<PVEnumeratedType> >::iterator ienum =
@@ -4643,21 +5369,24 @@ StreamParser::finalizeStreamProcessing()
 
     // Write Any Remaining Data in PV Buffers
 
-    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
-            ipv != m_pvs_by_key.end(); ++ipv )
+    for ( vector<PVInfoBase*>::iterator ipv = m_pvs_list.begin();
+            ipv != m_pvs_list.end(); ++ipv )
     {
         // *Always* Flush Buffers at End, to Get Run Metrics for PVs...!
-        ipv->second->flushBuffers( &m_run_metrics );
+        // (Use Guaranteed-Set Run Metrics Time (convert to nanoseconds).)
+        (*ipv)->flushBuffers(
+            timespec_to_nsec( m_run_metrics.run_start_time ),
+            &m_run_metrics );
     }
 
     // Write Any Conditional STS Config Group Elements,
     // Now that All the PV Buffers have been Processed,
     // and Any Conditional Flags have been Set... :-D
 
-    for ( map<PVKey,PVInfoBase*>::iterator ipv = m_pvs_by_key.begin();
-            ipv != m_pvs_by_key.end(); ++ipv )
+    for ( vector<PVInfoBase*>::iterator ipv = m_pvs_list.begin();
+            ipv != m_pvs_list.end(); ++ipv )
     {
-        ipv->second->createSTSConfigConditionalGroups();
+        (*ipv)->createSTSConfigConditionalGroups();
     }
 
     // Now Globally Write Any Captured PV Units Attributes,
@@ -4666,7 +5395,428 @@ StreamParser::finalizeStreamProcessing()
     checkSTSConfigElementUnitsPaths();
 
     // Let adapter do anything else it wants to
-    finalize( m_run_metrics );
+    finalize( m_run_metrics, m_run_info );
+}
+
+
+/*! \brief This method tries to Merge/Collapse Duplicate PV Logs...!
+ *
+ * This method is called just prior to actually writing out all the
+ * final PV Logs into DASlogs, and tries to Reconcile Any Duplicate PVs
+ * (i.e. PVs with the _Same_ Connection Information).
+ * We try to Merge Differing Sections that hopefully Don't Overlap in Time,
+ * thereby Collapsing Away Any Duplicate PV Logs...! ;-D
+ */
+void
+StreamParser::collapseDuplicatePVs()
+{
+    PVInfo<uint32_t> *pvinfoU32, *pvinfoDupU32;
+    PVInfo<double> *pvinfoDbl, *pvinfoDupDbl;
+    PVInfo<string> *pvinfoStr, *pvinfoDupStr;
+    PVInfo< vector<uint32_t> > *pvinfoU32Arr, *pvinfoDupU32Arr;
+    PVInfo< vector<double> > *pvinfoDblArr, *pvinfoDupDblArr;
+
+    uint64_t start_time = timespec_to_nsec( m_run_metrics.run_start_time );
+
+    std::string cast_fail = "collapseDuplicatePVs()";
+    cast_fail += " Failed to Cast PVInfoBase to PVInfo for ";
+
+    // Search PV List for "Duplicates"...
+    for ( vector<PVInfoBase*>::iterator ipv = m_pvs_list.begin();
+            ipv != m_pvs_list.end(); ++ipv )
+    {
+        // Found a PV Marked as Duplicate...!
+        if ( (*ipv)->m_duplicate && !((*ipv)->m_ignore) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:",
+                "StreamParser::collapseDuplicatePVs()",
+                "Found PV Marked as Duplicate",
+                (*ipv)->m_device_pv_str.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            // Search Remaining List of PVs for Matching Connections,
+            // and Try to Absorb/Subsume Any Duplicate PV Values...
+            for ( vector<PVInfoBase*>::iterator ipvDup = ipv + 1;
+                    ipvDup != m_pvs_list.end(); ++ipvDup )
+            {
+                // Found a Matching PV Log, try to Absorb/Subsume It...!
+                if ( (*ipv)->sameDefinitionPVConn( *ipvDup ) )
+                {
+                    syslog( LOG_ERR, "[%i] %s %s: %s %s - %s",
+                        g_pid, "STS Error:",
+                        "StreamParser::collapseDuplicatePVs()",
+                        "Found Matching Duplicate PV",
+                        (*ipvDup)->m_device_pv_str.c_str(),
+                        "Try to Subsume Its Values..." );
+                    // give syslog a chance...
+                    usleep(30000);
+
+                    switch ( (*ipv)->m_type )
+                    {
+                        case STS::PVT_INT:  // ADARA only supports uint32_t
+                        case STS::PVT_ENUM:
+                        case STS::PVT_UINT:
+
+                            pvinfoU32 =
+                                dynamic_cast<PVInfo<uint32_t>*>( *ipv );
+                            if ( !pvinfoU32 ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipv)->m_device_pv_str )
+                            }
+
+                            // Make Sure This PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoU32->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Main PV Duplicate Not Normalized",
+                                    (*ipv)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoU32->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDupU32 =
+                                dynamic_cast<PVInfo<uint32_t>*>( *ipvDup );
+                            if ( !pvinfoDupU32 ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipvDup)->m_device_pv_str )
+                            }
+
+                            // Make Sure Matching PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDupU32->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Matching PV Isn't Normalized",
+                                    (*ipvDup)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDupU32->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoU32->subsumeValues(
+                                pvinfoDupU32->m_value_buffer,
+                                pvinfoDupU32->m_time_buffer );
+
+                            // This Duplicate PV's Values have
+                            // Now Been Subsumed, So Mark It to Ignore...
+                            // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupU32->m_ignore = true;
+
+                            break;
+
+                        case STS::PVT_FLOAT: // ADARA only supports double
+                        case STS::PVT_DOUBLE:
+
+                            pvinfoDbl =
+                                dynamic_cast<PVInfo<double>*>( *ipv );
+                            if ( !pvinfoDbl ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipv)->m_device_pv_str )
+                            }
+
+                            // Make Sure This PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDbl->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Main PV Duplicate Not Normalized",
+                                    (*ipv)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDbl->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDupDbl =
+                                dynamic_cast<PVInfo<double>*>( *ipvDup );
+                            if ( !pvinfoDupDbl ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipvDup)->m_device_pv_str )
+                            }
+
+                            // Make Sure Matching PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDupDbl->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Matching PV Isn't Normalized",
+                                    (*ipvDup)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDupDbl->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDbl->subsumeValues(
+                                pvinfoDupDbl->m_value_buffer,
+                                pvinfoDupDbl->m_time_buffer );
+
+                            // This Duplicate PV's Values have
+                            // Now Been Subsumed, So Mark It to Ignore...
+                            // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupDbl->m_ignore = true;
+
+                            break;
+
+                        case STS::PVT_STRING:
+
+                            pvinfoStr =
+                                dynamic_cast<PVInfo<string>*>( *ipv );
+                            if ( !pvinfoStr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipv)->m_device_pv_str )
+                            }
+
+                            // Make Sure This PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoStr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Main PV Duplicate Not Normalized",
+                                    (*ipv)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoStr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDupStr =
+                                dynamic_cast<PVInfo<string>*>( *ipvDup );
+                            if ( !pvinfoDupStr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipvDup)->m_device_pv_str )
+                            }
+
+                            // Make Sure Matching PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDupStr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Matching PV Isn't Normalized",
+                                    (*ipvDup)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDupStr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoStr->subsumeValues(
+                                pvinfoDupStr->m_value_buffer,
+                                pvinfoDupStr->m_time_buffer );
+
+                            // This Duplicate PV's Values have
+                            // Now Been Subsumed, So Mark It to Ignore...
+                            // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupStr->m_ignore = true;
+
+                            break;
+
+                        case STS::PVT_UINT_ARRAY:
+
+                            pvinfoU32Arr =
+                                dynamic_cast<PVInfo< vector<uint32_t> >*>(
+                                    *ipv );
+                            if ( !pvinfoU32Arr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipv)->m_device_pv_str )
+                            }
+
+                            // Make Sure This PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoU32Arr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Main PV Duplicate Not Normalized",
+                                    (*ipv)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoU32Arr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDupU32Arr =
+                                dynamic_cast<PVInfo< vector<uint32_t> >*>(
+                                    *ipvDup );
+                            if ( !pvinfoDupU32Arr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipvDup)->m_device_pv_str )
+                            }
+
+                            // Make Sure Matching PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDupU32Arr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Matching PV Isn't Normalized",
+                                    (*ipvDup)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDupU32Arr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoU32Arr->subsumeValues(
+                                pvinfoDupU32Arr->m_value_buffer,
+                                pvinfoDupU32Arr->m_time_buffer );
+
+                            // This Duplicate PV's Values have
+                            // Now Been Subsumed, So Mark It to Ignore...
+                            // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupU32Arr->m_ignore = true;
+
+                            break;
+
+                        case STS::PVT_DOUBLE_ARRAY:
+
+                            pvinfoDblArr =
+                                dynamic_cast<PVInfo< vector<double> >*>(
+                                    *ipv );
+                            if ( !pvinfoDblArr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipv)->m_device_pv_str )
+                            }
+
+                            // Make Sure This PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDblArr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Main PV Duplicate Not Normalized",
+                                    (*ipv)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDblArr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDupDblArr =
+                                dynamic_cast<PVInfo< vector<double> >*>(
+                                    *ipvDup );
+                            if ( !pvinfoDupDblArr ) {
+                                THROW_TRACE( ERR_CAST_FAILED, cast_fail
+                                        << (*ipvDup)->m_device_pv_str )
+                            }
+
+                            // Make Sure Matching PV's Timestamps
+                            // Have Been Normalized...!
+                            if ( pvinfoDupDblArr->m_has_non_normalized )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s - %s %s %s, %s",
+                                    g_pid, "STS Error:",
+                                    "StreamParser::collapseDuplicatePVs()",
+                                    "Matching PV Isn't Normalized",
+                                    (*ipvDup)->m_device_pv_str.c_str(),
+                                    "Normalizing PV Value Times",
+                                    "with First Pulse Time",
+                                    "Now Available" );
+                                usleep(30000); // give syslog a chance...
+
+                                pvinfoDupDblArr->normalizeTimestamps(
+                                    start_time );
+                            }
+
+                            pvinfoDblArr->subsumeValues(
+                                pvinfoDupDblArr->m_value_buffer,
+                                pvinfoDupDblArr->m_time_buffer );
+
+                            // This Duplicate PV's Values have
+                            // Now Been Subsumed, So Mark It to Ignore...
+                            // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupDblArr->m_ignore = true;
+
+                            break;
+                    }
+
+                    // Leave Subsumed PV Log Marked as "Duplicate",
+                    // So We Won't Try to Write Its Values to DASlogs...
+                }
+            }
+
+            // This PV has Now Subsumed All Other Duplicate PV Logs,
+            // So We Can Let It Thru into the DASlogs Output...
+            (*ipv)->m_duplicate = false;
+
+            syslog( LOG_ERR, "[%i] %s %s: %s %s - %s",
+                g_pid, "STS Error:",
+                "StreamParser::collapseDuplicatePVs()",
+                "PV Has Subsumed All Duplicate PV Log Values",
+                (*ipv)->m_device_pv_str.c_str(),
+                "Cleared for Writing to DASlogs." );
+            // give syslog a chance...
+            usleep(30000);
+        }
+
+        // This Duplicate has Already Been Subsumed...! ;-D
+        else if ( (*ipv)->m_duplicate )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:",
+                "StreamParser::collapseDuplicatePVs()",
+                "Ignoring Already Subsumed PV Duplicate",
+                (*ipv)->m_device_pv_str.c_str() );
+            usleep(30000); // give syslog a chance...
+        }
+    }
 }
 
 
@@ -4696,6 +5846,8 @@ StreamParser::getPktName(
             ss << "Src List"; break;
         case ADARA::PacketType::BANKED_EVENT_TYPE:
             ss << "Banked Event"; break;
+        case ADARA::PacketType::BANKED_EVENT_STATE_TYPE:
+            ss << "Banked Event State"; break;
         case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
             ss << "Beam Monitor Event"; break;
         case ADARA::PacketType::PIXEL_MAPPING_TYPE:
@@ -4850,7 +6002,6 @@ StreamParser::gatherStats( const ADARA::Packet &a_pkt ) const
         stats.max_pkt_size = a_pkt.packet_length();
     stats.total_size += a_pkt.packet_length();
 }
-
 
 } // End namespace STS
 

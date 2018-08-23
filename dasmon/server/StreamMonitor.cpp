@@ -62,7 +62,7 @@ StreamMonitor::StreamMonitor(
       m_first_pulse_time(0), m_last_pulse_time(0),
       m_stream_size(0), m_stream_rate(0), m_diagnostics(true),
       m_last_cycle(0), m_last_time(0), m_this_time(0),
-      m_bnk_pkt_count(0), m_mon_pkt_count(0),
+      m_bnk_pkt_count(0), m_bnk_state_pkt_count(0), m_mon_pkt_count(0),
       m_maxtof(a_maxtof), m_pixbankmap_processed(false),
       m_proc_ticker(0), m_metrics_ticker(0), m_metrics_state(TS_INIT),
       m_in_prolog(false)
@@ -495,7 +495,7 @@ StreamMonitor::metricsThread()
             boost::unique_lock<boost::mutex> lock(m_mutex);
 
             // Check low-count rate on banked events
-            if ( !m_bnk_pkt_count )
+            if ( !m_bnk_pkt_count && !m_bnk_state_pkt_count )
             {
                 m_bank_count_info.reset();
                 m_pcharge.reset();
@@ -525,6 +525,7 @@ StreamMonitor::metricsThread()
             stream_metrics = m_stream_metrics;
             m_stream_size = 0;
             m_bnk_pkt_count = 0;
+            m_bnk_state_pkt_count = 0;
             m_mon_pkt_count = 0;
 
             // Release lock and notify listeners
@@ -584,6 +585,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
             case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
             case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
             case ADARA::PacketType::BANKED_EVENT_TYPE:
+            case ADARA::PacketType::BANKED_EVENT_STATE_TYPE:
                 return Parser::rxPacket(a_pkt);
 
             // Packet types that are not processes by StreamParser
@@ -910,32 +912,35 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
     uint32_t flags = a_pkt.flags();
 
     // Check flags
-    if ( flags & BankedEventPkt::ERROR_PIXELS )
+    if ( flags & ERROR_PIXELS )
          ++m_run_metrics.m_pixel_error_count;
 
-    if ( flags & BankedEventPkt::PULSE_VETO )
+    if ( flags & PULSE_VETO )
          ++m_run_metrics.m_pulse_veto_count;
 
-    if ( flags & BankedEventPkt::MISSING_RTDL )
+    if ( flags & MISSING_RTDL )
          ++m_run_metrics.m_missing_rtdl_count;
 
-    if ( flags & BankedEventPkt::MAPPING_ERROR )
+    if ( flags & MAPPING_ERROR )
          ++m_run_metrics.m_mapping_error_count;
 
-    if ( flags & BankedEventPkt::DUPLICATE_PULSE )
+    if ( flags & DUPLICATE_PULSE )
          ++m_run_metrics.m_dup_pulse_count;
 
-    if ( flags & BankedEventPkt::PCHARGE_UNCORRECTED
-            || flags & BankedEventPkt::VETO_UNCORRECTED )
+    if ( flags & PCHARGE_UNCORRECTED
+            || flags & VETO_UNCORRECTED )
     {
          ++m_run_metrics.m_pulse_pcharge_uncorrected;
     }
 
-    if ( flags & BankedEventPkt::GOT_METADATA )
+    if ( flags & GOT_METADATA )
          ++m_run_metrics.m_got_metadata_count;
 
-    if ( flags & BankedEventPkt::GOT_NEUTRONS )
+    if ( flags & GOT_NEUTRONS )
          ++m_run_metrics.m_got_neutrons_count;
+
+    if ( flags & HAS_STATES )
+         ++m_run_metrics.m_has_states_count;
 
     // Count Total Pulses (with Data... ;-D)
     ++m_run_metrics.m_total_pulses_count;
@@ -969,6 +974,201 @@ StreamMonitor::rxPacket( const ADARA::BankedEventPkt &a_pkt )
         while( bank_count-- )
         {
             bank_id = (int16_t)*rpos++;
+            bank_event_count = *rpos++;
+
+            if ( bank_id == -1 )
+            {
+                m_stream_metrics.m_pixel_map_err += bank_event_count;
+                rpos += bank_event_count << 1;
+            }
+            else if ( bank_id == -2 )
+            {
+                m_stream_metrics.m_pixel_errors += bank_event_count;
+                rpos += bank_event_count << 1;
+            }
+            else if (( ibank = m_bank_info.find( bank_id )) != m_bank_info.end() )
+            {
+                if ( ibank->second.m_last_pulse_time == 0 )
+                {
+                    ibank->second.m_source_id = source_id;
+                    ibank->second.m_last_pulse_time = m_this_time;
+                }
+                else
+                {
+                    if ( ibank->second.m_source_id != source_id )
+                        ++m_stream_metrics.m_bank_source_mismatch;
+
+                    if ( ibank->second.m_last_pulse_time == m_this_time )
+                        ++m_stream_metrics.m_duplicate_bank;
+                }
+
+                event_count += bank_event_count;
+
+                bank_endpos = rpos + ( bank_event_count << 1 );
+                while ( rpos < bank_endpos )
+                {
+                    tof = *rpos++;
+                    pid = *rpos++;
+                    if ( tof > m_maxtof ) // in 100nsec units, compare to 2e8 usec
+                        ++m_stream_metrics.m_pixel_invalid_tof;
+
+                    if ( pid >= m_pixbankmap.size() )
+                        pixbank = -1;
+                    else
+                        pixbank = m_pixbankmap[pid];
+
+                    if ( pixbank < 0 )
+                        ++m_stream_metrics.m_pixel_unknown_id;
+                    else if ( pixbank != bank_id )
+                        ++m_stream_metrics.m_pixel_bank_mismatch;
+                }
+            }
+            else
+            {
+                // This code should never get called unless the SMS fails somehow
+                ++m_stream_metrics.m_invalid_bank_id;
+                rpos += bank_event_count << 1;
+            }
+        }
+    }
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+
+    m_pcharge.addSample( a_pkt.pulseCharge() * 10.0 );
+
+    uint64_t pulse_time = timespec_to_nsec( a_pkt.timestamp() );
+
+    if ( !m_first_pulse_time )
+    {
+        m_first_pulse_time = pulse_time;
+    }
+
+    if ( m_last_pulse_time )
+    {
+        m_pfreq.addSample( NANO_PER_SECOND_D
+            / ( pulse_time - m_last_pulse_time ) );
+    }
+
+    m_last_pulse_time = pulse_time;
+    m_bank_count_info.addSample( event_count );
+    m_run_metrics.m_total_counts += event_count;
+    m_run_metrics.m_time = ( pulse_time - m_first_pulse_time )
+        / NANO_PER_SECOND_D;
+
+    return false;
+}
+
+
+/**
+ * \brief ADARA banked event state packet handler.
+ */
+bool
+StreamMonitor::rxPacket( const ADARA::BankedEventStatePkt &a_pkt )
+{
+    m_proc_state = TS_PKT_BANKED_EVENT_STATE;
+
+    if ( m_in_prolog )
+    {
+        m_in_prolog = false;
+        m_notify.endProlog();
+    }
+
+    ++m_bnk_state_pkt_count;
+
+    m_this_time = timespec_to_nsec(a_pkt.timestamp());
+
+    if ( m_last_time )
+    {
+        if (((( m_last_cycle < 599 ) && ( a_pkt.cycle() != m_last_cycle + 1 )) ||
+            ( m_last_cycle == 599 && a_pkt.cycle() != 0 )) )
+            ++m_stream_metrics.m_cycle_err;
+
+        if ( m_last_time > m_this_time )
+            ++m_stream_metrics.m_invalid_pkt_time;
+        else if ( m_last_time == m_this_time )
+            ++m_stream_metrics.m_duplicate_packet;
+        // TODO: This should depend on the Actual Facility Pulse Frequency!
+        // (and account for Sub-60Hz operation, and 2nd Target Station!)
+        else if ( fabs((m_this_time-m_last_time) - 16666666.0 ) > 1000000 )
+            ++m_stream_metrics.m_pulse_freq_tol;
+    }
+
+    m_last_time = m_this_time;
+    m_last_cycle = a_pkt.cycle();
+
+    // Parse banked event packet to calulate pulse info, event count, and event rate
+    const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
+    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
+
+    rpos += 4; // Skip over pulse info
+
+    uint32_t flags = a_pkt.flags();
+
+    // Check flags
+    if ( flags & ERROR_PIXELS )
+         ++m_run_metrics.m_pixel_error_count;
+
+    if ( flags & PULSE_VETO )
+         ++m_run_metrics.m_pulse_veto_count;
+
+    if ( flags & MISSING_RTDL )
+         ++m_run_metrics.m_missing_rtdl_count;
+
+    if ( flags & MAPPING_ERROR )
+         ++m_run_metrics.m_mapping_error_count;
+
+    if ( flags & DUPLICATE_PULSE )
+         ++m_run_metrics.m_dup_pulse_count;
+
+    if ( flags & PCHARGE_UNCORRECTED
+            || flags & VETO_UNCORRECTED )
+    {
+         ++m_run_metrics.m_pulse_pcharge_uncorrected;
+    }
+
+    if ( flags & GOT_METADATA )
+         ++m_run_metrics.m_got_metadata_count;
+
+    if ( flags & GOT_NEUTRONS )
+         ++m_run_metrics.m_got_neutrons_count;
+
+    if ( flags & HAS_STATES )
+         ++m_run_metrics.m_has_states_count;
+
+    // Count Total Pulses (with Data... ;-D)
+    ++m_run_metrics.m_total_pulses_count;
+
+    uint32_t        source_id;
+    uint32_t        bank_count;
+    int16_t         bank_id;
+    uint32_t        state;
+    uint32_t        event_count = 0;
+    uint32_t        bank_event_count;
+    const uint32_t *bank_endpos;
+    uint32_t        tof, pid;
+    int16_t         pixbank;
+    map<int16_t,BankInfo>::iterator ibank;
+
+    m_sources.clear();
+
+    // Process banks per-source
+    while ( rpos < epos )
+    {
+        source_id = *rpos++;
+
+        if ( find( m_sources.begin(), m_sources.end(), source_id ) != m_sources.end())
+            ++m_stream_metrics.m_duplicate_source;
+        else
+            m_sources.push_back( source_id );
+
+        rpos += 2; // Skip over intrapulse time and TOF offset
+        bank_count = *rpos++;
+
+        // Process events per-bank
+        while ( bank_count-- )
+        {
+            bank_id = (int16_t)*rpos++;
+            state = *rpos++;
             bank_event_count = *rpos++;
 
             if ( bank_id == -1 )

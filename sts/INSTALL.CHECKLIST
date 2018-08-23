@@ -1,7 +1,7 @@
 
-ADARA PVSD Install Checklist
+ADARA STS Install Checklist
 
-	- for a New or Upgraded DASSRV1 Host...
+	- for a New or Upgraded STS1/STS2 (or Labanalysis) Host...
 
 *** ADARA Git Repository ***
 
@@ -24,9 +24,9 @@ source directory location for any configuration files being copied
 from the ADARA Git Repository.
 
 # NOTE: If Verifying the State of an Existing Git Config Repository,
-# Please Skip Step 1.a. and Proceed to Step 1.b. :-D
+# Please Skip Step 1.a. and Proceed to Step 1.b. :-D 
 
-1.a. Create Initial PVSD Configuration on New Beamline/Host:
+1.a. Create Initial STS Configuration on New Beamline/Host:
 
 	# Make Top Level Home Controls Area...
 
@@ -44,16 +44,16 @@ from the ADARA Git Repository.
 
 	# Create New Git Config Repo Branch, Copy/Steal from Existing Branch!
 
-	ls -l /home/controls/config-dassrv1/
+	ls -l /home/controls/config/
 
 	git clone git+ssh://trac.sns.gov/var/repos/config \
-		/home/controls/config-dassrv1/
+		/home/controls/config/
 
-	cd /home/controls/config-dassrv1/
+	cd /home/controls/config/
 
-	OLD="blXXX-dassrv1"   # "Old" or Existing Beamline Branch to Copy From
+	OLD="stsXXX"   # "Old" or Existing Beamline Branch to Copy From
 
-	NEW="blYYY-dassrv1"   # "New" Beamline Branch Being Created
+	NEW="stsYYY"   # "New" Beamline Branch Being Created
 
 	git checkout ${OLD}
 
@@ -65,15 +65,15 @@ from the ADARA Git Repository.
 
 	git branch -a | head
 
-		* blYYY-dassrv1
+		* stsYYY
 		  master
 		  remotes/origin/HEAD -> origin/master
 		  . . .
 
-	git rm -r deploy/ pvsd.deployment.history.txt
+	git rm -r deploy/ sts.deployment.history.txt
 
 	git commit -m "Clearing Deployment History from Copied Branch" \
-		deploy/ pvsd.deployment.history.txt
+		deploy/ sts.deployment.history.txt
 
 	git status
 
@@ -82,10 +82,10 @@ from the ADARA Git Repository.
 	RedHat6:
 	vi .git/config
 		- add section:
-			[branch "YYY-dassrv1"]
+			[branch "stsYYY"]
 				remote = origin
-				merge = refs/heads/YYY-dassrv1
-	
+				merge = refs/heads/stsYYY
+
 	RedHat7:
 	git branch --set-upstream-to=origin/${NEW} ${NEW}
 
@@ -96,12 +96,7 @@ from the ADARA Git Repository.
 	# Populate New Branch with Schtuff...! ;-D
 
 	### NOTE: If Just Copied Complete Setup from Existing Branch,
-	### Then Edit PVSD Wrapper Script and Please Proceed to Step 1.b. :-D
-
-	# Replace "--domain" name with New Beamline Short Name, "SNS.INST",
-	# And Perhaps Edit "--broker_uri" to use "amqbrokerdev"... ;-D
-
-	vi pvsd/usr.local.bin.pvsd
+	### Then Please Proceed to Step 1.b. :-D
 
 	### Else Proceed with Step 1.a to Create Brand New Config. :-D
 
@@ -112,103 +107,173 @@ from the ADARA Git Repository.
 
 	# Get/Copy/Create a "confck" Script...
 
-	cp /SNS/users/y8y/confck.pvsd confck
+	cp /SNS/users/y8y/confck.sts confck
 	git add confck
 	git commit -m "Install ConfCk Script." confck
 
 	./confck
 
-	mkdir pvsd
+	# STS XInetd Configurations
 
-	# PVSD Init Script
+	mkdir -p etc/xinetd.d
 
-	sudo cp ~/gitsrc/ADARA/PVStreamer/pvsd/pvsd.initscript /etc/init.d/pvsd
+	-> Do For Each ${STS} Deployment in:
+		"sts", "sts_test", "sts_dummy", "sts_hfir" and "sts_hfir_test"
 
-	ifconfig [Obtain Local Beamline IP/Subnet Address, i.e. 10.111.14.130]
+		sudo cp ~/gitsrc/ADARA/sts/sts.xinetd /etc/xinetd.d/${STS}
 
-	sudo vi /etc/init.d/pvsd
-		- replace: EPICS_CA_ADDR_LIST="10.111.XXX.255 160.91.228.17"
+		sudo vi /etc/xinetd.d/${STS}
+			- set "id" to "${STS}-stream"
+			- set "server" to "/usr/local/bin/${STS}"
+			- set "port" to:
+				-> sts = 31417
+				-> sts_test = 31418
+				-> sts_dummy = 31419
+				-> sts_hfir = 31420
+				-> sts_hfir_test = 31421
 
-	cp /etc/init.d/pvsd pvsd/pvsd.initscript
+		cp /etc/xinetd.d/${STS} etc/xinetd.d/${STS}
 
-	# PVSD Wrapper Script
+	# STS Services
 
-	sudo cp ~/gitsrc/ADARA/PVStreamer/pvsd/pvsd.wrapper /usr/local/bin/pvsd
+	-> Add the Following Ports to /etc/services:
 
-	sudo vi /usr/local/bin/pvsd
-		- replace "bl999" with beamline number
-		- replace "XXX" with beamline short name
+	sudo vi /etc/services
 
-	cp /usr/local/bin/pvsd pvsd/usr.local.bin.pvsd
+		sts             31417/udp
+		sts             31417/tcp
+		sts_test        31418/udp
+		sts_test        31418/tcp
+		sts_dummy       31419/udp
+		sts_dummy       31419/tcp
+		sts_hfir        31420/udp
+		sts_hfir        31420/tcp
+		sts_hfir_test   31421/udp
+		sts_hfir_test   31421/tcp
 
-	# ADARA Mailer Config
+	cp /etc/services etc/services
 
-	sudo cp /SNS/users/y8y/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+	git add etc
+	git commit -m "STS Etc and XInetd Config Files." etc
 
-	cp /etc/rsyslog.d/adaraMailer.conf pvsd/adaraMailer.conf
+	# STS Wrapper Scripts
 
-	git add pvsd
-	git commit pvsd
+	mkdir -p usr/local/bin
+
+	-> Do For Each ${STS} Deployment in:
+		"sts", "sts_test", "sts_dummy", "sts_hfir" and "sts_hfir_test"
+
+		sudo cp ~/gitsrc/ADARA/sts/sts.wrapper /usr/local/bin/${STS}
+
+		sudo vi /usr/local/bin/${STS}
+			- set "CONFIG_FILE" to:
+				-> sts = "/SNS/snfs1/stsdata/sts_config.xml"
+				-> sts_test = "/SNS/snfs1/stsdata_test/sts_config.xml"
+				-> sts_dummy = "/TESTING/SNS/stsdata_dummy/sts_config.xml"
+				-> sts_hfir = "/HFIR/stsdata_hfir/sts_config.xml"
+				-> sts_hfir_test = "/HFIR/stsdata_hfir_test/sts_config.xml"
+			- set binary executable path to:
+				-> sts = "/usr/sbin/sts"
+				-> sts_test = "/usr/sbin/sts_test"
+				-> sts_dummy = "/usr/sbin/sts_dummy"
+				-> sts_hfir = "/usr/sbin/sts_hfir"
+				-> sts_hfir_test = "/usr/sbin/sts_hfir_test"
+			- set "STS Working Directory" (-w <path>) to:
+				-> sts = "-w /SNS/snfs1/stsdata"
+				-> sts_test = "-w /SNS/snfs1/stsdata_test"
+				-> sts_dummy = "-w /TESTING/SNS/stsdata_dummy"
+				-> sts_hfir = "-w /HFIR/HB2C/stsdata_hfir"
+					NOTE: HFIR STS Deployments are Per Beamline...!
+				-> sts_hfir_test = "-w /HFIR/HB2C/stsdata_hfir_test"
+					NOTE: HFIR STS Deployments are Per Beamline...!
+
+		cp /usr/local/bin/${STS} usr/local/bin/${STS}
+
+	git add usr
+	git commit -m "STS Usr Local Bin Wrapper Scripts." usr
+
+1.b. Verify State of Existing Git Config Repository:
+
+	pushd /home/controls/config/ ; git pull ; git diff ; git status
 
 	./confck
 
--OR-
+	sudo cp etc/rsyslog.d/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
 
-1.b. Verify State of Any Existing Git Config Repository:
+	sudo cp etc/rsyslog.d/stslog.conf /etc/rsyslog.d/stslog.conf
 
-	pushd /home/controls/config-dassrv1/ ; git pull ; git diff ; git status
+	sudo cp etc/xinetd.d/sts /etc/xinetd.d/sts
 
-	./confck
+	sudo cp etc/xinetd.d/sts_dummy /etc/xinetd.d/sts_dummy
 
-	sudo cp pvsd/usr.local.bin.pvsd /usr/local/bin/pvsd
+	sudo cp etc/xinetd.d/sts_hfir /etc/xinetd.d/sts_hfir
 
-	sudo cp pvsd/pvsd.initscript /etc/init.d/pvsd
+	sudo cp etc/xinetd.d/sts_hfir_test /etc/xinetd.d/sts_hfir_test
 
-	sudo cp pvsd/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+	sudo cp etc/xinetd.d/sts_test /etc/xinetd.d/sts_test
 
-	ls -l /usr/local/bin/pvsd /etc/init.d/pvsd \
-		/etc/rsyslog.d/adaraMailer.conf   
+	sudo cp usr/local/bin/sts /usr/local/bin/sts
 
-		-rwxr-xr-x 1 root root 2146 Mar 31  2017 /etc/init.d/pvsd*
+	sudo cp usr/local/bin/sts_dummy /usr/local/bin/sts_dummy
 
-		-rw-r--r-- 1 root root  513 Mar 27  2017
-			/etc/rsyslog.d/adaraMailer.conf
+	sudo cp usr/local/bin/sts_hfir /usr/local/bin/sts_hfir
 
-		-rwxr-xr-x 1 root root  549 May 31 18:35 /usr/local/bin/pvsd*
+	sudo cp usr/local/bin/sts_hfir_test /usr/local/bin/sts_hfir_test
 
-	./confck
+	sudo cp usr/local/bin/sts_test /usr/local/bin/sts_test
 
-	diff pvsd/rsyslog.conf /etc/rsyslog.conf
+	ls -l /etc/rsyslog.d/adaraMailer.conf /etc/rsyslog.d/stslog.conf \
+		/etc/xinetd.d/sts /etc/xinetd.d/sts_dummy \
+		/etc/xinetd.d/sts_hfir /etc/xinetd.d/sts_hfir_test \
+		/etc/xinetd.d/sts_test \
+		/usr/local/bin/sts /usr/local/bin/sts_dummy \
+		/usr/local/bin/sts_hfir /usr/local/bin/sts_hfir_test \
+		/usr/local/bin/sts_test
 
-	sudo cp pvsd/rsyslog.conf /etc/rsyslog.conf
+	-rw-r--r-- 1 root     root           513 Apr  2 15:12
+		/etc/rsyslog.d/adaraMailer.conf
 
-	./confck
+	-rw-r--r-- 1 root     root           145 Mar 22 16:52
+		/etc/rsyslog.d/stslog.conf
 
-	diff pvsd/etc.crontab /etc/crontab
+	-rw-rw-r-- 1 root     sts_developers 321 Mar 22 16:47
+		/etc/xinetd.d/sts
+	-rw-rw-r-- 1 root     sts_developers 320 Mar 23 15:36
+		/etc/xinetd.d/sts_dummy
+	-rw-rw-r-- 1 root     sts_developers 337 Mar 22 16:47
+		/etc/xinetd.d/sts_hfir
+	-rw-rw-r-- 1 root     sts_developers 352 Mar 22 16:46
+		/etc/xinetd.d/sts_hfir_test
+	-rw-rw-r-- 1 root     sts_developers 336 Mar 22 16:46
+		/etc/xinetd.d/sts_test
 
-	sudo cp pvsd/etc.crontab /etc/crontab
+	-rwxrwxr-x 1 snsdata  adara          246 Mar 22 16:44
+		/usr/local/bin/sts*
+	-rwxrwxr-x 1 snsdata  adara          308 Mar 22 16:44
+		/usr/local/bin/sts_dummy*
+	-rwxrwxr-x 1 hfirdata adara          417 Mar 22 16:43
+		/usr/local/bin/sts_hfir*
+	-rwxrwxr-x 1 hfirdata adara          442 Mar 22 16:43
+		/usr/local/bin/sts_hfir_test*
+	-rwxrwxr-x 1 snsdata  adara          261 Mar 22 16:42
+		/usr/local/bin/sts_test*
 
 	./confck
 
 2. RSyslog Setup:
 
-	sudo vi /etc/rsyslog.conf
+	# NOTE: We no longer edit this file for the STS Log file...
+	# -> this is handled by the "/etc/rsyslog.d/stslog.conf" file
 
-		#### RULES ####
+	ls -l /var/log/sts.log
 
-		# pvsd log
-		if $programname == 'pvsd' then /var/log/pvsd.log
-		& ~
+	sudo touch /var/log/sts.log
 
-	ls -l /var/log/pvsd.log
+	sudo chgrp users /var/log/sts.log
 
-	sudo touch /var/log/pvsd.log
+	sudo chmod g+w /var/log/sts.log
 
-	sudo chgrp users /var/log/pvsd.log
-
-	sudo chmod g+w /var/log/pvsd.log
-
-	ls -l /var/log/pvsd.log
+	ls -l /var/log/sts.log
 
 	sudo /sbin/service rsyslog status
 
@@ -218,10 +283,10 @@ from the ADARA Git Repository.
 
 	./confck 
 
-	cp /etc/rsyslog.conf pvsd/rsyslog.conf
+	cp /etc/rsyslog.conf etc/rsyslog.conf
 
-	git add pvsd/rsyslog.conf
-	git commit pvsd/rsyslog.conf
+	git add etc/rsyslog.conf
+	git commit etc/rsyslog.conf
 
 	./confck
 
@@ -250,10 +315,10 @@ from the ADARA Git Repository.
 
 	./confck
 
-	cp /etc/crontab pvsd/etc.crontab
+	cp /etc/crontab etc/etc.crontab
 
-	git add pvsd/etc.crontab
-	git commit pvsd/etc.crontab
+	git add etc/etc.crontab
+	git commit etc/etc.crontab
 
 	./confck
 
@@ -261,50 +326,36 @@ from the ADARA Git Repository.
 
 	crontab -l
 
-	crontab -e   # Edit "blXXX" to New Beamline Number...! :-D
+	crontab -e
 
-		MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
-		PATH=/home/controls/epics/base/master/bin/linux-x86_64:/home/controls/epics/basev4/master/pvAccessCPP/bin/linux-x86_64/:/home/controls/epics/extensions/master/bin/linux-x86_64:/home/controls/epics/extensions/master/bin:/usr/local/SNS/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/sbin:/usr/sbin
-		0-59/10 * * * * /SNS/users/y8y/stuff/exec/pvsd_mon
-		0 8,17 * * * /home/controls/config-dassrv1/confck --quiet
-		0 8,17 * * * /home/controls/share/master/scripts/check_beamline_xml --quiet /home/controls/blXXX/beamline.xml
+	MAILTO='kohlja@ornl.gov'
+	0 8,17 * * * /home/controls/config/confck --quiet
+	0 8,17 * * * /home/controls/config-sts-config/confck --quiet
+	0 8,17 * * * /home/controls/config-sts-config-test/confck --quiet
+	0 8,17 * * * /home/controls/config-sts-config-hfir/confck --quiet
+	0 8,17 * * * /home/controls/config-sts-config-hfir-test/confck --quiet
+	0 8,17 * * * /home/controls/config-sts-config-dummy/confck --quiet
 
 	crontab -l
 
-5. Add SMS to Local Run Levels
+5. User Local Bin Soft Link Setup:
 
-	chkconfig --list pvsd
+	ls -l /usr/sbin/sts*
 
-	sudo chkconfig --add pvsd
+	sudo ln -s /home/controls/config/deploy/sts /usr/sbin/sts
 
-	chkconfig --list pvsd
+	sudo ln -s /home/controls/config/deploy/sts_dummy /usr/sbin/sts_dummy
 
-	sudo chkconfig pvsd on
+	sudo ln -s /home/controls/config/deploy/sts_hfir /usr/sbin/sts_hfir
 
-	chkconfig --list pvsd
+	sudo ln -s /home/controls/config/deploy/sts_hfir_test \
+		/usr/sbin/sts_hfir_test
 
-	./confck
+	sudo ln -s /home/controls/config/deploy/sts_test /usr/sbin/sts_test
 
-	(rm pvsd/chkconfig.pvsd)
+	ls -l /usr/sbin/sts*
 
-	chkconfig --list pvsd > pvsd/chkconfig.pvsd 2>&1
-
-	git add pvsd/chkconfig.pvsd
-	git commit pvsd/chkconfig.pvsd
-
-	git diff ; git pull ; git push ; git status
-
-	./confck
-
-6. User Local Bin Soft Link Setup:
-
-	ls -l /usr/sbin/pvsd
-
-	sudo ln -s /home/controls/config-dassrv1/deploy/pvsd /usr/sbin/pvsd
-
-	ls -l /usr/sbin/pvsd
-
-7. Semi-Manually Deploy Local EPICS Libraries and Utilities...
+6. Semi-Manually Deploy Local EPICS Libraries and Utilities...
 
 	# Temporarily Edit $HOME/.bashrc EPICS Settings for the Build Process
 
@@ -343,7 +394,7 @@ from the ADARA Git Repository.
 	cp -rp /home/controls/epics/basev4/master \
 		/home/controls/prod/epics/basev4/rel4.5-SNS2_20170606
 
-8. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
+7. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
 
 	ls -l /home/controls/prod/ADARA
 
@@ -387,7 +438,7 @@ from the ADARA Git Repository.
 
 	printenv | grep EPICS
 
-9. Make Sure Accelerator Timing Git Repo is Deployed:
+8. Make Sure Accelerator Timing Git Repo is Deployed:
 
 	ls -l /home/controls/Accelerator/
 
@@ -403,25 +454,26 @@ from the ADARA Git Repository.
 		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
 			SNS.Timing.Master.Functional.System.Description.pdf
 
-10. Deploy PVSD Daemon:
+9. Deploy STS Daemon:
 
 	pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
 
-	(ls -l /home/controls/config-dassrv1/deploy/pvsd)
+	(ls -l /home/controls/config/deploy/sts)
 
 		lrwxrwxrwx 1 y8y slowcontrols_developers 47 Jul 18 13:28
-			/home/controls/config-dassrv1/deploy/pvsd ->
-				/home/controls/prod/ADARA/20170717/v1.6.19/pvsd*
+			/home/controls/config/deploy/sts ->
+				/home/controls/prod/ADARA/20170717/v1.6.19/sts*
 
-	./deploy_adara pvsd
+	# Best Deployment Order for "All Local Everything" Hosts:
 
-11. Start PVSD Daemon:
+	./deploy_adara sts_dummy
+	./deploy_adara sts_test
+	./deploy_adara sts_hfir_test
+	./deploy_adara sts_hfir
+	./deploy_adara sts
 
-	sudo /sbin/service pvsd status
-
-	sudo /sbin/service pvsd start
-
-	pvsdlog
+	(Note: The "Last" STS Deployment Sets the Version for All the
+		SMS, PVSD and DASMON Binaries in /home/controls/<config>/deploy/.)
 
 DONE!!! :-D
 

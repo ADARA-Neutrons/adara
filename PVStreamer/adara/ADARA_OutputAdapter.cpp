@@ -463,6 +463,17 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
         a_adara_pkt.payload_len     = 16 + a_state.m_str_val.size();
         a_adara_pkt.vvp_str.str_len = a_state.m_str_val.size();
 
+        // (For Now) Log String PV Value Updates...
+        syslog( LOG_ERR,
+            "%s: %s Device [%s] (%s id=%d) PV <%s> (%s) (pv id=%d) = [%s]",
+            "OutputAdapter::buildVVP()",
+            "String PV Value Update for",
+            a_pv->m_device->m_name.c_str(),
+            "device", a_pv->m_device->m_id,
+            a_pv->m_name.c_str(), a_pv->m_connection.c_str(),
+            a_pv->m_id, a_state.m_str_val.c_str() );
+        usleep(33333); // give syslog a chance...
+
         // Set payload
         a_payload = vector<uint8_t>( a_state.m_str_val.size() );
         bytes = a_payload.data();

@@ -901,6 +901,42 @@ int H5nx::H5NXmake_dataset_string( const std::string &group_path,
 }
 
 ///////////////////////////////////////////////////////////////////
+// H5NXcheck_dataset_path
+////////////////////////////////////////////////////////////////////
+int H5nx::H5NXcheck_dataset_path( const std::string &group_path,
+        const std::string &dataset_name, bool &exists )
+{
+    hid_t   did;  // dataset ID
+
+    std::string absolute_dataset_name = group_path + "/" + dataset_name;
+
+    // Try to Open the Dataset Path...
+    if ( (did = H5Dopen2( this->m_fid, absolute_dataset_name.c_str(),
+            H5P_DEFAULT)) < 0 )
+    {
+        exists = false;
+        return SUCCEED;
+    }
+    else {
+        exists = true;
+    }
+
+    // If Successful, Try to Close It... ;-D
+    if ( H5Dclose( did ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STS Error", "H5nx::H5NXcheck_dataset_path",
+            "H5Dclose", "Close Dataset" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr(
+            "H5nx::H5NXcheck_dataset_path(): H5Dclose() Close Dataset");
+        return FAIL;
+    }
+
+    return SUCCEED;
+}
+
+///////////////////////////////////////////////////////////////////
 // to_nx_type
 ////////////////////////////////////////////////////////////////////
 

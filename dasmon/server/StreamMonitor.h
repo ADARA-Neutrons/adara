@@ -279,6 +279,7 @@ enum ThreadState
     TS_PKT_STREAM_ANNOTATION,
     TS_PKT_BEAM_MONITOR_EVENT,
     TS_PKT_BANKED_EVENT,
+    TS_PKT_BANKED_EVENT_STATE,
     TS_NOTIFY_NONE              = 200,
     TS_NOTIFY_RUN_INFO,
     TS_NOTIFY_BEAM_INFO,
@@ -398,6 +399,7 @@ private:
     bool        rxPacket( const ADARA::Packet &a_pkt );
     bool        rxPacket( const ADARA::RunStatusPkt &a_pkt );
     bool        rxPacket( const ADARA::BankedEventPkt &a_pkt );
+    bool        rxPacket( const ADARA::BankedEventStatePkt &a_pkt );
     bool        rxPacket( const ADARA::PixelMappingPkt &a_pkt );
     bool        rxPacket( const ADARA::PixelMappingAltPkt &a_pkt );
     bool        rxPacket( const ADARA::BeamMonitorPkt &a_pkt );
@@ -482,6 +484,7 @@ private:
     uint64_t                        m_last_time;
     uint64_t                        m_this_time;
     uint32_t                        m_bnk_pkt_count;
+    uint32_t                        m_bnk_state_pkt_count;
     uint32_t                        m_mon_pkt_count;
     uint32_t                        m_maxtof;
     std::map<int16_t,BankInfo>      m_bank_info;

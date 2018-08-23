@@ -129,19 +129,22 @@ private:
 
 	typedef std::vector<ADARA::Event> EventVector;
 
+	typedef std::pair<uint32_t, uint32_t> BankIndex;
+
+	typedef std::map< BankIndex, EventVector > BankMap;
+
 	struct EventSource {
-		EventSource(uint32_t intraPulse, uint32_t tofField,
-			uint32_t nBanks) :
+		EventSource( uint32_t intraPulse, uint32_t tofField ) :
 				m_intraPulseTime(intraPulse),
 				m_tofField(tofField),
-				m_activeBanks(0),
-				m_banks(nBanks, EventVector())
+				m_activeBanks(0)
 		{ }
 
 		uint32_t			m_intraPulseTime;
 		uint32_t			m_tofField;
 		uint32_t			m_activeBanks;
-		std::vector<EventVector>	m_banks;
+
+		BankMap				m_banks;
 	};
 
 	typedef std::map<uint32_t, EventSource> SourceMap;
@@ -302,6 +305,15 @@ private:
 	boost::shared_ptr<smsUint32PV> m_pvIntermittentDataThreshold;
 	static uint32_t m_intermittentDataThreshold;
 
+	boost::shared_ptr<smsUint32PV> m_pvNeutronEventStateBits;
+	boost::shared_ptr<smsBooleanPV> m_pvNeutronEventSortByState;
+	static uint32_t m_neutronEventStateBits;
+	static uint32_t m_neutronEventStateMask;
+	static bool m_neutronEventSortByState;
+
+	boost::shared_ptr<smsBooleanPV> m_pvIgnoreInterleavedSawtooth;
+	static bool m_ignoreInterleavedSawtooth;
+
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 
 	boost::shared_ptr<CleanShutdownPV> m_pvCleanShutdown;
@@ -331,6 +343,7 @@ private:
 				uint32_t id, uint32_t tof);
 
 	void buildBankedPacket(PulsePtr &pulse);
+	void buildBankedStatePacket(PulsePtr &pulse);
 	void buildMonitorPacket(PulsePtr &pulse);
 	void buildChopperPackets(PulsePtr &pulse);
 	void buildFastMetaPackets(PulsePtr &pulse);

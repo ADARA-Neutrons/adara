@@ -10,6 +10,7 @@
 #include "TraceException.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
+#include "combus/ComBus.h"
 #include "UserIdLdap.h"
 
 // Do Stu's Dummy PixelId-Filled Histogram Test...
@@ -54,6 +55,7 @@ NxGen::NxGen
     m_daslogs_path(m_entry_path + string("/DASlogs")),
     m_daslogs_freq_path(m_daslogs_path + string("/frequency")),
     m_daslogs_pchg_path(m_daslogs_path + string("/proton_charge")),
+    m_software_path(m_entry_path + string("/Software")),
     m_pid_name(string("event_id")),
     m_tof_name(string("event_time_offset")),
     m_index_name(string("event_index")),
@@ -69,7 +71,7 @@ NxGen::NxGen
     m_haveRunComment(false)
 {
     // Capture STS "Start of Processing Time"...
-    clock_gettime( CLOCK_REALTIME, &m_sts_start_time );
+    clock_gettime( CLOCK_REALTIME, &m_sts_run_start_time );
 
     if ( !a_nexus_out_file.empty() )
     {
@@ -99,7 +101,8 @@ NxGen::~NxGen()
  * This method constructs Nexus-specific PVInfoBase objects for use by
  * the generalized process variable handlers in the StreamParser class.
  * Due to ADARA protocol limitations, only uint32, double and string
- * types are supported (others are mapped to these).
+ * scalar types are supported (others are mapped to these), in addition
+ * to the new uint32 and double array PVs.
  */
 STS::PVInfoBase*
 NxGen::makePVInfo
@@ -117,123 +120,150 @@ NxGen::makePVInfo
     bool                    a_ignore        ///< [in] PV Ignore Flag
 )
 {
-    string internal_name = a_name;
-    uint32_t name_ver = 0;
-
     string internal_connection = a_connection;
-    uint32_t connection_ver = 0;
+    string internal_name = a_name;
 
-    set<string>::iterator i;
+    // *Only* When PV Name (Alias) is Different than PV Connection String,
+    // Check for Name Clashes & Do Versioning of PV Name (Alias) Here...
+    // (If the PV Name == Connection String, then the "Name" is Actually
+    // just a copy of the Connection String, so Defer to Duplicates Below!)
+    // [Note: This is True for All Recent PVSD Incarnations, tho this is
+    // _Not_ True for Ancient Legacy Test Cases in the ADARA Test Harness;
+    // But These Test Cases have been Checked and Have No Name Clashes.]
 
-    // Check for PV Name Collisions: This code looks for the Name (Alias)
-    // across all PV names and connection strings encountered thus far,
-    // and if found increments/appends a version number.
-    // Then it checks again to make sure _This_ auto-generated internal
-    // name doesn't collide with an existing (top-level) name.
-    // This continues until a version is found that doesn't collide.
-
-    while ( 1 )
+    if ( a_name.compare( a_connection ) )
     {
-        i = m_pv_name_history.find( internal_name );
-        if ( i != m_pv_name_history.end() )
-        {
-            internal_name = a_name + "("
-                + boost::lexical_cast<string>( ++name_ver ) + ")";
-        }
-        else
-        {
-            if ( name_ver > 0 )
-            {
-                syslog( LOG_ERR,
-                    "[%i] %s Device %s: %s Clash %s -> %s",
-                    g_pid, "STS Error:", a_device_name.c_str(),
-                    "PV Name", a_name.c_str(), internal_name.c_str() );
-                usleep(30000); // give syslog a chance...
-            }
-            m_pv_name_history.insert( internal_name );
-            break;
-        }
-    }
+        // Check for PV Name Collisions:
+        // This code looks for the Name (Alias) across all PV Names and
+        // Connection Strings encountered thus far, and if found
+        // Increments/Appends a Version Number to the Name.
+        // Then, it checks again to make sure _This_ New Auto-Generated
+        // Internal Name doesn't collide with an existing (top-level) Name.
+        // This continues until a Version is found that doesn't collide.
 
-    // Now Handle Connection String Issues/Collisions.
+        set<string>::iterator i;
 
-    // If the Name and Connection String were the same before,
-    // then just make them the same again now... ;-D
-    if ( a_name == a_connection )
-    {
-        internal_connection = internal_name;
-    }
+        uint32_t name_ver = 0;
 
-    // Otherwise Check for Connection String Collisions: This code looks
-    // for this connection string across all PVs and if found increments
-    // a version number.  Then it checks again to make sure _This_
-    // auto-generated internal connection string doesn't collide with
-    // an existing (top-level) PV name or connection string.
-    // This continues until a version is found that doesn't collide.
-
-    // Let's *Not* Assume that any Connection String collisions
-    // correspond to 2 Different Aliases of the Same Variable, just
-    // in case that happens Not to be true... Better to duplicate a
-    // PV than throw away the values for a distinct PV with a Name Clash.)
-
-    else
-    {
         while ( 1 )
         {
-            i = m_pv_name_history.find( internal_connection );
-            if ( i != m_pv_name_history.end())
+            i = m_pv_name_history.find( internal_name );
+            if ( i != m_pv_name_history.end() )
             {
-                internal_connection = a_connection + "("
-                    + boost::lexical_cast<string>( ++connection_ver )
-                    + ")";
+                internal_name = a_name + "("
+                    + boost::lexical_cast<string>( ++name_ver ) + ")";
             }
             else
             {
-                if ( connection_ver > 0 )
+                if ( name_ver > 0 )
                 {
                     syslog( LOG_ERR,
-                        "[%i] %s Device %s: %s Clash %s -> %s",
-                        g_pid, "STS Error:", a_device_name.c_str(),
-                        "PV Connection String", a_connection.c_str(),
-                        internal_connection.c_str() );
+                        "[%i] %s %s: %s: Device %s: %s -> %s",
+                        g_pid, "STS Error:", "makePVInfo()",
+                        "PV Name Clash",
+                        a_device_name.c_str(),
+                        a_name.c_str(),
+                        internal_name.c_str() );
                     usleep(30000); // give syslog a chance...
                 }
-                m_pv_name_history.insert( internal_connection );
+                m_pv_name_history.insert( internal_name );
                 break;
             }
         }
     }
 
+    // Now, Check for PV Connection String Collisions/Duplicates:
+    // This code looks for this PV Connection String across All Known PVs,
+    // and, if found, Marks This PV (and its Dopplegangers) as "Duplicate".
+
+    // NOTE: We *Now* Indeed Assume that PV Connection Strings are
+    // *Unique* Across a Given Beamline, so that any PV Connection String
+    // Collisions _Must_ Correspond to 2 Different Aliases of the
+    // Same Variable.
+
+    // In the case of such Duplicates, We Collect All the PV Value Updates
+    // for *All* Copies of the PV, in the hopes that we can Authoritatively
+    // Verify a Complete Match, and/or Stitch Together _All_ the Values
+    // from All Copies, as needed.
+
+    vector<STS::PVInfoBase*>::iterator ipv = m_pvs_list.begin();
+
+    bool isDuplicate = false;
+
+    while ( ipv != m_pvs_list.end() )
+    {
+        // Check for Duplicate PV Connections...
+        // (Ignore Device Name and PV Name (Alias)... ;-D)
+        if ( (*ipv)->sameDefinitionPVConn( internal_connection,
+                a_type, a_enum_vector, a_enum_index, a_units, a_ignore ) )
+        {
+            // Mark This PV as a Duplicate...!
+            // (And It's Doppleganger, Too...! ;-D)
+
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s: Device %s %s == Device %s %s",
+                g_pid, "STS Error:", "makePVInfo()",
+                "Duplicate PV Connection",
+                a_device_name.c_str(),
+                internal_connection.c_str(),
+                (*ipv)->m_device_name.c_str(),
+                (*ipv)->m_connection.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            // Create New PVInfo as a "Duplicate", with flag set...
+            isDuplicate = true;
+
+            // Mark This Matching PV
+            (*ipv)->m_duplicate = true;
+
+            // Once We've Found One Duplicate,
+            // We've Added Ourselves to the Chain... ;-D
+            break;
+        }
+
+        ++ipv;
+    }
+
+    // If _Not_ a Duplicate PV Connection String,
+    // Add This Connection String to the List of PV Names...
+
+    if ( !isDuplicate )
+    {
+        m_pv_name_history.insert( internal_connection );
+    }
+
+    // Now Proceed to Create the New PVInfo Instance for This Device/PV...
+
     switch ( a_type )
     {
-    case STS::PVT_INT:  // ADARA only supports uint32_t currently
-    case STS::PVT_ENUM:
-    case STS::PVT_UINT:
-        return new NxPVInfo<uint32_t>( a_device_name,
-            a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, a_ignore, *this );
-    case STS::PVT_FLOAT: // ADARA only supports double currently
-    case STS::PVT_DOUBLE:
-        return new NxPVInfo<double>( a_device_name,
-            a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, a_ignore, *this );
-    case STS::PVT_STRING:
-        return new NxPVInfo<string>( a_device_name,
-            a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, a_ignore, *this );
-    case STS::PVT_UINT_ARRAY:
-        return new NxPVInfo< vector<uint32_t> >( a_device_name,
-            a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, a_ignore, *this );
-    case STS::PVT_DOUBLE_ARRAY:
-        return new NxPVInfo< vector<double> >( a_device_name,
-            a_name, internal_name, a_connection, internal_connection,
-            a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
-            a_units, a_ignore, *this );
+        case STS::PVT_INT:  // ADARA only supports uint32_t currently
+        case STS::PVT_ENUM:
+        case STS::PVT_UINT:
+            return new NxPVInfo<uint32_t>( a_device_name,
+                a_name, internal_name, a_connection, internal_connection,
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units, a_ignore, isDuplicate, *this );
+        case STS::PVT_FLOAT: // ADARA only supports double currently
+        case STS::PVT_DOUBLE:
+            return new NxPVInfo<double>( a_device_name,
+                a_name, internal_name, a_connection, internal_connection,
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units, a_ignore, isDuplicate, *this );
+        case STS::PVT_STRING:
+            return new NxPVInfo<string>( a_device_name,
+                a_name, internal_name, a_connection, internal_connection,
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units, a_ignore, isDuplicate, *this );
+        case STS::PVT_UINT_ARRAY:
+            return new NxPVInfo< vector<uint32_t> >( a_device_name,
+                a_name, internal_name, a_connection, internal_connection,
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units, a_ignore, isDuplicate, *this );
+        case STS::PVT_DOUBLE_ARRAY:
+            return new NxPVInfo< vector<double> >( a_device_name,
+                a_name, internal_name, a_connection, internal_connection,
+                a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
+                a_units, a_ignore, isDuplicate, *this );
     }
 
     THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
@@ -251,13 +281,14 @@ STS::BankInfo*
 NxGen::makeBankInfo
 (
     uint16_t a_id,              ///< [in] ID of detector bank
+    uint32_t a_state,           ///< [in] State of detector bank
     uint32_t a_buf_reserve,     ///< [in] Event buffer initial capacity
     uint32_t a_idx_buf_reserve  ///< [in] Index buffer initial capacity
 )
 {
     try
     {
-        NxBankInfo* bi = new NxBankInfo( a_id,
+        NxBankInfo* bi = new NxBankInfo( a_id, a_state,
             a_buf_reserve, a_idx_buf_reserve, *this );
 
         // "Late" Initialization Now via NxGen::initializeNxBank()...
@@ -267,7 +298,8 @@ NxGen::makeBankInfo
     }
     catch ( TraceException &e )
     {
-        RETHROW_TRACE( e, "makeBankInfo( bank: " << a_id << " ) failed." )
+        RETHROW_TRACE( e, "makeBankInfo( bank: " << a_id
+            << " state: " << a_state << " ) failed." )
     }
 }
 
@@ -335,6 +367,7 @@ NxGen::initializeNxBank
     catch ( TraceException &e )
     {
         RETHROW_TRACE( e, "initializeNxBank( bank: " << a_bi->m_id
+            << " state: " << a_bi->m_state
             << ", end_of_run=" << a_end_of_run
             << " ) initialization failed." )
     }
@@ -452,6 +485,34 @@ NxGen::initialize()
         //     to pulseBuffersReady() or finalize(),
         //     create & write in one shot...)
 
+        // Create Software Provenance Collection
+        makeGroup( m_software_path, "NXcollection" );
+
+        // Create ADARA STS Software Provenance Note
+        makeGroup( m_software_path + "/Translation", "NXprocess" );
+        writeString( m_software_path + "/Translation", "program",
+            "ADARA STS" );
+        writeString( m_software_path + "/Translation", "note",
+            ADARA::ATTRIB );
+
+        // ADARA STS Version String
+        string sts_version = "ADARA STS ";
+        sts_version += STS_VERSION;
+        sts_version += ", Common ";
+        sts_version += ADARA::VERSION;
+        sts_version += ", ComBus ";
+        sts_version += ADARA::ComBus::VERSION;
+        sts_version += ", Tag ";
+        sts_version += ADARA::TAG_NAME;
+        writeString( m_software_path + "/Translation", "version",
+            sts_version );
+
+        // ADARA STS Processing Start Time
+        struct timespec now;
+        clock_gettime( CLOCK_REALTIME_COARSE, &now );
+        string time = timeToISO8601( now );
+        writeString( m_software_path + "/Translation", "date", time );
+
         // Insert initial "not in scan" value:
         //     - Current Nexus scan log calls for 0
         //     to be used for all scan stops
@@ -480,7 +541,8 @@ NxGen::initialize()
 void
 NxGen::finalize
 (
-    const STS::RunMetrics &a_run_metrics    ///< [in] Run metrics object
+    const STS::RunMetrics &a_run_metrics,   ///< [in] Run metrics object
+    const STS::RunInfo &a_run_info          ///< [in] Run information object
 )
 {
     if (!m_gen_nexus)
@@ -489,6 +551,21 @@ NxGen::finalize
     try
     {
         writeString( m_entry_path, "definition", "NXsnsevent" );
+
+        // Create ADARA Software Provenance Note
+        makeGroup( m_software_path + "/DataAcquistion", "NXprocess" );
+        writeString( m_software_path + "/DataAcquistion", "program",
+            "ADARA SMS" );
+        writeString( m_software_path + "/DataAcquistion", "version",
+            a_run_info.das_version );
+        writeString( m_software_path + "/DataAcquistion", "note",
+            ADARA::ATTRIB );
+
+        // ADARA SMS Processing Start Time
+        string run_start_time_str =
+            timeToISO8601( a_run_metrics.run_start_time );
+        writeString( m_software_path + "/DataAcquistion", "date",
+            run_start_time_str );
 
         // Make Sure We Have "Some" Overall Run Comment... ;-D
         if ( !m_haveRunComment ) {
@@ -587,7 +664,7 @@ NxGen::finalize
 
         // Capture Run Total Duration (for processing bandwidth statistics)
         m_duration = calcDiffSeconds(
-            a_run_metrics.end_time, a_run_metrics.start_time );
+            a_run_metrics.run_end_time, a_run_metrics.run_start_time );
 
         writeScalar( m_entry_path, "duration",
             m_duration, TIME_SEC_UNITS );
@@ -619,70 +696,70 @@ NxGen::finalize
             a_run_metrics.total_charge, CHARGE_UNITS );
 
         // Start time
-        string time = timeToISO8601( a_run_metrics.start_time );
-        writeString( m_entry_path, "start_time", time );
+        writeString( m_entry_path, "start_time", run_start_time_str );
 
         // Add start time (offset) properties to all time axis in DAS logs
         writeStringAttribute( m_daslogs_freq_path + "/time",
-            "offset", time );
+            "offset", run_start_time_str );
         writeScalarAttribute( m_daslogs_freq_path + "/time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( m_daslogs_freq_path + "/time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/pause/time",
-            "start", time );
+            "start", run_start_time_str );
         writeScalarAttribute( m_daslogs_path + "/pause/time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( m_daslogs_path + "/pause/time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/scan_index/time",
-            "start", time );
+            "start", run_start_time_str );
         writeScalarAttribute( m_daslogs_path + "/scan_index/time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( m_daslogs_path + "/scan_index/time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/comments/time",
-            "start", time );
+            "start", run_start_time_str );
         writeScalarAttribute( m_daslogs_path + "/comments/time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( m_daslogs_path + "/comments/time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute(
             m_daslogs_path + "/Veto_pulse/veto_pulse_time",
-            "start", time );
+            "start", run_start_time_str );
         writeScalarAttribute(
             m_daslogs_path + "/Veto_pulse/veto_pulse_time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute(
             m_daslogs_path + "/Veto_pulse/veto_pulse_time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         writeStringAttribute( m_daslogs_path + "/pulse_flags/time",
-            "start", time );
+            "start", run_start_time_str );
         writeScalarAttribute( m_daslogs_path + "/pulse_flags/time",
-            "offset_seconds", (uint32_t)a_run_metrics.start_time.tv_sec
+            "offset_seconds", (uint32_t)a_run_metrics.run_start_time.tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET );
         writeScalarAttribute( m_daslogs_path + "/pulse_flags/time",
             "offset_nanoseconds",
-            (uint32_t)a_run_metrics.start_time.tv_nsec );
+            (uint32_t)a_run_metrics.run_start_time.tv_nsec );
 
         // End time
-        time = timeToISO8601( a_run_metrics.end_time );
-        writeString( m_entry_path, "end_time", time );
+        string run_end_time_str =
+            timeToISO8601( a_run_metrics.run_end_time );
+        writeString( m_entry_path, "end_time", run_end_time_str );
 
         m_h5nx.H5NXclose_file();
     }
@@ -861,11 +938,12 @@ NxGen::dumpProcessingStatistics(void)
 
     // STS Processing Statistics
 
-    struct timespec sts_end_time;
+    struct timespec sts_run_end_time;
 
-    clock_gettime( CLOCK_REALTIME, &sts_end_time );
+    clock_gettime( CLOCK_REALTIME, &sts_run_end_time );
 
-    float sts_duration = calcDiffSeconds( sts_end_time, m_sts_start_time );
+    float sts_duration = calcDiffSeconds(
+        sts_run_end_time, m_sts_run_start_time );
 
     syslog( LOG_INFO, "[%i] %s = %f seconds",
         g_pid, "Total STS Processing Time", sts_duration );
@@ -1219,15 +1297,15 @@ NxGen::pulseBuffersReady
             // write them to pulse_flags DASLog
             // (For Forward-/Backwards-Compatibility, Strip Off Veto Flags
             //  in top 12 bits of flags...)
-            if ( (*f & 0xfffff) & ~ADARA::BankedEventPkt::PULSE_VETO )
+            if ( (*f & 0xfffff) & ~ADARA::PULSE_VETO )
             {
                 m_pulse_flags_time.push_back( *t );
                 m_pulse_flags_value.push_back(
-                    (*f & 0xfffff) & ~ADARA::BankedEventPkt::PULSE_VETO );
+                    (*f & 0xfffff) & ~ADARA::PULSE_VETO );
             }
 
             // Write pulse vetoes to dedicated DASlog buffer
-            if ( *f & ADARA::BankedEventPkt::PULSE_VETO )
+            if ( *f & ADARA::PULSE_VETO )
                 m_pulse_vetoes.push_back( *t );
         }
 
@@ -1354,7 +1432,7 @@ NxGen::bankPidTOFBuffersReady
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "bankPidTOFBuffersReady() failed for bank id: "
-            << a_bank.m_id )
+            << a_bank.m_id << " state: " << a_bank.m_state )
     }
 }
 
@@ -1434,7 +1512,7 @@ NxGen::bankIndexBuffersReady
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "bankIndexBuffersReady() failed for bank id: "
-            << a_bank.m_id )
+            << a_bank.m_id << " state: " << a_bank.m_state )
     }
 }
 
@@ -1485,7 +1563,8 @@ NxGen::bankPulseGap
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "bankPulseGap() failed for bank id: "
-            << a_bank.m_id << ", gap count: " << a_count )
+            << a_bank.m_id << " state: " << a_bank.m_state
+            << ", gap count: " << a_count )
     }
 }
 
@@ -1538,8 +1617,8 @@ NxGen::bankFinalize
         if ( bi->m_has_histo )
         {
             syslog( LOG_INFO,
-                "[%i] Detector Bank %d - Writing Histogram Data",
-                g_pid, a_bank.m_id );
+                "[%i] Detector Bank %d State %u - Writing Histogram Data",
+                g_pid, a_bank.m_id, a_bank.m_state );
             usleep(30000); // give syslog a chance...
 
             // Create & Write Histogram Multi-dimensional Data...
@@ -1622,7 +1701,7 @@ NxGen::bankFinalize
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "bankFinalize() failed for bank id: "
-            << a_bank.m_id )
+            << a_bank.m_id << " state: " << a_bank.m_state )
     }
 }
 
@@ -3555,19 +3634,22 @@ NxGen::parseSTSConfigFile
 
                     // Add Group Container to STS Config...
                     // (If Required Fields are Present, Else Error)
+                    // Note: It's Ok to have No Elements, Only Conditions!
                     if ( group.name.size()
                             && group.path.size()
                             && group.type.size()
-                            && group.elements.size() )
+                            && ( group.elements.size()
+                                || group.conditions.size() ) )
                     {
                         // REMOVE ME...
                         syslog( LOG_INFO,
-                            "[%i] %s \"%s\" %s - %s=[%s] %s=[%s] (%lu %s)",
+                    "[%i] %s \"%s\" %s - %s=[%s] %s=[%s] (%lu %s, %lu %s)",
                             g_pid, "Adding Group Container",
                             group.name.c_str(), "to STS Config",
                             "path", group.path.c_str(),
                             "type", group.type.c_str(),
-                            group.elements.size(), "elements" );
+                            group.elements.size(), "elements",
+                            group.conditions.size(), "conditions" );
                         usleep(30000); // give syslog a chance
 
                         m_config_groups.push_back( group );
@@ -3578,12 +3660,13 @@ NxGen::parseSTSConfigFile
                             + group.name
                             + "\" in STS Config";
                         syslog( LOG_ERR,
-                            "[%i] %s %s - %s %s=[%s] %s=[%s] (%lu %s)",
+                        "[%i] %s %s - %s %s=[%s] %s=[%s] (%lu %s, %lu %s)",
                             g_pid, "STS Error:", err.c_str(),
                             "Ignoring",
                             "path", group.path.c_str(),
                             "type", group.type.c_str(),
-                            group.elements.size(), "elements" );
+                            group.elements.size(), "elements",
+                            group.conditions.size(), "conditions" );
                         usleep(30000); // give syslog a chance
                     }
                 }
@@ -3706,6 +3789,27 @@ NxGen::writeString
             THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_string() failed for path: " << a_path << ", value: "
                          << a_value )
         }
+    }
+}
+
+
+/*! \brief Checks existence of a Nexus dataset location
+ *
+ * This method tries to open a dataset path, to see if it exists.
+ */
+void
+NxGen::checkDataset
+(
+    const string &a_path,       ///< [in] Path in Nexus file to write string
+    const string &a_dataset,    ///< [in] Name of dataset at specified path to receive string value
+    bool &a_exists              ///< [out] Does the dataset exist?
+)
+{
+    if ( m_h5nx.H5NXcheck_dataset_path( a_path, a_dataset, a_exists )
+            != SUCCEED )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "H5NXcheck_dataset_path() failed for path: " << a_path )
     }
 }
 

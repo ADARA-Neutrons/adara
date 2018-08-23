@@ -96,6 +96,7 @@ private:
         BIF_PULSE_PCHG_UNCOR,
         BIF_GOT_METADATA_COUNT,
         BIF_GOT_NEUTRONS_COUNT,
+        BIF_HAS_STATES_COUNT,
         BIF_TOTAL_PULSES_COUNT,
         BIF_COUNT
     };

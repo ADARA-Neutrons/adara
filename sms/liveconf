@@ -139,6 +139,14 @@ option_label[$num_options]="[Ignore End-of-Pulse]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
+option_name[$num_options]="ignore_local_sawtooth"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:IgnoreLocalSAWTOOTH"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Ignore Local SAWTOOTH Times]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
 option_name[$num_options]="mixed_data_packets"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MixedDataPackets"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
@@ -241,6 +249,30 @@ option_pv[$num_options]="SMS:Control:IntermittentDataThreshold"
 option_value_type[$num_options]="UINT32_VALUE(number_of_missing_pulses)"
 option_default[$num_options]="9"
 option_label[$num_options]="[Intermittent Data Source Threshold]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="neutron_event_state_bits"
+option_pv[$num_options]="SMS:Control:NeutronEventStateBits"
+option_value_type[$num_options]="UINT32_VALUE(number_of_state_bits)"
+option_default[$num_options]="0"
+option_label[$num_options]="[Number of Neutron Event State Bits]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="neutron_event_sort_by_state"
+option_pv[$num_options]="SMS:Control:NeutronEventSortByState"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Whether to Sort Neutron Events By State]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="ignore_interleaved_sawtooth"
+option_pv[$num_options]="SMS:Control:IgnoreInterleavedGlobalSAWTOOTH"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Ignore Interleaved Global SAWTOOTH Times]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
@@ -1413,6 +1445,7 @@ if [[ "$command" == "status" \
 					caget $WAIT ${dsprefix}:DataTimeout
 					caget $WAIT ${dsprefix}:DataTimeoutRetry
 					caget $WAIT ${dsprefix}:IgnoreEoP
+					caget $WAIT ${dsprefix}:IgnoreLocalSAWTOOTH
 					caget $WAIT ${dsprefix}:MixedDataPackets
 					caget $WAIT -S ${dsprefix}:MaxReadChunk
 					caget $WAIT ${dsprefix}:RTDLNoDataThresh
@@ -1504,6 +1537,9 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:Control:DoPulsePchgCorrect
 		caget $WAIT ${PRE}:SMS:Control:DoPulseVetoCorrect
 		caget $WAIT ${PRE}:SMS:Control:IntermittentDataThreshold
+		caget $WAIT ${PRE}:SMS:Control:NeutronEventStateBits
+		caget $WAIT ${PRE}:SMS:Control:NeutronEventSortByState
+		caget $WAIT ${PRE}:SMS:Control:IgnoreInterleavedGlobalSAWTOOTH
 
 		echo
 
@@ -2550,8 +2586,7 @@ CONFCK()
 		if [ ${is_indexed[$opt_id_type]} == 1 ]; then
 			echo "   Indexed Option."
 			numVarsPV="${PRE}:${index_pv[$opt_id_type]}"
-			numIndexedVars=`caget $WAIT $numVarsPV | grep $numVarsPV \
-				| awk '{print $2}'`
+			numIndexedVars=`caget $WAIT $numVarsPV | grep $numVarsPV | awk '{print $2}'`
 			# Make Sure We Got Something...
 			if [[ $numIndexedVars == "" ]]; then
 				echo -e -n "\nWarning: Unable to Obtain"

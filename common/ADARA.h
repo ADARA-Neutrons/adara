@@ -51,8 +51,10 @@
 
 namespace ADARA {
 
-const std::string VERSION = "1.8.2";
+const std::string VERSION = "1.9.1";
 const std::string TAG_NAME = "XXX_TAG_NAME_XXX";
+
+const std::string ATTRIB = "ADARA Data Acquisition System, Neutron Sciences Directorate, Oak Ridge National Laboratory (ORNL), UT-Battelle LLC";
 
 namespace PacketType {
 
@@ -62,6 +64,7 @@ namespace PacketType {
 		SOURCE_LIST_TYPE				=	0x0002,
 		MAPPED_EVENT_TYPE				=	0x0003,
 		BANKED_EVENT_TYPE				=	0x4000,
+		BANKED_EVENT_STATE_TYPE			=	0x4100,
 		BEAM_MONITOR_EVENT_TYPE			=	0x4001,
 		PIXEL_MAPPING_TYPE				=	0x4002,
 		PIXEL_MAPPING_ALT_TYPE			=	0x4102,
@@ -91,6 +94,7 @@ namespace PacketType {
 		SOURCE_LIST_VERSION				=	0x00,
 		MAPPED_EVENT_VERSION			=	0x01,
 		BANKED_EVENT_VERSION			=	0x01,
+		BANKED_EVENT_STATE_VERSION		=	0x00,
 		BEAM_MONITOR_EVENT_VERSION		=	0x01,
 		PIXEL_MAPPING_VERSION			=	0x00,
 		PIXEL_MAPPING_ALT_VERSION		=	0x00,
