@@ -123,8 +123,16 @@ public:
 		return m_scanStart;
 	}
 
+	static void encodeAutoSaveString( std::string str_in,
+		std::string &str_out );
+	static void decodeAutoSaveString( std::string str_in,
+		std::string &str_out );
+
 	static void autoSavePV(std::string pv_name, std::string pv_value,
 		struct timespec *pv_time);
+
+	static bool parseTimeString( std::string pv_time_str,
+		struct timespec & pv_time_spec );
 
 	static bool getAutoSavePV(std::string pv_name, std::string & pv_value,
 		struct timespec & pv_time);

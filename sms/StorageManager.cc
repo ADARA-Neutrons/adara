@@ -1516,6 +1516,44 @@ void StorageManager::scanStorage(void)
 		<< m_pendingRuns.size() << " runs pending translation.");
 }
 
+// Encode/Decode Any Newlines or Other Special Characters in the
+// AutoSave Value Strings to Keep from Breaking Lines/Perturbing
+// the Format of the AutoSave File...! ;-o
+
+void StorageManager::encodeAutoSaveString( std::string str_in,
+		std::string &str_out )
+{
+	std::stringstream ss_out;
+
+	for ( size_t i=0 ; i < str_in.size() ; ++i )
+	{
+		if ( str_in[i] == '\n' )
+			ss_out << "%0A";
+		else
+			ss_out << str_in[i];
+	}
+
+	str_out = ss_out.str();
+}
+
+void StorageManager::decodeAutoSaveString( std::string str_in,
+		std::string &str_out )
+{
+	std::stringstream ss_out;
+
+	for ( size_t i=0 ; i < str_in.size() ; ++i )
+	{
+		if ( !str_in.compare( i, 3, "%0A" ) ) {
+			ss_out << '\n';
+			i += 2; // ( pattern_length - 1 )
+		}
+		else
+			ss_out << str_in[i];
+	}
+
+	str_out = ss_out.str();
+}
+
 void StorageManager::autoSavePV( std::string pv_name, std::string pv_value,
 		struct timespec *pv_time )
 {
@@ -1528,11 +1566,15 @@ void StorageManager::autoSavePV( std::string pv_name, std::string pv_value,
 			<< std::setfill('0') << std::setw(9) << pv_time->tv_nsec);
 	}
 
+	// "Clean" the PV Value String for the AutoSave File... ;-D
+	std::string pv_value_out;
+	encodeAutoSaveString( pv_value, pv_value_out );
+
 	// Assemble the PV AutoSave Entry...
 	std::stringstream ss;
 	ss << pv_time->tv_sec << "."
 		<< std::setfill('0') << std::setw(9) << pv_time->tv_nsec;
-	ss << " " << pv_name << " " << pv_value << std::endl;
+	ss << " " << pv_name << " " << pv_value_out << std::endl;
 	INFO("autoSavePV(): AutoSaving PV Value - " << ss.str());
 
 	// Write PV AutoSave Entry to File...
@@ -1591,6 +1633,39 @@ bool StorageManager::openAutoSaveFile(void)
 	}
 }
 
+bool StorageManager::parseTimeString( std::string pv_time_str,
+		struct timespec & pv_time_spec )
+{
+	size_t dot = pv_time_str.find(".");
+
+	if ( dot != std::string::npos ) {
+
+		try {
+			pv_time_spec.tv_sec = boost::lexical_cast<time_t>(
+				pv_time_str.substr(0, dot) );
+			pv_time_spec.tv_nsec = boost::lexical_cast<long>(
+				pv_time_str.substr( dot + 1 ) );
+		}
+		catch (...) {
+			ERROR("parseTimeString(): Error Parsing Time String Format"
+				<< " (dddddddddd.ddddddddd)"
+				<< " -> [" << pv_time_str << "]"
+				<< " dot=" << dot);
+			return( false );
+		}
+	}
+
+	else {
+		ERROR("parseTimeString(): Error Parsing Time String Format"
+			<< " (dddddddddd.ddddddddd)"
+			<< " -> [" << pv_time_str << "]"
+			<< " - No Dot!");
+		return( false );
+	}
+
+	return( true );
+}
+
 bool StorageManager::getAutoSavePV( std::string pv_name,
 		std::string & pv_value, struct timespec & pv_time )
 {
@@ -1606,22 +1681,7 @@ bool StorageManager::getAutoSavePV( std::string pv_name,
 
 		pv_value = it->second.second;
 
-		size_t dot = it->second.first.find(".");
-		if ( dot != std::string::npos ) {
-			try {
-				pv_time.tv_sec = boost::lexical_cast<time_t>(
-					it->second.first.substr(0, dot) );
-				pv_time.tv_nsec = boost::lexical_cast<long>(
-					it->second.first.substr( dot + 1 ) );
-			}
-			catch (...) {
-				ERROR("getAutoSavePV():"
-					<< " Error Parsing AutoSaved Config Time for PV"
-					<< pv_name << " - (" << it->second.first << ")");
-				return( false );
-			}
-		}
-		else {
+		if ( !parseTimeString( it->second.first, pv_time ) ) {
 			ERROR("getAutoSavePV():"
 				<< " Error Parsing AutoSaved Config Time for PV"
 				<< pv_name << " - (" << it->second.first << ")");
@@ -1845,18 +1905,54 @@ bool StorageManager::parseAutoSaveFile(void)
 		std::string pv_name;
 		std::string pv_value;
 
-		iss >> pv_time;
+		try {
 
-		iss >> pv_name;
+			iss >> pv_time;
 
-		std::getline( iss, pv_value );
+			// Sanity Check Time Stamp for Valid Format...
+			// (Handy for Identifying Multi-Line Strings... ;-b)
+			struct timespec ts;
+			if ( !parseTimeString( pv_time, ts ) ) {
+				ERROR("parseAutoSaveFile():"
+					<< " Error Parsing Config Time in AutoSave File"
+					<< " [" << m_autosave_filename << "]"
+					<< " at Line #" << lineno
+					<< " -> [" << line << "]"
+					<< " pv_time=[" << pv_time << "]");
+				continue;
+			}
 
-		// Strip Off Preceding White Space...
-		if ( pv_value.at(0) == ' ' )
-			pv_value = pv_value.substr(1);
+			iss >> pv_name;
 
-		m_autoSaveConfig[ pv_name ] = std::pair<std::string, std::string>(
-			pv_time, pv_value );
+			std::getline( iss, pv_value );
+
+			// Strip Off Preceding White Space...
+			if ( pv_value.at(0) == ' ' )
+				pv_value = pv_value.substr(1);
+
+			// Decode Any Newline or Special Character Encodings...
+			std::string pv_value_out;
+			decodeAutoSaveString( pv_value, pv_value_out );
+
+			m_autoSaveConfig[ pv_name ] =
+				std::pair<std::string, std::string>(
+					pv_time, pv_value_out );
+		}
+		catch (std::runtime_error e) {
+			ERROR("parseAutoSaveFile():"
+				<< " Exception Parsing AutoSave File"
+				<< " [" << m_autosave_filename << "]"
+				<< " at Line #" << lineno
+				<< ": " << e.what()
+				<< " -> [" << line << "]");
+		}
+		catch (...) {
+			ERROR("parseAutoSaveFile():"
+				<< " Unknown Exception Parsing AutoSave File"
+				<< " [" << m_autosave_filename << "]"
+				<< " at Line #" << lineno
+				<< " -> [" << line << "]");
+		}
 	}
 
 	DEBUG("parseAutoSaveFile(): Retrieved AutoSave Config, "
