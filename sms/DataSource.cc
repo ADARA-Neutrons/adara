@@ -1022,11 +1022,15 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 	struct timespec now;
 	clock_gettime( CLOCK_REALTIME_COARSE, &now );
 
-	INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-		<< "unregisterHWSources():"
-		<< " Data Source " << m_name << " is " << why
-		<< " - Source is" << ( isSourceDown ? "" : " Not" ) << " Down,"
-		<< " State" << ( stateChanged ? " Changed" : " Did Not Change" ) );
+	// Meh, This Log Message can be Annoying for Persistently Down Sources
+	// - Only Log at This Level if the State Actually Changed...
+	if ( stateChanged )
+	{
+		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "unregisterHWSources(): State Change:"
+			<< " Data Source " << m_name << " is " << why << ","
+			<< " Source is" << ( isSourceDown ? "" : " Not" ) << " Down" );
+	}
 
 	for ( it=m_hwSources.begin(); it != m_hwSources.end(); it++ )
 	{
