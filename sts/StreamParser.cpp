@@ -4040,7 +4040,7 @@ StreamParser::rxPacket
                                             i++ )
                                     {
                                         if ( ienum->second[i].sameEnum(
-                                                &devEnum ) )
+                                                &devEnum, true ) )
                                         {
                                             // Don't Log Duplicate Enums
                                             // (DDP is Duplicated at
@@ -5441,7 +5441,8 @@ StreamParser::collapseDuplicatePVs()
                     ipvDup != m_pvs_list.end(); ++ipvDup )
             {
                 // Found a Matching PV Log, try to Absorb/Subsume It...!
-                if ( (*ipv)->sameDefinitionPVConn( *ipvDup ) )
+                if ( (*ipv)->sameDefinitionPVConn( *ipvDup,
+                    false /* Not "Exact" Match (Device Enum Name)... */ ) )
                 {
                     syslog( LOG_ERR, "[%i] %s %s: %s %s - %s",
                         g_pid, "STS Error:",
