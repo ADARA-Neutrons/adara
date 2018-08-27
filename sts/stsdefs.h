@@ -664,12 +664,16 @@ struct PVEnumeratedType
     std::vector<std::string>   element_names;
     std::vector<uint32_t>      element_values;
 
-    bool sameEnum( const PVEnumeratedType *a_enum ) const
+    bool sameEnum( const PVEnumeratedType *a_enum,
+            bool exactMatch /* "Exact" Match? (Device Enum Name) */ ) const
     {
         if ( a_enum == NULL )
             return( false );
 
-        if ( name.compare( a_enum->name ) != 0 )
+        // For "Duplicate" PV Connections, We Don't Care
+        // Whether the Device/Enum Name Matches,
+        // Just the *Contents* (Element Names/Values)...! ;-D
+        if ( exactMatch && name.compare( a_enum->name ) != 0 )
             return( false );
 
         if ( element_names.size() != a_enum->element_names.size() )
@@ -677,7 +681,8 @@ struct PVEnumeratedType
 
         for ( uint32_t i=0 ; i < element_names.size() ; i++ )
         {
-            if ( element_names[i].compare( a_enum->element_names[i] ) != 0 )
+            if ( element_names[i].compare(
+                a_enum->element_names[i] ) != 0 )
             {
                 return( false );
             }
@@ -737,8 +742,9 @@ public:
     {}
 
     bool diffEnum(
-        const PVEnumeratedType *a_enum1,
-        const PVEnumeratedType *a_enum2 ) const
+            const PVEnumeratedType *a_enum1,
+            const PVEnumeratedType *a_enum2,
+            bool exactMatch /* "Exact" Match? (Device Enum Name) */ ) const
     {
         // Both NULL Enum Pointers... (Most Common Case...)
         if ( a_enum1 == NULL && a_enum2 == NULL )
@@ -750,7 +756,7 @@ public:
             return( true );
 
         // Compare 2 Non-Null Enums
-        return( ! a_enum1->sameEnum( a_enum2 ) );
+        return( ! a_enum1->sameEnum( a_enum2, exactMatch ) );
     }
 
     bool sameDefinitionPVConn(
@@ -759,7 +765,8 @@ public:
             const std::vector<PVEnumeratedType> *a_enum_vector,
             const uint32_t a_enum_index,
             const std::string &a_units,
-            const bool a_ignore ) const
+            const bool a_ignore,
+            bool exactMatch /* "Exact" Match? (Device Enum Name) */ ) const
     {
         const PVEnumeratedType *enum1 = NULL, *enum2 = NULL;
 
@@ -770,7 +777,8 @@ public:
             enum2 = &((*a_enum_vector)[ a_enum_index ]);
 
         if ( m_connection == a_connection
-                && m_type == a_type && !diffEnum( enum1, enum2 )
+                && m_type == a_type
+                && !diffEnum( enum1, enum2, exactMatch )
                 && m_units == a_units && m_ignore == a_ignore ) {
             return true;
         }
@@ -780,11 +788,12 @@ public:
     }
 
     /// Determine if PVs have equivalent definitions
-    bool sameDefinitionPVConn( const PVInfoBase* a_pv ) const
+    bool sameDefinitionPVConn( const PVInfoBase* a_pv,
+            bool exactMatch /* "Exact" Match? (Device Enum Name) */ ) const
     {
         return sameDefinitionPVConn( a_pv->m_connection,
             a_pv->m_type, a_pv->m_enum_vector, a_pv->m_enum_index,
-            a_pv->m_units, a_pv->m_ignore );
+            a_pv->m_units, a_pv->m_ignore, exactMatch );
     }
 
     bool sameDefinition(
@@ -800,7 +809,7 @@ public:
         if ( m_device_name == a_device_name && m_name == a_name
                 && sameDefinitionPVConn( a_connection,
                     a_type, a_enum_vector, a_enum_index,
-                    a_units, a_ignore ) ) {
+                    a_units, a_ignore, true ) ) {
             return true;
         }
         else {
