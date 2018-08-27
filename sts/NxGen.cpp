@@ -195,7 +195,8 @@ NxGen::makePVInfo
         // Check for Duplicate PV Connections...
         // (Ignore Device Name and PV Name (Alias)... ;-D)
         if ( (*ipv)->sameDefinitionPVConn( internal_connection,
-                a_type, a_enum_vector, a_enum_index, a_units, a_ignore ) )
+                a_type, a_enum_vector, a_enum_index, a_units, a_ignore,
+                false /* Not "Exact" Match (Device Enum Name)... */ ) )
         {
             // Mark This PV as a Duplicate...!
             // (And It's Doppleganger, Too...! ;-D)
