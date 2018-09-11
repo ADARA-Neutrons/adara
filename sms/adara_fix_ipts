@@ -1152,10 +1152,14 @@ UPDATE_PROPOSAL_METADATA()
 
 		for (( i = 0 ; i < ${len_diff} ; ++i )); do
 
-			ckspc=`echo "${ipts_new_line}" | ${GREP} -c " "`
+			# *Only* Steal Spaces from _Before_ This Current Tag!
+			# I.e. Not from Subsequent Data Content, e.g. Proposal Title...
+			ckspc=`echo "${ipts_new_line}" | ${GREP} -c " <${_xml_tag}>"`
 			if [[ "${ckspc}" != "1" ]]; then   # Not 1 Line Found...
 				echo -e -n "\nERROR: Insufficient White Space to Remove "
 				echo "in Old ${_meta_name} Line!"
+				echo -e -n "\n\tNeed ${len_diff} Spaces, "
+				echo "Only Found $i..."
 				MANUAL_EDIT "${rundir}" "${datafile}" \
 					"${_xml_tag}" "${_meta_name}" "${_new_value}"
 				if [[ $? != 0 ]]; then
@@ -1168,13 +1172,17 @@ UPDATE_PROPOSAL_METADATA()
 				fi
 			fi
 
-			# Take Any Space We Can Get...! ;-D
-			ipts_new_line=`echo "${ipts_new_line}" | ${SED} 's/ //'`
+			# Take Any Space We Can Get (_Before_ This Tag)...! ;-D
+			ipts_new_line=`echo "${ipts_new_line}" \
+				| ${SED} "s/ <${_xml_tag}>/<${_xml_tag}>/"`
 			cksedspc=$?
 
 			if [[ ${cksedspc} != 0 ]]; then
 				echo -e -n "\nERROR Stripping White Space "
 				echo "from Proposal Meta-Data Line...!"
+				echo -e -n "\nOnly Stripped Off $i Spaces, "
+				echo "Leaving ${_meta_name} Line Template as:"
+				echo -e "\n\t[${ipts_new_line}]"
 				MANUAL_EDIT "${rundir}" "${datafile}" \
 					"${_xml_tag}" "${_meta_name}" "${_new_value}"
 				if [[ $? != 0 ]]; then
