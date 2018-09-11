@@ -66,20 +66,20 @@ umask 0000
 USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
-	echo "         [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
-	echo "         [--sts1|--sts2|--sts_host=<STS_HOST>] \\"
-	echo "         [--sts|--sts_test|--sts_dummy] \\"
-	echo "         [--sts_port=<STSPort>] \\"
-	echo "         [--adara_parser=<${ADARA_PARSER}>] \\"
-	echo "         [--sms_config=<${SMS_CONFIG}>] \\"
-	echo "         [--sms_data=<${SMS_DATA}>] \\"
-	echo "         [--first_data_file|--last_data_file] \\"
-	echo "         [--send-paused-data] [--no-send-paused-data] \\"
-	echo "         [--archive_path=<${ARCHIVE_PATH}>] \\"
-	echo "         [--run=<RunNumber1>] \\"
-	echo "         [--run=<RunNumber2,RunNumber3,...>] \\"
-	echo "         [--run=<RunNumber4-RunNumber5>] \\"
-	echo "         [--ipts=<IPTS-nnnnn>] [--help]"
+	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
+	echo "    [--sts1|--sts2|--sts_host=<STS_HOST>] \\"
+	echo "    [--sts|--sts_test|--sts_dummy|--sts_hfir|--sts_hfir_test] \\"
+	echo "    [--sts_port=<STSPort>] \\"
+	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
+	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
+	echo "    [--sms_data=<${SMS_DATA}>] \\"
+	echo "    [--first_data_file|--last_data_file] \\"
+	echo "    [--send-paused-data] [--no-send-paused-data] \\"
+	echo "    [--archive_path=<${ARCHIVE_PATH}>] \\"
+	echo "    [--run=<RunNumber1>] \\"
+	echo "    [--run=<RunNumber2,RunNumber3,...>] \\"
+	echo "    [--run=<RunNumber4-RunNumber5>] \\"
+	echo "    [--ipts=<IPTS-nnnnn>] [--help]"
 	echo
 }
 
@@ -214,6 +214,12 @@ for arg in "$@" ; do
 		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
 	elif [[ "#$key#" == '#--sts_dummy#' ]]; then
 		STS_SERVICE="sts_dummy"
+		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
+	elif [[ "#$key#" == '#--sts_hfir#' ]]; then
+		STS_SERVICE="sts_hfir"
+		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
+	elif [[ "#$key#" == '#--sts_hfir_test#' ]]; then
+		STS_SERVICE="sts_hfir_test"
 		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
 	elif [[ "#$key#" == '#--sts_port#' ]]; then
 		STS_PORT="$value"
