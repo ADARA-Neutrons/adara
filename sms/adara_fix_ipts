@@ -1597,10 +1597,10 @@ for run in ${RUN_NUMBERS} ; do
 							echo "from Both Lists - Ok As Is!"
 
 							new_user_list=`echo "$new_user_list" \
-								| ${SED} -e "s/${new_user}//"`
+								| ${SED} -e "s/[[:space:]]*${new_user}//"`
 
 							old_user_list=`echo "$old_user_list" \
-								| ${SED} -e "s/${old_user}//"`
+								| ${SED} -e "s/[[:space:]]*${old_user}//"`
 
 							found=1
 
@@ -1632,22 +1632,20 @@ for run in ${RUN_NUMBERS} ; do
 
 				for new_user in ${new_user_list} ; do
 
+					# Get Next Unused/Unneeded Old Proposal User...
+					old_user=`echo "${old_user_list}" \
+						| ${AWK} '{print $1}'`
+
 					# Are There Any Old Users Left to Substitute?
-					if [[ -n ${old_user_list} ]]; then
-
-						# Get Next Unused/Unneeded Old Proposal User...
-						old_user=`echo "${old_user_list}" \
-							| ${AWK} '{print $1}'`
-
-						### ERROR CHECK HERE...? ;-Q
+					if [[ -n ${old_user} ]]; then
 
 						# Remove This New User from the List...
 						new_user_list=`echo "$new_user_list" \
-							| ${SED} -e "s/${new_user}//"`
+							| ${SED} -e "s/[[:space:]]*${new_user}//"`
 
 						# Remove This Old User from the List...
 						old_user_list=`echo "$old_user_list" \
-							| ${SED} -e "s/${old_user}//"`
+							| ${SED} -e "s/^[[:space:]]*${old_user}//"`
 
 						echo -e -n "\nSubstituting New User [${new_user}] "
 						echo "for Old User [${old_user}]."
@@ -1662,7 +1660,7 @@ for run in ${RUN_NUMBERS} ; do
 						if [[ ${ckupdate} != 0
 								|| "${USER_OLD}" != "${old_user}" ]]; then
 							echo -e -n "\nWARNING: Unable to Substitute "
-							echo -n "New Proposal User [${new_user}] "
+							echo "New Proposal User [${new_user}]"
 							echo "for Old User [${old_user}]...!"
 							echo -e -n "\n\tUSER_OLD = [${USER_OLD}] "
 							echo "vs. [${old_user}]"
@@ -1672,7 +1670,7 @@ for run in ${RUN_NUMBERS} ; do
 					else
 
 						echo -e -n "\nWARNING: Unable to Substitute "
-						echo -n "New Proposal User [${new_user}] "
+						echo "New Proposal User [${new_user}]"
 						echo "for Any Old Users - List Depleted...!"
 						echo -e "\nGiving Up on Remaining New User List:"
 						echo -e "\n\t[${new_user_list}]"
