@@ -393,21 +393,25 @@ INSTALL_AND_CHECK_DATAFILE()
 
 	# Make Sure File Still ADARA-Parses...!
 
+	lesscmd=""
+
 	echo -e "\nNow Verify Still a Valid Stream File with ADARA Parser..."
 	echo -e "\n\t-> Search for New ${_meta_name} Value(s):"
 	echo -e "\t\t\"${_new_value}\""
 	echo -e -n "\n\t-> Verify File Parses to End!"
 	if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
 		echo -n " [_Not_ End of Run]"
+		lesscmd="/${_xml_tag}"
 	else
 		echo -n " [End of Run]"
+		lesscmd="G?${_xml_tag}"
 	fi
 	echo
 
 	CHECK_PROCEED
 
 	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
-		| ${Less} "+/${_xml_tag}"
+		| ${Less} "+${lesscmd}"
 
 	#
 	# Copy Original Data File to Backup Copy Before Proceeding...
@@ -819,7 +823,15 @@ MANUAL_EDIT()
 	fi
 
 	# Manually Edit the Data File...
-	${Editor} "+/${_xml_tag}" "${_rundir}/${_datafile}.NEW-$$"
+
+	search=""
+	if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
+		search="+/${_xml_tag}"
+	else
+		search="+?${_xml_tag}"
+	fi
+
+	${Editor} "$search" "${_rundir}/${_datafile}.NEW-$$"
 	ckedit=$?
 
 	if [[ ${ckedit} != 0 ]]; then
@@ -910,8 +922,13 @@ LOOKUP_PROPOSAL_METADATA()
 	#
 
 	# Note: Global Reference to "$ipts_old_line_wnum"...! ;-D
-	ipts_old_line_wnum=`${GREP} --text -n "<${_xml_tag}>" \
-		"${rundir}/${datafile}"`
+	# Limit Search to First/Last RunInfo Section in File...
+	ipts_old_line_wnum=`${AWK} \
+			"{ if ( NR >= ${runinfo_lines_start} \
+					&& NR <= ${runinfo_lines_end} ) \
+				printf(\"%s:%s\\n\",NR,\\$0) }" \
+			"${rundir}/${datafile}" \
+		| ${GREP} --text "<${_xml_tag}>"`
 	ckoldiptsline=$?
 
 	if [[ ${ckoldiptsline} != 0 ]]; then
@@ -1340,6 +1357,75 @@ for run in ${RUN_NUMBERS} ; do
 	echo -e -n "\nFound ${SMS_WHICH_DATA_FILE} ADARA Output Stream File "
 	echo "for Run ${run}:"
 	echo -e "\t[${datafile}]"
+
+	#
+	# Capture the Line Number Bounds of First/Last "RunInfo" Section,
+	# for Limiting Range of Subsequent Substitutions...
+	#
+
+	runinfo_lines_wnum=`${GREP} --text -n -e "<runinfo " -e "</runinfo>" \
+		"${rundir}/${datafile}"`
+	ckruninfolines=$?
+
+	if [[ ${ckruninfolines} != 0 ]]; then
+		echo -e -n "\nERROR Extracting RunInfo Section Lines "
+		echo "from Stream File for Run ${run}!"
+		echo -e "\n\t[${runinfo_lines_wnum}]"
+		### TODO: Try the "2nd" or "Next to Last" File...?
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	# Take First Set of RunInfo Lines of the First Data File...
+	if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
+		runinfo_lines_wnum=`echo "${runinfo_lines_wnum}" \
+			| ${HEAD} -2`
+		echo -e -n "\nUsing First Set of RunInfo Lines "
+		echo -e "of the First Data File for Run ${run}:\n"
+		echo "${runinfo_lines_wnum}" | ${SED} 's/runinfo.*/runinfo.../'
+			# Allow Self-Indenting from XML Line(s)
+	# Else Take Last Set of RunInfo Lines of the Last Data File...
+	else
+		runinfo_lines_wnum=`echo "${runinfo_lines_wnum}" \
+			| ${TAIL} -2`
+		echo -e -n "\nUsing Last Set of RunInfo Lines "
+		echo -e "of the Last Data File for Run ${run}:\n"
+		echo "${runinfo_lines_wnum}" | ${SED} 's/runinfo.*/runinfo.../'
+			# Allow Self-Indenting from XML Line(s)
+	fi
+
+	# Extract Starting/Ending Line Number Range...
+
+	runinfo_lines_start=`echo "${runinfo_lines_wnum}" \
+		| ${HEAD} -1 | ${AWK} -F ":" '{print $1}'`
+	ckawkruninfostart=$?
+
+	if [[ ${ckawkruninfostart} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Line Number for "
+		echo -n "${SMS_WHICH_DATA_FILE} "
+		echo "RunInfo Meta-Data Start Line...!"
+		echo -e "\n[${runinfo_lines_wnum}]"
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	runinfo_lines_end=`echo "${runinfo_lines_wnum}" \
+		| ${TAIL} -1 | ${AWK} -F ":" '{print $1}'`
+	ckawkruninfoend=$?
+
+	if [[ ${ckawkruninfoend} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Line Number for "
+		echo -n "${SMS_WHICH_DATA_FILE} "
+		echo "RunInfo Meta-Data End Line...!"
+		echo -e "\n[${runinfo_lines_wnum}]"
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	echo -e -n "\nFound Line Number Range for "
+	echo -n "${SMS_WHICH_DATA_FILE} "
+	echo -n "RunInfo Meta-Data - "
+	echo "Lines ${runinfo_lines_start} to ${runinfo_lines_end}."
 
 	#
 	# Initialize Substitute Expression List
