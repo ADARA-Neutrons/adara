@@ -1197,7 +1197,8 @@ UPDATE_PROPOSAL_METADATA()
 
 			# Take Any Space We Can Get (_Before_ This Tag)...! ;-D
 			ipts_new_line=`echo "${ipts_new_line}" \
-				| ${SED} "s/ <${_xml_tag}>/<${_xml_tag}>/"`
+				| ${SED} "s@ <${_xml_tag}>@<${_xml_tag}>@"`
+					# Note: XML Tag Could Contain "/" for Embedded Tag!
 			cksedspc=$?
 
 			if [[ ${cksedspc} != 0 ]]; then
