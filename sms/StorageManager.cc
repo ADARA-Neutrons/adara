@@ -81,7 +81,8 @@ public:
 			return;
 		}
 
-		DEBUG("Poolsize = " << poolsize << " -> MaxSize = " << maxSize);
+		DEBUG("Poolsize = " << poolsize << " -> MaxSize = " << maxSize
+			<< " (BlockSize=" << m_block_size << ")");
 
 		/* Compute Max Blocks Allowed from Max Size... */
 		uint64_t max_blocks_allowed = maxSize + m_block_size - 1;
@@ -155,7 +156,9 @@ public:
 		maxSize = fsstats.f_blocks * ((uint64_t) percent) / 100;
 		maxSize *= m_block_size;
 
-		DEBUG("Percent = " << percent << " -> MaxSize = " << maxSize);
+		DEBUG("Percent = " << percent << " -> MaxSize = " << maxSize
+			<< " (" << m_baseDir << ")"
+			<< " (BlockSize=" << m_block_size << ")");
 
 		/* Compute Max Blocks Allowed from Max Size... */
 		uint64_t max_blocks_allowed = maxSize + m_block_size - 1;
@@ -407,7 +410,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 	}
 
 	m_block_size = (uint64_t) stats.st_blksize;
-	DEBUG("Filesystem Block Size = " << m_block_size);
+	DEBUG("Filesystem (" << m_baseDir << ") Block Size = "
+		<< m_block_size);
 
 	// Max Blocks Allowed - Option Priorities:
 	//    1. if "max_blocks_allowed" is explicitly set go with that, else
@@ -432,7 +436,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 				throw std::runtime_error(msg);
 			}
 			DEBUG("Poolsize = " << m_poolsize
-				<< " -> MaxSize = " << maxSize);
+				<< " -> MaxSize = " << maxSize
+				<< " (BlockSize=" << m_block_size << ")");
 		} else {
 			DEBUG("Poolsize not in config: Use Percent (or default 80%).");
 			/* If the user doesn't specify a size, we'll use a percentage
@@ -447,7 +452,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 				msg += strerror(err);
 				throw std::runtime_error(msg);
 			}
-			DEBUG("Filesystem Total Blocks = " << fsstats.f_blocks);
+			DEBUG("Filesystem (" << m_baseDir << ") Total Blocks = "
+				<< fsstats.f_blocks);
 
 			m_percent = conf.get<int>("storage.percent", 80);
 			maxSize = ((uint64_t) fsstats.f_blocks)
@@ -455,7 +461,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 			maxSize *= m_block_size;
 
 			DEBUG("Percent = " << m_percent
-				<< " -> MaxSize = " << maxSize);
+				<< " -> MaxSize = " << maxSize
+				<< " (BlockSize=" << m_block_size << ")");
 		}
 
 		/* Compute Max Blocks Allowed from Max Size... */
@@ -508,7 +515,9 @@ bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 			DEBUG("Max Blocks Too Big: requested size="
 				<< (m_max_blocks_allowed * m_block_size)
 				<< " > filesystem size="
-				<< (fsstats.f_blocks * m_block_size));
+				<< (fsstats.f_blocks * m_block_size)
+				<< " (" << m_baseDir << ")"
+				<< " (BlockSize=" << m_block_size << ")");
 			m_max_blocks_allowed = (uint64_t) fsstats.f_blocks;
 			DEBUG("Max Blocks Allowed limited to "
 				<< m_max_blocks_allowed);
@@ -517,7 +526,9 @@ bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 		else {
 			DEBUG("Max Blocks Allowed verified less than filesystem size"
 				<< " (" << (m_max_blocks_allowed * m_block_size)
-				<< " <= " << (fsstats.f_blocks * m_block_size) << ")");
+				<< " <= " << (fsstats.f_blocks * m_block_size) << ")"
+				<< " (" << m_baseDir << ")"
+				<< " (BlockSize=" << m_block_size << ")");
 			return( false ); // requested value unchanged...
 		}
 	}
@@ -1313,7 +1324,8 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 			<< " + blocks=" << blocks
 			<< " = " << (m_blocks_used + blocks)
 			<< " > m_max_blocks_allowed=" << m_max_blocks_allowed
-			<< ": goal=" << goal << ")";
+			<< ": goal=" << goal << ")"
+			<< " (BlockSize=" << m_block_size << ")";
 		requestPurge( goal, ss.str() );
 	}
 
@@ -1367,7 +1379,8 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 			<< " + blocks=" << blocks
 			<< " = " << (m_blocks_used + blocks)
 			<< " > m_max_blocks_allowed=" << m_max_blocks_allowed
-			<< ": goal=" << goal << ")";
+			<< ": goal=" << goal << ")"
+			<< " (BlockSize=" << m_block_size << ")";
 		requestPurge( goal, ss.str() );
 	}
 }
