@@ -930,10 +930,15 @@ DataSource::~DataSource()
 		m_addrinfo = NULL;
 	}
 	delete m_timer;
-	if (m_fdreg)
+	if (m_fdreg) {
 		delete m_fdreg;
-	if (m_fd != -1)
+		m_fdreg = NULL;
+	}
+	if (m_fd != -1) {
+		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
+		m_fd = -1;
+	}
 	m_connection.disconnect();
 }
 
@@ -1170,6 +1175,7 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 		m_fdreg = NULL;
 	}
 	if (m_fd != -1) {
+		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
 	}
@@ -1369,6 +1375,7 @@ void DataSource::startConnect(void)
 		m_fd = -1;   // just to be sure... ;-b
 		goto error;
 	}
+	DEBUG("New Socket for " << m_name << " m_fd=" << m_fd);
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
 	if (flags < 0) {
@@ -1439,6 +1446,7 @@ void DataSource::startConnect(void)
 		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bad Alloc Error for " << m_name
 			<< " adapter: " << e.what());
+		m_fdreg = NULL;
 		goto error_fd;
 	}
 
@@ -1448,8 +1456,11 @@ void DataSource::startConnect(void)
 	return;
 
 error_fd:
-	close(m_fd);
-	m_fd = -1;
+	if (m_fd != -1) {
+		DEBUG("Close m_fd=" << m_fd);
+		close(m_fd);
+		m_fd = -1;
+	}
 
 error:
 	m_pvConnected->failed();
@@ -1461,9 +1472,14 @@ void DataSource::connectComplete(void)
 	socklen_t elen = sizeof(int);
 	int e, rc;
 
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &e, &elen);
 	if (!rc && !e) {
-		delete m_fdreg;
+		if (m_fdreg) {
+			delete m_fdreg;
+			m_fdreg = NULL;
+		}
+		// XXX CATCH BAD ALLOC EXCEPTION...!!!
 		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
 				boost::bind(&DataSource::fdReady, this));
 
@@ -1591,6 +1607,7 @@ void DataSource::dataReady(void)
 		}
 	}
 
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_fd, log_info, 4000, m_max_read_chunk)) {

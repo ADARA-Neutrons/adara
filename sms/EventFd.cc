@@ -1,4 +1,5 @@
 
+#include <boost/lexical_cast.hpp>
 #include <boost/function.hpp>
 #include <fdManager.h>
 #include <sys/eventfd.h>
@@ -31,7 +32,11 @@ EventFd::EventFd( callback cb )
 	m_ready.reset(new ReadyAdapter( m_fd, fdrRead, cb ));
 }
 
-EventFd::~EventFd() { close( m_fd ); }
+EventFd::~EventFd()
+{
+	DEBUG("Close m_fd=" << m_fd);
+	close( m_fd );
+}
 
 void EventFd::init( int flags )
 {
@@ -39,9 +44,13 @@ void EventFd::init( int flags )
 	if ( m_fd < 0 ) {
 		int e = errno;
 		std::string msg("Unable to create eventfd: ");
+		msg += "m_fd=";
+		msg += boost::lexical_cast<std::string>(m_fd);
+		msg += " - ";
 		msg += strerror(e);
 		throw std::runtime_error(msg);
 	}
+	DEBUG("New EventFD m_fd=" << m_fd);
 }
 
 bool EventFd::read( uint64_t & val )
@@ -92,6 +101,9 @@ bool EventFd::do_read( uint64_t & val )
 			if (errno != EAGAIN && errno != EINTR) {
 				int e = errno;
 				std::string msg("Unable to read eventfd: ");
+				msg += "m_fd=";
+				msg += boost::lexical_cast<std::string>(m_fd);
+				msg += " - ";
 				msg += strerror(e);
 				throw std::runtime_error(msg);
 			} else if ( !m_nonBlocking ) {
@@ -150,6 +162,9 @@ bool EventFd::do_write( uint64_t val ) {
 			if (errno != EAGAIN && errno != EINTR) {
 				int e = errno;
 				std::string msg("Unable to write to eventfd: ");
+				msg += "m_fd=";
+				msg += boost::lexical_cast<std::string>(m_fd);
+				msg += " - ";
 				msg += strerror(e);
 				throw std::runtime_error(msg);
 			} else {

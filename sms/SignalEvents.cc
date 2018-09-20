@@ -1,3 +1,4 @@
+
 #include "EPICS.h"
 #include "ReadyAdapter.h"
 #include "SignalEvents.h"
@@ -8,9 +9,9 @@
 #include <unistd.h>
 #include <errno.h>
 
-// #include "Logging.h"
+#include "Logging.h"
 
-// static LoggerPtr logger(Logger::getLogger("SMS.SignalEvents"));
+static LoggerPtr logger(Logger::getLogger("SMS.SignalEvents"));
 
 ReadyAdapter *SignalEvents::m_read;
 int SignalEvents::m_fd = -1;
@@ -30,14 +31,22 @@ void SignalEvents::check_init(void)
 		const char *err = strerror(errno);
 		std::string msg("Unable to create signalfd: ");
 		msg += err;
+		m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error(msg);
 	}
+	DEBUG("New SignalEvent SignalFD m_fd=" << m_fd);
 
 	try {
 		m_read = new ReadyAdapter(m_fd, fdrRead,
 					  boost::bind(&SignalEvents::signaled));
 	} catch (...) {
-		close(m_fd);
+		ERROR("Exception Allocating ReadyAdapter");
+		m_read = NULL;
+		if (m_fd != -1) {
+			DEBUG("Close m_fd=" << m_fd);
+			close(m_fd);
+			m_fd = -1;
+		}
 		throw;
 	}
 }
@@ -56,11 +65,15 @@ void SignalEvents::registerHandler(int sig, cbFunc cb)
 	m_sig_map[sig] = cb;
 	sigaddset(&m_sig_set, sig);
 
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	if (signalfd(m_fd, &m_sig_set, SFD_NONBLOCK | SFD_CLOEXEC) < 0) {
 		const char *err = strerror(errno);
 		std::string msg("Unable to add signal ");
 		msg += boost::lexical_cast<std::string>(sig);
 		msg += " to signalfd: ";
+		msg += "m_fd=";
+		msg += boost::lexical_cast<std::string>(m_fd);
+		msg += " - ";
 		msg += err;
 		sigdelset(&m_sig_set, sig);
 		throw std::runtime_error(msg);
@@ -108,6 +121,7 @@ void SignalEvents::signaled(void)
 	int rc;
 
 	for (;;) {
+		// XXX CHECK FILE DESCRIPTOR...!!! 
 		// NOTE: This is Standard C Library read()... ;-o
 		rc = read(m_fd, &info, sizeof(info));
 		if (rc <= 0) {
@@ -118,6 +132,9 @@ void SignalEvents::signaled(void)
 
 			std::string msg;
 			msg = "Fatal error in SignalEvents::signaled: ";
+			msg += "m_fd=";
+			msg += boost::lexical_cast<std::string>(m_fd);
+			msg += " - ";
 			msg += strerror(rc);
 			throw std::runtime_error(msg);
 		}
@@ -127,3 +144,4 @@ void SignalEvents::signaled(void)
 
 	// DEBUG("signaled exit");
 }
+

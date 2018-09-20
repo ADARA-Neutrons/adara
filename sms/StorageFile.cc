@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -9,6 +10,7 @@
 #include <fcntl.h>
 #include <limits.h>
 
+#include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 
 #include "ADARA.h"
@@ -98,8 +100,11 @@ void StorageFile::put_fd(void)
 
 	m_fdRefs--;
 	if (!m_fdRefs) {
-		::close(m_fd);
-		m_fd = -1;
+		if (m_fd != -1) {
+			DEBUG("Close m_fd=" << m_fd);
+			::close(m_fd);
+			m_fd = -1;
+		}
 	}
 }
 
@@ -149,8 +154,10 @@ void StorageFile::open(int flags)
 		msg += ") error: ";
 		msg += strerror(err);
 		ERROR(msg);
+		m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error("StorageFile::" + msg);
 	}
+	DEBUG("New File Descriptor m_fd=" << m_fd);
 
 	m_fdRefs = 1;
 }
@@ -176,6 +183,7 @@ void StorageFile::addSync(void)
 	sync.hdr.ts_nsec = now.tv_nsec;
 	sync.offset = m_size;
 
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	for (len = sizeof(sync); len; len -= rc) {
 		rc = ::write(m_fd, p, len);
 		if (rc <= 0) {
@@ -184,6 +192,9 @@ void StorageFile::addSync(void)
 
 			int err = errno;
 			std::string msg("addSync() write error: ");
+			msg += "m_fd=";
+			msg += boost::lexical_cast<std::string>(m_fd);
+			msg += " - ";
 			msg += strerror(err);
 			ERROR(msg);
 			throw std::runtime_error("StorageFile::" + msg);
@@ -252,6 +263,7 @@ off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 	int iovcnt;
 	ssize_t rc;
 
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	while (len) {
 		iovcnt = nvecs;
 		if (iovcnt > IOV_MAX)
@@ -264,6 +276,9 @@ off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 
 			int err = errno;
 			std::string msg("write(): writev() error: ");
+			msg += "m_fd=";
+			msg += boost::lexical_cast<std::string>(m_fd);
+			msg += " - ";
 			msg += strerror(err);
 			ERROR(msg);
 			throw std::runtime_error("StorageFile::" + msg);
@@ -351,6 +366,7 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 	int iovcnt;
 	ssize_t rc;
 
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	while (len) {
 		iovcnt = nvecs;
 		if (iovcnt > IOV_MAX)
@@ -363,6 +379,9 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 
 			int err = errno;
 			std::string msg("save(): writev() error: ");
+			msg += "m_fd=";
+			msg += boost::lexical_cast<std::string>(m_fd);
+			msg += " - ";
 			msg += strerror(err);
 			ERROR(msg);
 			throw std::runtime_error("StorageFile::" + msg);
@@ -465,8 +484,10 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 		msg += ") mkstemp error: ";
 		msg += strerror(err);
 		ERROR(msg);
+		f->m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error("StorageFile::" + msg);
 	}
+	DEBUG("New State File Descriptor m_fd=" << f->m_fd);
 
 	try {
 		/* We did not increase the string length, but there is no
@@ -643,18 +664,23 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 
 	struct stat statbuf;
 	int err = fstat(f->m_fd, &statbuf);
-	if (err)
-		err = errno;
-	f->put_fd();
-
-	// Don't Throw An Exception Just Trying to Stat Some Old Data File...!
-	// (Whine Loudly Tho... ;-D)
 	if (err) {
+		err = errno;
+		// Whine Loudly... ;-D
 		std::string msg("importFile(");
 		msg += path;
 		msg += ") Stat Error: ";
+		msg += "f->m_fd=";
+		msg += boost::lexical_cast<std::string>(f->m_fd);
+		msg += " - ";
 		msg += strerror(err);
 		ERROR(msg);
+	}
+
+	f->put_fd();
+
+	// Don't Throw An Exception Just Trying to Stat Some Old Data File...!
+	if (err) {
 		return StorageFile::SharedPtr();
 	}
 

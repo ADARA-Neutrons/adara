@@ -60,9 +60,12 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 	socklen_t saLen = sizeof(sa);
 	int rc;
 
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	if (getpeername(m_client_fd, (struct sockaddr *) &sa, &saLen) < 0) {
 		int e = errno;
-		ERROR("Unable to get peer name: " << strerror(e));
+		ERROR("Unable to get peer name: "
+			<< "(m_client_fd=" << m_client_fd << ") "
+			<< strerror(e));
 		throw std::runtime_error("Unable to create client");
 	}
 
@@ -100,6 +103,7 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 
 	m_send_paused_data = m_server->getSendPausedData();
 
+	// XXX CATCH BAD ALLOC EXCEPTION...!!!
 	m_read = new ReadyAdapter(m_client_fd, fdrRead,
 				  boost::bind(&LiveClient::readable, this));
 
@@ -145,6 +149,7 @@ LiveClient::~LiveClient()
 	delete m_read;
 	delete m_write;
 	delete m_timer;
+	DEBUG("Close m_client_fd=" << m_client_fd);
 	close(m_client_fd);
 	if (m_file_fd != -1)
 		m_files.front().first->put_fd();
@@ -250,11 +255,13 @@ void LiveClient::writable(void)
 			int e = errno;
 			if (errno != EPIPE && errno != ECONNRESET) {
 				ERROR("client " << m_clientName
-				      << ": Fatal error during sendfile: "
-				      << strerror(e));
+					<< ": Fatal error during sendfile: "
+					<< "(m_client_fd=" << m_client_fd << ") "
+					<< strerror(e));
 			}
 			else {
 				ERROR("client " << m_clientName << " connection broken: "
+					<< "(m_client_fd=" << m_client_fd << ") "
 					<< strerror(e));
 			}
 
@@ -301,9 +308,11 @@ more:
 	/* We have more data to write, so make sure we get notified when
 	 * there is room in the socket buffer.
 	 */
-	if (!m_write)
+	if (!m_write) {
+		// XXX CATCH BAD ALLOC EXCEPTION...!!!
 		m_write = new ReadyAdapter(m_client_fd, fdrWrite,
 				boost::bind(&LiveClient::writable, this));
+	}
 	// DEBUG("writable() more exit");
 }
 
@@ -356,6 +365,7 @@ void LiveClient::readable(void)
 
 	std::string log_info;
 
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_client_fd, log_info, 4000, MAX_PKT_SIZE)) {
@@ -365,6 +375,7 @@ void LiveClient::readable(void)
 			 * member variables after calling the handlers.
 			 */
 			ERROR("client " << m_clientName
+				<< "(m_client_fd=" << m_client_fd << ") "
 				<< " error reading stream log_info=(" << log_info << ")");
 			delete this;
 		}
@@ -492,6 +503,7 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 
 	/* And try to send the data we've queued up.
 	 */
+	// XXX CATCH BAD ALLOC EXCEPTION...!!!
 	m_write = new ReadyAdapter(m_client_fd, fdrWrite,
 				boost::bind(&LiveClient::writable, this));
 

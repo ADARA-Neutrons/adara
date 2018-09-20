@@ -68,6 +68,7 @@ STSClient::~STSClient()
 	m_contConnection.disconnect();
 	m_fileConnection.disconnect();
 	m_timer->cancel();
+	DEBUG("Close m_sts_fd=" << m_sts_fd);
 	close(m_sts_fd);
 	if (m_file_fd != -1)
 		m_files.front()->put_fd();
@@ -141,16 +142,17 @@ void STSClient::writable(void)
 
 			if (errno == EPIPE || errno == ECONNRESET) {
 				ERROR("Lost connection to STS for run "
-				     << m_run->runNumber());
+				     << m_run->runNumber()
+					 << " (m_sts_fd=" << m_sts_fd << ")");
 			} else {
 				int e = errno;
 				ERROR("Run " << m_run->runNumber()
 					<< " had fatal sendfile error error: "
-					<< strerror(e)
 					<< "[m_sts_fd=" << m_sts_fd
 					<< " m_file_fd=" << m_file_fd
 					<< " m_cur_offset=" << m_cur_offset
-					<< " len=" << len << "]");
+					<< " len=" << len << "] - "
+					<< strerror(e));
 			}
 
 			delete this;
@@ -213,6 +215,7 @@ more:
 	 * any heartbeat packets, as we have a full pipe.
 	 */
 	if (!m_write.get()) {
+		// XXX CATCH BAD ALLOC EXCEPTION...!!!
 		m_write.reset(new ReadyAdapter(m_sts_fd, fdrWrite,
 				boost::bind(&STSClient::writable, this)));
 	}
@@ -239,7 +242,9 @@ void STSClient::sendDataDone(void)
 		// which doesn't appear to work through our network setup... ;-b
 		if (shutdown(m_sts_fd, SHUT_WR)) {
 			int e = errno;
-			ERROR("shutdown() failed: " << strerror(e));
+			ERROR("shutdown() failed: "
+				 << "(m_sts_fd=" << m_sts_fd << ") - "
+				 << strerror(e));
 		}
 	}
 }
@@ -289,6 +294,7 @@ void STSClient::readable(void)
 			 * Take care of that case here.
 			 */
 			ERROR("Lost connection to STS for run " << m_run->runNumber()
+				 << " (m_sts_fd=" << m_sts_fd << ") "
 				 << " log_info=(" << log_info << ")");
 		}
 	}
