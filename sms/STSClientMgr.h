@@ -42,7 +42,7 @@ private:
 	std::auto_ptr<TimerAdapter<STSClientMgr> > m_reconnect_timer;
 	std::auto_ptr<TimerAdapter<STSClientMgr> > m_transient_timer;
 	int m_fd;
-	std::auto_ptr<ReadyAdapter> m_fdreg;
+	ReadyAdapter *m_fdreg;
 	bool m_connecting;
 	bool m_backoff;
 	unsigned int m_connections;

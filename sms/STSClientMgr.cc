@@ -246,8 +246,15 @@ STSClientMgr::~STSClientMgr()
 {
 	m_singleton = NULL;
 	m_mgrConnection.disconnect();
-	if (m_fd != -1)
+	if (m_fdreg) {
+		delete m_fdreg;
+		m_fdreg = NULL;
+	}
+	if (m_fd != -1) {
+		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
+		m_fd = -1;
+	}
 }
 
 void STSClientMgr::containerChange(StorageContainer::SharedPtr &c,
@@ -470,6 +477,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		m_fd = -1;   // just to be sure... ;-b
 		goto error;
 	}
+	DEBUG("New Socket m_fd=" << m_fd);
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
 	if (flags < 0)
@@ -488,7 +496,8 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 				RLL_STS_CONNECTION_REFUSED, m_node + ":" + m_service,
 				60, 3, 10, log_info ) ) {
 			ERROR(log_info << "Connection Refused for STS at "
-				<< m_node << ":" << m_service);
+				<< m_node << ":" << m_service
+				<< " (m_fd=" << m_fd << ")");
 		}
 		goto error;
 	case EAGAIN:
@@ -499,7 +508,8 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 				60, 3, 10, log_info ) ) {
 			ERROR(log_info << "Connection "
 				<< "Resource Temporarily Unavailable for STS at "
-				<< m_node << ":" << m_service << " - Ignoring...");
+				<< m_node << ":" << m_service << " - Ignoring..."
+				<< " (m_fd=" << m_fd << ")");
 		}
 		break;
 	case EINTR:
@@ -508,7 +518,8 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 				RLL_STS_CONNECTION_INTR, m_node + ":" + m_service,
 				60, 3, 10, log_info ) ) {
 			ERROR(log_info << "Connection Interrupted for STS at "
-				<< m_node << ":" << m_service << " - Ignoring...");
+				<< m_node << ":" << m_service << " - Ignoring..."
+				<< " (m_fd=" << m_fd << ")");
 		}
 		break;
 	case EINPROGRESS:
@@ -518,7 +529,8 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 				60, 3, 10, log_info ) ) {
 			// Apparently, This Happens A Lot... ;-Q  Make it just "Info"!
 			INFO(log_info << "Connection In Progress for STS at "
-				<< m_node << ":" << m_service << " - Ignoring...");
+				<< m_node << ":" << m_service << " - Ignoring..."
+				<< " (m_fd=" << m_fd << ")");
 		}
 		break;
 	case 0:
@@ -531,15 +543,18 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 				RLL_STS_UNEXPECTED_CONN_ERROR, m_node + ":" + m_service,
 				60, 3, 10, log_info ) ) {
 			ERROR(log_info << "Unexpected Error from Connect to STS at "
-				<< m_node << ":" << m_service << " - " << strerror(rc));
+				<< m_node << ":" << m_service
+				<< " (m_fd=" << m_fd << ")"
+				<< " - " << strerror(rc));
 		}
 		goto error;
 	}
 
 	try {
-		m_fdreg.reset(new ReadyAdapter(m_fd, fdrWrite,
-			boost::bind(&STSClientMgr::connectComplete, this)));
+		m_fdreg = new ReadyAdapter(m_fd, fdrWrite,
+			boost::bind(&STSClientMgr::connectComplete, this));
 	} catch (std::bad_alloc e) {
+		m_fdreg = NULL;
 		goto error;
 	}
 
@@ -557,7 +572,8 @@ error:
 			RLL_STS_FAILED_TO_CONNECT, m_node + ":" + m_service,
 			60, 3, 10, log_info ) ) {
 		ERROR(log_info << "Failed to Initiate Connection to STS at "
-			<< m_node << ":" << m_service);
+			<< m_node << ":" << m_service
+			<< " (m_fd=" << m_fd << ")");
 	}
 	connectFailed();
 }
@@ -571,11 +587,17 @@ void STSClientMgr::connectComplete(void)
 
 	std::string log_info;
 
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &err, &errlen);
 	if (!rc && !err) {
-		DEBUG("Connected to STS at " << m_node << ":" << m_service);
+		DEBUG("Connected to STS at " << m_node << ":" << m_service
+			<< " (m_fd=" << m_fd << ")");
 
-		m_fdreg.reset();
+		if (m_fdreg) {
+			delete m_fdreg;
+			m_fdreg = NULL;
+		}
+
 		m_connect_timer->cancel();
 
 		StorageContainer::SharedPtr &run = nextRun();
@@ -656,10 +678,15 @@ void STSClientMgr::connectComplete(void)
 
 void STSClientMgr::connectFailed(void)
 {
-	if (m_fd != -1)
+	if (m_fdreg) {
+		delete m_fdreg;
+		m_fdreg = NULL;
+	}
+	if (m_fd != -1) {
+		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
-	m_fd = -1;
-	m_fdreg.reset();
+		m_fd = -1;
+	}
 	m_connect_timer->cancel();
 	// Update Connect Retry Timeout from PV...
 	m_connect_retry = m_pvConnectRetryTimeout->value();
