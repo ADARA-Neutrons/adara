@@ -32,8 +32,8 @@ private:
 	off_t m_cur_offset;
 	StorageContainer::SharedPtr m_run;
 	bool m_send_paused_data;
-	std::auto_ptr<ReadyAdapter> m_read;
-	std::auto_ptr<ReadyAdapter> m_write;
+	ReadyAdapter *m_read;
+	ReadyAdapter *m_write;
 	std::auto_ptr<TimerAdapter<STSClient> > m_timer;
 	connection m_contConnection;
 	connection m_fileConnection;

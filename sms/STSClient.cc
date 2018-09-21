@@ -43,15 +43,21 @@ STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 	ADARA::POSIXParser(INITIAL_BUFFER_SIZE, MAX_PACKET_SIZE),
 	m_mgr(mgr), m_sts_fd(fd), m_file_fd(-1), m_cur_offset(0), m_run(run),
 	m_send_paused_data(m_mgr.m_send_paused_data),
-	m_read(new ReadyAdapter(fd, fdrRead,
-				boost::bind(&STSClient::readable, this))),
-	m_write(new ReadyAdapter(fd, fdrWrite,
-				 boost::bind(&STSClient::writable, this))),
+	m_read(NULL), m_write(NULL),
 	m_timer(new TimerAdapter<STSClient>(this, &STSClient::sendHeartbeat)),
 	m_disp(STSClientMgr::CONNECTION_LOSS), m_reason("")
 {
 	INFO("Initiating Translation of " << m_run->runNumber()
 		<< " SendPausedData=" << m_send_paused_data);
+
+	// XXX CATCH BAD ALLOC EXCEPTION...!!!
+	m_read = new ReadyAdapter(fd, fdrRead,
+				boost::bind(&STSClient::readable, this));
+
+	// XXX CATCH BAD ALLOC EXCEPTION...!!!
+	m_write = new ReadyAdapter(fd, fdrWrite,
+				 boost::bind(&STSClient::writable, this));
+
 	run->getFiles(m_files);
 	if (run->active()) {
 		m_contConnection = run->connect(
@@ -67,11 +73,29 @@ STSClient::~STSClient()
 {
 	m_contConnection.disconnect();
 	m_fileConnection.disconnect();
+
+	if (m_read) {
+		delete m_read;
+		m_read = NULL;
+	}
+
+	if (m_write) {
+		delete m_write;
+		m_write = NULL;
+	}
+
 	m_timer->cancel();
-	DEBUG("Close m_sts_fd=" << m_sts_fd);
-	close(m_sts_fd);
-	if (m_file_fd != -1)
+
+	if (m_sts_fd != -1) {
+		DEBUG("Close m_sts_fd=" << m_sts_fd);
+		close(m_sts_fd);
+		m_sts_fd = -1;
+	}
+
+	if (m_file_fd != -1) {
 		m_files.front()->put_fd();
+		m_file_fd = -1;
+	}
 
 	/* Inform the manager of our final status */
 	m_mgr.clientComplete(m_run, m_disp, m_reason);
@@ -90,7 +114,7 @@ void STSClient::writable(void)
 	std::list<StorageFile::SharedPtr>::iterator it;
 	ssize_t len, rc;
 
-	/* We're trying to send data, so cancel the hearbeat timer. We'll
+	/* We're trying to send data, so cancel the heartbeat timer. We'll
 	 * re-enable it if we go idle.
 	 */
 	m_timer->cancel();
@@ -135,6 +159,7 @@ void STSClient::writable(void)
 				<< " size=" << f->size());
 		}
 
+		// XXX CHECK FILE DESCRIPTOR...!!!
 		rc = sendfile(m_sts_fd, m_file_fd, &m_cur_offset, len);
 		if (rc < 0) {
 			if (errno == EAGAIN || errno == EINTR)
@@ -177,9 +202,11 @@ void STSClient::writable(void)
 		/* We finished this file, and there will be no more data
 		 * coming for it; close it out and go to the next one.
 		 */
-		m_file_fd = -1;
+		if (m_file_fd != -1) {
+			f->put_fd();
+			m_file_fd = -1;
+		}
 		m_cur_offset = 0;
-		f->put_fd();
 		it = m_files.erase(it);
 	}
 
@@ -204,7 +231,10 @@ idle:
 	 * have data waiting to be sent. Go ahead and start the heartbeat
 	 * as well, as we have no guarantees when we'll see more data.
 	 */
-	m_write.reset();
+	if (m_write) {
+		delete m_write;
+		m_write = NULL;
+	}
 	m_timer->start(m_heartbeat_interval);
 	// DEBUG("writable() idle exit");
 	return;
@@ -214,10 +244,10 @@ more:
 	 * there is room in the socket buffer. We also do not need to send
 	 * any heartbeat packets, as we have a full pipe.
 	 */
-	if (!m_write.get()) {
+	if (!m_write) {
 		// XXX CATCH BAD ALLOC EXCEPTION...!!!
-		m_write.reset(new ReadyAdapter(m_sts_fd, fdrWrite,
-				boost::bind(&STSClient::writable, this)));
+		m_write = new ReadyAdapter(m_sts_fd, fdrWrite,
+				boost::bind(&STSClient::writable, this));
 	}
 	// DEBUG("writable() more exit");
 }
@@ -230,6 +260,7 @@ void STSClient::sendDataDone(void)
 
 	DEBUG("Sending Data Done to STS for run " << m_run->runNumber());
 
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	bool send_status = Utils::sendBytes( m_sts_fd,
 		(char *) data_done_pkt, sizeof( data_done_pkt ), log_info );
 
@@ -267,7 +298,7 @@ void STSClient::fileUpdated(const StorageFile &f)
 	/* The current file just got updated; if we're not already waiting
 	 * for buffer space in the socket, try to send the new data
 	 */
-	if (!m_write.get())
+	if (!m_write)
 		writable();
 
 	if (!f.active())
@@ -285,6 +316,7 @@ void STSClient::readable(void)
 	bool ok = false;
 
 	try {
+		// XXX CHECK FILE DESCRIPTOR...!!!
 		// NOTE: This is POSIXParser::read()... ;-o
 		ok = read(m_sts_fd, log_info, 4000, MAX_PACKET_SIZE);
 		if (!ok && m_disp == STSClientMgr::CONNECTION_LOSS) {
