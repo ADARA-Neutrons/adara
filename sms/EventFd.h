@@ -28,7 +28,7 @@ public:
 	bool signal( uint64_t val = 1 );
 
 private:
-	std::auto_ptr<ReadyAdapter> m_ready;
+	ReadyAdapter *m_ready;
 	int m_fd;
 	bool m_nonBlocking;
 

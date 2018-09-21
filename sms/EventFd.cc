@@ -17,7 +17,7 @@
 static LoggerPtr logger(Logger::getLogger("SMS.EventFd"));
 
 EventFd::EventFd( bool nonBlocking )
-	: m_nonBlocking(nonBlocking)
+	: m_ready(NULL), m_nonBlocking(nonBlocking)
 {
 	if ( nonBlocking )
 		init( EFD_NONBLOCK );
@@ -26,16 +26,26 @@ EventFd::EventFd( bool nonBlocking )
 }
 
 EventFd::EventFd( callback cb )
+	: m_ready(NULL)
 {
 	m_nonBlocking = true;
 	init( EFD_NONBLOCK );
-	m_ready.reset(new ReadyAdapter( m_fd, fdrRead, cb ));
+	// XXX CHECK FILE DESCRIPTOR...!!!
+	// XXX CATCH BAD ALLOC EXCEPTION...!!!
+	m_ready = new ReadyAdapter( m_fd, fdrRead, cb );
 }
 
 EventFd::~EventFd()
 {
-	DEBUG("Close m_fd=" << m_fd);
-	close( m_fd );
+	if (m_ready) {
+		delete m_ready;
+		m_ready = NULL;
+	}
+
+	if (m_fd != -1) {
+		DEBUG("Close m_fd=" << m_fd);
+		close( m_fd );
+	}
 }
 
 void EventFd::init( int flags )
@@ -48,6 +58,7 @@ void EventFd::init( int flags )
 		msg += boost::lexical_cast<std::string>(m_fd);
 		msg += " - ";
 		msg += strerror(e);
+		m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error(msg);
 	}
 	DEBUG("New EventFD m_fd=" << m_fd);
@@ -94,6 +105,7 @@ bool EventFd::do_read( uint64_t & val )
 			//<< " bufptr=0x" << std::hex << (void *) bufptr << std::dec
 			//<< " remaining len=" << len);
 
+		// XXX CHECK FILE DESCRIPTOR...!!!
 		// NOTE: This is Standard C Library read()... ;-o
 		rc = ::read( m_fd, bufptr, len );
 
@@ -156,6 +168,7 @@ bool EventFd::do_write( uint64_t val ) {
 			//<< " bufptr=0x" << std::hex << (void *) bufptr << std::dec
 			//<< " remaining len=" << len);
 
+		// XXX CHECK FILE DESCRIPTOR...!!!
 		rc = write( m_fd, bufptr, len );
 
 		if ( rc == (ssize_t) -1 ) {
