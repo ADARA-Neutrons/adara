@@ -118,12 +118,14 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 		ERROR("Exception in LiveClient() Hello Timer/Timeout"
 			<< " client=" << m_clientName << " - " << e.what());
 		delete m_read;
+		m_read = NULL;
 		throw;
 	}
 	catch (...) {
 		ERROR("Unknown Exception in LiveClient() Hello Timer/Timeout"
 			<< " client=" << m_clientName);
 		delete m_read;
+		m_read = NULL;
 		throw;
 	}
 
@@ -146,13 +148,25 @@ LiveClient::~LiveClient()
 	m_mgrConnection.disconnect();
 	m_contConnection.disconnect();
 	m_fileConnection.disconnect();
+
 	delete m_read;
+	m_read = NULL;
+
 	delete m_write;
+	m_write = NULL;
+
 	delete m_timer;
-	DEBUG("Close m_client_fd=" << m_client_fd);
-	close(m_client_fd);
-	if (m_file_fd != -1)
+
+	if (m_client_fd != -1) {
+		DEBUG("Close m_client_fd=" << m_client_fd);
+		close(m_client_fd);
+		m_client_fd = -1;
+	}
+
+	if (m_file_fd != -1) {
 		m_files.front().first->put_fd();
+		m_file_fd = -1;
+	}
 }
 
 bool LiveClient::timerExpired(void)
@@ -246,6 +260,7 @@ void LiveClient::writable(void)
 			}
 		}
 
+		// XXX CHECK (BOTH) FILE DESCRIPTORS...!!!
 		rc = sendfile(m_client_fd, m_file_fd, &cur_offset, len);
 		if (rc < 0) {
 			if (errno == EAGAIN || errno == EINTR)
@@ -288,8 +303,10 @@ void LiveClient::writable(void)
 		/* We finished this file, and there will be no more data
 		 * coming for it; close it out and go to the next one.
 		 */
-		m_file_fd = -1;
-		f->put_fd();
+		if (m_file_fd != -1) {
+			f->put_fd();
+			m_file_fd = -1;
+		}
 		it = m_files.erase(it);
 	}
 
@@ -503,6 +520,7 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 
 	/* And try to send the data we've queued up.
 	 */
+	// XXX CHECK FILE DESCRIPTOR...!!!
 	// XXX CATCH BAD ALLOC EXCEPTION...!!!
 	m_write = new ReadyAdapter(m_client_fd, fdrWrite,
 				boost::bind(&LiveClient::writable, this));
