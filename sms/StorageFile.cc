@@ -297,11 +297,11 @@ off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 				vec++;
 				nvecs--;
 			} else {
-				uint8_t *p = (uint8_t *) vec->iov_len;
+				uint8_t *p = (uint8_t *) vec->iov_base;
 				p += rc;
 				vec->iov_base = p;
 				vec->iov_len -= rc;
-				break;
+				rc = 0;
 			}
 		}
 	}
@@ -399,11 +399,11 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 				vec++;
 				nvecs--;
 			} else {
-				uint8_t *p = (uint8_t *) vec->iov_len;
+				uint8_t *p = (uint8_t *) vec->iov_base;
 				p += rc;
 				vec->iov_base = p;
 				vec->iov_len -= rc;
-				break;
+				rc = 0;
 			}
 		}
 	}
