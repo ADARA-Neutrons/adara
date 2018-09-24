@@ -1472,16 +1472,40 @@ void DataSource::connectComplete(void)
 	socklen_t elen = sizeof(int);
 	int e, rc;
 
-	// XXX CHECK FILE DESCRIPTOR...!!!
+	// Check File Descriptor...
+	if (m_fd == -1) {
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "connectComplete(): Invalid File Descriptor for "
+			<< m_name << " m_fd=" << m_fd);
+		// We might as well Disconnect and try again later...
+		// Leave m_pvConnected in its current state, latch failures
+		connectionFailed(false, false, IDLE);
+		return;
+	}
+
 	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &e, &elen);
 	if (!rc && !e) {
+
 		if (m_fdreg) {
 			delete m_fdreg;
 			m_fdreg = NULL;
 		}
-		// XXX CATCH BAD ALLOC EXCEPTION...!!!
-		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
-				boost::bind(&DataSource::fdReady, this));
+
+		// Catch Bad Alloc Exception...
+		try {
+			m_fdreg = new ReadyAdapter(m_fd, fdrRead,
+					boost::bind(&DataSource::fdReady, this));
+		} catch (std::bad_alloc e) {
+			ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Bad Alloc Error for " << m_name
+				<< " adapter: " << e.what());
+			m_fdreg = NULL;
+			// If we can't get notified to read from this Data Source,
+			// we might as well Disconnect and try again later...
+			// Leave m_pvConnected in its current state, latch failures
+			connectionFailed(false, false, IDLE);
+			return;
+		}
 
 		m_timer->cancel();
 
@@ -1607,7 +1631,16 @@ void DataSource::dataReady(void)
 		}
 	}
 
-	// XXX CHECK FILE DESCRIPTOR...!!!
+	// Check File Descriptor...
+	if (m_fd == -1) {
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "dataReady(): Invalid File Descriptor for "
+			<< m_name << " m_fd=" << m_fd);
+		m_pvConnected->failed();
+		connectionFailed(true, true, IDLE);
+		return;
+	}
+
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_fd, log_info, 4000, m_max_read_chunk)) {
