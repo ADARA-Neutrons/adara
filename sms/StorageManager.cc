@@ -336,6 +336,9 @@ boost::shared_ptr<BlockSizePV> StorageManager::m_pvBlockSize;
 
 boost::shared_ptr<RescanRunDirPV> StorageManager::m_pvRescanRunDir;
 
+boost::shared_ptr<smsBooleanPV> StorageManager::m_pvComBusVerbose;
+bool StorageManager::m_combus_verbose;
+
 struct timespec StorageManager::m_scanStart;
 
 std::list<StorageContainer::SharedPtr> StorageManager::m_pendingRuns;
@@ -473,6 +476,9 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 	set_max_blocks_allowed(max_blocks_allowed);
 
 	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
+
+	m_combus_verbose = conf.get<bool>("storage.combus_verbose", true);
+	DEBUG("ComBus Verbose Set to " << m_combus_verbose);
 
 	StorageFile::config(conf);
 }
@@ -702,12 +708,16 @@ void StorageManager::lateInit(void)
 	m_pvRescanRunDir = boost::shared_ptr<RescanRunDirPV>(new
 		RescanRunDirPV(prefix + ":RescanRunDir"));
 
+	m_pvComBusVerbose = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":ComBusVerbose"));
+
 	ctrl->addPV(m_pvPoolsize);
 	ctrl->addPV(m_pvPercent);
 	ctrl->addPV(m_pvMaxBlocksAllowed);
 	ctrl->addPV(m_pvMaxBlocksAllowedMultiplier);
 	ctrl->addPV(m_pvBlockSize);
 	ctrl->addPV(m_pvRescanRunDir);
+	ctrl->addPV(m_pvComBusVerbose);
 
 	/* Set the fencepost for the scan; any containers with a
 	 * date after this time have been generated as part of this
@@ -733,11 +743,15 @@ void StorageManager::lateInit(void)
 	/* Initialize Rescan Run Directory PV... */
 	m_pvRescanRunDir->update("", &m_scanStart);
 
+	/* Initialize ComBus Verbosity PV... */
+	m_pvComBusVerbose->update(m_combus_verbose, &m_scanStart);
+
 	/* Restore Any PVs to AutoSaved Config Values... */
 
 	struct timespec ts;
 	std::string value;
 	uint32_t uvalue;
+	bool bvalue;
 
 	if ( StorageManager::getAutoSavePV(
 			m_pvPoolsize->getName(), value, ts ) ) {
@@ -761,6 +775,12 @@ void StorageManager::lateInit(void)
 			m_pvMaxBlocksAllowedMultiplier->getName(), uvalue, ts ) ) {
 		m_max_blocks_allowed_multiplier = uvalue;
 		m_pvMaxBlocksAllowedMultiplier->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvComBusVerbose->getName(), bvalue, ts ) ) {
+		m_combus_verbose = bvalue;
+		m_pvComBusVerbose->update(bvalue, &ts);
 	}
 
 	/* We need a timestamp for the initial index entry; any timestamp
@@ -1154,7 +1174,11 @@ void StorageManager::pauseRecording(void)
 {
 	m_cur_container->pause();
 
-	if (m_cur_container->runNumber()) {
+	// Update ComBus Verbosity PV...
+	m_combus_verbose = m_pvComBusVerbose->value();
+
+	// (Optionally) Notify ComBus of Run Pause...
+	if (m_cur_container->runNumber() && m_combus_verbose) {
 		m_combus->sendUpdate(
 			m_cur_container->runNumber(), m_cur_container->propId(),
 			std::string("SMS run paused"));
@@ -1165,7 +1189,11 @@ void StorageManager::resumeRecording(void)
 {
 	m_cur_container->resume();
 
-	if (m_cur_container->runNumber()) {
+	// Update ComBus Verbosity PV...
+	m_combus_verbose = m_pvComBusVerbose->value();
+
+	// (Optionally) Notify ComBus of Run Pause...
+	if (m_cur_container->runNumber() && m_combus_verbose) {
 		m_combus->sendUpdate(
 			m_cur_container->runNumber(), m_cur_container->propId(),
 			std::string("SMS run resumed"));

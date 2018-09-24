@@ -26,6 +26,7 @@ class PercentPV;
 class MaxBlocksPV;
 class BlockSizePV;
 class RescanRunDirPV;
+class smsBooleanPV;
 
 class StorageManager {
 public:
@@ -194,6 +195,9 @@ private:
 	static boost::shared_ptr<MaxBlocksPV> m_pvMaxBlocksAllowedMultiplier;
 	static boost::shared_ptr<BlockSizePV> m_pvBlockSize;
 	static boost::shared_ptr<RescanRunDirPV> m_pvRescanRunDir;
+
+	static boost::shared_ptr<smsBooleanPV> m_pvComBusVerbose;
+	static bool m_combus_verbose;
 
 	static struct timespec m_scanStart;
 	static uint64_t m_scannedBlocks;
