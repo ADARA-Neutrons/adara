@@ -63,6 +63,8 @@ LS="/bin/ls"
 #
 umask 0000
 
+ERROR_ONLY_PROMPTING=0
+
 USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
@@ -80,6 +82,8 @@ USAGE()
 	echo "    [--run=<RunNumber2,RunNumber3,...>] \\"
 	echo "    [--run=<RunNumber4-RunNumber5>] \\"
 	echo "    [--ipts=<IPTS-nnnnn>] [--help]"
+	echo
+	echo "Note: Turn Error-Only Prompting: On (\"YES\") or Off (\"NO\")."
 	echo
 }
 
@@ -145,8 +149,17 @@ CHECK_PROCEED()
 
 	local _proceed_ck=""
 
-	echo -e -n "\n${_proceed_query} (yes/No)? "
+	echo -e -n "\n${_proceed_query} (yes/No)[YES/NO]? "
 	read _proceed_ck
+
+	# Activate/Deactivate "Error-Only Prompting"...
+	if [[ "${_proceed_ck}" == "YES" ]]; then
+		ERROR_ONLY_PROMPTING=1
+		echo -e "\n[Error-Only Prompting ACTIVATED!]"
+	elif [[ "${_proceed_ck}" == "NO" ]]; then
+		ERROR_ONLY_PROMPTING=0
+		echo -e "\n[Error-Only Prompting Deactivated.]"
+	fi
 
 	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
 
@@ -408,10 +421,19 @@ INSTALL_AND_CHECK_DATAFILE()
 	fi
 	echo
 
-	CHECK_PROCEED
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
 
-	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
-		| ${Less} "+${lesscmd}"
+		CHECK_PROCEED
+
+		${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
+			| ${Less} "+${lesscmd}"
+
+	else
+
+		${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
+			| ${TAIL} -12
+
+	fi
 
 	#
 	# Copy Original Data File to Backup Copy Before Proceeding...
@@ -452,7 +474,9 @@ INSTALL_AND_CHECK_DATAFILE()
 	echo -e "\t[${_datafile}.NEW-$$]"
 	echo -e "\t-> [${_datafile}]"
 
-	CHECK_PROCEED
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED
+	fi
 
 	echo -e -n "\nMoving Substituted Data File into Place of "
 	echo "${SMS_WHICH_DATA_FILE} Original Stream File:"
@@ -549,7 +573,9 @@ RESUBMIT_RUN()
 	echo -e -n "\nUsing STS \"${STS_SERVICE}\" Service "
 	echo "on \"${STS_HOST}:${STS_PORT}\"."
 
-	CHECK_PROCEED
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED
+	fi
 
 	${ADARA_CAT} ${SEND_PAUSED_DATA} --run="${run}" --dir="${rundir}" \
 		| ${NC} ${STS_HOST} ${STS_PORT}
@@ -626,9 +652,14 @@ RESUBMIT_RUN()
 	#
 
 	# Prompt User for NeXus Diff Comparison...
-	CHECK_PROCEED \
-		"Do You Want To Verify the Differences in the NeXus Files"
-	local _ckdonxdiff=$?
+	local _ckdonxdiff
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED \
+			"Do You Want To Verify the Differences in the NeXus Files"
+		_ckdonxdiff=$?
+	else
+		_ckdonxdiff=1	# Default to *Not* Calling NxDiff...
+	fi
 
 	if [[ ${_ckdonxdiff} == 0 ]]; then
 
@@ -658,9 +689,14 @@ RESUBMIT_RUN()
 	#
 
 	# Prompt User for FindNeXus Catalog Check...
-	CHECK_PROCEED \
-		"Do You Want To Use FindNeXus to Verify the Proposal Move"
-	local _cknotify=$?
+	local _cknotify
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED \
+			"Do You Want To Use FindNeXus to Verify the Proposal Move"
+		_cknotify=$?
+	else
+		_cknotify=1		# Default to *Not* Calling FindNeXus...
+	fi
 
 	if [[ ${_cknotify} == 0 ]]; then
 
@@ -687,8 +723,14 @@ RESUBMIT_RUN()
 	#
 
 	# Prompt User for Email Notification to Catalog Admins...
-	CHECK_PROCEED "Do You Want To Notify the Catalog Admins of the Change"
-	local _cknotify=$?
+	local _cknotify
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED \
+			"Do You Want To Notify the Catalog Admins of the Change"
+		_cknotify=$?
+	else
+		_cknotify=0		# Default to *Sending* Email Notification...
+	fi
 
 	if [[ ${_cknotify} == 0 ]]; then
 
@@ -1266,7 +1308,9 @@ UPDATE_PROPOSAL_METADATA()
 	echo -e "\tnew: [${ipts_new_line}]"
 		# Allow Self-Indenting from XML Line(s)
 
-	CHECK_PROCEED
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED
+	fi
 
 	#
 	# Append Substitution to List
