@@ -633,9 +633,18 @@ void StorageManager::init(void)
 	 * EPICS fdManager to be instantiated before they can register
 	 * their interest in descriptors.
 	 */
-	m_ioStartEvent = new EventFd();
-	m_ioCompleteEvent = new EventFd(
-		boost::bind( &StorageManager::ioCompleted ) );
+	try {
+		m_ioStartEvent = new EventFd();
+		m_ioCompleteEvent = new EventFd(
+			boost::bind( &StorageManager::ioCompleted ) );
+	}
+	catch ( std::exception &e )
+	{
+		std::string msg("StorageManager::init():");
+		msg += " Error Creating EventFds for Background I/O - ";
+		msg += e.what();
+		throw std::runtime_error(msg);
+	}
 
 	if (cleanupRunFiles())
 		throw std::runtime_error("Unable to obtain initial run number");

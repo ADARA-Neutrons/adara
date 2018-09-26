@@ -68,6 +68,10 @@ ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 {
 	// Channel Access Exception Handler Now Installed in commThread()... :-D
 
+	m_commRestart = NULL;
+
+	m_restart_combus = false;
+
 	try
 	{
 		// Make Sure We Got A Message Queue...!
@@ -95,7 +99,7 @@ ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 	}
 	catch (...)
 	{
-		ERROR("ComBusSMSMon::SendOriginal() Unknown Exception"
+		ERROR("ComBusSMSMon() Unknown Exception"
 			<< " Trying to Create EPICS Message Queue...!"
 			<< " Facility=" << m_facility
 			<< " Beamline=" << m_beam_sname
@@ -111,9 +115,23 @@ ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 		<< " Count=" << 100
 		<< " MaxMsgSize=" << sizeof(SMSRunStatus *));
 
-	// Create EventFd for commThread() Restart Communication...
-	m_commRestart = new EventFd( true ); // Non-Blocking = true
-	m_restart_combus = false;
+	try
+	{
+		// Create EventFd for commThread() Restart Communication...
+		m_commRestart = new EventFd( true ); // Non-Blocking = true
+	}
+	catch ( std::exception &e )
+	{
+		ERROR("ComBusSMSMon() Exception"
+			<< " Trying to Create EventFd Signaler...!"
+			<< " [" << e.what() << "]"
+			<< " Facility=" << m_facility
+			<< " Beamline=" << m_beam_sname);
+		if ( m_commRestart ) {
+			delete m_commRestart;
+			m_commRestart = NULL;
+		}
+	}
 }
 
 ComBusSMSMon::~ComBusSMSMon()
@@ -130,7 +148,10 @@ ComBusSMSMon::~ComBusSMSMon()
 		m_inqueue = 0;
 	}
 
-	delete m_commRestart;
+	if ( m_commRestart ) {
+		delete m_commRestart;
+		m_commRestart = NULL;
+	}
 }
 
 std::string ComBusSMSMon::m_domain;
@@ -356,7 +377,9 @@ void ComBusSMSMon::restartComBus()
 		m_restartCommData.broker_pass = m_broker_pass;
 
 		// Send the Restart Struct to commThread() to Trigger the Restart!
-		m_commRestart->signal( 1 );
+		if ( m_commRestart == NULL || !m_commRestart->signal( 1 ) ) {
+			ERROR("restartComBus(): Error Signaling via EventFd...!");
+		}
 	}
 
 	// Reset the ComBus Restart PV, We've Set Things in Motion (or Not!) ;-D
@@ -463,8 +486,12 @@ void ComBusSMSMon::checkRestart()
 {
 	uint64_t val;
 
+	if ( m_commRestart == NULL ) {
+		ERROR("checkRestart(): NULL CommRestart EventFd...!");
+	}
+
 	// Got Something on the EventFd...
-	if ( m_commRestart->read( val ) ) {
+	else if ( m_commRestart->read( val ) ) {
 
 		// Got a Restart Request...! :-D
 		if ( val == 1 ) {
