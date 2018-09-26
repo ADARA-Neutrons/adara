@@ -30,8 +30,8 @@ EventFd::EventFd( callback cb )
 {
 	m_nonBlocking = true;
 	init( EFD_NONBLOCK );
-	// XXX CHECK FILE DESCRIPTOR...!!!
-	// XXX CATCH BAD ALLOC EXCEPTION...!!!
+	// File Descriptor Created in init() (or std::runtime_error thrown...)
+	// Note: Can Throw Bad Alloc Exception...!
 	m_ready = new ReadyAdapter( m_fd, fdrRead, cb );
 }
 
@@ -105,19 +105,30 @@ bool EventFd::do_read( uint64_t & val )
 			//<< " bufptr=0x" << std::hex << (void *) bufptr << std::dec
 			//<< " remaining len=" << len);
 
-		// XXX CHECK FILE DESCRIPTOR...!!!
+		// Check File Descriptor...
+		if ( m_fd == -1 ) {
+			ERROR("do_read(): Invalid File Descriptor (Still Dead)"
+				<< " m_fd=" << m_fd);
+			return( false );
+		}
+
 		// NOTE: This is Standard C Library read()... ;-o
 		rc = ::read( m_fd, bufptr, len );
 
 		if ( rc == (ssize_t) -1 ) {
 			if (errno != EAGAIN && errno != EINTR) {
 				int e = errno;
-				std::string msg("Unable to read eventfd: ");
-				msg += "m_fd=";
-				msg += boost::lexical_cast<std::string>(m_fd);
-				msg += " - ";
-				msg += strerror(e);
-				throw std::runtime_error(msg);
+				ERROR("do_read(): Unable to Read eventfd: "
+					<< " m_fd=" << m_fd << " - "
+					<< strerror(e));
+				// *Don't* Throw Exception Here, Just Limp Along
+				// and Wait for Help/Restart... ;-D
+				if ( m_fd != -1 ) {
+					DEBUG("Close Dead m_fd=" << m_fd);
+					close( m_fd );
+					m_fd = -1;
+				}
+				return( false );
 			} else if ( !m_nonBlocking ) {
 				DEBUG("do_read(): Read Returned rc=" << rc
 					<< " Continuing..." << " (cnt=" << cnt << ")");
@@ -168,18 +179,29 @@ bool EventFd::do_write( uint64_t val ) {
 			//<< " bufptr=0x" << std::hex << (void *) bufptr << std::dec
 			//<< " remaining len=" << len);
 
-		// XXX CHECK FILE DESCRIPTOR...!!!
+		// Check File Descriptor...
+		if ( m_fd == -1 ) {
+			ERROR("do_write(): Invalid File Descriptor (Still Dead)"
+				<< " m_fd=" << m_fd);
+			return( false );
+		}
+
 		rc = write( m_fd, bufptr, len );
 
 		if ( rc == (ssize_t) -1 ) {
 			if (errno != EAGAIN && errno != EINTR) {
 				int e = errno;
-				std::string msg("Unable to write to eventfd: ");
-				msg += "m_fd=";
-				msg += boost::lexical_cast<std::string>(m_fd);
-				msg += " - ";
-				msg += strerror(e);
-				throw std::runtime_error(msg);
+				ERROR("do_write(): Unable to Write to eventfd: "
+					<< " m_fd=" << m_fd << " - "
+					<< strerror(e));
+				// *Don't* Throw Exception Here, Just Limp Along
+				// and Wait for Help/Restart... ;-D
+				if ( m_fd != -1 ) {
+					DEBUG("Close Dead m_fd=" << m_fd);
+					close( m_fd );
+					m_fd = -1;
+				}
+				return( false );
 			} else {
 				DEBUG("do_write(): Write Returned rc=" << rc
 					<< " Continuing..." << " (cnt=" << cnt << ")");
