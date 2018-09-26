@@ -191,7 +191,8 @@ void StorageFile::addSync(void)
 				<< " m_fd=" << m_fd);
 			// This Will Require Cleanup of Raw Data File... ;-b
 			if (len != sizeof(sync)) {
-				ERROR("addSync(): Partial Write Before Failure -"
+				ERROR("addSync(): BUMMER!"
+					<< " Partial Write Before Failure -"
 					<< " wrote " << (sizeof(sync) - len) << " bytes"
 					<< " of " << sizeof(sync) << " total");
 			}
@@ -210,6 +211,13 @@ void StorageFile::addSync(void)
 			ERROR("addSync() Write Error: "
 				<< "m_fd=" << m_fd << " - "
 				<< strerror(err));
+			// This Will Require Cleanup of Raw Data File... ;-b
+			if (len != sizeof(sync)) {
+				ERROR("addSync(): BUMMER!"
+					<< " Partial Write Before Failure -"
+					<< " wrote " << (sizeof(sync) - len) << " bytes"
+					<< " of " << sizeof(sync) << " total");
+			}
 			break;   // need to update Sync Distance anyway...
 		}
 
@@ -379,25 +387,47 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 	int iovcnt;
 	ssize_t rc;
 
-	// XXX CHECK FILE DESCRIPTOR...!!!
 	while (len) {
 		iovcnt = nvecs;
 		if (iovcnt > IOV_MAX)
 			iovcnt = IOV_MAX;
+
+		// Check File Descriptor...
+		if (m_fd < 0) {
+			ERROR("save(): Invalid File Descriptor!"
+				<< " m_fd=" << m_fd);
+			// This Will Require Cleanup of Saved Stream File... ;-b
+			if (nvecs != ((int) iovec.size())) {
+				ERROR("save(): BUMMER!"
+					<< " Partial IoVector Write Before Failure -"
+					<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+					<< " of " << iovec.size() << " total"
+					<< " (" << len << " bytes remaining");
+			}
+			break;   // return the number of bytes we've written anyway...
+		}
 
 		rc = writev(m_fd, vec, iovcnt);
 		if (rc <= 0) {
 			if (errno == EAGAIN || errno == EINTR)
 				continue;
 
+			// *Don't* Throw Exception Here...!
+			// We can live without the Saved Input Stream files...
+			// Whine Loudly tho. ;-D
 			int err = errno;
-			std::string msg("save(): writev() error: ");
-			msg += "m_fd=";
-			msg += boost::lexical_cast<std::string>(m_fd);
-			msg += " - ";
-			msg += strerror(err);
-			ERROR(msg);
-			throw std::runtime_error("StorageFile::" + msg);
+			ERROR("save(): writev() Error: "
+				<< "m_fd=" << m_fd << " - "
+				<< strerror(err));
+			// This Will Require Cleanup of Saved Stream File... ;-b
+			if (nvecs != ((int) iovec.size())) {
+				ERROR("save(): BUMMER!"
+					<< " Partial IoVector Write Before Failure -"
+					<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+					<< " of " << iovec.size() << " total"
+					<< " (" << len << " bytes remaining");
+			}
+			break;   // return the number of bytes we've written anyway...
 		}
 
 		m_size += rc;
