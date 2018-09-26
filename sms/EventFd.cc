@@ -42,9 +42,10 @@ EventFd::~EventFd()
 		m_ready = NULL;
 	}
 
-	if (m_fd != -1) {
+	if (m_fd >= 0) {
 		DEBUG("Close m_fd=" << m_fd);
 		close( m_fd );
+		m_fd = -1;
 	}
 }
 
@@ -106,7 +107,7 @@ bool EventFd::do_read( uint64_t & val )
 			//<< " remaining len=" << len);
 
 		// Check File Descriptor...
-		if ( m_fd == -1 ) {
+		if ( m_fd < 0 ) {
 			ERROR("do_read(): Invalid File Descriptor (Still Dead)"
 				<< " m_fd=" << m_fd);
 			return( false );
@@ -123,7 +124,7 @@ bool EventFd::do_read( uint64_t & val )
 					<< strerror(e));
 				// *Don't* Throw Exception Here, Just Limp Along
 				// and Wait for Help/Restart... ;-D
-				if ( m_fd != -1 ) {
+				if ( m_fd >= 0 ) {
 					DEBUG("Close Dead m_fd=" << m_fd);
 					close( m_fd );
 					m_fd = -1;
@@ -180,7 +181,7 @@ bool EventFd::do_write( uint64_t val ) {
 			//<< " remaining len=" << len);
 
 		// Check File Descriptor...
-		if ( m_fd == -1 ) {
+		if ( m_fd < 0 ) {
 			ERROR("do_write(): Invalid File Descriptor (Still Dead)"
 				<< " m_fd=" << m_fd);
 			return( false );
@@ -196,7 +197,7 @@ bool EventFd::do_write( uint64_t val ) {
 					<< strerror(e));
 				// *Don't* Throw Exception Here, Just Limp Along
 				// and Wait for Help/Restart... ;-D
-				if ( m_fd != -1 ) {
+				if ( m_fd >= 0 ) {
 					DEBUG("Close Dead m_fd=" << m_fd);
 					close( m_fd );
 					m_fd = -1;

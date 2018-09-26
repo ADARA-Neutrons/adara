@@ -86,13 +86,13 @@ STSClient::~STSClient()
 
 	m_timer->cancel();
 
-	if (m_sts_fd != -1) {
+	if (m_sts_fd >= 0) {
 		DEBUG("Close m_sts_fd=" << m_sts_fd);
 		close(m_sts_fd);
 		m_sts_fd = -1;
 	}
 
-	if (m_file_fd != -1) {
+	if (m_file_fd >= 0) {
 		m_files.front()->put_fd();
 		m_file_fd = -1;
 	}
@@ -131,7 +131,7 @@ void STSClient::writable(void)
 			continue;
 		}
 
-		if (m_file_fd == -1) {
+		if (m_file_fd < 0) {
 			try {
 				m_file_fd = f->get_fd();
 			} catch (std::runtime_error re) {
@@ -202,7 +202,7 @@ void STSClient::writable(void)
 		/* We finished this file, and there will be no more data
 		 * coming for it; close it out and go to the next one.
 		 */
-		if (m_file_fd != -1) {
+		if (m_file_fd >= 0) {
 			f->put_fd();
 			m_file_fd = -1;
 		}

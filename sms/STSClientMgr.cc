@@ -250,7 +250,7 @@ STSClientMgr::~STSClientMgr()
 		delete m_fdreg;
 		m_fdreg = NULL;
 	}
-	if (m_fd != -1) {
+	if (m_fd >= 0) {
 		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
@@ -682,7 +682,7 @@ void STSClientMgr::connectFailed(void)
 		delete m_fdreg;
 		m_fdreg = NULL;
 	}
-	if (m_fd != -1) {
+	if (m_fd >= 0) {
 		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;

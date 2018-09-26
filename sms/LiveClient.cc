@@ -157,13 +157,13 @@ LiveClient::~LiveClient()
 
 	delete m_timer;
 
-	if (m_client_fd != -1) {
+	if (m_client_fd >= 0) {
 		DEBUG("Close m_client_fd=" << m_client_fd);
 		close(m_client_fd);
 		m_client_fd = -1;
 	}
 
-	if (m_file_fd != -1) {
+	if (m_file_fd >= 0) {
 		m_files.front().first->put_fd();
 		m_file_fd = -1;
 	}
@@ -220,7 +220,7 @@ void LiveClient::writable(void)
 			}
 		}
 
-		if (m_file_fd == -1) {
+		if (m_file_fd < 0) {
 			try {
 				m_file_fd = f->get_fd();
 			} catch (std::runtime_error re) {
@@ -303,7 +303,7 @@ void LiveClient::writable(void)
 		/* We finished this file, and there will be no more data
 		 * coming for it; close it out and go to the next one.
 		 */
-		if (m_file_fd != -1) {
+		if (m_file_fd >= 0) {
 			f->put_fd();
 			m_file_fd = -1;
 		}

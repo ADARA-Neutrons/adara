@@ -934,7 +934,7 @@ DataSource::~DataSource()
 		delete m_fdreg;
 		m_fdreg = NULL;
 	}
-	if (m_fd != -1) {
+	if (m_fd >= 0) {
 		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
@@ -1174,7 +1174,7 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 		delete m_fdreg;
 		m_fdreg = NULL;
 	}
-	if (m_fd != -1) {
+	if (m_fd >= 0) {
 		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
@@ -1456,7 +1456,7 @@ void DataSource::startConnect(void)
 	return;
 
 error_fd:
-	if (m_fd != -1) {
+	if (m_fd >= 0) {
 		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
@@ -1473,7 +1473,7 @@ void DataSource::connectComplete(void)
 	int e, rc;
 
 	// Check File Descriptor...
-	if (m_fd == -1) {
+	if (m_fd < 0) {
 		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "connectComplete(): Invalid File Descriptor for "
 			<< m_name << " m_fd=" << m_fd);
@@ -1632,7 +1632,7 @@ void DataSource::dataReady(void)
 	}
 
 	// Check File Descriptor...
-	if (m_fd == -1) {
+	if (m_fd < 0) {
 		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "dataReady(): Invalid File Descriptor for "
 			<< m_name << " m_fd=" << m_fd);

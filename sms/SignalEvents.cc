@@ -20,7 +20,7 @@ std::vector<SignalEvents::cbFunc> SignalEvents::m_sig_map;
 
 void SignalEvents::check_init(void)
 {
-	if (m_fd != -1)
+	if (m_fd >= 0)
 		return;
 
 	m_sig_map.resize(SIGRTMAX+1);
@@ -42,7 +42,7 @@ void SignalEvents::check_init(void)
 	} catch (...) {
 		ERROR("Exception Allocating ReadyAdapter");
 		m_read = NULL;
-		if (m_fd != -1) {
+		if (m_fd >= 0) {
 			DEBUG("Close m_fd=" << m_fd);
 			close(m_fd);
 			m_fd = -1;
