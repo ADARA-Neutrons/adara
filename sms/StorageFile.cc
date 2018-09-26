@@ -100,7 +100,7 @@ void StorageFile::put_fd(void)
 
 	m_fdRefs--;
 	if (!m_fdRefs) {
-		if (m_fd != -1) {
+		if (m_fd >= 0) {
 			DEBUG("Close m_fd=" << m_fd);
 			::close(m_fd);
 			m_fd = -1;
@@ -183,21 +183,34 @@ void StorageFile::addSync(void)
 	sync.hdr.ts_nsec = now.tv_nsec;
 	sync.offset = m_size;
 
-	// XXX CHECK FILE DESCRIPTOR...!!!
 	for (len = sizeof(sync); len; len -= rc) {
+
+		// Check File Descriptor...
+		if (m_fd < 0) {
+			ERROR("addSync(): Invalid File Descriptor!"
+				<< " m_fd=" << m_fd);
+			// This Will Require Cleanup of Raw Data File... ;-b
+			if (len != sizeof(sync)) {
+				ERROR("addSync(): Partial Write Before Failure -"
+					<< " wrote " << (sizeof(sync) - len) << " bytes"
+					<< " of " << sizeof(sync) << " total");
+			}
+			break;   // need to update Sync Distance anyway...
+		}
+
 		rc = ::write(m_fd, p, len);
 		if (rc <= 0) {
 			if (errno == EAGAIN || errno == EINTR)
 				continue;
 
+			// *Don't* Throw Exception Here...!
+			// We can live without Sync point in Raw Data files...
+			// Whine Loudly tho. ;-D
 			int err = errno;
-			std::string msg("addSync() write error: ");
-			msg += "m_fd=";
-			msg += boost::lexical_cast<std::string>(m_fd);
-			msg += " - ";
-			msg += strerror(err);
-			ERROR(msg);
-			throw std::runtime_error("StorageFile::" + msg);
+			ERROR("addSync() Write Error: "
+				<< "m_fd=" << m_fd << " - "
+				<< strerror(err));
+			break;   // need to update Sync Distance anyway...
 		}
 
 		m_size += rc;
