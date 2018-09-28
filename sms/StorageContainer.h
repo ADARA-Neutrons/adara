@@ -47,12 +47,13 @@ public:
 				std::string &propId, bool &path_deleted);
 
 	void newFile(void);
-	off_t write(IoVector &iovec, uint32_t len, bool notify = true);
+	bool write(IoVector &iovec, uint32_t len, bool notify = true,
+			uint32_t *written = NULL);
 	void terminate(void);
 	void notify(void);
 
-	off_t save(IoVector &iovec, uint32_t len, uint32_t dataSourceId,
-			bool notify);
+	bool save(IoVector &iovec, uint32_t len, uint32_t dataSourceId,
+			bool notify, uint32_t *written = NULL);
 
 	void pause(void);
 	void resume(void);

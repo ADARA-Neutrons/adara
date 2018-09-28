@@ -80,7 +80,8 @@ void StorageContainer::newFile(void)
 	m_newFile(m_cur_file);
 }
 
-off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
+bool StorageContainer::write(IoVector &iovec, uint32_t len, bool notify,
+		uint32_t *written)
 {
 	/* We don't immediately close a file when we exceed the size limit
 	 * in order to avoid creating a new file just for the end-of-run
@@ -95,7 +96,10 @@ off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
 	if (!m_cur_file)
 		newFile();
 
-	return m_cur_file->write(iovec, len, notify);
+	// XXX TODO On Error, Should We Try to Close the Current Data File
+	// and Open a New One Here...?
+	// (Maybe with a Error Counter to prevent File Thrashing...?)
+	return m_cur_file->write(iovec, len, notify, written);
 }
 
 void StorageContainer::terminate(void)
@@ -124,8 +128,8 @@ void StorageContainer::notify(void)
 		m_cur_file->notify();
 }
 
-off_t StorageContainer::save(IoVector &iovec, uint32_t len,
-		uint32_t dataSourceId, bool notify)
+bool StorageContainer::save(IoVector &iovec, uint32_t len,
+		uint32_t dataSourceId, bool notify, uint32_t *written)
 {
 	// Verify the Saved Input Stream File for this Data Source,
 	// Create it as needed...
@@ -180,7 +184,10 @@ off_t StorageContainer::save(IoVector &iovec, uint32_t len,
 		StorageManager::saveCreated( dataSourceId );
 	}
 
-	return m_ds_input_files[dataSourceId]->save(iovec, len);
+	// XXX TODO On Error, Should We Try to Close the Current
+	// Saved Stream File and Open a New One Here...?
+	// (Maybe with a Error Counter to prevent File Thrashing...?)
+	return m_ds_input_files[dataSourceId]->save(iovec, len, written);
 }
 
 void StorageContainer::pause(void)
