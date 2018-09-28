@@ -10,6 +10,8 @@
 #include <fcntl.h>
 #include <limits.h>
 
+#include <string>
+
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 
@@ -268,13 +270,27 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 		| ((uint32_t) m_addendum << 24);
 #endif
 
+	// Stuff Run Status Packet into IoVector for Write to Disk...
 	IoVector iovec(1);
 	iovec[0].iov_base = &spkt;
 	iovec[0].iov_len = sizeof(spkt);
-	write(iovec, sizeof(spkt), false);
+
+	// Write Run Status Packet to Disk...
+	if ( !write(iovec, sizeof(spkt), false) ) {
+		// Something Went Wrong Trying to Write This Run Status Pkt to Disk!
+		// We will therefore LOSE THIS DATA as a result of the error,
+		// so LOG IT HERE in the hopes it can be salvaged later...! ;-Q
+		// Fortunately, We'll get Another Copy of this Run Status Pkt
+		// with the _Next_ Data File, so we _May_ Be Ok here...?
+		std::stringstream ss;
+		ss << "LOST Run Status Packet fileNumber=" << m_fileNumber
+			<< " status=" << status;
+		StorageManager::logIoVector(ss.str(), iovec);
+	}
 }
 
-off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
+bool StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify,
+		uint32_t *written)
 {
 	// DEBUG("StorageFile::write() entry len=" << len
 		// << " nvecs=" << iovec.size());
@@ -284,26 +300,56 @@ off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 	int iovcnt;
 	ssize_t rc;
 
-	// XXX CHECK FILE DESCRIPTOR...!!!
+	bool ret = true;
+
+	if (written)
+		*written = 0;
+
 	while (len) {
 		iovcnt = nvecs;
 		if (iovcnt > IOV_MAX)
 			iovcnt = IOV_MAX;
+
+		// Check File Descriptor...
+		if (m_fd < 0) {
+			ERROR("write(): Invalid File Descriptor!"
+				<< " m_fd=" << m_fd);
+			// This Will Require Cleanup of Saved Stream File... ;-b
+			if (nvecs != ((int) iovec.size())) {
+				ERROR("write(): BUMMER!"
+					<< " Partial IoVector Write Before Failure -"
+					<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+					<< " of " << iovec.size() << " total"
+					<< " (" << len << " bytes remaining");
+			}
+			ret = false;
+			break;	// still need to check file oversize...
+		}
 
 		rc = writev(m_fd, vec, iovcnt);
 		if (rc <= 0) {
 			if (errno == EAGAIN || errno == EINTR)
 				continue;
 
+			// *Don't* Throw Exception Here...! Always Try to Forge On...!
 			int err = errno;
-			std::string msg("write(): writev() error: ");
-			msg += "m_fd=";
-			msg += boost::lexical_cast<std::string>(m_fd);
-			msg += " - ";
-			msg += strerror(err);
-			ERROR(msg);
-			throw std::runtime_error("StorageFile::" + msg);
+			ERROR("write(): writev() Error: "
+				<< "m_fd=" << m_fd << " - "
+				<< strerror(err));
+			// This Will Require Cleanup of Saved Stream File... ;-b
+			if (nvecs != ((int) iovec.size())) {
+				ERROR("write(): BUMMER!"
+					<< " Partial IoVector Write Before Failure -"
+					<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+					<< " of " << iovec.size() << " total"
+					<< " (" << len << " bytes remaining");
+			}
+			ret = false;
+			break;	// still need to check file oversize...
 		}
+
+		if (written)
+			*written += rc;
 
 		m_syncDistance += rc;
 		m_size += rc;
@@ -344,7 +390,7 @@ off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 
 	// DEBUG("StorageFile::write() exit");
 
-	return m_size;
+	return( ret );
 }
 
 void StorageFile::notify(void)
@@ -377,7 +423,7 @@ void StorageFile::terminate(ADARA::RunStatus::Enum status)
 	put_fd();
 }
 
-off_t StorageFile::save(IoVector &iovec, uint32_t len)
+bool StorageFile::save(IoVector &iovec, uint32_t len, uint32_t *written)
 {
 	// DEBUG("StorageFile::save() entry len=" << len
 		// << " nvecs=" << iovec.size());
@@ -386,6 +432,11 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 	int nvecs = iovec.size();
 	int iovcnt;
 	ssize_t rc;
+
+	bool ret = true;
+
+	if (written)
+		*written = 0;
 
 	while (len) {
 		iovcnt = nvecs;
@@ -404,7 +455,8 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 					<< " of " << iovec.size() << " total"
 					<< " (" << len << " bytes remaining");
 			}
-			break;   // return the number of bytes we've written anyway...
+			ret = false;
+			break;	// still need to check file oversize...
 		}
 
 		rc = writev(m_fd, vec, iovcnt);
@@ -427,8 +479,12 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 					<< " of " << iovec.size() << " total"
 					<< " (" << len << " bytes remaining");
 			}
-			break;   // return the number of bytes we've written anyway...
+			ret = false;
+			break;	// still need to check file oversize...
 		}
+
+		if (written)
+			*written += rc;
 
 		m_size += rc;
 
@@ -456,7 +512,7 @@ off_t StorageFile::save(IoVector &iovec, uint32_t len)
 
 	// DEBUG("StorageFile::save() exit");
 
-	return m_size;
+	return( ret );
 }
 
 void StorageFile::terminateSave(void)
