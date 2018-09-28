@@ -1328,7 +1328,18 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 * to this location for replay after a snapshot.
 	 */
 	resumeLocation = m_cur_container->file()->size();
-	m_cur_container->write(iovec, len, notify);
+
+	// Write Data Packet to Disk...
+	if ( !m_cur_container->write(iovec, len, notify) ) {
+		// Something Went Wrong Trying to Write This Data to Disk! :-O
+		// We will therefore LOSE THIS EXPERIMENT DATA
+		// as a result of the error, so LOG IT HERE in the hopes
+		// it can be salvaged later...! ;-Q
+		std::stringstream ss;
+		ss << "LOST EXPERIMENT DATA packetType=0x"
+			<< std::hex << hdr->pkt_format << std::dec;
+		logIoVector(ss.str(), iovec);
+	}
 
 	/* Is it time to take a state snapshot? If we took one while writing
 	 * the current packet out -- ie, we started a new file -- then
@@ -1395,7 +1406,16 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 		startContainer( paused );
 	}
 
-	m_cur_container->save(iovec, len, dataSourceId, true);
+	// Write Saved Stream Packet to Disk...
+	if ( !m_cur_container->save(iovec, len, dataSourceId, true) ) {
+		// Something Went Wrong Trying to Write This Data to Disk! :-O
+		// We will therefore LOSE This Saved Input Stream Data
+		// as a result of the error, so LOG IT HERE in the hopes
+		// it can be salvaged later...! ;-Q
+		std::stringstream ss;
+		ss << "LOST Saved Input Stream Data dataSourceId=" << dataSourceId;
+		logIoVector(ss.str(), iovec);
+	}
 
 	/* Is it time to initiate a purge of old data?
 	 *
@@ -1433,7 +1453,20 @@ void StorageManager::addPrologue(IoVector &iovec)
 	}
 
 	uint32_t len = validatePacket(iovec);
-	m_prologueFile->write(iovec, len, false);
+
+	// Write Prologue Packet to Disk...
+	if ( !m_prologueFile->write(iovec, len, false) ) {
+		// Something Went Wrong Trying to Write This Prologue Pkt to Disk!
+		// We will therefore LOSE THIS DATA as a result of the error,
+		// so LOG IT HERE in the hopes it can be salvaged later...! ;-Q
+		// Fortunately, We'll get Another Copy of this Prologue Pkt Data
+		// with the _Next_ Data File, so we _May_ Be Ok here...?
+		ADARA::Header *hdr = (ADARA::Header *) iovec[0].iov_base;
+		std::stringstream ss;
+		ss << "LOST Prologue Packet Data packetType=0x"
+			<< std::hex << hdr->pkt_format << std::dec;
+		logIoVector(ss.str(), iovec);
+	}
 }
 
 uint32_t StorageManager::validatePacket(const IoVector &iovec)
@@ -1462,6 +1495,34 @@ void StorageManager::addSavePrologue(IoVector &iovec,
 	 */
 	uint32_t len = validatePacket(iovec);
 	m_cur_container->save(iovec, len, dataSourceId, false);
+}
+
+void StorageManager::logIoVector(std::string label, IoVector &iovec)
+{
+	// Go Through IoVector and Convert Everything to String Format... ;-b
+
+	std::stringstream ss;
+
+	ss << std::hex << std::setfill('0');
+
+	ss << "[0x";
+
+	for (IoVector::iterator iovit = iovec.begin() ;
+			iovit != iovec.end() ; ++iovit)
+	{
+		uint8_t *bytes = (uint8_t *) iovit->iov_base;
+
+		for (uint32_t i=0 ; i < iovit->iov_len ; i++)
+		{
+			ss << std::setw(2) << static_cast<unsigned>(bytes[i]);
+		}
+	}
+
+	ss << "]";
+
+	ss << std::dec;
+
+	ERROR("logIoVector(): " << label << " - " << ss.str());
 }
 
 void StorageManager::scanDaily(const std::string &dir)

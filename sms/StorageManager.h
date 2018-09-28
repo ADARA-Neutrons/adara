@@ -87,6 +87,8 @@ public:
 		addSavePrologue(iovec, dataSourceId);
 	}
 
+	static void logIoVector(std::string label, IoVector &iovec);
+
 	static int base_fd(void) { return m_base_fd; }
 
 	static std::string base_dir(void) { return m_baseDir; }
