@@ -870,25 +870,30 @@ StreamParser::rxPacket
         return false;
     }
 
-    // Pulse flag should be 0 (no data processed yet) or 2 (monitor data processed)
+    // Pulse flag should be 0 (no data processed yet)
+    // or 2 (monitor data processed)
     // any other value indicates an error with SMS packet generation
 
     if ( m_pulse_flag == 0 )
     {
-        // First packet of new pulse - count it and set flag indicating it was counted
+        // First packet of new pulse
+        // - count it and set flag indicating it was counted
         ++m_pulse_count;
         m_pulse_flag |= 1;
     }
-    else if ( m_pulse_flag == 2 )
+    else if ( m_pulse_flag == 2 ) {
         m_pulse_flag = 0;
-    else
-        THROW_TRACE( ERR_UNEXPECTED_INPUT, "Invalid banked event packet sequence received" )
-
+    }
+    else {
+        THROW_TRACE( ERR_UNEXPECTED_INPUT,
+            "Invalid banked event packet sequence received" )
+    }
 
     processPulseInfo( a_pkt );
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
-    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
+    const uint32_t *epos = (const uint32_t*)
+        (a_pkt.payload() + a_pkt.payload_length());
 
     rpos += 4; // Skip over pulse info
 
@@ -901,7 +906,8 @@ StreamParser::rxPacket
     while ( rpos < epos )
     {
         source_id = *rpos++;
-        rpos += 2; // TODO For now, skip over source-specific pulse info. Should eventually process this data
+        rpos += 2; // TODO For now, skip over source-specific pulse info.
+                   // Should eventually process this data
         bank_count = *rpos++;
 
         // Process events per-bank
@@ -976,15 +982,18 @@ StreamParser::rxPacket
 
     if ( m_pulse_flag == 0 )
     {
-        // First packet of new pulse - count it and set flag indicating it was counted
+        // First packet of new pulse
+        // - count it and set flag indicating it was counted
         ++m_pulse_count;
         m_pulse_flag |= 1;
     }
-    else if ( m_pulse_flag == 2 )
+    else if ( m_pulse_flag == 2 ) {
         m_pulse_flag = 0;
-    else
-        THROW_TRACE( ERR_UNEXPECTED_INPUT, "Invalid banked event state packet sequence received" )
-
+    }
+    else {
+        THROW_TRACE( ERR_UNEXPECTED_INPUT,
+            "Invalid banked event state packet sequence received" )
+    }
 
     processPulseInfo( a_pkt );
 
@@ -1102,13 +1111,15 @@ StreamParser::rxOversizePkt
                     == ADARA::PacketType::BANKED_EVENT_STATE_TYPE )
             {
                 THROW_TRACE( ERR_UNEXPECTED_INPUT,
-                    "Invalid banked event packet sequence received" )
+                    "Invalid (oversized) banked event packet"
+                        << " sequence received" )
             }
             else if ( hdr->base_type() ==
                     ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE )
             {
                 THROW_TRACE( ERR_UNEXPECTED_INPUT,
-                    "Invalid beam monitor packet sequence received" )
+                    "Invalid (oversized) beam monitor packet"
+                        << " sequence received" )
             }
         }
     }
@@ -1678,14 +1689,18 @@ StreamParser::rxPacket
 
     if ( m_pulse_flag == 0 )
     {
-        // First packet of new pulse - count it and set flag indicating it was counted
+        // First packet of new pulse
+        // - count it and set flag indicating it was counted
         ++m_pulse_count;
         m_pulse_flag |= 2;
     }
-    else if ( m_pulse_flag == 1 )
+    else if ( m_pulse_flag == 1 ) {
         m_pulse_flag = 0;
-    else
-        THROW_TRACE( ERR_UNEXPECTED_INPUT, "Invalid beam monitor packet sequence received" )
+    }
+    else {
+        THROW_TRACE( ERR_UNEXPECTED_INPUT,
+            "Invalid beam monitor packet sequence received" )
+    }
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
     const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
