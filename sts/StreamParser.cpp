@@ -454,6 +454,16 @@ StreamParser::rxPacket
             bad_state = true;
         }
     }
+    else if ( a_pkt.status() == ADARA::RunStatus::RUN_BOF )
+    {
+        syslog( LOG_INFO,
+            "[%i] Run Status, Run File #%d, %s = %s.",
+            g_pid, a_pkt.fileNumber(),
+            "Processing State", getProcessingStateString().c_str() );
+    }
+    // We don't really need to log the _End_ of the file...
+    // Just log the Start of the _Next_ file... ;-D
+    // ( a_pkt.status() == ADARA::RunStatus::RUN_EOF )
 
     if ( bad_state )
     {
