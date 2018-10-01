@@ -702,7 +702,7 @@ void Markers::addAnnotationComment(void)
 	}
 }
 
-void Markers::dumpRunNotesComment(void)
+void Markers::dumpRunNotesComment( bool prologue )
 {
 	// Keep Saving Things Until a Run Actually Starts (& Un-Pauses!)
 	if ( !m_inRun || m_isPaused )
@@ -728,7 +728,8 @@ void Markers::dumpRunNotesComment(void)
 
 				emitPacket( first_notes_it->first,
 					ADARA::MarkerType::OVERALL_RUN_COMMENT,
-					first_notes_it->second );
+					first_notes_it->second,
+					StringPVSharedPtr(), prologue );
 
 				notesCommentQueue.erase( first_notes_it );
 
@@ -753,7 +754,8 @@ void Markers::dumpRunNotesComment(void)
 
 				emitPacket( last_notes_it->first,
 					ADARA::MarkerType::OVERALL_RUN_COMMENT,
-					last_notes_it->second );
+					last_notes_it->second,
+					StringPVSharedPtr(), prologue );
 
 				notesCommentQueue.pop_back();
 
@@ -766,7 +768,7 @@ void Markers::dumpRunNotesComment(void)
 	// (...Done in dumpQueuedComments() to Interleave with Other Queues...)
 }
 
-void Markers::dumpQueuedComments(void)
+void Markers::dumpQueuedComments( bool prologue )
 {
 	// Keep Saving Things Until a Run Actually Starts (& Un-Pauses!)
 	if ( !m_inRun || m_isPaused )
@@ -905,7 +907,8 @@ void Markers::dumpQueuedComments(void)
 		else
 			DEBUG( ss.str() );
 
-		emitPacket( next_it->first, markerType, prefix + comment );
+		emitPacket( next_it->first, markerType, prefix + comment,
+			StringPVSharedPtr(), prologue );
 
 		// Handle Scan Index Restore... ;-b
 		if ( is_scan )
@@ -953,10 +956,10 @@ void Markers::dumpQueuedComments(void)
 void Markers::onPrologue(void)
 {
 	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
-	dumpRunNotesComment();
+	dumpRunNotesComment( true );
 
 	// Dump Any Pre-Run Scan Comments Now...
-	dumpQueuedComments();
+	dumpQueuedComments( true );
 
 	if ( m_scanIndex )
 	{
