@@ -76,8 +76,10 @@ declare -A nHostSTSLDAPSearchFailed
 declare -A nHostSTSMoreThanOnePVValue
 declare -A nHostSTSPVIDReNumbered
 declare -A nHostSTSNoMatchingUnitsPV
+declare -A nHostSTSPrePulseVarValue
 declare -A nHostSTSVarValueSawtooth
 declare -A nHostSTSVarValueTruncateNegTime
+declare -A nHostSTSNormalizeVarValueTimes
 declare -A nHostSTSConnectionFailed
 declare -A nHostSTSParserStoppedUnexpect
 declare -A nHostSTSTranslationFailed
@@ -224,8 +226,10 @@ PARSE_LOG()
 		nHostSTSMoreThanOnePVValue[$host]=0
 		nHostSTSPVIDReNumbered[$host]=0
 		nHostSTSNoMatchingUnitsPV[$host]=0
+		nHostSTSPrePulseVarValue[$host]=0
 		nHostSTSVarValueSawtooth[$host]=0
 		nHostSTSVarValueTruncateNegTime[$host]=0
+		nHostSTSNormalizeVarValueTimes[$host]=0
 		nHostSTSConnectionFailed[$host]=0
 		nHostSTSParserStoppedUnexpect[$host]=0
 		nHostSTSTranslationFailed[$host]=0
@@ -379,6 +383,13 @@ PARSE_LOG()
 			nHostSTSNoMatchingUnitsPV[$host]=$(( \
 				nHostSTSNoMatchingUnitsPV[$host] + 1 ))
 
+		# "Got Pre-Pulse Variable Value Update" Log
+		elif [[ "$log" =~ \
+				Got${S}Pre-Pulse${S}Variable${S}Value${S}Update ]]; then
+			#echo "Got Pre-Pulse Variable Value Update..."
+			nHostSTSPrePulseVarValue[$host]=$(( \
+				nHostSTSPrePulseVarValue[$host] + 1 ))
+
 		# "Variable Value Update SAWTOOTH" Log
 		elif [[ "$log" =~ Variable${S}Value${S}Update${S}SAWTOOTH ]]; then
 			#echo "Variable Value Update SAWTOOTH..."
@@ -392,6 +403,14 @@ PARSE_LOG()
 			#echo "Variable Value Update SAWTOOTH..."
 			nHostSTSVarValueTruncateNegTime[$host]=$(( \
 				nHostSTSVarValueTruncateNegTime[$host] + 1 ))
+
+		# "Normalizing PV Value Times with First Pulse Time" Log
+		elif [[ "$log" =~ \
+			Normalizing${S}PV${S}Value${S}Times${S}with${S}First${S}Pulse \
+		]]; then
+			#echo "Normalizing PV Value Times with First Pulse Time..."
+			nHostSTSNormalizeVarValueTimes[$host]=$(( \
+				nHostSTSNormalizeVarValueTimes[$host] + 1 ))
 
 		# "Connection Failed, Not Done Processing" Log
 		elif [[ "$log" =~ \
@@ -1283,6 +1302,10 @@ for h in ${HostList} ; do
 		echo -n "   * ${nHostSTSEmptyFinalPulseInfo[$h]} "
 		echo "STS \"Empty Final Pulse Info Buffer(s)\" Logs"
 	fi
+	if [[ ${nHostSTSPrePulseVarValue[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSPrePulseVarValue[$h]} "
+		echo "STS \"Pre-Pulse Variable Value Update\" Logs"
+	fi
 	if [[ ${nHostSTSVarValueSawtooth[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSVarValueSawtooth[$h]} "
 		echo "STS \"Variable Value Update SAWTOOTH\" Logs"
@@ -1290,6 +1313,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSVarValueTruncateNegTime[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSVarValueTruncateNegTime[$h]} "
 		echo "STS \"Truncate Negative Variable Value Update Time\" Logs"
+	fi
+	if [[ ${nHostSTSNormalizeVarValueTimes[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSNormalizeVarValueTimes[$h]} "
+		echo "STS \"Normalizing PV Value Times with First Pulse\" Logs"
 	fi
 	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSMoreThanOnePVValue[$h]} "
