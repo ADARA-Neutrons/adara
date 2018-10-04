@@ -880,9 +880,9 @@ StreamParser::rxPacket
         return false;
     }
 
-    // Pulse flag should be 0 (no data processed yet)
-    // or 2 (monitor data processed)
-    // any other value indicates an error with SMS packet generation
+    // (Current) Pulse flag should be 0 (no data processed yet)
+    // or 2 (monitor data processed).
+    // Any other value indicates an error with SMS packet generation.
 
     if ( m_pulse_flag == 0 )
     {
@@ -892,11 +892,27 @@ StreamParser::rxPacket
         m_pulse_flag |= 1;
     }
     else if ( m_pulse_flag == 2 ) {
+        // "Complete" Pulse, Got Both Some Neutron & Beam Monitor Data...
         m_pulse_flag = 0;
     }
     else {
-        THROW_TRACE( ERR_UNEXPECTED_INPUT,
-            "Invalid banked event packet sequence received" )
+        // *** No Intervening Beam Monitor Packet for Last Pulse?!
+        // _Assume_ First Packet of _New_ Pulse...
+        // - count it and set flag indicating it was counted
+        ++m_pulse_count;
+        m_pulse_flag = 1;
+        // *Don't* Throw Exception Here, Log Profusely & Move On...
+        // (No need to throw out baby with the bath water...! ;-)
+        syslog( LOG_ERR,
+            "[%i] %s %s Received at %u.%09u, %s %s Continuing...",
+            g_pid, "STS Error:",
+            "Invalid Banked Event Packet Sequence",
+            (uint32_t) a_pkt.timestamp().tv_sec
+                - ADARA::EPICS_EPOCH_OFFSET,
+            (uint32_t) a_pkt.timestamp().tv_nsec,
+            "No Intervening Beam Monitor Packet!",
+            "(LOST EXPERIMENT DATA?)" );
+        usleep(30000); // give syslog a chance...
     }
 
     processPulseInfo( a_pkt );
@@ -987,8 +1003,9 @@ StreamParser::rxPacket
         return false;
     }
 
-    // Pulse flag should be 0 (no data processed yet) or 2 (monitor data processed)
-    // any other value indicates an error with SMS packet generation
+    // (Current) Pulse flag should be 0 (no data processed yet)
+    // or 2 (monitor data processed).
+    // Any other value indicates an error with SMS packet generation.
 
     if ( m_pulse_flag == 0 )
     {
@@ -998,11 +1015,27 @@ StreamParser::rxPacket
         m_pulse_flag |= 1;
     }
     else if ( m_pulse_flag == 2 ) {
+        // "Complete" Pulse, Got Both Some Neutron & Beam Monitor Data...
         m_pulse_flag = 0;
     }
     else {
-        THROW_TRACE( ERR_UNEXPECTED_INPUT,
-            "Invalid banked event state packet sequence received" )
+        // *** No Intervening Beam Monitor Packet for Last Pulse?!
+        // _Assume_ First Packet of _New_ Pulse...
+        // - count it and set flag indicating it was counted
+        ++m_pulse_count;
+        m_pulse_flag = 1;
+        // *Don't* Throw Exception Here, Log Profusely & Move On...
+        // (No need to throw out baby with the bath water...! ;-)
+        syslog( LOG_ERR,
+            "[%i] %s %s Received at %u.%09u, %s %s Continuing...",
+            g_pid, "STS Error:",
+            "Invalid Banked Event State Packet Sequence",
+            (uint32_t) a_pkt.timestamp().tv_sec
+                - ADARA::EPICS_EPOCH_OFFSET,
+            (uint32_t) a_pkt.timestamp().tv_nsec,
+            "No Intervening Beam Monitor Packet!",
+            "(LOST EXPERIMENT DATA?)" );
+        usleep(30000); // give syslog a chance...
     }
 
     processPulseInfo( a_pkt );
@@ -1082,9 +1115,11 @@ StreamParser::rxOversizePkt
                 || hdr->base_type()
                     == ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE )
         {
-            // Pulse flag should be 0 (no data processed yet) or 2 (monitor
-            // data processed) any other value indicates an error with
-            // SMS packet generation
+            // (Current) Pulse flag should be 0 (no data processed yet)
+            // or 1 (event data processed) [If This is Beam Monitor Pkt]
+            // or 2 (monitor data processed) [If This is Banked Event Pkt]
+            // Any other mismatching value indicates an error with
+            // SMS packet generation.
 
             if ( m_pulse_flag == 0 )
             {
@@ -1113,6 +1148,8 @@ StreamParser::rxOversizePkt
                             ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE
                         && m_pulse_flag == 1 ) )
             {
+                // "Complete" Pulse,
+                // Got Both Some Neutron & Beam Monitor Data...
                 m_pulse_flag = 0;
             }
             else if ( hdr->base_type()
@@ -1120,16 +1157,44 @@ StreamParser::rxOversizePkt
                 || hdr->base_type()
                     == ADARA::PacketType::BANKED_EVENT_STATE_TYPE )
             {
-                THROW_TRACE( ERR_UNEXPECTED_INPUT,
-                    "Invalid (oversized) banked event packet"
-                        << " sequence received" )
+                // *** No Intervening Beam Monitor Packet for Last Pulse?!
+                // _Assume_ First Packet of _New_ Pulse...
+                // - count it and set flag indicating it was counted
+                ++m_pulse_count;
+                m_pulse_flag = 1;
+                // *Don't* Throw Exception Here, Log Profusely & Move On...
+                // (No need to throw out baby with the bath water...! ;-)
+                syslog( LOG_ERR,
+                    "[%i] %s %s Received at %u.%09u, %s %s Continuing...",
+                    g_pid, "STS Error:",
+                    "Invalid (Oversized) Banked Event Packet Sequence",
+                    (uint32_t) hdr->timestamp().tv_sec
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (uint32_t) hdr->timestamp().tv_nsec,
+                    "No Intervening Beam Monitor Packet!",
+                    "(LOST EXPERIMENT DATA?)" );
+                usleep(30000); // give syslog a chance...
             }
             else if ( hdr->base_type() ==
                     ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE )
             {
-                THROW_TRACE( ERR_UNEXPECTED_INPUT,
-                    "Invalid (oversized) beam monitor packet"
-                        << " sequence received" )
+                // *** No Intervening Banked Event Packet for Last Pulse?!
+                // _Assume_ First Packet of _New_ Pulse...
+                // - count it and set flag indicating it was counted
+                ++m_pulse_count;
+                m_pulse_flag = 2;
+                // *Don't* Throw Exception Here, Log Profusely & Move On...
+                // (No need to throw out baby with the bath water...! ;-)
+                syslog( LOG_ERR,
+                    "[%i] %s %s Received at %u.%09u, %s %s Continuing...",
+                    g_pid, "STS Error:",
+                    "Invalid (Oversized) Beam Monitor Packet Sequence",
+                    (uint32_t) hdr->timestamp().tv_sec
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (uint32_t) hdr->timestamp().tv_nsec,
+                    "No Intervening Banked Event Packet!",
+                    "(LOST EXPERIMENT DATA?)" );
+                usleep(30000); // give syslog a chance...
             }
         }
     }
@@ -1694,8 +1759,9 @@ StreamParser::rxPacket
         return false;
     }
 
-    // Pulse flag should be 0 (no data processed yet) or 1 (event data processed)
-    // any other value indicates an error with SMS packet generation
+    // (Current) Pulse flag should be 0 (no data processed yet)
+    // or 1 (event data processed).
+    // Any other value indicates an error with SMS packet generation.
 
     if ( m_pulse_flag == 0 )
     {
@@ -1705,15 +1771,32 @@ StreamParser::rxPacket
         m_pulse_flag |= 2;
     }
     else if ( m_pulse_flag == 1 ) {
+        // "Complete" Pulse, Got Both Some Neutron & Beam Monitor Data...
         m_pulse_flag = 0;
     }
     else {
-        THROW_TRACE( ERR_UNEXPECTED_INPUT,
-            "Invalid beam monitor packet sequence received" )
+        // *** No Intervening Banked Event Packet for Last Pulse?!
+        // _Assume_ First Packet of _New_ Pulse...
+        // - count it and set flag indicating it was counted
+        ++m_pulse_count;
+        m_pulse_flag = 2;
+        // *Don't* Throw Exception Here, Log Profusely & Move On...
+        // (No need to throw out baby with the bath water...! ;-)
+        syslog( LOG_ERR,
+            "[%i] %s %s Received at %u.%09u, %s %s Continuing...",
+            g_pid, "STS Error:",
+            "Invalid Beam Monitor Packet Sequence",
+            (uint32_t) a_pkt.timestamp().tv_sec
+                - ADARA::EPICS_EPOCH_OFFSET,
+            (uint32_t) a_pkt.timestamp().tv_nsec,
+            "No Intervening Banked Event Packet!",
+            "(LOST EXPERIMENT DATA?)" );
+        usleep(30000); // give syslog a chance...
     }
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
-    const uint32_t *epos = (const uint32_t*)(a_pkt.payload() + a_pkt.payload_length());
+    const uint32_t *epos = (const uint32_t*)(a_pkt.payload()
+        + a_pkt.payload_length());
 
     // TODO What do we do with the pulse info from beam monitor packets?
     rpos += 4; // Skip over pulse info
@@ -1727,7 +1810,7 @@ StreamParser::rxPacket
         monitor_id = *rpos >> 22;
         event_count = *rpos++ & 0x003FFFFF;
 
-        // TODO What do we do with the source info from beam monitor packets?
+        // TODO What do we do with source info from beam monitor packets?
         rpos += 2; // Skip over source info (source ID & tof offset)
 
         processMonitorEvents( monitor_id, event_count, rpos );
