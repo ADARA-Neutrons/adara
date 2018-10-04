@@ -80,6 +80,12 @@ declare -A nHostSTSPrePulseVarValue
 declare -A nHostSTSVarValueSawtooth
 declare -A nHostSTSVarValueTruncateNegTime
 declare -A nHostSTSNormalizeVarValueTimes
+declare -A nHostSTSFoundDupVar
+declare -A nHostSTSFoundMatchDupVarValues
+declare -A nHostSTSSkipIdenticalVarValues
+declare -A nHostSTSPurgePrePulseVarValues
+declare -A nHostSTSIgnoreSubsumedVarValues
+declare -A nHostSTSSubsumedAllDupVarValues
 declare -A nHostSTSConnectionFailed
 declare -A nHostSTSParserStoppedUnexpect
 declare -A nHostSTSTranslationFailed
@@ -230,6 +236,12 @@ PARSE_LOG()
 		nHostSTSVarValueSawtooth[$host]=0
 		nHostSTSVarValueTruncateNegTime[$host]=0
 		nHostSTSNormalizeVarValueTimes[$host]=0
+		nHostSTSFoundDupVar[$host]=0
+		nHostSTSFoundMatchDupVarValues[$host]=0
+		nHostSTSSkipIdenticalVarValues[$host]=0
+		nHostSTSPurgePrePulseVarValues[$host]=0
+		nHostSTSIgnoreSubsumedVarValues[$host]=0
+		nHostSTSSubsumedAllDupVarValues[$host]=0
 		nHostSTSConnectionFailed[$host]=0
 		nHostSTSParserStoppedUnexpect[$host]=0
 		nHostSTSTranslationFailed[$host]=0
@@ -411,6 +423,45 @@ PARSE_LOG()
 			#echo "Normalizing PV Value Times with First Pulse Time..."
 			nHostSTSNormalizeVarValueTimes[$host]=$(( \
 				nHostSTSNormalizeVarValueTimes[$host] + 1 ))
+
+		# "Found PV Marked as Duplicate" Log
+		elif [[ "$log" =~ Found${S}PV${S}Marked${S}as${S}Duplicate ]]; then
+			#echo "Found PV Marked as Duplicate..."
+			nHostSTSFoundDupVar[$host]=$(( \
+				nHostSTSFoundDupVar[$host] + 1 ))
+
+		# "Found Matching Duplicate PV" Log
+		elif [[ "$log" =~ Found${S}Matching${S}Duplicate${S}PV ]]; then
+			#echo "Found Matching Duplicate PV..."
+			nHostSTSFoundMatchDupVarValues[$host]=$(( \
+				nHostSTSFoundMatchDupVarValues[$host] + 1 ))
+
+		# "Skip Past Identical Values (Subsume)" Log
+		elif [[ "$log" =~ Skip${S}Past${S}Identical${S}Values ]]; then
+			#echo "Skip Past Identical Values..."
+			nHostSTSSkipIdenticalVarValues[$host]=$(( \
+				nHostSTSSkipIdenticalVarValues[$host] + 1 ))
+
+		# "Purging Pre-First-Pulse Values" Log
+		elif [[ "$log" =~ Purging${S}Pre-First-Pulse${S}Values ]]; then
+			#echo "Purging Pre-First-Pulse Values..."
+			nHostSTSPurgePrePulseVarValues[$host]=$(( \
+				nHostSTSPurgePrePulseVarValues[$host] + 1 ))
+
+		# "Ignoring Already Subsumed PV Duplicate" Log
+		elif [[ "$log" =~ \
+				Ignoring${S}Already${S}Subsumed${S}PV${S}Duplicate ]]; then
+			#echo "Ignoring Already Subsumed PV Duplicate..."
+			nHostSTSIgnoreSubsumedVarValues[$host]=$(( \
+				nHostSTSIgnoreSubsumedVarValues[$host] + 1 ))
+
+		# "PV Has Subsumed All Duplicate PV Log Values" Log
+		elif [[ "$log" =~ \
+				Subsumed${S}All${S}Duplicate${S}PV${S}Log${S}Values \
+		]]; then
+			#echo "Ignoring Already Subsumed PV Duplicate..."
+			nHostSTSSubsumedAllDupVarValues[$host]=$(( \
+				nHostSTSSubsumedAllDupVarValues[$host] + 1 ))
 
 		# "Connection Failed, Not Done Processing" Log
 		elif [[ "$log" =~ \
@@ -1290,6 +1341,10 @@ for h in ${HostList} ; do
 		echo -n "   *** ${nHostSTSOversizePkt[$h]} "
 		echo "STS \"OversizePkt\" Logs"
 	fi
+	if [[ ${nHostSTSFoundDupVar[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTSFoundDupVar[$h]} "
+		echo "STS \"Found PV Marked as Duplicate\" Logs"
+	fi
 	if [[ ${nHostSTSLDAPSearchFailed[$h]} -gt 0 ]]; then
 		echo -n "   ** ${nHostSTSLDAPSearchFailed[$h]} "
 		echo "STS \"stsLdapConnect(): LDAP Search Failed\" Logs"
@@ -1301,6 +1356,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSEmptyFinalPulseInfo[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTSEmptyFinalPulseInfo[$h]} "
 		echo "STS \"Empty Final Pulse Info Buffer(s)\" Logs"
+	fi
+	if [[ ${nHostSTSPurgePrePulseVarValues[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTSPurgePrePulseVarValues[$h]} "
+		echo "STS \"Purging Pre-First-Pulse Values\" Logs"
 	fi
 	if [[ ${nHostSTSPrePulseVarValue[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSPrePulseVarValue[$h]} "
@@ -1317,6 +1376,22 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSNormalizeVarValueTimes[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSNormalizeVarValueTimes[$h]} "
 		echo "STS \"Normalizing PV Value Times with First Pulse\" Logs"
+	fi
+	if [[ ${nHostSTSFoundMatchDupVarValues[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSFoundMatchDupVarValues[$h]} "
+		echo "STS \"Found Matching Duplicate PV\" Logs"
+	fi
+	if [[ ${nHostSTSSkipIdenticalVarValues[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSSkipIdenticalVarValues[$h]} "
+		echo "STS \"Skip Past Identical Values (Subsume)\" Logs"
+	fi
+	if [[ ${nHostSTSIgnoreSubsumedVarValues[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSIgnoreSubsumedVarValues[$h]} "
+		echo "STS \"Ignoring Already Subsumed PV Duplicate\" Logs"
+	fi
+	if [[ ${nHostSTSSubsumedAllDupVarValues[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTSSubsumedAllDupVarValues[$h]} "
+		echo "STS \"PV Has Subsumed All Duplicate PV Log Values\" Logs"
 	fi
 	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSMoreThanOnePVValue[$h]} "
