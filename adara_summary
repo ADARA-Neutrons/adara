@@ -459,7 +459,7 @@ PARSE_LOG()
 		elif [[ "$log" =~ \
 				Subsumed${S}All${S}Duplicate${S}PV${S}Log${S}Values \
 		]]; then
-			#echo "Ignoring Already Subsumed PV Duplicate..."
+			#echo "PV Has Subsumed All Duplicate PV Log Values..."
 			nHostSTSSubsumedAllDupVarValues[$host]=$(( \
 				nHostSTSSubsumedAllDupVarValues[$host] + 1 ))
 
