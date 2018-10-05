@@ -413,6 +413,7 @@ StreamParser::rxPacket
                 "[%i] Run Status Start-of-Run Received (%s = %s).",
                 g_pid, "Processing State",
                 getProcessingStateString().c_str() );
+            usleep(30000); // give syslog a chance...
         }
         else
         {
@@ -420,6 +421,7 @@ StreamParser::rxPacket
                 "[%i] %s Run Status Error: %s = %s.",
                 g_pid, "STS Error:", "Start-of-Run with Processing State",
                 getProcessingStateString().c_str() );
+            usleep(30000); // give syslog a chance...
             bad_state = true;
         }
     }
@@ -443,6 +445,7 @@ StreamParser::rxPacket
                 "[%i] Run Status End-of-Run Received (%s = %s).",
                 g_pid, "Processing State",
                 getProcessingStateString().c_str() );
+            usleep(30000); // give syslog a chance...
             return true;
         }
         else
@@ -451,6 +454,7 @@ StreamParser::rxPacket
                 "[%i] %s Run Status Error: %s = %s.",
                 g_pid, "STS Error:", "End-of-Run with Processing State",
                 getProcessingStateString().c_str() );
+            usleep(30000); // give syslog a chance...
             bad_state = true;
         }
     }
@@ -460,6 +464,7 @@ StreamParser::rxPacket
             "[%i] Run Status, Run File #%d, %s = %s.",
             g_pid, a_pkt.fileNumber(),
             "Processing State", getProcessingStateString().c_str() );
+        usleep(30000); // give syslog a chance...
     }
     // We don't really need to log the _End_ of the file...
     // Just log the Start of the _Next_ file... ;-D
