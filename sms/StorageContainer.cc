@@ -235,9 +235,11 @@ bool StorageContainer::save(IoVector &iovec, uint32_t len,
 		StorageManager::saveCreated( dataSourceId );
 	}
 
-	// XXX TODO On Error, Should We Try to Close the Current
+	// TODO On Error, Should We Try to Close the Current
 	// Saved Stream File and Open a New One Here...?
 	// (Maybe with a Error Counter to prevent File Thrashing...?)
+	// Nawww... We don't want to pound on a troubled filesystem
+	// just to try and save our input stream data... Just let it go! ;-D
 	return m_ds_input_files[dataSourceId]->save(iovec, len, written);
 }
 
