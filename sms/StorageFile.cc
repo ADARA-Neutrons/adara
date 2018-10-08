@@ -295,88 +295,113 @@ bool StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify,
 	// DEBUG("StorageFile::write() entry len=" << len
 		// << " nvecs=" << iovec.size());
 
-	struct iovec *vec = &iovec.front();
-	int nvecs = iovec.size();
-	int iovcnt;
-	ssize_t rc;
+	struct iovec *vec;
+	int nvecs;
 
-	bool ret = true;
+	uint32_t retry_count = 0;
+	bool partial = false;
+	bool ret;
 
-	if (written)
+	if ( written )
 		*written = 0;
 
-	while (len) {
-		iovcnt = nvecs;
-		if (iovcnt > IOV_MAX)
-			iovcnt = IOV_MAX;
+	// On Non-Partial Write Errors, We _Retry_ the Write Twice to Be Sure!
+	do
+	{
+		// Reset to Start of the IoVector...
+		vec = &iovec.front();
+		nvecs = iovec.size();
 
-		// Check File Descriptor...
-		if (m_fd < 0) {
-			ERROR("write(): Invalid File Descriptor!"
-				<< " m_fd=" << m_fd);
-			// This Will Require Cleanup of Saved Stream File... ;-b
-			if (nvecs != ((int) iovec.size())) {
-				ERROR("write(): BUMMER!"
-					<< " Partial IoVector Write Before Failure -"
-					<< " wrote " << (iovec.size() - nvecs) << " iovecs"
-					<< " of " << iovec.size() << " total"
-					<< " (" << len << " bytes remaining");
+		uint32_t remaining = len;
+
+		ret = true;
+
+		ssize_t rc;
+		int iovcnt;
+
+		while ( remaining ) {
+			iovcnt = nvecs;
+			if ( iovcnt > IOV_MAX )
+				iovcnt = IOV_MAX;
+
+			// Check File Descriptor...
+			if ( m_fd < 0 ) {
+				ERROR("write(): Invalid File Descriptor!"
+					<< " m_fd=" << m_fd
+					<< " retry_count=" << retry_count);
+				// This Will Require Cleanup of Data File... ;-b
+				if ( partial ) {
+					ERROR("write(): BUMMER!"
+						<< " Partial IoVector Write Before Failure -"
+						<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+						<< " of " << iovec.size() << " total"
+						<< " (" << remaining << " bytes remaining");
+				}
+				retry_count = 3; // kick out of retry loop, not recoverable!
+				ret = false;
+				break;	// still need to check file oversize...
 			}
-			ret = false;
-			break;	// still need to check file oversize...
-		}
 
-		rc = writev(m_fd, vec, iovcnt);
-		if (rc <= 0) {
-			if (errno == EAGAIN || errno == EINTR)
-				continue;
+			rc = writev( m_fd, vec, iovcnt );
+			if ( rc <= 0 ) {
+				if ( errno == EAGAIN || errno == EINTR )
+					continue;
 
-			// *Don't* Throw Exception Here...! Always Try to Forge On...!
-			int err = errno;
-			ERROR("write(): writev() Error: "
-				<< "m_fd=" << m_fd << " - "
-				<< strerror(err));
-			// This Will Require Cleanup of Saved Stream File... ;-b
-			if (nvecs != ((int) iovec.size())) {
-				ERROR("write(): BUMMER!"
-					<< " Partial IoVector Write Before Failure -"
-					<< " wrote " << (iovec.size() - nvecs) << " iovecs"
-					<< " of " << iovec.size() << " total"
-					<< " (" << len << " bytes remaining");
+				// *Don't* Throw Exception Here...!
+				// Always Try to Forge On...!
+				int err = errno;
+				ERROR("write(): writev() Error:"
+					<< " m_fd=" << m_fd
+					<< " retry_count=" << retry_count << " - "
+					<< strerror(err));
+				// This Will Require Cleanup of the Data File... ;-b
+				if ( partial ) {
+					ERROR("write(): BUMMER!"
+						<< " Partial IoVector Write Before Failure -"
+						<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+						<< " of " << iovec.size() << " total"
+						<< " (" << remaining << " bytes remaining");
+				}
+				ret = false;
+				break;	// still need to check file oversize...
 			}
-			ret = false;
-			break;	// still need to check file oversize...
-		}
 
-		if (written)
-			*written += rc;
+			// We at least wrote _Part_ of this packet to disk!
+			// (Maybe all of it... :-)
+			partial = true;
 
-		m_syncDistance += rc;
-		m_size += rc;
+			if ( written )
+				*written += rc;
 
-		if (rc == len)
-			break;
+			m_syncDistance += rc;
+			m_size += rc;
 
-		len -= rc;
-		while (rc) {
-			if (vec->iov_len <= (size_t) rc) {
-				rc -= vec->iov_len;
-				vec++;
-				nvecs--;
-			} else {
-				uint8_t *p = (uint8_t *) vec->iov_base;
-				p += rc;
-				vec->iov_base = p;
-				vec->iov_len -= rc;
-				rc = 0;
+			if ( rc == remaining )
+				break;
+
+			remaining -= rc;
+
+			while ( rc ) {
+				if ( vec->iov_len <= (size_t) rc ) {
+					rc -= vec->iov_len;
+					vec++;
+					nvecs--;
+				} else {
+					uint8_t *p = (uint8_t *) vec->iov_base;
+					p += rc;
+					vec->iov_base = p;
+					vec->iov_len -= rc;
+					rc = 0;
+				}
 			}
 		}
 	}
+	while ( ret == false && !partial && ++retry_count < 3 );
 
 	/* We want the final run status to be the last packet in the file,
 	 * so don't add a sync packet if we're no longer active.
 	 */
-	if (m_syncDistance >= m_max_sync_distance && m_active)
+	if ( m_syncDistance >= m_max_sync_distance && m_active )
 		addSync();
 
 	/* We don't check the file size unless we're notifying subscribers --
@@ -385,7 +410,7 @@ bool StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify,
 	 * to stop recording before more data comes in, and we don't want
 	 * to have a file that's only contents are the "I'm done" indication.
 	 */
-	if (do_notify)
+	if ( do_notify )
 		notify();
 
 	// DEBUG("StorageFile::write() exit");
@@ -428,86 +453,110 @@ bool StorageFile::save(IoVector &iovec, uint32_t len, uint32_t *written)
 	// DEBUG("StorageFile::save() entry len=" << len
 		// << " nvecs=" << iovec.size());
 
-	struct iovec *vec = &iovec.front();
-	int nvecs = iovec.size();
-	int iovcnt;
-	ssize_t rc;
+	struct iovec *vec;
+	int nvecs;
 
-	bool ret = true;
+	uint32_t retry_count = 0;
+	bool partial = false;
+	bool ret;
 
-	if (written)
+	if ( written )
 		*written = 0;
 
-	while (len) {
-		iovcnt = nvecs;
-		if (iovcnt > IOV_MAX)
-			iovcnt = IOV_MAX;
+	// On Non-Partial Write Errors, We _Retry_ the Write Twice to Be Sure!
+	do
+	{
+		// Reset to Start of the IoVector...
+		vec = &iovec.front();
+		nvecs = iovec.size();
 
-		// Check File Descriptor...
-		if (m_fd < 0) {
-			ERROR("save(): Invalid File Descriptor!"
-				<< " m_fd=" << m_fd);
-			// This Will Require Cleanup of Saved Stream File... ;-b
-			if (nvecs != ((int) iovec.size())) {
-				ERROR("save(): BUMMER!"
-					<< " Partial IoVector Write Before Failure -"
-					<< " wrote " << (iovec.size() - nvecs) << " iovecs"
-					<< " of " << iovec.size() << " total"
-					<< " (" << len << " bytes remaining");
+		uint32_t remaining = len;
+
+		ret = true;
+
+		ssize_t rc;
+		int iovcnt;
+
+		while ( remaining ) {
+			iovcnt = nvecs;
+			if ( iovcnt > IOV_MAX )
+				iovcnt = IOV_MAX;
+
+			// Check File Descriptor...
+			if ( m_fd < 0 ) {
+				ERROR("save(): Invalid File Descriptor!"
+					<< " m_fd=" << m_fd
+					<< " retry_count=" << retry_count);
+				// This Will Require Cleanup of Saved Stream File... ;-b
+				if ( partial ) {
+					ERROR("save(): BUMMER!"
+						<< " Partial IoVector Write Before Failure -"
+						<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+						<< " of " << iovec.size() << " total"
+						<< " (" << remaining << " bytes remaining");
+				}
+				retry_count = 3; // kick out of retry loop, not recoverable!
+				ret = false;
+				break;	// still need to check file oversize...
 			}
-			ret = false;
-			break;	// still need to check file oversize...
-		}
 
-		rc = writev(m_fd, vec, iovcnt);
-		if (rc <= 0) {
-			if (errno == EAGAIN || errno == EINTR)
-				continue;
+			rc = writev( m_fd, vec, iovcnt );
+			if ( rc <= 0 ) {
+				if ( errno == EAGAIN || errno == EINTR )
+					continue;
 
-			// *Don't* Throw Exception Here...!
-			// We can live without the Saved Input Stream files...
-			// Whine Loudly tho. ;-D
-			int err = errno;
-			ERROR("save(): writev() Error: "
-				<< "m_fd=" << m_fd << " - "
-				<< strerror(err));
-			// This Will Require Cleanup of Saved Stream File... ;-b
-			if (nvecs != ((int) iovec.size())) {
-				ERROR("save(): BUMMER!"
-					<< " Partial IoVector Write Before Failure -"
-					<< " wrote " << (iovec.size() - nvecs) << " iovecs"
-					<< " of " << iovec.size() << " total"
-					<< " (" << len << " bytes remaining");
+				// *Don't* Throw Exception Here...!
+				// We can live without the Saved Input Stream files...
+				// Whine Loudly tho. ;-D
+				int err = errno;
+				ERROR("save(): writev() Error:"
+					<< " m_fd=" << m_fd
+					<< " retry_count=" << retry_count << " - "
+					<< strerror(err));
+				// This Will Require Cleanup of Saved Stream File... ;-b
+				if ( partial ) {
+					ERROR("save(): BUMMER!"
+						<< " Partial IoVector Write Before Failure -"
+						<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+						<< " of " << iovec.size() << " total"
+						<< " (" << remaining << " bytes remaining");
+				}
+				ret = false;
+				break;	// still need to check file oversize...
 			}
-			ret = false;
-			break;	// still need to check file oversize...
-		}
 
-		if (written)
-			*written += rc;
+			// We at least wrote _Part_ of this packet to disk!
+			// (Maybe all of it... :-)
+			partial = true;
 
-		m_size += rc;
+			if ( written )
+				*written += rc;
 
-		if (rc == len)
-			break;
+			m_size += rc;
 
-		len -= rc;
-		while (rc) {
-			if (vec->iov_len <= (size_t) rc) {
-				rc -= vec->iov_len;
-				vec++;
-				nvecs--;
-			} else {
-				uint8_t *p = (uint8_t *) vec->iov_base;
-				p += rc;
-				vec->iov_base = p;
-				vec->iov_len -= rc;
-				rc = 0;
+			if ( rc == remaining )
+				break;
+
+			remaining -= rc;
+
+			while ( rc ) {
+				if ( vec->iov_len <= (size_t) rc ) {
+					rc -= vec->iov_len;
+					vec++;
+					nvecs--;
+				} else {
+					uint8_t *p = (uint8_t *) vec->iov_base;
+					p += rc;
+					vec->iov_base = p;
+					vec->iov_len -= rc;
+					rc = 0;
+				}
 			}
 		}
 	}
+	while ( ret == false && !partial && ++retry_count < 3 );
 
-	if (m_size >= m_max_file_size)
+	if ( m_size >= m_max_file_size )
 		m_oversize = true;
 
 	// DEBUG("StorageFile::save() exit");
