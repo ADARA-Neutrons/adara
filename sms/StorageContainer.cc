@@ -83,6 +83,8 @@ void StorageContainer::newFile(void)
 bool StorageContainer::write(IoVector &iovec, uint32_t len, bool notify,
 		uint32_t *written)
 {
+	static uint32_t retry_count = 0;
+
 	/* We don't immediately close a file when we exceed the size limit
 	 * in order to avoid creating a new file just for the end-of-run
 	 * marker. Instead, we wait for the run to start or the next packet
@@ -96,10 +98,59 @@ bool StorageContainer::write(IoVector &iovec, uint32_t len, bool notify,
 	if (!m_cur_file)
 		newFile();
 
-	// XXX TODO On Error, Should We Try to Close the Current Data File
-	// and Open a New One Here...?
-	// (Maybe with a Error Counter to prevent File Thrashing...?)
-	return m_cur_file->write(iovec, len, notify, written);
+	// On File Write Error, Try to Close the Current Data File
+	// and Open a New One Here, Just in Case This Helps...
+	// Use an Error Counter to prevent File Thrashing...
+
+	bool doRetry;
+	bool writeOk;
+
+	do
+	{
+		writeOk = m_cur_file->write(iovec, len, notify, written);
+
+		// File Write Failed...!
+		if ( !writeOk ) {
+			// Rotate Current File and Retry...
+			if ( retry_count++ < 5 ) {
+				ERROR("Container Write Failed!"
+					<< " Try Rotating File & Retrying Write"
+					<< " m_cur_file="
+						<< ( m_cur_file ? m_cur_file->path() : "(null)" )
+					<< " retry_count=" << retry_count);
+				terminateFile();
+				newFile();
+				doRetry = true;
+			}
+			// Retry Count Exceeded, Fail Hard...!
+			else {
+				ERROR("Container Write Failed!"
+					<< " Retry Count Exceeded, HARD FAIL on Write...!"
+					<< " m_cur_file="
+						<< ( m_cur_file ? m_cur_file->path() : "(null)" )
+					<< " retry_count=" << retry_count);
+				doRetry = false;
+			}
+		}
+
+		// File Write Succeeded. :-D
+		else {
+			// We Were Buggered, But Now We've Recovered... Whew! ;-D
+			if ( retry_count ) {
+				ERROR("Container Recovered - Write Succeeded!"
+					<< " m_cur_file="
+						<< ( m_cur_file ? m_cur_file->path() : "(null)" )
+					<< " Resetting retry_count=" << retry_count << " -> 0");
+				// Reset Retry Count, We Got Through...
+				retry_count = 0;
+			}
+			// Note: No need to reset doRetry=false here.
+			// We will fall thru loop anyway, as writeOk=true... ;-D
+		}
+	}
+	while ( !writeOk && doRetry );
+
+	return( writeOk );
 }
 
 void StorageContainer::terminate(void)
