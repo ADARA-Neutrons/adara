@@ -1109,6 +1109,14 @@ UPDATE_PROPOSAL_METADATA()
 	fi
 
 	#
+	# Set/Save Old Value Global, If Specified...
+	#
+
+	if [[ -n "${_old_value_var}" ]]; then
+		eval "${_old_value_var}=\"${update_old_value}\""
+	fi
+
+	#
 	# Separate Old Meta-Data Line into Line Number and Content...
 	#
 
@@ -1320,14 +1328,6 @@ UPDATE_PROPOSAL_METADATA()
 	subst="${ipts_old_line_num}s@${ipts_old_line}@${ipts_new_line}@"
 
 	SUBST_EXPRS="$SUBST_EXPRS -e \"${subst}\""
-
-	#
-	# Set/Save Old Value Global, If Specified...
-	#
-
-	if [[ -n "${_old_value_var}" ]]; then
-		eval "${_old_value_var}=\"${update_old_value}\""
-	fi
 
 	#
 	# Done with This Proposal Meta-Data Update.
