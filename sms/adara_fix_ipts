@@ -1259,8 +1259,6 @@ UPDATE_PROPOSAL_METADATA()
 
 		# Try to Remove Sufficient Spaces from Old Proposal Meta-Data Line
 
-		skip_run=0
-
 		for (( i = 0 ; i < ${len_diff} ; ++i )); do
 
 			# *Only* Steal Spaces from _Before_ This Current Tag!
@@ -1276,10 +1274,9 @@ UPDATE_PROPOSAL_METADATA()
 				if [[ $? != 0 ]]; then
 					CHECK_PROCEED
 					echo -e "\nContinuing with Next Run Number..."
-					skip_run=1
-					break
+					return 35
 				else
-					continue
+					return 0
 				fi
 			fi
 
@@ -1300,19 +1297,13 @@ UPDATE_PROPOSAL_METADATA()
 				if [[ $? != 0 ]]; then
 					CHECK_PROCEED
 					echo -e "\nContinuing with Next Run Number..."
-					skip_run=1
-					break
+					return 36
 				else
-					continue
+					return 0
 				fi
 			fi
 
 		done
-
-		# Skip This Run, We Had a Failure...
-		if [[ $skip_run == 1 ]]; then
-			return 35
-		fi
 
 		echo -e "\nResulting New/Old ${_meta_name} Line Template is:"
 		echo -e "\t[${ipts_new_line}]"
@@ -1342,7 +1333,7 @@ UPDATE_PROPOSAL_METADATA()
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
-			return 36
+			return 37
 		else
 			return 0
 		fi
