@@ -8,6 +8,44 @@
 # (Because it can happen that often... ;-)
 #
 
+#
+# "Fix IPTS" Test Commands:
+#
+# ./sms/adara_fix_ipts --inst=PG3 --sts_host=localhost --sts_port=31420 \
+#    --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --archive_path=/TESTING --run=38524-38527 --ipts=IPTS-2767
+#
+# ./sms/adara_fix_ipts --inst=VULCAN --sts_host=localhost \
+#    --sts_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --archive_path=/TESTING --run=156458 --ipts=IPTS-18677
+#
+# ./sms/adara_fix_ipts --inst=EQSANS --sts_host=localhost \
+#    --sts_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --archive_path=/TESTING --run=98446-98448 --ipts=IPTS-21608
+#
+# With "Fix IPTS" Test Data in:
+#
+#    /SNS/users/y8y/20170830/20170830-013325.796536119-run-38523/
+#    /SNS/users/y8y/20170830/20170830-034457.473266516-run-38524/
+#    /SNS/users/y8y/20170830/20170830-055215.443177248-run-38525/
+#    /SNS/users/y8y/20170830/20170830-075802.792935897-run-38526/
+#    /SNS/users/y8y/20170830/20170830-085315.302591461-run-38527/
+#    /SNS/users/y8y/20170830/20170830-094851.304674233-run-38528/
+#    (/SNS/users/y8y/20170830/cleanup)
+#
+#    /SNS/users/y8y/20170925/20170925-223300.550696919-run-156458/
+#    (/SNS/users/y8y/20170925/cleanup)
+#
+#    /SNS/users/y8y/20180920/20180920-133950.705888442-run-98446/
+#    /SNS/users/y8y/20180920/20180920-154457.198797185-run-98447/
+#    /SNS/users/y8y/20180920/20180920-154729.955497035-run-98448/
+#    (/SNS/users/y8y/20180920/cleanup)
+#
+
+#
+# Defaults:
+#
+
 PROD_BASE_URL="https://snsapp1.sns.ornl.gov/xprod_ro/proposal_production"
 
 GET_PROPOSAL_BY_ID="express/getIPTSByPrpsl"
