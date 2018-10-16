@@ -549,11 +549,19 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		}
 		goto error;
 	}
-
+ 
+	// File Descriptor Already Checked Above...
 	try {
 		m_fdreg = new ReadyAdapter(m_fd, fdrWrite,
 			boost::bind(&STSClientMgr::connectComplete, this));
-	} catch (std::bad_alloc e) {
+	} catch (std::exception &e) {
+		ERROR("Exception in lookupComplete()"
+			<< " Creating ReadyAdapter Write - " << e.what());
+		m_fdreg = NULL;
+		goto error;
+	} catch (...) {
+		ERROR("Unknown Exception in lookupComplete()"
+			<< " Creating ReadyAdapter Write");
 		m_fdreg = NULL;
 		goto error;
 	}
