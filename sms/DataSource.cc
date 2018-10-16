@@ -1432,8 +1432,6 @@ void DataSource::startConnect(void)
 			}
 	}
 
-	/* TODO handle any other error here */
-
 	try {
 		/* We won't notice that the connect completed until we get
 		 * the first packet from the source unless we look for the
@@ -1442,10 +1440,18 @@ void DataSource::startConnect(void)
 		fdRegType type = (m_state == CONNECTING) ? fdrWrite : fdrRead;
 		m_fdreg = new ReadyAdapter(m_fd, type,
 				boost::bind(&DataSource::fdReady, this));
-	} catch (std::bad_alloc e) {
+	} catch (std::exception &e) {
 		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Bad Alloc Error for " << m_name
-			<< " adapter: " << e.what());
+			<< "Exception in startConnect()"
+			<< " Creating ReadyAdapter for " << m_name
+			<< " fdReady(): " << e.what());
+		m_fdreg = NULL;
+		goto error_fd;
+	} catch (...) {
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Unknown Exception in startConnect()"
+			<< " Creating ReadyAdapter for " << m_name
+			<< " fdReady()");
 		m_fdreg = NULL;
 		goto error_fd;
 	}
@@ -1495,10 +1501,22 @@ void DataSource::connectComplete(void)
 		try {
 			m_fdreg = new ReadyAdapter(m_fd, fdrRead,
 					boost::bind(&DataSource::fdReady, this));
-		} catch (std::bad_alloc e) {
+		} catch (std::exception &e) {
 			ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "Bad Alloc Error for " << m_name
-				<< " adapter: " << e.what());
+				<< "Exception in connectComplete()"
+				<< " Creating ReadyAdapter for " << m_name
+				<< " fdReady(): " << e.what());
+			m_fdreg = NULL;
+			// If we can't get notified to read from this Data Source,
+			// we might as well Disconnect and try again later...
+			// Leave m_pvConnected in its current state, latch failures
+			connectionFailed(false, false, IDLE);
+			return;
+		} catch (...) {
+			ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Unknown Exception in connectComplete()"
+				<< " Creating ReadyAdapter for " << m_name
+				<< " fdReady()");
 			m_fdreg = NULL;
 			// If we can't get notified to read from this Data Source,
 			// we might as well Disconnect and try again later...
