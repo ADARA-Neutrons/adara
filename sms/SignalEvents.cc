@@ -31,6 +31,7 @@ void SignalEvents::check_init(void)
 		const char *err = strerror(errno);
 		std::string msg("Unable to create signalfd: ");
 		msg += err;
+		ERROR(msg);
 		m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error(msg);
 	}
@@ -38,16 +39,30 @@ void SignalEvents::check_init(void)
 
 	try {
 		m_read = new ReadyAdapter(m_fd, fdrRead,
-					  boost::bind(&SignalEvents::signaled));
-	} catch (...) {
-		ERROR("Exception Allocating ReadyAdapter");
+			boost::bind(&SignalEvents::signaled));
+	} catch (std::exception &e) {
+		std::string msg(
+			"Exception Creating ReadyAdapter in check_init() - ");
+		msg += e.what();
+		ERROR(msg);
 		m_read = NULL;
 		if (m_fd >= 0) {
 			DEBUG("Close m_fd=" << m_fd);
 			close(m_fd);
-			m_fd = -1;
+			m_fd = -1;   // just to be sure... ;-b
 		}
-		throw;
+		throw std::runtime_error(msg);
+	} catch (...) {
+		std::string msg(
+			"Unknown Exception Creating ReadyAdapter in check_init()");
+		ERROR(msg);
+		m_read = NULL;
+		if (m_fd >= 0) {
+			DEBUG("Close m_fd=" << m_fd);
+			close(m_fd);
+			m_fd = -1;   // just to be sure... ;-b
+		}
+		throw std::runtime_error(msg);
 	}
 }
 
