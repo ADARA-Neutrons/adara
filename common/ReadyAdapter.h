@@ -11,6 +11,8 @@ public:
 	ReadyAdapter(int fd, fdRegType reg, callback cb) :
 			fdReg(fd, reg), m_cb(cb) { }
 
+	~ReadyAdapter() { }
+
 private:
 	callback m_cb;
 
