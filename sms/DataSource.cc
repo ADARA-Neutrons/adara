@@ -1445,14 +1445,14 @@ void DataSource::startConnect(void)
 			<< "Exception in startConnect()"
 			<< " Creating ReadyAdapter for " << m_name
 			<< " fdReady(): " << e.what());
-		m_fdreg = NULL;
+		m_fdreg = NULL; // just to be sure... ;-b
 		goto error_fd;
 	} catch (...) {
 		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Unknown Exception in startConnect()"
 			<< " Creating ReadyAdapter for " << m_name
 			<< " fdReady()");
-		m_fdreg = NULL;
+		m_fdreg = NULL; // just to be sure... ;-b
 		goto error_fd;
 	}
 
@@ -1462,6 +1462,7 @@ void DataSource::startConnect(void)
 	return;
 
 error_fd:
+
 	if (m_fd >= 0) {
 		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
@@ -1469,6 +1470,7 @@ error_fd:
 	}
 
 error:
+
 	m_pvConnected->failed();
 	connectionFailed(false, false, IDLE);
 }
@@ -1506,7 +1508,7 @@ void DataSource::connectComplete(void)
 				<< "Exception in connectComplete()"
 				<< " Creating ReadyAdapter for " << m_name
 				<< " fdReady(): " << e.what());
-			m_fdreg = NULL;
+			m_fdreg = NULL; // just to be sure... ;-b
 			// If we can't get notified to read from this Data Source,
 			// we might as well Disconnect and try again later...
 			// Leave m_pvConnected in its current state, latch failures
@@ -1517,7 +1519,7 @@ void DataSource::connectComplete(void)
 				<< "Unknown Exception in connectComplete()"
 				<< " Creating ReadyAdapter for " << m_name
 				<< " fdReady()");
-			m_fdreg = NULL;
+			m_fdreg = NULL; // just to be sure... ;-b
 			// If we can't get notified to read from this Data Source,
 			// we might as well Disconnect and try again later...
 			// Leave m_pvConnected in its current state, latch failures

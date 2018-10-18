@@ -379,12 +379,14 @@ more:
 			ERROR("Exception in writable()"
 				<< " Creating ReadyAdapter Write for "
 				<< m_clientName << ": " << e.what());
+			m_write = NULL; // just to be sure... ;-b
 			delete this;
 			return;
 		} catch (...) {
 			ERROR("Unknown Exception in writable()"
 				<< " Creating ReadyAdapter Write for "
 				<< m_clientName);
+			m_write = NULL; // just to be sure... ;-b
 			delete this;
 			return;
 		}
@@ -607,6 +609,7 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 		ERROR("Exception in rxPacket(ClientHelloPkt)"
 			<< " Creating ReadyAdapter Write for "
 			<< m_clientName << ": " << e.what());
+		m_write = NULL; // just to be sure... ;-b
 		// Close Our Client Socket to Allow Graceful Cleanup...
 		if ( m_client_fd >= 0 ) {
 			DEBUG("Close m_client_fd=" << m_client_fd);
@@ -618,6 +621,7 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 		ERROR("Unknown Exception in rxPacket(ClientHelloPkt)"
 			<< " Creating ReadyAdapter Write for "
 			<< m_clientName);
+		m_write = NULL; // just to be sure... ;-b
 		// Close Our Client Socket to Allow Graceful Cleanup...
 		if ( m_client_fd >= 0 ) {
 			DEBUG("Close m_client_fd=" << m_client_fd);
