@@ -38,9 +38,9 @@ private:
 	typedef boost::signals2::connection connection;
 	typedef std::map<uint32_t, StorageContainer::SharedPtr> RunMap;
 
-	std::auto_ptr<TimerAdapter<STSClientMgr> > m_connect_timer;
-	std::auto_ptr<TimerAdapter<STSClientMgr> > m_reconnect_timer;
-	std::auto_ptr<TimerAdapter<STSClientMgr> > m_transient_timer;
+	TimerAdapter<STSClientMgr> *m_connect_timer;
+	TimerAdapter<STSClientMgr> *m_reconnect_timer;
+	TimerAdapter<STSClientMgr> *m_transient_timer;
 	int m_fd;
 	ReadyAdapter *m_fdreg;
 	bool m_connecting;

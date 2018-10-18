@@ -244,6 +244,21 @@ STSClientMgr::STSClientMgr() :
 
 STSClientMgr::~STSClientMgr()
 {
+	if (m_connect_timer) {
+		m_connect_timer->cancel();
+		delete m_connect_timer;
+		m_connect_timer = NULL;
+	}
+	if (m_reconnect_timer) {
+		m_reconnect_timer->cancel();
+		delete m_reconnect_timer;
+		m_reconnect_timer = NULL;
+	}
+	if (m_transient_timer) {
+		m_transient_timer->cancel();
+		delete m_transient_timer;
+		m_transient_timer = NULL;
+	}
 	m_singleton = NULL;
 	m_mgrConnection.disconnect();
 	if (m_fdreg) {
@@ -265,7 +280,7 @@ void STSClientMgr::containerChange(StorageContainer::SharedPtr &c,
 
 	if (starting) {
 		StorageManager::sendComBus(c->runNumber(), c->propId(),
-			std::string("SMS start run sent to STS"));
+			std::string("SMS Start Run Sent to STS"));
 		queueRun(c);
 		startConnect();
 	} else
@@ -278,7 +293,7 @@ void STSClientMgr::queueRun(StorageContainer::SharedPtr &c)
 
 	ret = m_pendingRuns.insert(std::make_pair(c->runNumber(), c));
 	if (!ret.second)
-		throw std::logic_error("Duplicate run numbers");
+		throw std::logic_error("Duplicate Run Numbers");
 
 	if (c->active())
 		m_currentRun = c->runNumber();
@@ -557,12 +572,12 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	} catch (std::exception &e) {
 		ERROR("Exception in lookupComplete()"
 			<< " Creating ReadyAdapter Write - " << e.what());
-		m_fdreg = NULL;
+		m_fdreg = NULL; // just to be sure... ;-b
 		goto error;
 	} catch (...) {
 		ERROR("Unknown Exception in lookupComplete()"
 			<< " Creating ReadyAdapter Write");
-		m_fdreg = NULL;
+		m_fdreg = NULL; // just to be sure... ;-b
 		goto error;
 	}
 
@@ -575,6 +590,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	return;
 
 error:
+
 	/* Rate-limited connection failure message */
 	if ( RateLimitedLogging::checkLog( RLLHistory_STSClientMgr,
 			RLL_STS_FAILED_TO_CONNECT, m_node + ":" + m_service,
@@ -595,7 +611,13 @@ void STSClientMgr::connectComplete(void)
 
 	std::string log_info;
 
-	// XXX CHECK FILE DESCRIPTOR...!!!
+	// Check File Descriptor...
+	if (m_fd < 0) {
+		ERROR("connectComplete(): Invalid File Descriptor for STS");
+		connectFailed();
+		return;
+	}
+
 	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &err, &errlen);
 	if (!rc && !err) {
 		DEBUG("Connected to STS at " << m_node << ":" << m_service
@@ -605,6 +627,8 @@ void STSClientMgr::connectComplete(void)
 			delete m_fdreg;
 			m_fdreg = NULL;
 		}
+
+		m_connections++;
 
 		m_connect_timer->cancel();
 
@@ -616,7 +640,6 @@ void STSClientMgr::connectComplete(void)
 
 		try {
 			new STSClient(m_fd, run, *this);
-			m_connections++;
 		}
 		catch (std::exception &e) {
 			// Don't Throw Exception Here, Just Re-Queue Run to Try Again...
@@ -627,11 +650,14 @@ void STSClientMgr::connectComplete(void)
 				ERROR(log_info << "Connection Failed to STS at "
 					<< m_node << ":" << m_service << " - "
 					<< "STSClient() failed?"
-					<< " Re-Queueing run " << run->runNumber() << "... "
+					<< " Re-Queueing Run " << run->runNumber() << "... "
 					<< e.what());
 			}
-			dequeueRun(run); // clean up...
-			queueRun(run); // re-queue run...
+			m_connections--; // clientComplete() won't get called...
+			// Note: Must Re-Queue Run _Before_ De-Queue,
+			// So Any Rescan Run Containers Aren't Deallocated...! ;-D
+			queueRun(run); // re-queue Run on Pending list...
+			dequeueRun(run); // clean up Run from Sending list...
 			connectFailed();
 			return;
 		}
@@ -644,16 +670,19 @@ void STSClientMgr::connectComplete(void)
 				ERROR(log_info << "Connection Failed to STS at "
 					<< m_node << ":" << m_service << " - "
 					<< "STSClient() failed?"
-					<< " Re-Queueing run " << run->runNumber() << "... "
+					<< " Re-Queueing Run " << run->runNumber() << "... "
 					<< "Unknown Exception.");
 			}
-			dequeueRun(run); // clean up...
-			queueRun(run); // re-queue run...
+			m_connections--; // clientComplete() won't get called...
+			// Note: Must Re-Queue Run _Before_ De-Queue,
+			// So Any Rescan Run Containers Aren't Deallocated...! ;-D
+			queueRun(run); // re-queue Run on Pending list...
+			dequeueRun(run); // clean up Run from Sending list...
 			connectFailed();
 			return;
 		}
 
-		INFO("Sending run " << run->runNumber() << " to STS at "
+		INFO("Sending Run " << run->runNumber() << " to STS at "
 			<< m_node << ":" << m_service);
 		m_connecting = false;
 		startConnect();
@@ -691,7 +720,7 @@ void STSClientMgr::connectFailed(void)
 		m_fdreg = NULL;
 	}
 	if (m_fd >= 0) {
-		DEBUG("Close m_fd=" << m_fd);
+		DEBUG("connectFailed(): Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
 	}
@@ -789,7 +818,7 @@ void STSClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		else {
 			// Increment Re-Queue Count
 			c->incrRequeueCount();
-			ERROR("Requeueing Run " << c->runNumber()
+			ERROR("Re-Queueing Run " << c->runNumber()
 				<< ", Re-Queue #" << c->getRequeueCount());
 			result = "STS transient Error";
 			if ( !reason.empty() )
