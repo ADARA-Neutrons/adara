@@ -132,6 +132,17 @@ ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 			m_commRestart = NULL;
 		}
 	}
+	catch (...)
+	{
+		ERROR("ComBusSMSMon() Unknown Exception"
+			<< " Trying to Create EventFd Signaler...!"
+			<< " Facility=" << m_facility
+			<< " Beamline=" << m_beam_sname);
+		if ( m_commRestart ) {
+			delete m_commRestart;
+			m_commRestart = NULL;
+		}
+	}
 }
 
 ComBusSMSMon::~ComBusSMSMon()

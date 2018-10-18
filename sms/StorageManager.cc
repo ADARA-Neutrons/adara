@@ -645,6 +645,12 @@ void StorageManager::init(void)
 		msg += e.what();
 		throw std::runtime_error(msg);
 	}
+	catch (...)
+	{
+		std::string msg("StorageManager::init():");
+		msg += " Error Creating EventFds for Background I/O";
+		throw std::runtime_error(msg);
+	}
 
 	if (cleanupRunFiles())
 		throw std::runtime_error("Unable to obtain initial run number");
