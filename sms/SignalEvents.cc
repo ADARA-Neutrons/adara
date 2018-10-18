@@ -45,7 +45,7 @@ void SignalEvents::check_init(void)
 			"Exception Creating ReadyAdapter in check_init() - ");
 		msg += e.what();
 		ERROR(msg);
-		m_read = NULL;
+		m_read = NULL; // just to be sure... ;-b
 		if (m_fd >= 0) {
 			DEBUG("Close m_fd=" << m_fd);
 			close(m_fd);
@@ -56,7 +56,7 @@ void SignalEvents::check_init(void)
 		std::string msg(
 			"Unknown Exception Creating ReadyAdapter in check_init()");
 		ERROR(msg);
-		m_read = NULL;
+		m_read = NULL; // just to be sure... ;-b
 		if (m_fd >= 0) {
 			DEBUG("Close m_fd=" << m_fd);
 			close(m_fd);
