@@ -31,8 +31,17 @@ EventFd::EventFd( callback cb )
 	m_nonBlocking = true;
 	init( EFD_NONBLOCK );
 	// File Descriptor Created in init() (or std::runtime_error thrown...)
-	// Note: Can Throw Bad Alloc Exception...!
-	m_ready = new ReadyAdapter( m_fd, fdrRead, cb );
+	try {
+		m_ready = new ReadyAdapter( m_fd, fdrRead, cb );
+	} catch (std::exception &e) {
+		ERROR("EventFd(): Exception Creating ReadyAdapter: " << e.what());
+		m_ready = NULL; // just to be sure... ;-b
+		throw;
+	} catch (...) {
+		ERROR("EventFd(): Unknown Exception Creating ReadyAdapter");
+		m_ready = NULL; // just to be sure... ;-b
+		throw;
+	}
 }
 
 EventFd::~EventFd()
