@@ -832,10 +832,10 @@ PARSE_LOG()
 			nHostSMSDSTSConnectionFailed[$host]=$(( \
 				nHostSMSDSTSConnectionFailed[$host] + 1 ))
 
-		# "Lost connection to STS for run..." Log
+		# "Lost Connection to STS for Run..." Log
 		elif [[ "$log" =~ \
-				Lost${S}connection${S}to${S}STS${S}for${S}run ]]; then
-			#echo "Lost connection to STS for run..."
+				Lost${S}Connection${S}to${S}STS${S}for${S}Run ]]; then
+			#echo "Lost Connection to STS for Run..."
 			nHostSMSDLostConnectionToSTS[$host]=$(( \
 				nHostSMSDLostConnectionToSTS[$host] + 1 ))
 
@@ -1357,6 +1357,10 @@ for h in ${HostList} ; do
 		echo -n "   * ${nHostSTSEmptyFinalPulseInfo[$h]} "
 		echo "STS \"Empty Final Pulse Info Buffer(s)\" Logs"
 	fi
+	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTSMoreThanOnePVValue[$h]} "
+		echo "STS \"More Than 1 PV Value for\" Logs"
+	fi
 	if [[ ${nHostSTSPurgePrePulseVarValues[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTSPurgePrePulseVarValues[$h]} "
 		echo "STS \"Purging Pre-First-Pulse Values\" Logs"
@@ -1392,10 +1396,6 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSSubsumedAllDupVarValues[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSSubsumedAllDupVarValues[$h]} "
 		echo "STS \"PV Has Subsumed All Duplicate PV Log Values\" Logs"
-	fi
-	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSMoreThanOnePVValue[$h]} "
-		echo "STS \"More Than 1 PV Value for\" Logs"
 	fi
 	if [[ ${nHostSTSNoMatchingUnitsPV[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTSNoMatchingUnitsPV[$h]} "
@@ -1444,7 +1444,7 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDLostConnectionToSTS[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDLostConnectionToSTS[$h]} "
-		echo "SMSD \"Lost connection to STS for run...\" Logs"
+		echo "SMSD \"Lost Connection to STS for Run...\" Logs"
 	fi
 	if [[ ${nHostSMSDDataSourceTimedOut[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDDataSourceTimedOut[$h]} "
