@@ -17,8 +17,7 @@ class ReadyAdapter;
 
 class STSClient : public ADARA::POSIXParser {
 public:
-	STSClient(int fd, StorageContainer::SharedPtr &run,
-		  STSClientMgr &mgr);
+	STSClient(int fd, StorageContainer::SharedPtr &run, STSClientMgr &mgr);
 	~STSClient();
 
 	static void config(const boost::property_tree::ptree &conf);
@@ -34,7 +33,7 @@ private:
 	bool m_send_paused_data;
 	ReadyAdapter *m_read;
 	ReadyAdapter *m_write;
-	std::auto_ptr<TimerAdapter<STSClient> > m_timer;
+	TimerAdapter<STSClient> *m_timer;
 	connection m_contConnection;
 	connection m_fileConnection;
 	STSClientMgr::Disposition m_disp;
