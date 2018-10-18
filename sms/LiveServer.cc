@@ -326,11 +326,13 @@ void LiveServer::setupListener(void)
 	}
 	catch (std::exception &e) {
 		ERROR("setupListener(): Exception in Ready Adapter - " << e.what());
-		goto error_fdreg;
+		m_fdreg = NULL; // just to be sure... ;-b
+		goto error_fd;
 	}
 	catch (...) {
 		ERROR("setupListener(): Unknown Exception in Ready Adapter!");
-		goto error_fdreg;
+		m_fdreg = NULL; // just to be sure... ;-b
+		goto error_fd;
 	}
 
 	INFO("setupListener(): Adapter Ready for Connections");
@@ -340,13 +342,6 @@ void LiveServer::setupListener(void)
 	m_pvListenStatus->update(0, false /* major */, &now);
 
 	return;
-
-error_fdreg:
-
-	if ( m_fdreg ) {
-		delete m_fdreg;
-		m_fdreg = NULL;
-	}
 
 error_fd:
 
