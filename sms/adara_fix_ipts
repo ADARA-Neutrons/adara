@@ -129,6 +129,8 @@ PARSE_RUN_NUMBERS()
 {
 	local _runlist="$1"
 
+	echo -e "\nParsing Run Numbers: [${_runlist}]"
+
 	# Strip Off Any Comma Separators...
 	_runlist=`echo "${_runlist}" | ${SED} 's/,/ /g'`
 	cksed=$?
