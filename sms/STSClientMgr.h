@@ -9,6 +9,7 @@
 #include "StorageContainer.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
+#include "SignalEvents.h"
 
 class STSClient;
 
@@ -38,9 +39,11 @@ private:
 	typedef boost::signals2::connection connection;
 	typedef std::map<uint32_t, StorageContainer::SharedPtr> RunMap;
 
+	SignalEvents *m_signalEvents;
 	TimerAdapter<STSClientMgr> *m_connect_timer;
 	TimerAdapter<STSClientMgr> *m_reconnect_timer;
 	TimerAdapter<STSClientMgr> *m_transient_timer;
+	TimerAdapter<STSClientMgr> *m_lookup_timer;
 	int m_fd;
 	ReadyAdapter *m_fdreg;
 	bool m_connecting;
@@ -82,6 +85,7 @@ private:
 
 	bool reconnectTimeout(void);
 	bool transientTimeout(void);
+	bool lookupTimeout(void);
 
 	void clientComplete(StorageContainer::SharedPtr &c,
 		Disposition disp, std::string reason);

@@ -88,18 +88,21 @@ bool STSClientMgr::m_send_paused_data = false;
 STSClientMgr *STSClientMgr::m_singleton;
 
 STSClientMgr::STSClientMgr() :
+	m_signalEvents(new SignalEvents()),
 	m_connect_timer(new TimerAdapter<STSClientMgr>(this,
 					&STSClientMgr::connectTimeout)),
 	m_reconnect_timer(new TimerAdapter<STSClientMgr>(this,
 					&STSClientMgr::reconnectTimeout)),
 	m_transient_timer(new TimerAdapter<STSClientMgr>(this,
 					&STSClientMgr::transientTimeout)),
+	m_lookup_timer(new TimerAdapter<STSClientMgr>(this,
+					&STSClientMgr::lookupTimeout)),
 	m_fd(-1), m_fdreg(NULL), m_connecting(false), m_backoff(false),
 	m_connections(0), m_queueMode(BALANCE), m_sendNext(OLDEST),
 	m_currentRun(0)
 {
 	m_sigevent.sigev_notify = SIGEV_SIGNAL;
-	m_sigevent.sigev_signo = SignalEvents::allocateRTsig(
+	m_sigevent.sigev_signo = m_signalEvents->allocateRTsig(
 		boost::bind(&STSClientMgr::lookupComplete, this, _1));
 
 	memset(&m_gai_hints, 0, sizeof(m_gai_hints));
@@ -259,6 +262,11 @@ STSClientMgr::~STSClientMgr()
 		delete m_transient_timer;
 		m_transient_timer = NULL;
 	}
+	if (m_lookup_timer) {
+		m_lookup_timer->cancel();
+		delete m_lookup_timer;
+		m_lookup_timer = NULL;
+	}
 	m_singleton = NULL;
 	m_mgrConnection.disconnect();
 	if (m_fdreg) {
@@ -411,6 +419,15 @@ void STSClientMgr::startConnect(void)
 		<< " Flags=" << m_gai_hints.ai_flags
 			<< " (" << ( AI_CANONNAME | AI_V4MAPPED ) << ")");
 
+	// Make Sure Something is Still Listening for Us...! ;-D
+	if ( !(m_signalEvents->valid()) ) {
+		ERROR("startConnect(): Whoa...! SignalEvents Went Invalid...!"
+			<< " Re-Allocate RT Signal...");
+		m_sigevent.sigev_notify = SIGEV_SIGNAL;
+		m_sigevent.sigev_signo = m_signalEvents->allocateRTsig(
+			boost::bind(&STSClientMgr::lookupComplete, this, _1));
+	}
+
 	rc = getaddrinfo_a(GAI_NOWAIT, &gai, 1, &m_sigevent);
 	if (rc) {
 		// *Don't* Throw Exception, But Log Potentially Non-Transient Error!
@@ -428,6 +445,10 @@ void STSClientMgr::startConnect(void)
 		return;
 	}
 
+	// Make Sure We Eventually Come Back, Even If Lookup Never Returns...!
+	// (Cheat and Use Transient Lookup Timeout for Lookups... ;-D)
+	m_lookup_timer->start(m_transient_timeout);
+
 	m_connecting = true;
 }
 
@@ -435,6 +456,9 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 {
 	struct addrinfo *ai;
 	int flags, rc;
+
+	// Ok, We Made It Back from the Asynchronous Lookup... ;-D
+	m_lookup_timer->cancel();
 
 	/* Make sure we're expecting this signal, and that it comes from us. */
 	if ( !m_connecting || info.ssi_pid != (uint32_t) getpid()
@@ -485,6 +509,19 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		} else {
 			DEBUG("Connecting to STS, getnameinfo failed");
 		}
+	}
+
+ 	// Free Any Previous ReadyAdapter...
+	if (m_fdreg) {
+		delete m_fdreg;
+		m_fdreg = NULL;
+	}
+
+	// Free Any Previous File Descriptor...
+	if (m_fd >= 0) {
+		DEBUG("Close m_fd=" << m_fd);
+		close(m_fd);
+		m_fd = -1;
 	}
 
 	m_fd = socket(ai->ai_addr->sa_family, SOCK_STREAM, 0);
@@ -549,6 +586,7 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		}
 		break;
 	case 0:
+		DEBUG("Fast Connect!");
 		connectComplete();
 		return;
 	default:
@@ -746,6 +784,7 @@ bool STSClientMgr::connectTimeout(void)
 
 bool STSClientMgr::reconnectTimeout(void)
 {
+	DEBUG("reconnectTimeout(): Restarting STS Connection...");
 	m_connecting = false;
 	startConnect();
 	return false;
@@ -753,7 +792,16 @@ bool STSClientMgr::reconnectTimeout(void)
 
 bool STSClientMgr::transientTimeout(void)
 {
+	DEBUG("transientTimeout(): Retrying STS Connection...");
 	m_backoff = false;
+	startConnect();
+	return false;
+}
+
+bool STSClientMgr::lookupTimeout(void)
+{
+	DEBUG("lookupTimeout(): Restarting STS Connection...");
+	m_connecting = false;
 	startConnect();
 	return false;
 }
