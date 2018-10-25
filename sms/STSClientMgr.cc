@@ -105,6 +105,11 @@ STSClientMgr::STSClientMgr() :
 	m_sigevent.sigev_signo = m_signalEvents->allocateRTsig(
 		boost::bind(&STSClientMgr::lookupComplete, this, _1));
 
+	m_gai.ar_name = (char *) NULL;
+	m_gai.ar_service = (char *) NULL;
+	m_gai.ar_request = (struct addrinfo *) NULL;
+	m_gai.ar_result = (struct addrinfo *) NULL;
+
 	memset(&m_gai_hints, 0, sizeof(m_gai_hints));
 	m_gai_hints.ai_family = AF_INET6;
 	m_gai_hints.ai_socktype = SOCK_STREAM;
@@ -403,7 +408,12 @@ void STSClientMgr::startConnect(void)
 	m_gai.ar_name = m_node.c_str();
 	m_gai.ar_service = m_service.c_str();
 	m_gai.ar_request = &m_gai_hints;
-	m_gai.ar_result = NULL;
+
+	// Free Any Previous AddrInfo Results Returned...
+	if ( m_gai.ar_result != NULL ) {
+		freeaddrinfo( m_gai.ar_result );
+		m_gai.ar_result = NULL;
+	}
 
 	// I'm only paranoid if they're not actually out to get me... ;-D
 	DEBUG("startConnect():"
