@@ -275,6 +275,22 @@ option_default[$num_options]="true"
 option_label[$num_options]="[Ignore Interleaved Global SAWTOOTH Times]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="beam_monitor_tof_bits"
+option_pv[$num_options]="SMS:Control:BeamMonitorTOFBits"
+option_value_type[$num_options]="UINT32_VALUE(number_of_tof_bits)"
+option_default[$num_options]="21"
+option_label[$num_options]="[Number of Beam Monitor TOF Bits]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="chopper_tof_bits"
+option_pv[$num_options]="SMS:Control:ChopperTOFBits"
+option_value_type[$num_options]="UINT32_VALUE(number_of_tof_bits)"
+option_default[$num_options]="21"
+option_label[$num_options]="[Number of Chopper TOF Bits]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="id"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Id"
@@ -1548,6 +1564,8 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:Control:NeutronEventStateBits
 		caget $WAIT ${PRE}:SMS:Control:NeutronEventSortByState
 		caget $WAIT ${PRE}:SMS:Control:IgnoreInterleavedGlobalSAWTOOTH
+		caget $WAIT ${PRE}:SMS:Control:BeamMonitorTOFBits
+		caget $WAIT ${PRE}:SMS:Control:ChopperTOFBits
 
 		echo
 
