@@ -90,6 +90,12 @@ bool SMSControl::m_neutronEventSortByState;
 
 bool SMSControl::m_ignoreInterleavedSawtooth;
 
+uint32_t SMSControl::m_monitorTOFBits;
+uint32_t SMSControl::m_monitorTOFMask;
+
+uint32_t SMSControl::m_chopperTOFBits;
+uint32_t SMSControl::m_chopperTOFMask;
+
 class PopPulseBufferPV : public smsInt32PV {
 public:
 	PopPulseBufferPV(const std::string &name) :
@@ -254,6 +260,22 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 		conf.get<bool>("sms.ignore_interleaved_sawtooth", true);
 	INFO("Setting Ignore-Interleaved-Global-SAWTOOTH Flag to "
 		<< ( ( m_ignoreInterleavedSawtooth ) ? "True" : "False" ));
+
+	m_monitorTOFBits = conf.get<uint32_t>("sms.beam_monitor_tof_bits", 21);
+	INFO("Setting Beam Monitor TOF Bits to " << m_monitorTOFBits << ".");
+
+	// Set Beam Monitor TOF Mask Based on Number of Bits...
+	m_monitorTOFMask = ((uint32_t) -1) >> (32 - m_monitorTOFBits);
+	INFO("Setting Beam Monitor TOF Mask to 0x"
+		<< std::hex << m_monitorTOFMask << std::dec << ".");
+
+	m_chopperTOFBits = conf.get<uint32_t>("sms.chopper_tof_bits", 21);
+	INFO("Setting Chopper TOF Bits to " << m_chopperTOFBits << ".");
+
+	// Set Chopper TOF Mask Based on Number of Bits...
+	m_chopperTOFMask = ((uint32_t) -1) >> (32 - m_chopperTOFBits);
+	INFO("Setting Chopper TOF Mask to 0x"
+		<< std::hex << m_chopperTOFMask << std::dec << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -514,6 +536,16 @@ SMSControl::SMSControl() :
 							+ "IgnoreInterleavedGlobalSAWTOOTH",
 						/* AutoSave */ true));
 
+	m_pvMonitorTOFBits = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "BeamMonitorTOFBits", 0, INT32_MAX,
+						/* AutoSave */ true));
+
+	m_pvChopperTOFBits = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "ChopperTOFBits", 0, INT32_MAX,
+						/* AutoSave */ true));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -541,6 +573,8 @@ SMSControl::SMSControl() :
 	addPV(m_pvNeutronEventStateBits);
 	addPV(m_pvNeutronEventSortByState);
 	addPV(m_pvIgnoreInterleavedSawtooth);
+	addPV(m_pvMonitorTOFBits);
+	addPV(m_pvChopperTOFBits);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
 	addPV(m_pvCleanShutdown);
@@ -607,6 +641,12 @@ SMSControl::SMSControl() :
 	// Initialize Ignore Interleaved-Global-SAWTOOTH Flag...
 	m_pvIgnoreInterleavedSawtooth->update(
 		m_ignoreInterleavedSawtooth, &now );
+
+	// Initialize Beam Monitor TOF Bits PV...
+	m_pvMonitorTOFBits->update( m_monitorTOFBits, &now);
+
+	// Initialize Chopper TOF Bits PV...
+	m_pvChopperTOFBits->update( m_chopperTOFBits, &now);
 
 	// Initialize Fast "Last Pulse" Lookup...
 	PulseIdentifier m_lastPid(-1,-1);
@@ -681,6 +721,28 @@ SMSControl::SMSControl() :
 			m_pvIgnoreInterleavedSawtooth->getName(), bvalue, ts ) ) {
 		m_ignoreInterleavedSawtooth = bvalue;
 		m_pvIgnoreInterleavedSawtooth->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvMonitorTOFBits->getName(), uvalue, ts ) ) {
+		m_monitorTOFBits = uvalue;
+		m_pvMonitorTOFBits->update(uvalue, &ts);
+
+		// Set Beam Monitor TOF Mask Based on Number of Bits...
+		m_monitorTOFMask = ((uint32_t) -1) >> (32 - m_monitorTOFBits);
+		INFO("Setting Beam Monitor TOF Mask to 0x"
+			<< std::hex << m_monitorTOFMask << std::dec << ".");
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvChopperTOFBits->getName(), uvalue, ts ) ) {
+		m_chopperTOFBits = uvalue;
+		m_pvChopperTOFBits->update(uvalue, &ts);
+
+		// Set Chopper TOF Mask Based on Number of Bits...
+		m_chopperTOFMask = ((uint32_t) -1) >> (32 - m_chopperTOFBits);
+		INFO("Setting Chopper TOF Mask to 0x"
+			<< std::hex << m_chopperTOFMask << std::dec << ".");
 	}
 
 	// Initialize Next Run Number...
@@ -2046,7 +2108,7 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
 	}
 
 	uint32_t rising = (pixel & 1) << 31;
-	tof &= ((1U << 21) - 1);
+	tof &= m_monitorTOFMask;
 	tof |= rising;
 
 	mon->second.m_eventTof.push_back(tof);
@@ -2129,7 +2191,7 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt,
 	 * these values; if this is not the case, we will need to handle
 	 * that here.
 	 */
-	tof &= (1U << 21) - 1;
+	tof &= m_chopperTOFMask;
 	tof *= 100;
 	tof <<= 1;
 	if (pixel & 1)
@@ -2200,9 +2262,10 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		pulse->m_charge = pkt.pulseCharge();
 	}
 
-	// Infrequently Check Live Control PV for Neutron Event State Handling
+	// Infrequently Check Live Control PV for Bit/Mask Handling
 	// (Once Per Minute...)
 	if ( !(++cnt % 3600) ) {
+		// Neutron Event State Bits
 		uint32_t tmp = m_pvNeutronEventStateBits->value();
 		if ( tmp != m_neutronEventStateBits ) {
 			ERROR("pulseEvents(): Number of Neutron Event State Bits"
@@ -2222,7 +2285,34 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					<< ".");
 			}
 		}
+		// Neutron Event Sort By State
 		m_neutronEventSortByState = m_pvNeutronEventSortByState->value();
+		// Beam Monitor TOF Bits
+		tmp = m_pvMonitorTOFBits->value();
+		if ( tmp != m_monitorTOFBits ) {
+			ERROR("pulseEvents(): Number of Beam Monitor TOF Bits"
+				<< " has been Changed from " << m_monitorTOFBits
+				<< " to " << tmp);
+			m_monitorTOFBits = tmp;
+
+			// Set Beam Monitor TOF Mask Based on Number of Bits...
+			m_monitorTOFMask = ((uint32_t) -1) >> (32 - m_monitorTOFBits);
+			INFO("Setting Beam Monitor TOF Mask to 0x"
+				<< std::hex << m_monitorTOFMask << std::dec << ".");
+		}
+		// Chopper TOF Bits
+		tmp = m_pvChopperTOFBits->value();
+		if ( tmp != m_chopperTOFBits ) {
+			ERROR("pulseEvents(): Number of Chopper TOF Bits"
+				<< " has been Changed from " << m_chopperTOFBits
+				<< " to " << tmp);
+			m_chopperTOFBits = tmp;
+
+			// Set Chopper TOF Mask Based on Number of Bits...
+			m_chopperTOFMask = ((uint32_t) -1) >> (32 - m_chopperTOFBits);
+			INFO("Setting Chopper TOF Mask to 0x"
+				<< std::hex << m_chopperTOFMask << std::dec << ".");
+		}
 	}
 
 	ADARA::Event translated;
