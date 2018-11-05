@@ -528,12 +528,14 @@ void STSClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	}
 
 	// Free Any Previous File Descriptor...
+	// (If it got passed down into STSClient(), then we already cleared it!)
 	if (m_fd >= 0) {
 		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
 	}
 
+	// Get New Socket for _Next_ (Possibly Concurrent) STSClient()...!
 	m_fd = socket(ai->ai_addr->sa_family, SOCK_STREAM, 0);
 	if (m_fd < 0) {
 		m_fd = -1;   // just to be sure... ;-b
@@ -732,6 +734,9 @@ void STSClientMgr::connectComplete(void)
 
 		INFO("Sending Run " << run->runNumber() << " to STS at "
 			<< m_node << ":" << m_service);
+		// Clear Out This Socket/File Descriptor, We've Handed It Off Now...
+		// (We *Don't* Want to Close It Out from Under the STSClient...!)
+		m_fd = -1;
 		m_connecting = false;
 		startConnect();
 		return;
