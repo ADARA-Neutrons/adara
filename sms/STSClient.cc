@@ -201,6 +201,7 @@ void STSClient::writable(void)
 				delete this;
 				return;
 			}
+			DEBUG("Using Data File Descriptor m_file_fd=" << m_file_fd);
 		}
 
 		len = f->size() - m_cur_offset;
