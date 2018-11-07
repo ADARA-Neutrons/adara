@@ -3995,6 +3995,14 @@ StreamParser::rxPacket
 
                                                 m_pvs_by_key.erase( ipk );
                                             }
+
+                                            // Say, What About the Old PV?!
+
+                                            // XXX TODO Fix This, as it
+                                            // Can Result in Failure to
+                                            // Create Duplicate PV with,
+                                            // e.g. Same Name but a
+                                            // Different Enum Type...! ;-Q
                                         }
                                     }
                                     // Else, Same Definition... That's Ok!
