@@ -36,7 +36,7 @@ public:
 		}
 
 		if ( ! m_liveServer->isInit() ) {
-			ERROR("ListenStringPV: " << m_pv_name << " PV value changed"
+			DEBUG("ListenStringPV: " << m_pv_name << " PV value changed"
 				<< " [" << value() << "]"
 				<< " But Live Server Not Yet Initialized - Ignore...");
 			return;
