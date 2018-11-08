@@ -222,6 +222,73 @@ NxGen::makePVInfo
             break;
         }
 
+        // _ALSO_ Check for Legit PV Connection Collisions:
+        // This code looks for the PV Connection String across
+        // all PV Names and Connection Strings encountered thus far,
+        // and if found Increments/Appends a Version Number to the Name.
+        // Then, it checks again to make sure _This_ New Auto-Generated
+        // Internal Name doesn't collide with an existing (top-level) Name.
+        // This continues until a Version is found that doesn't collide.
+        // Note: This can happen if the Enumerated Type for a PV
+        // _Changes_ in the Middle of a Run...! ;-Q  (It happens... ;-)
+        else if ( (*ipv)->m_connection == internal_connection )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s: Device %s %s == Device %s %s",
+                g_pid, "STS Error:", "makePVInfo()",
+                "Duplicate PV Connection for Different PV Definition",
+                a_device_name.c_str(),
+                internal_connection.c_str(),
+                (*ipv)->m_device_name.c_str(),
+                (*ipv)->m_connection.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            set<string>::iterator i;
+
+            uint32_t conn_ver = 0;
+
+            while ( 1 )
+            {
+                i = m_pv_name_history.find( internal_connection );
+                if ( i != m_pv_name_history.end() )
+                {
+                    internal_connection = a_connection + "("
+                        + boost::lexical_cast<string>( ++conn_ver ) + ")";
+                }
+                else
+                {
+                    if ( conn_ver > 0 )
+                    {
+                        syslog( LOG_ERR,
+                            "[%i] %s %s: %s: Device %s: %s -> %s",
+                            g_pid, "STS Error:", "makePVInfo()",
+                            "PV Connection Clash",
+                            a_device_name.c_str(),
+                            a_connection.c_str(),
+                            internal_connection.c_str() );
+                        usleep(30000); // give syslog a chance...
+                    }
+                    m_pv_name_history.insert( internal_connection );
+
+                    // Check for Matching Alias, Which Also Needs Fix...
+                    if ( !a_name.compare( a_connection ) )
+                    {
+                        internal_name = internal_connection;
+                        syslog( LOG_ERR,
+                            "[%i] %s %s: %s: Device %s: %s -> %s",
+                            g_pid, "STS Error:", "makePVInfo()",
+                            "Associated PV Name (Alias) Clash",
+                            a_device_name.c_str(),
+                            a_name.c_str(),
+                            internal_name.c_str() );
+                        usleep(30000); // give syslog a chance...
+                    }
+
+                    break;
+                }
+            }
+        }
+
         ++ipv;
     }
 
