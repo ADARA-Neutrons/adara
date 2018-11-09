@@ -975,6 +975,9 @@ LOOKUP_PROPOSAL_METADATA()
 	local _new_value="$1"
 	shift
 
+	local _old_line_wnum_var="$1"
+	shift
+
 	local _old_value_var="$1"
 	shift
 
@@ -1003,9 +1006,8 @@ LOOKUP_PROPOSAL_METADATA()
 	# _Not_ of the form "IPTS-*"... ;-D
 	#
 
-	# Note: Global Reference to "$ipts_old_line_wnum"...! ;-D
 	# Limit Search to First/Last RunInfo Section in File...
-	ipts_old_line_wnum=`${AWK} \
+	local _old_line_wnum=`${AWK} \
 			"{ if ( NR >= ${runinfo_lines_start} \
 					&& NR <= ${runinfo_lines_end} ) \
 				printf(\"%s:%s\\n\",NR,\\$0) }" \
@@ -1016,7 +1018,7 @@ LOOKUP_PROPOSAL_METADATA()
 	if [[ ${ckoldiptsline} != 0 ]]; then
 		echo -e -n "\nERROR Extracting Old ${_meta_name} Line "
 		echo "from Stream File for Run ${run}!"
-		echo -e "\n\t[${ipts_old_line_wnum}]"
+		echo -e "\n\t[${_old_line_wnum}]"
 		### TODO: Try the "2nd" or "Next to Last" File...?
 		MANUAL_EDIT "${rundir}" "${datafile}" \
 			"${_xml_tag}" "${_meta_name}" "${_new_value}"
@@ -1030,8 +1032,7 @@ LOOKUP_PROPOSAL_METADATA()
 	fi
 
 	# See How Many Old Proposal Meta-Data Lines We Got...
-	ckoneline=`echo "${ipts_old_line_wnum}" \
-		| ${WC} | ${AWK} '{print $1}'`
+	ckoneline=`echo "${_old_line_wnum}" | ${WC} | ${AWK} '{print $1}'`
 
 	# Make Sure We Only Get *1* Old Proposal Meta-Data Line...! ;-D
 	if [[ "${_allow_multi}" == "NoMulti" ]]; then
@@ -1041,24 +1042,22 @@ LOOKUP_PROPOSAL_METADATA()
 
 			echo -e -n "\nWarning: Multiple ${_meta_name} Lines Found "
 			echo "for Run ${run}!"
-			echo -e "\n${ipts_old_line_wnum}"
+			echo -e "\n${_old_line_wnum}"
 				# Allow Self-Indenting from XML Line(s)
 
 			# Take First Line of the First Data File...
 			if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
-				ipts_old_line_wnum=`echo "${ipts_old_line_wnum}" \
-					| ${HEAD} -1`
+				_old_line_wnum=`echo "${_old_line_wnum}" | ${HEAD} -1`
 				echo -e -n "\nUsing First ${_meta_name} "
 				echo "of the First Data File for Run ${run}:"
-				echo -e "\n${ipts_old_line_wnum}"
+				echo -e "\n${_old_line_wnum}"
 					# Allow Self-Indenting from XML Line(s)
 			# Else Take Last Line of the Last Data File...
 			else
-				ipts_old_line_wnum=`echo "${ipts_old_line_wnum}" \
-					| ${TAIL} -1`
+				_old_line_wnum=`echo "${_old_line_wnum}" | ${TAIL} -1`
 				echo -e -n "\nUsing Last ${_meta_name} "
 				echo "of the Last Data File for Run ${run}:"
-				echo -e "\n${ipts_old_line_wnum}"
+				echo -e "\n${_old_line_wnum}"
 					# Allow Self-Indenting from XML Line(s)
 			fi
 
@@ -1070,10 +1069,10 @@ LOOKUP_PROPOSAL_METADATA()
 	fi
 
 	echo -e "\nOld ${_meta_name} Line(s) for Run ${run}:"
-	echo -e "\n${ipts_old_line_wnum}"
+	echo -e "\n${_old_line_wnum}"
 		# Allow Self-Indenting from XML Line(s)
 
-	local _old_value=`echo "${ipts_old_line_wnum}" \
+	local _old_value=`echo "${_old_line_wnum}" \
 		| ${AWK} -F "[<>]" '{print $3}'`
 	ckoldipts=$?
 
@@ -1093,6 +1092,14 @@ LOOKUP_PROPOSAL_METADATA()
 
 	echo -e "\nFound Old ${_meta_name} for Run ${run}:"
 	echo -e "\n\t["${_old_value}"]"   # Collapse Multi-Line Values
+
+	#
+	# Set/Save Old Line w/Number Global, If Specified...
+	#
+
+	if [[ -n "${_old_line_wnum_var}" ]]; then
+		eval "${_old_line_wnum_var}=\"${_old_line_wnum}\""
+	fi
 
 	#
 	# Set/Save Old Value Global, If Specified...
@@ -1137,7 +1144,7 @@ UPDATE_PROPOSAL_METADATA()
 
 	LOOKUP_PROPOSAL_METADATA \
 		"${_xml_tag}" "${_meta_name}" "${_new_value}" \
-		"update_old_value"
+		"ipts_old_line_wnum" "update_old_value"
 	cklookup=$?
 
 	# Pass-Thru Return...
@@ -1626,9 +1633,8 @@ for run in ${RUN_NUMBERS} ; do
 
 			LOOKUP_PROPOSAL_METADATA \
 				"id" "Proposal Users" "${new_user_list}" \
-				"old_user_list" "AllowMulti"
+				"" "old_user_list" "AllowMulti"
 			cklookup=$?
-			# NOTE: Sets Global ${ipts_old_line_wnum}...! ;-D
 
 			# Something Happened During Lookup...
 			if [[ ${cklookup} != 0 ]]; then
