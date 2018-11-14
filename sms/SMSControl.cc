@@ -1,4 +1,19 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.Control"));
+
+#include <string>
+#include <sstream>
+#include <map>
+
+#include <time.h>
+#include <math.h>
+#include <stdint.h>
+
+#include <boost/lexical_cast.hpp>
+#include <boost/make_shared.hpp>
+
 #include "EPICS.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
@@ -15,23 +30,11 @@
 #include "MetaDataMgr.h"
 #include "FastMeta.h"
 #include "Markers.h"
-#include "Logging.h"
 #include "utils.h"
 
 #include "snsTiming.h"
 
-#include <string>
-#include <sstream>
-#include <map>
-#include <time.h>
-#include <math.h>
-#include <boost/lexical_cast.hpp>
-#include <boost/make_shared.hpp>
-#include <stdint.h>
-
 #include <cadef.h>
-
-static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 
 RateLimitedLogging::History RLLHistory_SMSControl;
 
@@ -140,12 +143,34 @@ SMSControl *SMSControl::m_singleton = NULL;
 
 static uint32_t pulseEnergy(uint32_t ringPeriod)
 {
+	// Handle Bogus Ring Period...!
+	// (Can't Have Zero Ring Period, Equals Infinite Velocity...! ;-)
+	if ( ringPeriod == 0 ) {
+		ERROR("pulseEnergy(): Bogus Ring Period of Zero"
+			<< " - No RTDL for 1st Pulse After SMS Restart?"
+			<< " Setting Pulse Energy to Zero.");
+		// Just Return Zero Pulse Energy...
+		return( 0 );
+	}
+
 	double ring_circumference = 248; // meters
 	double period = ringPeriod * 1e-12; // seconds
 	double v = ring_circumference / period; // m/s
 	double c = 299792458; // m/s
 	double beta = v / c;
 	double E0 = 938.257e6; // rest energy of proton, eV
+
+	// Another Sanity Check, "Beta" Better Be < 1.0... ;-D
+	// (As Far As We Know, Can't Go Faster Than Light...? ;-D)
+	if ( beta >= 1.0 ) {
+		ERROR("pulseEnergy(): Bogus Pulse Data"
+			<< " ringPeriod=" << ringPeriod
+			<< " beta=" << beta
+			<< " - No Faster Than Light Ring Traversal!"
+			<< " Setting Pulse Energy to Zero.");
+		// Just Return Zero Pulse Energy...
+		return( 0 );
+	}
 
 	/* Return pulse energy in eV */
 	return (E0 / sqrt(1 - (beta * beta))) - E0;
@@ -2830,8 +2855,9 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		// (This Pulse's PCharge comes from _Next_ Pulse...!)
 		if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
 			PulseMap::iterator next = it;
-			if (++next != m_pulses.end())
+			if (++next != m_pulses.end()) {
 				correctPChargeVeto(it->second, next->second);
+			}
 			else {
 				/* Rate-limited logging of global sawtooth pulse */
 				std::string log_info;
@@ -3052,6 +3078,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 		}
 
 		// Build Various Packets for Pulse...
+
 		buildMonitorPacket(pulse);
 
 		// Choose Between Polarization State vs. "Normal" Banked Events...
@@ -3063,7 +3090,9 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 		}
 
 		buildChopperPackets(pulse);
+
 		buildFastMetaPackets(pulse);
+
 	} catch (std::runtime_error e) {
 		ERROR( ( m_recording ? "[RECORDING] " : "" )
 			<< "Failed to record pulse: " << e.what());
