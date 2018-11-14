@@ -1,13 +1,17 @@
-#include <boost/bind.hpp>
 
-#include <string>
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.MetaDataMgr"));
+
 #include <sstream>
+#include <string>
 #include <map>
 
 #include <stdint.h>
 #include <string.h>
 
 #include <boost/make_shared.hpp>
+#include <boost/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
@@ -15,10 +19,6 @@
 #include "MetaDataMgr.h"
 #include "StorageManager.h"
 #include "SMSControl.h"
-
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.MetaDataMgr"));
 
 RateLimitedLogging::History RLLHistory_MetaDataMgr;
 

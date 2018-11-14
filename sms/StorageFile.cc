@@ -1,4 +1,10 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.StorageFile"));
+
+#include <string>
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -10,8 +16,6 @@
 #include <fcntl.h>
 #include <limits.h>
 
-#include <string>
-
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 
@@ -19,12 +23,9 @@
 #include "StorageFile.h"
 #include "StorageContainer.h"
 #include "StorageManager.h"
-#include "Logging.h"
 #include "utils.h"
 
 namespace fs = boost::filesystem;
-
-static LoggerPtr logger(Logger::getLogger("SMS.StorageFile"));
 
 struct sync_packet {
 	ADARA::Header	hdr;

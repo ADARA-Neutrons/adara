@@ -1,3 +1,11 @@
+
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
+
+#include <string>
+#include <sstream>
+
 #include <unistd.h>
 #include <errno.h>
 #include <sys/sendfile.h>
@@ -5,19 +13,14 @@
 #include <stdint.h>
 
 #include <boost/bind.hpp>
-#include <string>
-#include <sstream>
 
 #include "EPICS.h"
 #include "STSClient.h"
 #include "STSClientMgr.h"
 #include "ReadyAdapter.h"
-#include "Logging.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
 #include "utils.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
 
 #define INITIAL_BUFFER_SIZE	4096
 #define MAX_PACKET_SIZE		(128 * 1024)

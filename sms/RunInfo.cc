@@ -1,21 +1,23 @@
 
-#include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
-#include <stdint.h>
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.RunInfo"));
+
 #include <string>
 #include <sstream>
+
+#include <stdint.h>
+
+#include <gddApps.h>
+
+#include <boost/lexical_cast.hpp>
+#include <boost/bind.hpp>
 
 #include "EPICS.h"
 #include "RunInfo.h"
 #include "StorageManager.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
-
-#include <gddApps.h>
-
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.RunInfo"));
 
 RateLimitedLogging::History RLLHistory_RunInfo;
 

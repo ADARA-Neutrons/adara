@@ -1,20 +1,22 @@
 
-#include <boost/lexical_cast.hpp>
-#include <boost/function.hpp>
-#include <fdManager.h>
-#include <sys/eventfd.h>
-#include <sstream>
-#include <stdint.h>
-#include <errno.h>
-
-#include <memory>
-#include <stdexcept>
-
-#include "ReadyAdapter.h"
-#include "EventFd.h"
 #include "Logging.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.EventFd"));
+
+#include <stdexcept>
+#include <sstream>
+#include <memory>
+
+#include <fdManager.h>
+#include <sys/eventfd.h>
+#include <stdint.h>
+#include <errno.h>
+
+#include <boost/lexical_cast.hpp>
+#include <boost/function.hpp>
+
+#include "ReadyAdapter.h"
+#include "EventFd.h"
 
 EventFd::EventFd( bool nonBlocking )
 	: m_ready(NULL), m_nonBlocking(nonBlocking)

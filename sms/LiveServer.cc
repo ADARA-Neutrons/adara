@@ -1,3 +1,8 @@
+
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <fcntl.h>
@@ -13,9 +18,6 @@
 #include "SMSControlPV.h"
 #include "LiveServer.h"
 #include "LiveClient.h"
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
 
 class ListenStringPV : public smsStringPV {
 public:

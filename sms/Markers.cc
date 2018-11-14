@@ -1,18 +1,20 @@
 
-#include <boost/lexical_cast.hpp>
-#include <boost/function.hpp>
-#include <stdint.h>
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.Markers"));
+
 #include <string>
 #include <sstream>
+
+#include <stdint.h>
+
+#include <boost/lexical_cast.hpp>
+#include <boost/function.hpp>
 
 #include "Markers.h"
 #include "StorageManager.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
-
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.Markers"));
 
 class MarkerPausedPV : public smsBooleanPV {
 public:

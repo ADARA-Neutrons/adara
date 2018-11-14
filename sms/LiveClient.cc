@@ -1,10 +1,15 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
+
+#include <sstream>
+#include <string>
+
 #include <unistd.h>
 #include <errno.h>
 #include <sys/sendfile.h>
 #include <stdint.h>
-#include <sstream>
-#include <string>
 
 #include <boost/bind.hpp>
 
@@ -17,10 +22,7 @@
 #include "LiveClient.h"
 #include "StorageManager.h"
 #include "StorageFile.h"
-#include "Logging.h"
 #include "utils.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
 
 RateLimitedLogging::History RLLHistory_LiveClient;
 

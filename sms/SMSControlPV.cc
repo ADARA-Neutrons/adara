@@ -1,5 +1,14 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.SMSControlPV"));
+
 #include <sstream>
+
+#include <stdint.h>
+#include <string.h>
+
+#include <gddApps.h>
 
 #include "EPICS.h"
 #include "DataSource.h"
@@ -7,15 +16,6 @@
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "ADARAUtils.h"
-
-#include <gddApps.h>
-
-#include <stdint.h>
-#include <string.h>
-
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.SMSControlPV"));
 
 RateLimitedLogging::History RLLHistory_SMSControlPV;
 

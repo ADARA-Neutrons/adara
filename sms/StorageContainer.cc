@@ -1,3 +1,10 @@
+
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
+
+#include <stdexcept>
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -6,8 +13,6 @@
 #include <errno.h>
 #include <time.h>
 
-#include <stdexcept>
-
 #include <boost/filesystem.hpp>
 
 #include "StorageContainer.h"
@@ -15,11 +20,7 @@
 #include "StorageFile.h"
 #include "ADARA.h"
 
-#include "Logging.h"
-
 namespace fs = boost::filesystem;
-
-static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
 
 #define CONTAINER_MODE	(S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP)
 #define MARKER_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)

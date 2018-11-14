@@ -1,10 +1,16 @@
 
-#include <boost/bind.hpp>
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.DetectorBankSet"));
+
 #include <string>
 #include <sstream>
+
 #include <string.h>
 #include <stdint.h>
 #include <time.h>
+
+#include <boost/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
@@ -14,10 +20,6 @@
 #include "SMSControlPV.h"
 #include "DetectorBankSet.h"
 #include "StorageManager.h"
-
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.DetectorBankSet"));
 
 class DetectorBankSetInfo {
 

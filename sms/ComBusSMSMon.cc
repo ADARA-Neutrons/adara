@@ -1,18 +1,21 @@
+
+#include "Logging.h"
+
+static LoggerPtr logger( Logger::getLogger("SMS.ComBusSMSMon") );
+
+#include <string>
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
-#include <string>
+
 #include <boost/bind.hpp>
 
 #include "StorageManager.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "ComBusSMSMon.h"
-#include "Logging.h"
-
-static LoggerPtr logger( Logger::getLogger("SMS.ComBusSMSMon") );
-
-#include "EventFd.h"   // (Uses logger... :-)
+#include "EventFd.h"
 
 SMSRunStatus::SMSRunStatus(
 		unsigned long a_run_num, std::string &a_proposal_id,

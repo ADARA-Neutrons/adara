@@ -1,4 +1,11 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.STSClientMgr"));
+
+#include <string>
+#include <sstream>
+
 #include <unistd.h>
 #include <stdint.h>
 #include <signal.h>
@@ -8,8 +15,6 @@
 #include <time.h>
 
 #include <boost/bind.hpp>
-#include <string>
-#include <sstream>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
@@ -20,10 +25,6 @@
 #include "STSClientMgr.h"
 #include "STSClient.h"
 #include "SignalEvents.h"
-
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.STSClientMgr"));
 
 RateLimitedLogging::History RLLHistory_STSClientMgr;
 

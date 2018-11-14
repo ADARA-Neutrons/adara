@@ -1,6 +1,8 @@
 
-#include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
+
 #include <fstream>
 #include <utility>
 #include <stdexcept>
@@ -9,15 +11,16 @@
 #include <queue>
 #include <map>
 #include <set>
+
 #include <stdio.h>
 #include <stdint.h>
+
+#include <boost/lexical_cast.hpp>
+#include <boost/bind.hpp>
 
 #include "ADARA.h"
 #include "PixelMap.h"
 #include "StorageManager.h"
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
 
 std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 {

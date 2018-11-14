@@ -1,17 +1,22 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
+
+#include <stdexcept>
+#include <sstream>
+#include <string>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdint.h>
 #include <string.h>
-#include <string>
-#include <sstream>
 #include <netdb.h>
 #include <fcntl.h>
 #include <time.h>
 
 #include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
-#include <stdexcept>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
@@ -20,12 +25,7 @@
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
-
 #include "utils.h"
-
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 
 RateLimitedLogging::History RLLHistory_DataSource;
 

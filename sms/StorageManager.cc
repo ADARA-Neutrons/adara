@@ -1,4 +1,15 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
+
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <algorithm>
+#include <stdexcept>
+
 #include <errno.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -8,19 +19,11 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <string.h>
-
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <iomanip>
-#include <algorithm>
-#include <stdexcept>
+#include <time.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
-
-#include <time.h>
 
 #include "ADARA.h"
 #include "StorageManager.h"
@@ -30,14 +33,10 @@
 #include "SMSControlPV.h"
 #include "ADARAUtils.h"
 #include "STSClientMgr.h"
-#include "Logging.h"
+#include "EventFd.h"
 #include "utils.h"
 
 namespace fs = boost::filesystem;
-
-static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
-
-#include "EventFd.h"   // (Uses logger... :-)
 
 class PoolsizePV : public smsStringPV {
 public:

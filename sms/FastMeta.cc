@@ -1,9 +1,13 @@
-#include "FastMeta.h"
-#include "MetaDataMgr.h"
-#include "StorageManager.h"
+
 #include "Logging.h"
 
-#include "ADARA.h"
+static LoggerPtr logger(Logger::getLogger("FastMeta"));
+
+#include <fstream>
+#include <string>
+#include <sstream>
+
+#include <stdint.h>
 
 #include <boost/algorithm/string/classification.hpp>
 #include <boost/algorithm/string/predicate.hpp>
@@ -13,14 +17,12 @@
 #include <boost/tokenizer.hpp>
 #include <boost/foreach.hpp>
 
-#include <fstream>
-#include <string>
-#include <sstream>
-#include <stdint.h>
+#include "ADARA.h"
+#include "FastMeta.h"
+#include "MetaDataMgr.h"
+#include "StorageManager.h"
 
 using namespace boost::property_tree;
-
-static LoggerPtr logger(Logger::getLogger("FastMeta"));
 
 void FastMeta::addDevices(const ptree &conf)
 {

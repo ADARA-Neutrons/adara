@@ -1,17 +1,17 @@
 
-#include "EPICS.h"
-#include "ReadyAdapter.h"
-#include "SignalEvents.h"
+#include "Logging.h"
 
-#include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+static LoggerPtr logger(Logger::getLogger("SMS.SignalEvents"));
 
 #include <unistd.h>
 #include <errno.h>
 
-#include "Logging.h"
+#include <boost/lexical_cast.hpp>
+#include <boost/bind.hpp>
 
-static LoggerPtr logger(Logger::getLogger("SMS.SignalEvents"));
+#include "EPICS.h"
+#include "ReadyAdapter.h"
+#include "SignalEvents.h"
 
 SignalEvents::SignalEvents()
 	: m_read(NULL), m_fd(-1)
