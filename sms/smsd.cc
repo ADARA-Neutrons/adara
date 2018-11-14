@@ -37,8 +37,13 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS"));
+
 #include <iostream>
 #include <stdexcept>
+
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
@@ -47,14 +52,6 @@
 #include <stdint.h>
 #include <grp.h>
 #include <pwd.h>
-
-#include "EPICS.h"
-#include "SMSControl.h"
-#include "StorageManager.h"
-#include "ComBusSMSMon.h"
-#include "LiveServer.h"
-#include "STSClientMgr.h"
-#include "Logging.h"
 
 #include <log4cxx/propertyconfigurator.h>
 #include <log4cxx/consoleappender.h>
@@ -66,6 +63,13 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 
+#include "EPICS.h"
+#include "SMSControl.h"
+#include "StorageManager.h"
+#include "ComBusSMSMon.h"
+#include "LiveServer.h"
+#include "STSClientMgr.h"
+
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
@@ -73,8 +77,6 @@ std::string SMSD_VERSION = "1.6.24-devel";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
-
-static LoggerPtr logger(Logger::getLogger("SMS"));
 
 static std::string config_file("/SNSlocal/sms/conf/smsd.conf");
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
@@ -476,7 +478,18 @@ int main(int argc, char **argv)
 	try {
 		release_parent(CHILD_INIT_SUCCESS);
 		for (;;) {
+			// Reset Errno for this iteration...
+			errno = 0;
+			// Handle Callbacks on Open File Descriptors (Sockets, Files...)
 			fileDescriptorManager.process(1000.0);
+			// Check for Diabolical or Evil Errno Results...
+			// For now, Just Log 'Em... ;-D
+			if (errno && errno != EINPROGRESS && errno != EAGAIN) {
+				int e = errno;
+				ERROR("main(): fileDescriptorManager.process()"
+					<< " returned with errno=" << e << ": " << strerror(e));
+				errno = 0;
+			}
 		}
 	} catch (std::runtime_error e) {
 		ERROR("Dying on an Unexpected/Unhandled Exception: " << e.what());
