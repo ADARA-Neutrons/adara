@@ -373,13 +373,18 @@ StorageContainer::SharedPtr StorageContainer::create(
 		throw std::runtime_error("StorageContainer::StorageContainer()"
 					 " base strftime failed");
 
-	if (mkdirat(StorageManager::base_fd(), path, CONTAINER_MODE) &&
-							errno != EEXIST) {
-		int err = errno;
-		std::string msg("StorageContainer::StorageContainer(): "
-				"base mkdirat error: ");
-		msg += strerror(err);
-		throw std::runtime_error(msg);
+	if (mkdirat(StorageManager::base_fd(), path, CONTAINER_MODE)) {
+		// Don't "Pollute" Errno with Redundant Directory Creation...
+		if (errno == EEXIST) {
+			errno = 0;
+		}
+		else {
+			int err = errno;
+			std::string msg("StorageContainer::StorageContainer(): "
+					"base mkdirat error: ");
+			msg += strerror(err);
+			throw std::runtime_error(msg);
+		}
 	}
 
 	if (!strftime(path, sizeof(path), "%Y%m%d/%Y%m%d-%H%M%S", &tm))
