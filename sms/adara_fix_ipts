@@ -12,8 +12,7 @@ PROD_BASE_URL="https://snsapp1.sns.ornl.gov/xprod_ro/proposal_production"
 
 GET_PROPOSAL_BY_ID="express/getIPTSByPrpsl"
 
-#NOTIFY_EMAIL_LIST="parkerpg@ornl.gov rens@ornl.gov kohlja@ornl.gov"
-NOTIFY_EMAIL_LIST="kohlja@ornl.gov"
+NOTIFY_EMAIL_LIST="parkerpg@ornl.gov rens@ornl.gov kohlja@ornl.gov"
 
 MAILER="/usr/bin/Mail"
 
