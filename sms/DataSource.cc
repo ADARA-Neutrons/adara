@@ -1,17 +1,22 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
+
+#include <stdexcept>
+#include <sstream>
+#include <string>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdint.h>
 #include <string.h>
-#include <string>
-#include <sstream>
 #include <netdb.h>
 #include <fcntl.h>
 #include <time.h>
 
 #include <boost/make_shared.hpp>
 #include <boost/bind.hpp>
-#include <stdexcept>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
@@ -20,12 +25,7 @@
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
-
 #include "utils.h"
-
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 
 RateLimitedLogging::History RLLHistory_DataSource;
 
@@ -930,10 +930,15 @@ DataSource::~DataSource()
 		m_addrinfo = NULL;
 	}
 	delete m_timer;
-	if (m_fdreg)
+	if (m_fdreg) {
 		delete m_fdreg;
-	if (m_fd != -1)
+		m_fdreg = NULL;
+	}
+	if (m_fd >= 0) {
+		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
+		m_fd = -1;
+	}
 	m_connection.disconnect();
 }
 
@@ -1022,11 +1027,15 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 	struct timespec now;
 	clock_gettime( CLOCK_REALTIME_COARSE, &now );
 
-	INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-		<< "unregisterHWSources():"
-		<< " Data Source " << m_name << " is " << why
-		<< " - Source is" << ( isSourceDown ? "" : " Not" ) << " Down,"
-		<< " State" << ( stateChanged ? " Changed" : " Did Not Change" ) );
+	// Meh, This Log Message can be Annoying for Persistently Down Sources
+	// - Only Log at This Level if the State Actually Changed...
+	if ( stateChanged )
+	{
+		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "unregisterHWSources(): State Change:"
+			<< " Data Source " << m_name << " is " << why << ","
+			<< " Source is" << ( isSourceDown ? "" : " Not" ) << " Down" );
+	}
 
 	for ( it=m_hwSources.begin(); it != m_hwSources.end(); it++ )
 	{
@@ -1165,7 +1174,8 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 		delete m_fdreg;
 		m_fdreg = NULL;
 	}
-	if (m_fd != -1) {
+	if (m_fd >= 0) {
+		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
 	}
@@ -1365,6 +1375,7 @@ void DataSource::startConnect(void)
 		m_fd = -1;   // just to be sure... ;-b
 		goto error;
 	}
+	DEBUG("New Socket for " << m_name << " m_fd=" << m_fd);
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
 	if (flags < 0) {
@@ -1421,8 +1432,6 @@ void DataSource::startConnect(void)
 			}
 	}
 
-	/* TODO handle any other error here */
-
 	try {
 		/* We won't notice that the connect completed until we get
 		 * the first packet from the source unless we look for the
@@ -1431,10 +1440,19 @@ void DataSource::startConnect(void)
 		fdRegType type = (m_state == CONNECTING) ? fdrWrite : fdrRead;
 		m_fdreg = new ReadyAdapter(m_fd, type,
 				boost::bind(&DataSource::fdReady, this));
-	} catch (std::bad_alloc e) {
+	} catch (std::exception &e) {
 		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Bad Alloc Error for " << m_name
-			<< " adapter: " << e.what());
+			<< "Exception in startConnect()"
+			<< " Creating ReadyAdapter for " << m_name
+			<< " fdReady(): " << e.what());
+		m_fdreg = NULL; // just to be sure... ;-b
+		goto error_fd;
+	} catch (...) {
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "Unknown Exception in startConnect()"
+			<< " Creating ReadyAdapter for " << m_name
+			<< " fdReady()");
+		m_fdreg = NULL; // just to be sure... ;-b
 		goto error_fd;
 	}
 
@@ -1444,10 +1462,15 @@ void DataSource::startConnect(void)
 	return;
 
 error_fd:
-	close(m_fd);
-	m_fd = -1;
+
+	if (m_fd >= 0) {
+		DEBUG("Close m_fd=" << m_fd);
+		close(m_fd);
+		m_fd = -1;
+	}
 
 error:
+
 	m_pvConnected->failed();
 	connectionFailed(false, false, IDLE);
 }
@@ -1457,11 +1480,52 @@ void DataSource::connectComplete(void)
 	socklen_t elen = sizeof(int);
 	int e, rc;
 
+	// Check File Descriptor...
+	if (m_fd < 0) {
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "connectComplete(): Invalid File Descriptor for "
+			<< m_name << " m_fd=" << m_fd);
+		// We might as well Disconnect and try again later...
+		// Leave m_pvConnected in its current state, latch failures
+		connectionFailed(false, false, IDLE);
+		return;
+	}
+
 	rc = getsockopt(m_fd, SOL_SOCKET, SO_ERROR, &e, &elen);
 	if (!rc && !e) {
-		delete m_fdreg;
-		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
-				boost::bind(&DataSource::fdReady, this));
+
+		if (m_fdreg) {
+			delete m_fdreg;
+			m_fdreg = NULL;
+		}
+
+		// Catch Bad Alloc Exception...
+		try {
+			m_fdreg = new ReadyAdapter(m_fd, fdrRead,
+					boost::bind(&DataSource::fdReady, this));
+		} catch (std::exception &e) {
+			ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Exception in connectComplete()"
+				<< " Creating ReadyAdapter for " << m_name
+				<< " fdReady(): " << e.what());
+			m_fdreg = NULL; // just to be sure... ;-b
+			// If we can't get notified to read from this Data Source,
+			// we might as well Disconnect and try again later...
+			// Leave m_pvConnected in its current state, latch failures
+			connectionFailed(false, false, IDLE);
+			return;
+		} catch (...) {
+			ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Unknown Exception in connectComplete()"
+				<< " Creating ReadyAdapter for " << m_name
+				<< " fdReady()");
+			m_fdreg = NULL; // just to be sure... ;-b
+			// If we can't get notified to read from this Data Source,
+			// we might as well Disconnect and try again later...
+			// Leave m_pvConnected in its current state, latch failures
+			connectionFailed(false, false, IDLE);
+			return;
+		}
 
 		m_timer->cancel();
 
@@ -1585,6 +1649,16 @@ void DataSource::dataReady(void)
 			ssMRC << " (" << val << ")";
 			INFO(ssMRC.str());
 		}
+	}
+
+	// Check File Descriptor...
+	if (m_fd < 0) {
+		ERROR( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "dataReady(): Invalid File Descriptor for "
+			<< m_name << " m_fd=" << m_fd);
+		m_pvConnected->failed();
+		connectionFailed(true, true, IDLE);
+		return;
 	}
 
 	try {
@@ -2163,12 +2237,12 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME_COARSE, &now);
 
-	// Event Count Per Second
-	if ( m_last_second_time.tv_sec != now.tv_sec ) {
+	// Event Count Per Second (Updated Every 3 Seconds)
+	if ( m_last_second_time.tv_sec + 3 < now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
-		// (*Don't* Log Bandwidth Per Second, Generally... ;-)
+		// (*Don't* Log Bandwidth Per Second Here, Do With RTDL... ;-)
 		updateBandwidthSecond( now, false );
-		// Reset Last Second
+		// Reset "Last Second"...
 		m_last_second_time = now;
 	}
 	m_event_count_second += event_count;
@@ -2183,7 +2257,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	if ( m_last_minute != min ) {
 		// Update Bandwidth Count Per Minute PVs...
 		updateBandwidthMinute( now, true );
-		// Reset Last Minute
+		// Reset "Last Minute"...
 		m_last_minute = min;
 	}
 	m_event_count_minute += event_count;
@@ -2198,7 +2272,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	if ( m_last_tenmin != tenmin ) {
 		// Update Bandwidth Count Per Ten Minutes PVs...
 		updateBandwidthTenMin( now, true );
-		// Reset Last Ten Minutes
+		// Reset "Last Ten Minutes"...
 		m_last_tenmin = tenmin;
 	}
 	m_event_count_tenmin += event_count;
@@ -2397,12 +2471,14 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// RTDL Count Per "Read"...
 	m_rtdl_pkt_counts++;
 
-	// Pulse Count Per Second
-	if ( m_last_second_time.tv_sec != now.tv_sec ) {
+	// Pulse Count Per Second (Updated Every 3 Seconds)
+	static uint32_t log_secs_cnt = 0;
+	if ( m_last_second_time.tv_sec + 3 < now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
-		// (*Don't* Log Bandwidth Per Second, Generally... ;-)
-		updateBandwidthSecond( now, false );
-		// Reset Last Second
+		// Log Bandwidth Per Second Every 20th Time...
+		// (About Once Per Minute... ;-)
+		updateBandwidthSecond( now, !( ++log_secs_cnt % 20 ) );
+		// Reset "Last Second"...
 		m_last_second_time = now;
 	}
 	m_pulse_count_second++;
@@ -2412,7 +2488,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	if ( m_last_minute != min ) {
 		// Update Bandwidth Count Per Minute PVs...
 		updateBandwidthMinute( now, true );
-		// Reset Last Minute
+		// Reset "Last Minute"...
 		m_last_minute = min;
 	}
 	m_pulse_count_minute++;
@@ -2422,7 +2498,7 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	if ( m_last_tenmin != tenmin ) {
 		// Update Bandwidth Count Per Ten Minutes PVs...
 		updateBandwidthTenMin( now, true );
-		// Reset Last Ten Minutes
+		// Reset "Last Ten Minutes"...
 		m_last_tenmin = tenmin;
 	}
 	m_pulse_count_tenmin++;
@@ -2461,72 +2537,79 @@ void DataSource::resetBandwidthStatistics(void)
 
 void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 {
-	static uint32_t every_three_seconds = 0;
+	// Compute _Actual_ Elapsed Time...! ;-D
+	double elapsed;
+	if ( m_last_second_time.tv_sec > 0 ) {
+		elapsed =
+			( ( ((double) ( now.tv_sec - m_last_second_time.tv_sec ))
+					* NANO_PER_SECOND_D )
+				+ ( now.tv_nsec - m_last_second_time.tv_nsec ) )
+			/ NANO_PER_SECOND_D;
+	}
+	// If "Last Second" Time was Reset,
+	// then "Just Guess" It's Been 3 Seconds... ;-D
+	else {
+		elapsed = 3.0;
+	}
 
 	// Log the Second-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Second for " << m_name << ":"
-			<< " Pulses=" << m_pulse_count_second
-			<< " Events=" << m_event_count_second
-			<< " Meta=" << m_meta_count_second
-			<< " Err=" << m_err_count_second );
+			<< " Pulses="
+				<< (uint32_t)( ((double) m_pulse_count_second) / elapsed )
+			<< " Events="
+				<< (uint32_t)( ((double) m_event_count_second) / elapsed )
+			<< " Meta="
+				<< (uint32_t)( ((double) m_meta_count_second) / elapsed )
+			<< " Err="
+				<< (uint32_t)( ((double) m_err_count_second) / elapsed ) );
 	}
 
-	if ( !( ++every_three_seconds % 3 ) )
-	{
-		// Compute _Actual_ Elapsed Time...! ;-D
-		double elapsed =
-			( ( ((double) ( now.tv_sec - m_last_second_time.tv_sec ))
-					* NANO_PER_SECOND_D )
-				+ ( now.tv_nsec - m_last_second_time.tv_nsec ) )
-			/ NANO_PER_SECOND_D;
+	// Update Bandwidth Count Per Second PVs...
+	m_pvPulseBandwidthSecond->update(
+		(uint32_t)( ((double) m_pulse_count_second) / elapsed ), &now);
+	m_pvEventBandwidthSecond->update(
+		(uint32_t)( ((double) m_event_count_second) / elapsed ), &now);
+	m_pvMetaBandwidthSecond->update(
+		(uint32_t)( ((double) m_meta_count_second) / elapsed ), &now);
+	m_pvErrBandwidthSecond->update(
+		(uint32_t)( ((double) m_err_count_second) / elapsed ), &now);
 
-		// Update Bandwidth Count Per Second PVs...
-		m_pvPulseBandwidthSecond->update(
-			(uint32_t)( ((double) m_pulse_count_second) / elapsed ), &now);
-		m_pvEventBandwidthSecond->update(
-			(uint32_t)( ((double) m_event_count_second) / elapsed ), &now);
-		m_pvMetaBandwidthSecond->update(
-			(uint32_t)( ((double) m_meta_count_second) / elapsed ), &now);
-		m_pvErrBandwidthSecond->update(
-			(uint32_t)( ((double) m_err_count_second) / elapsed ), &now);
+	// Reset Counters for Next Second...
+	m_pulse_count_second = 0;
+	m_event_count_second = 0;
+	m_meta_count_second = 0;
+	m_err_count_second = 0;
 
-		// Reset Counters for Next Second...
-		m_pulse_count_second = 0;
-		m_event_count_second = 0;
-		m_meta_count_second = 0;
-		m_err_count_second = 0;
-
-		// Handle ALL HWSource Bandwidth Statistics/Reset Counters...
-		for ( HWSrcMap::iterator it = m_hwSources.begin();
-				it != m_hwSources.end() ; it++ ) {
-			if ( it->second->m_hwIndex >= 0 ) {
-				if ( do_log && it->second->m_event_count_second > 0 ) {
-					INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-						<< "Bandwidth Per Second for " << m_name << ":"
-						<< " HWSource HwId=" << it->second->hwId()
-						<< " Events="
-						<< it->second->m_event_count_second
-						<< " Meta="
-						<< it->second->m_meta_count_second
-						<< " Err="
-						<< it->second->m_err_count_second );
-				}
-				it->second->m_pvHWSourceEventBandwidthSecond->update(
-					(uint32_t)( ((double) it->second->m_event_count_second)
-						/ elapsed ), &now);
-				it->second->m_pvHWSourceMetaBandwidthSecond->update(
-					(uint32_t)( ((double) it->second->m_meta_count_second)
-						/ elapsed ), &now);
-				it->second->m_pvHWSourceErrBandwidthSecond->update(
-					(uint32_t)( ((double) it->second->m_err_count_second)
-						/ elapsed ), &now);
+	// Handle ALL HWSource Bandwidth Statistics/Reset Counters...
+	for ( HWSrcMap::iterator it = m_hwSources.begin();
+			it != m_hwSources.end() ; it++ ) {
+		if ( it->second->m_hwIndex >= 0 ) {
+			if ( do_log && it->second->m_event_count_second > 0 ) {
+				INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Bandwidth Per Second for " << m_name << ":"
+					<< " HWSource HwId=" << it->second->hwId()
+					<< " Events="
+					<< it->second->m_event_count_second
+					<< " Meta="
+					<< it->second->m_meta_count_second
+					<< " Err="
+					<< it->second->m_err_count_second );
 			}
-			it->second->m_event_count_second = 0;
-			it->second->m_meta_count_second = 0;
-			it->second->m_err_count_second = 0;
+			it->second->m_pvHWSourceEventBandwidthSecond->update(
+				(uint32_t)( ((double) it->second->m_event_count_second)
+					/ elapsed ), &now);
+			it->second->m_pvHWSourceMetaBandwidthSecond->update(
+				(uint32_t)( ((double) it->second->m_meta_count_second)
+					/ elapsed ), &now);
+			it->second->m_pvHWSourceErrBandwidthSecond->update(
+				(uint32_t)( ((double) it->second->m_err_count_second)
+					/ elapsed ), &now);
 		}
+		it->second->m_event_count_second = 0;
+		it->second->m_meta_count_second = 0;
+		it->second->m_err_count_second = 0;
 	}
 }
 

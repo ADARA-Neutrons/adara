@@ -1,10 +1,15 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
+
+#include <sstream>
+#include <string>
+
 #include <unistd.h>
 #include <errno.h>
 #include <sys/sendfile.h>
 #include <stdint.h>
-#include <sstream>
-#include <string>
 
 #include <boost/bind.hpp>
 
@@ -17,10 +22,7 @@
 #include "LiveClient.h"
 #include "StorageManager.h"
 #include "StorageFile.h"
-#include "Logging.h"
 #include "utils.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
 
 RateLimitedLogging::History RLLHistory_LiveClient;
 
@@ -60,9 +62,18 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 	socklen_t saLen = sizeof(sa);
 	int rc;
 
+	// Check Client File Descriptor...
+	if ( m_client_fd < 0 ) {
+		ERROR("Invalid Client File Descriptor in LiveClient()"
+			<< " (m_client_fd=" << m_client_fd << ")");
+		throw std::runtime_error("Invalid Client File Descriptor Passed");
+	}
+
 	if (getpeername(m_client_fd, (struct sockaddr *) &sa, &saLen) < 0) {
 		int e = errno;
-		ERROR("Unable to get peer name: " << strerror(e));
+		ERROR("Unable to get peer name: "
+			<< "(m_client_fd=" << m_client_fd << ") - "
+			<< strerror(e));
 		throw std::runtime_error("Unable to create client");
 	}
 
@@ -100,8 +111,23 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 
 	m_send_paused_data = m_server->getSendPausedData();
 
-	m_read = new ReadyAdapter(m_client_fd, fdrRead,
-				  boost::bind(&LiveClient::readable, this));
+	// File Descriptor Already Checked Above...
+	try {
+		m_read = new ReadyAdapter(m_client_fd, fdrRead,
+			boost::bind(&LiveClient::readable, this));
+	}
+	catch (std::exception &e) {
+		ERROR("Exception in LiveClient() Creating ReadyAdapter Read"
+			<< " client=" << m_clientName << " - " << e.what());
+		m_read = NULL; // just to be sure... ;-b
+		throw;
+	}
+	catch (...) {
+		ERROR("Unknown Exception in LiveClient() Creating ReadyAdapter Read"
+			<< " client=" << m_clientName);
+		m_read = NULL; // just to be sure... ;-b
+		throw;
+	}
 
 	ERROR("client " << m_clientName << " ready to connect"
 		<< " SendPausedData=" << m_send_paused_data);
@@ -114,12 +140,14 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 		ERROR("Exception in LiveClient() Hello Timer/Timeout"
 			<< " client=" << m_clientName << " - " << e.what());
 		delete m_read;
+		m_read = NULL;
 		throw;
 	}
 	catch (...) {
 		ERROR("Unknown Exception in LiveClient() Hello Timer/Timeout"
 			<< " client=" << m_clientName);
 		delete m_read;
+		m_read = NULL;
 		throw;
 	}
 
@@ -142,12 +170,25 @@ LiveClient::~LiveClient()
 	m_mgrConnection.disconnect();
 	m_contConnection.disconnect();
 	m_fileConnection.disconnect();
+
 	delete m_read;
+	m_read = NULL;
+
 	delete m_write;
+	m_write = NULL;
+
 	delete m_timer;
-	close(m_client_fd);
-	if (m_file_fd != -1)
+
+	if (m_client_fd >= 0) {
+		DEBUG("Close m_client_fd=" << m_client_fd);
+		close(m_client_fd);
+		m_client_fd = -1;
+	}
+
+	if (m_file_fd >= 0) {
 		m_files.front().first->put_fd();
+		m_file_fd = -1;
+	}
 }
 
 bool LiveClient::timerExpired(void)
@@ -201,7 +242,7 @@ void LiveClient::writable(void)
 			}
 		}
 
-		if (m_file_fd == -1) {
+		if (m_file_fd < 0) {
 			try {
 				m_file_fd = f->get_fd();
 			} catch (std::runtime_error re) {
@@ -241,6 +282,24 @@ void LiveClient::writable(void)
 			}
 		}
 
+		// Check Client File Descriptor...
+		if ( m_client_fd < 0 ) {
+			ERROR("Invalid Client File Descriptor in writable() for "
+				<< m_clientName << " before sendfile()"
+				<< " (m_client_fd=" << m_client_fd << ")");
+			delete this;
+			return;
+		}
+
+		// Check Data File Descriptor...
+		if ( m_file_fd < 0 ) {
+			ERROR("Invalid Data File Descriptor in writable() for "
+				<< m_clientName << " before sendfile()"
+				<< " (m_file_fd=" << m_file_fd << ")");
+			delete this;
+			return;
+		}
+
 		rc = sendfile(m_client_fd, m_file_fd, &cur_offset, len);
 		if (rc < 0) {
 			if (errno == EAGAIN || errno == EINTR)
@@ -250,11 +309,13 @@ void LiveClient::writable(void)
 			int e = errno;
 			if (errno != EPIPE && errno != ECONNRESET) {
 				ERROR("client " << m_clientName
-				      << ": Fatal error during sendfile: "
-				      << strerror(e));
+					<< ": Fatal error during sendfile: "
+					<< "(m_client_fd=" << m_client_fd << ") - "
+					<< strerror(e));
 			}
 			else {
 				ERROR("client " << m_clientName << " connection broken: "
+					<< "(m_client_fd=" << m_client_fd << ") - "
 					<< strerror(e));
 			}
 
@@ -281,8 +342,10 @@ void LiveClient::writable(void)
 		/* We finished this file, and there will be no more data
 		 * coming for it; close it out and go to the next one.
 		 */
-		m_file_fd = -1;
-		f->put_fd();
+		if (m_file_fd >= 0) {
+			f->put_fd();
+			m_file_fd = -1;
+		}
 		it = m_files.erase(it);
 	}
 
@@ -301,9 +364,35 @@ more:
 	/* We have more data to write, so make sure we get notified when
 	 * there is room in the socket buffer.
 	 */
-	if (!m_write)
-		m_write = new ReadyAdapter(m_client_fd, fdrWrite,
+	if (!m_write) {
+
+		// Check Client File Descriptor...
+		if ( m_client_fd < 0 ) {
+			ERROR("Invalid Client File Descriptor in writable() for "
+				<< m_clientName << " (m_client_fd=" << m_client_fd << ")");
+			delete this;
+			return;
+		}
+
+		try {
+			m_write = new ReadyAdapter(m_client_fd, fdrWrite,
 				boost::bind(&LiveClient::writable, this));
+		} catch (std::exception &e) {
+			ERROR("Exception in writable()"
+				<< " Creating ReadyAdapter Write for "
+				<< m_clientName << ": " << e.what());
+			m_write = NULL; // just to be sure... ;-b
+			delete this;
+			return;
+		} catch (...) {
+			ERROR("Unknown Exception in writable()"
+				<< " Creating ReadyAdapter Write for "
+				<< m_clientName);
+			m_write = NULL; // just to be sure... ;-b
+			delete this;
+			return;
+		}
+	}
 	// DEBUG("writable() more exit");
 }
 
@@ -356,6 +445,14 @@ void LiveClient::readable(void)
 
 	std::string log_info;
 
+	// Check Client File Descriptor...
+	if ( m_client_fd < 0 ) {
+		ERROR("Invalid Client File Descriptor in readable() for "
+			<< m_clientName << " (m_client_fd=" << m_client_fd << ")");
+		delete this;
+		return;
+	}
+
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
 		if (!read(m_client_fd, log_info, 4000, MAX_PKT_SIZE)) {
@@ -365,8 +462,10 @@ void LiveClient::readable(void)
 			 * member variables after calling the handlers.
 			 */
 			ERROR("client " << m_clientName
+				<< "(m_client_fd=" << m_client_fd << ") "
 				<< " error reading stream log_info=(" << log_info << ")");
 			delete this;
+			return;
 		}
 	} catch (std::runtime_error e) {
 		/* Rate-limited logging of LiveClient read exception? */
@@ -386,6 +485,7 @@ void LiveClient::readable(void)
 			}
 		}
 		delete this;
+		return;
 	}
 
 	// DEBUG("readable() exit");
@@ -492,8 +592,46 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 
 	/* And try to send the data we've queued up.
 	 */
-	m_write = new ReadyAdapter(m_client_fd, fdrWrite,
-				boost::bind(&LiveClient::writable, this));
+
+	// Note: If Anything Goes Wrong Here, Just Let it Go...
+	// The LiveClient connection will Time Out and Clean Itself Up. ;-D
+
+	// Check Client File Descriptor...
+	if ( m_client_fd < 0 ) {
+		ERROR("Invalid Client File Descriptor"
+			<< " in rxPacket(ClientHelloPkt) for " << m_clientName
+			<< " (m_client_fd=" << m_client_fd << ")");
+		return false;
+	}
+
+	try {
+		m_write = new ReadyAdapter(m_client_fd, fdrWrite,
+			boost::bind(&LiveClient::writable, this));
+	} catch (std::exception &e) {
+		ERROR("Exception in rxPacket(ClientHelloPkt)"
+			<< " Creating ReadyAdapter Write for "
+			<< m_clientName << ": " << e.what());
+		m_write = NULL; // just to be sure... ;-b
+		// Close Our Client Socket to Allow Graceful Cleanup...
+		if ( m_client_fd >= 0 ) {
+			DEBUG("Close m_client_fd=" << m_client_fd);
+			close(m_client_fd);
+			m_client_fd = -1;
+		}
+		return false;
+	} catch (...) {
+		ERROR("Unknown Exception in rxPacket(ClientHelloPkt)"
+			<< " Creating ReadyAdapter Write for "
+			<< m_clientName);
+		m_write = NULL; // just to be sure... ;-b
+		// Close Our Client Socket to Allow Graceful Cleanup...
+		if ( m_client_fd >= 0 ) {
+			DEBUG("Close m_client_fd=" << m_client_fd);
+			close(m_client_fd);
+			m_client_fd = -1;
+		}
+		return false;
+	}
 
 	return false;
 }

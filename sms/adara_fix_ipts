@@ -8,6 +8,44 @@
 # (Because it can happen that often... ;-)
 #
 
+#
+# "Fix IPTS" Test Commands:
+#
+# ./sms/adara_fix_ipts --inst=PG3 --sts_host=localhost --sts_port=31420 \
+#    --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --archive_path=/TESTING --run=38524-38527 --ipts=IPTS-2767
+#
+# ./sms/adara_fix_ipts --inst=VULCAN --sts_host=localhost \
+#    --sts_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --archive_path=/TESTING --run=156458 --ipts=IPTS-18677
+#
+# ./sms/adara_fix_ipts --inst=EQSANS --sts_host=localhost \
+#    --sts_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --archive_path=/TESTING --run=98446-98448 --ipts=IPTS-21608
+#
+# With "Fix IPTS" Test Data in:
+#
+#    /SNS/users/y8y/20170830/20170830-013325.796536119-run-38523/
+#    /SNS/users/y8y/20170830/20170830-034457.473266516-run-38524/
+#    /SNS/users/y8y/20170830/20170830-055215.443177248-run-38525/
+#    /SNS/users/y8y/20170830/20170830-075802.792935897-run-38526/
+#    /SNS/users/y8y/20170830/20170830-085315.302591461-run-38527/
+#    /SNS/users/y8y/20170830/20170830-094851.304674233-run-38528/
+#    (/SNS/users/y8y/20170830/cleanup)
+#
+#    /SNS/users/y8y/20170925/20170925-223300.550696919-run-156458/
+#    (/SNS/users/y8y/20170925/cleanup)
+#
+#    /SNS/users/y8y/20180920/20180920-133950.705888442-run-98446/
+#    /SNS/users/y8y/20180920/20180920-154457.198797185-run-98447/
+#    /SNS/users/y8y/20180920/20180920-154729.955497035-run-98448/
+#    (/SNS/users/y8y/20180920/cleanup)
+#
+
+#
+# Defaults:
+#
+
 PROD_BASE_URL="https://snsapp1.sns.ornl.gov/xprod_ro/proposal_production"
 
 GET_PROPOSAL_BY_ID="express/getIPTSByPrpsl"
@@ -62,29 +100,35 @@ LS="/bin/ls"
 #
 umask 0000
 
+ERROR_ONLY_PROMPTING=0
+
 USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
-	echo "         [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
-	echo "         [--sts1|--sts2|--sts_host=<STS_HOST>] \\"
-	echo "         [--sts|--sts_test|--sts_dummy] \\"
-	echo "         [--sts_port=<STSPort>] \\"
-	echo "         [--adara_parser=<${ADARA_PARSER}>] \\"
-	echo "         [--sms_config=<${SMS_CONFIG}>] \\"
-	echo "         [--sms_data=<${SMS_DATA}>] \\"
-	echo "         [--first_data_file|--last_data_file] \\"
-	echo "         [--send-paused-data] [--no-send-paused-data] \\"
-	echo "         [--archive_path=<${ARCHIVE_PATH}>] \\"
-	echo "         [--run=<RunNumber1>] \\"
-	echo "         [--run=<RunNumber2,RunNumber3,...>] \\"
-	echo "         [--run=<RunNumber4-RunNumber5>] \\"
-	echo "         [--ipts=<IPTS-nnnnn>] [--help]"
+	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
+	echo "    [--sts1|--sts2|--sts_host=<STS_HOST>] \\"
+	echo "    [--sts|--sts_test|--sts_dummy|--sts_hfir|--sts_hfir_test] \\"
+	echo "    [--sts_port=<STSPort>] \\"
+	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
+	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
+	echo "    [--sms_data=<${SMS_DATA}>] \\"
+	echo "    [--first_data_file|--last_data_file] \\"
+	echo "    [--send-paused-data] [--no-send-paused-data] \\"
+	echo "    [--archive_path=<${ARCHIVE_PATH}>] \\"
+	echo "    [--run=<RunNumber1>] \\"
+	echo "    [--run=<RunNumber2,RunNumber3,...>] \\"
+	echo "    [--run=<RunNumber4-RunNumber5>] \\"
+	echo "    [--ipts=<IPTS-nnnnn>] [--help]"
+	echo
+	echo "Note: Turn Error-Only Prompting: On (\"YES\") or Off (\"NO\")."
 	echo
 }
 
 PARSE_RUN_NUMBERS()
 {
 	local _runlist="$1"
+
+	echo -e "\nParsing Run Numbers: [${_runlist}]"
 
 	# Strip Off Any Comma Separators...
 	_runlist=`echo "${_runlist}" | ${SED} 's/,/ /g'`
@@ -144,8 +188,17 @@ CHECK_PROCEED()
 
 	local _proceed_ck=""
 
-	echo -e -n "\n${_proceed_query} (yes/No)? "
+	echo -e -n "\n${_proceed_query} (yes/No)[YES/NO]? "
 	read _proceed_ck
+
+	# Activate/Deactivate "Error-Only Prompting"...
+	if [[ "${_proceed_ck}" == "YES" ]]; then
+		ERROR_ONLY_PROMPTING=1
+		echo -e "\n[Error-Only Prompting ACTIVATED!]"
+	elif [[ "${_proceed_ck}" == "NO" ]]; then
+		ERROR_ONLY_PROMPTING=0
+		echo -e "\n[Error-Only Prompting Deactivated.]"
+	fi
 
 	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
 
@@ -213,6 +266,12 @@ for arg in "$@" ; do
 		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
 	elif [[ "#$key#" == '#--sts_dummy#' ]]; then
 		STS_SERVICE="sts_dummy"
+		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
+	elif [[ "#$key#" == '#--sts_hfir#' ]]; then
+		STS_SERVICE="sts_hfir"
+		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
+	elif [[ "#$key#" == '#--sts_hfir_test#' ]]; then
+		STS_SERVICE="sts_hfir_test"
 		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
 	elif [[ "#$key#" == '#--sts_port#' ]]; then
 		STS_PORT="$value"
@@ -322,7 +381,9 @@ fi
 #
 
 echo -e "\n*** Updating IPTS for Run Numbers:\n\n\t[${RUN_NUMBERS}]\n"
-echo "to New Proposal [${IPTS_NEW}]."
+echo "to New Proposal [${IPTS_NEW}],"
+
+echo -e "\nby Editing ${SMS_WHICH_DATA_FILE} Data File,"
 
 echo -e -n "\nUsing STS \"${STS_SERVICE}\" Service "
 echo "on \"${STS_HOST}:${STS_PORT}\"."
@@ -384,21 +445,34 @@ INSTALL_AND_CHECK_DATAFILE()
 
 	# Make Sure File Still ADARA-Parses...!
 
+	lesscmd=""
+
 	echo -e "\nNow Verify Still a Valid Stream File with ADARA Parser..."
 	echo -e "\n\t-> Search for New ${_meta_name} Value(s):"
 	echo -e "\t\t\"${_new_value}\""
 	echo -e -n "\n\t-> Verify File Parses to End!"
 	if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
 		echo -n " [_Not_ End of Run]"
+		lesscmd="/${_xml_tag}"
 	else
 		echo -n " [End of Run]"
+		lesscmd="G?${_xml_tag}"
 	fi
 	echo
 
-	CHECK_PROCEED
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
 
-	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
-		| ${Less} "+/${_xml_tag}"
+		CHECK_PROCEED
+
+		${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
+			| ${Less} "+${lesscmd}"
+
+	else
+
+		${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
+			| ${TAIL} -12
+
+	fi
 
 	#
 	# Copy Original Data File to Backup Copy Before Proceeding...
@@ -439,7 +513,9 @@ INSTALL_AND_CHECK_DATAFILE()
 	echo -e "\t[${_datafile}.NEW-$$]"
 	echo -e "\t-> [${_datafile}]"
 
-	CHECK_PROCEED
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED
+	fi
 
 	echo -e -n "\nMoving Substituted Data File into Place of "
 	echo "${SMS_WHICH_DATA_FILE} Original Stream File:"
@@ -536,7 +612,9 @@ RESUBMIT_RUN()
 	echo -e -n "\nUsing STS \"${STS_SERVICE}\" Service "
 	echo "on \"${STS_HOST}:${STS_PORT}\"."
 
-	CHECK_PROCEED
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED
+	fi
 
 	${ADARA_CAT} ${SEND_PAUSED_DATA} --run="${run}" --dir="${rundir}" \
 		| ${NC} ${STS_HOST} ${STS_PORT}
@@ -613,9 +691,14 @@ RESUBMIT_RUN()
 	#
 
 	# Prompt User for NeXus Diff Comparison...
-	CHECK_PROCEED \
-		"Do You Want To Verify the Differences in the NeXus Files"
-	local _ckdonxdiff=$?
+	local _ckdonxdiff
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED \
+			"Do You Want To Verify the Differences in the NeXus Files"
+		_ckdonxdiff=$?
+	else
+		_ckdonxdiff=1	# Default to *Not* Calling NxDiff...
+	fi
 
 	if [[ ${_ckdonxdiff} == 0 ]]; then
 
@@ -645,9 +728,14 @@ RESUBMIT_RUN()
 	#
 
 	# Prompt User for FindNeXus Catalog Check...
-	CHECK_PROCEED \
-		"Do You Want To Use FindNeXus to Verify the Proposal Move"
-	local _cknotify=$?
+	local _cknotify
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED \
+			"Do You Want To Use FindNeXus to Verify the Proposal Move"
+		_cknotify=$?
+	else
+		_cknotify=1		# Default to *Not* Calling FindNeXus...
+	fi
 
 	if [[ ${_cknotify} == 0 ]]; then
 
@@ -674,8 +762,14 @@ RESUBMIT_RUN()
 	#
 
 	# Prompt User for Email Notification to Catalog Admins...
-	CHECK_PROCEED "Do You Want To Notify the Catalog Admins of the Change"
-	local _cknotify=$?
+	local _cknotify
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED \
+			"Do You Want To Notify the Catalog Admins of the Change"
+		_cknotify=$?
+	else
+		_cknotify=0		# Default to *Sending* Email Notification...
+	fi
 
 	if [[ ${_cknotify} == 0 ]]; then
 
@@ -784,7 +878,7 @@ MANUAL_EDIT()
 
 	# Copy Original Data File to New Copy for Editing...
 
-	echo -e -n "\nCopying ${SMS_WHICH_DATA_FILE} ADARA Output Stream File "
+	echo -e "\nCopying ${SMS_WHICH_DATA_FILE} ADARA Output Stream File "
 	echo "for Editing Run ${run}:"
 	echo -e "\t[${_datafile}]"
 	echo -e "\t->[${_datafile}.NEW-$$]"
@@ -810,7 +904,15 @@ MANUAL_EDIT()
 	fi
 
 	# Manually Edit the Data File...
-	${Editor} "+/${_xml_tag}" "${_rundir}/${_datafile}.NEW-$$"
+
+	search=""
+	if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
+		search="+/${_xml_tag}"
+	else
+		search="+?${_xml_tag}"
+	fi
+
+	${Editor} "$search" "${_rundir}/${_datafile}.NEW-$$"
 	ckedit=$?
 
 	if [[ ${ckedit} != 0 ]]; then
@@ -872,6 +974,9 @@ LOOKUP_PROPOSAL_METADATA()
 	local _new_value="$1"
 	shift
 
+	local _old_line_wnum_var="$1"
+	shift
+
 	local _old_value_var="$1"
 	shift
 
@@ -900,14 +1005,20 @@ LOOKUP_PROPOSAL_METADATA()
 	# _Not_ of the form "IPTS-*"... ;-D
 	#
 
-	# Note: Global Reference to "$ipts_old_line"...! ;-D
-	ipts_old_line=`${GREP} --text "<${_xml_tag}>" "${rundir}/${datafile}"`
+	# Limit Search to First/Last RunInfo Section in File...
+	local _old_line_wnum=`${AWK} \
+			"{ if ( NR >= ${runinfo_lines_start} \
+					&& NR <= ${runinfo_lines_end} ) \
+				printf(\"%s:%s\\n\",NR,\\$0) }" \
+			"${rundir}/${datafile}" \
+		| ${GREP} --text "<${_xml_tag}>"`
 	ckoldiptsline=$?
 
 	if [[ ${ckoldiptsline} != 0 ]]; then
 		echo -e -n "\nERROR Extracting Old ${_meta_name} Line "
-		echo -e "from Stream File for Run ${run}!\n"
-		echo -e "\t[${ipts_old_line}]"
+		echo "from Stream File for Run ${run}!"
+		echo -e "\n\t[${_old_line_wnum}]"
+		### TODO: Try the "2nd" or "Next to Last" File...?
 		MANUAL_EDIT "${rundir}" "${datafile}" \
 			"${_xml_tag}" "${_meta_name}" "${_new_value}"
 		if [[ $? != 0 ]]; then
@@ -919,32 +1030,48 @@ LOOKUP_PROPOSAL_METADATA()
 		fi
 	fi
 
-	# Make Sure We Only Got *1* Old Proposal Meta-Data Line...! ;-D
-	ckoneline=`echo "${ipts_old_line}" | ${WC} | ${AWK} '{print $1}'`
+	# See How Many Old Proposal Meta-Data Lines We Got...
+	ckoneline=`echo "${_old_line_wnum}" | ${WC} | ${AWK} '{print $1}'`
 
+	# Make Sure We Only Get *1* Old Proposal Meta-Data Line...! ;-D
 	if [[ "${_allow_multi}" == "NoMulti" ]]; then
+
+		# Oops, Got More Than 1 Meta-Data Line...
 		if [[ ${ckoneline} != 1 ]]; then
-			echo -e -n "\nERROR: Multiple ${_meta_name} Lines Found "
-			echo -e "for Run ${run}!\n"
-			echo -e "${ipts_old_line}"
-			MANUAL_EDIT "${rundir}" "${datafile}" \
-				"${_xml_tag}" "${_meta_name}" "${_new_value}"
-			if [[ $? != 0 ]]; then
-				CHECK_PROCEED
-				echo -e "\nContinuing with Next Run Number..."
-				return 31
+
+			echo -e -n "\nWarning: Multiple ${_meta_name} Lines Found "
+			echo "for Run ${run}!"
+			echo -e "\n${_old_line_wnum}"
+				# Allow Self-Indenting from XML Line(s)
+
+			# Take First Line of the First Data File...
+			if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
+				_old_line_wnum=`echo "${_old_line_wnum}" | ${HEAD} -1`
+				echo -e -n "\nUsing First ${_meta_name} "
+				echo "of the First Data File for Run ${run}:"
+				echo -e "\n${_old_line_wnum}"
+					# Allow Self-Indenting from XML Line(s)
+			# Else Take Last Line of the Last Data File...
 			else
-				return 255   # Pass-Thru Return...!
+				_old_line_wnum=`echo "${_old_line_wnum}" | ${TAIL} -1`
+				echo -e -n "\nUsing Last ${_meta_name} "
+				echo "of the Last Data File for Run ${run}:"
+				echo -e "\n${_old_line_wnum}"
+					# Allow Self-Indenting from XML Line(s)
 			fi
+
 		fi
+
+	# Take 'Em All, We're Ok with Multiple Meta-Data Lines...
 	else
 		echo -e "\nLookup Found ${ckoneline} Results."
 	fi
 
-	echo -e "\nFound Old ${_meta_name} Line(s) for Run ${run}:"
-	echo -e "\n${ipts_old_line}"   # Allow Self-Indenting from XML Line(s)
+	echo -e "\nOld ${_meta_name} Line(s) for Run ${run}:"
+	echo -e "\n${_old_line_wnum}"
+		# Allow Self-Indenting from XML Line(s)
 
-	local _old_value=`echo "${ipts_old_line}" \
+	local _old_value=`echo "${_old_line_wnum}" \
 		| ${AWK} -F "[<>]" '{print $3}'`
 	ckoldipts=$?
 
@@ -964,6 +1091,14 @@ LOOKUP_PROPOSAL_METADATA()
 
 	echo -e "\nFound Old ${_meta_name} for Run ${run}:"
 	echo -e "\n\t["${_old_value}"]"   # Collapse Multi-Line Values
+
+	#
+	# Set/Save Old Line w/Number Global, If Specified...
+	#
+
+	if [[ -n "${_old_line_wnum_var}" ]]; then
+		eval "${_old_line_wnum_var}=\"${_old_line_wnum}\""
+	fi
 
 	#
 	# Set/Save Old Value Global, If Specified...
@@ -1008,7 +1143,7 @@ UPDATE_PROPOSAL_METADATA()
 
 	LOOKUP_PROPOSAL_METADATA \
 		"${_xml_tag}" "${_meta_name}" "${_new_value}" \
-		"update_old_value"
+		"ipts_old_line_wnum" "update_old_value"
 	cklookup=$?
 
 	# Pass-Thru Return...
@@ -1018,6 +1153,62 @@ UPDATE_PROPOSAL_METADATA()
 	elif [[ ${cklookup} != 0 ]]; then
 		return ${cklookup}
 	fi
+
+	#
+	# Set/Save Old Value Global, If Specified...
+	#
+
+	if [[ -n "${_old_value_var}" ]]; then
+		eval "${_old_value_var}=\"${update_old_value}\""
+	fi
+
+	#
+	# Separate Old Meta-Data Line into Line Number and Content...
+	#
+
+	ipts_old_line_num=`echo "${ipts_old_line_wnum}" \
+		| ${AWK} -F ":" '{print $1}'`
+	ckawkoldlinenum=$?
+
+	if [[ ${ckawkoldlinenum} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Line Number from "
+		echo "${_meta_name} Meta-Data Line...!"
+		MANUAL_EDIT "${rundir}" "${datafile}" \
+			"${_xml_tag}" "${_meta_name}" "${_new_value}"
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			return 33
+		else
+			return 0
+		fi
+	fi
+
+	ipts_old_line=`echo "${ipts_old_line_wnum}" \
+		| ${AWK} -F ":" '{print $2}'`
+	ckawkoldline=$?
+
+	if [[ ${ckawkoldline} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Content from "
+		echo "${_meta_name} Meta-Data Line...!"
+		MANUAL_EDIT "${rundir}" "${datafile}" \
+			"${_xml_tag}" "${_meta_name}" "${_new_value}"
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			return 34
+		else
+			return 0
+		fi
+	fi
+
+	echo -e -n "\nExtracted Line Number and Content "
+	echo "from ${_meta_name} Meta-Data Line:"
+	echo -e "\n\t${ipts_old_line_wnum}\n"
+		# Allow Self-Indenting from XML Line(s)
+	echo -e "\t-> Line #${ipts_old_line_num}"
+	echo -e "\t-> [${ipts_old_line}]"
+		# Allow Self-Indenting from XML Line(s)
 
 	#
 	# Compare the *Length* of the Old and New Proposal Meta-Data,
@@ -1064,7 +1255,7 @@ UPDATE_PROPOSAL_METADATA()
 		echo -e "\nResulting New ${_meta_name} is: [${_new_value}]"
 
 	# If New Meta-Data is _Longer_ than Old Meta-Data,
-	# Just Pad with White Space...
+	# Try to Remove Sufficient White Space...
 	elif [[ ${#_new_value} -gt ${#update_old_value} ]]; then
 
 		len_diff=$(( ${#_new_value} - ${#update_old_value} ))
@@ -1076,55 +1267,56 @@ UPDATE_PROPOSAL_METADATA()
 
 		# Try to Remove Sufficient Spaces from Old Proposal Meta-Data Line
 
-		skip_run=0
-
 		for (( i = 0 ; i < ${len_diff} ; ++i )); do
 
-			ckspc=`echo "${ipts_new_line}" | ${GREP} -c " "`
-			if [[ "${ckspc}" != "1" ]]; then
+			# *Only* Steal Spaces from _Before_ This Current Tag!
+			# I.e. Not from Subsequent Data Content, e.g. Proposal Title...
+			ckspc=`echo "${ipts_new_line}" | ${GREP} -c " <${_xml_tag}>"`
+			if [[ "${ckspc}" != "1" ]]; then   # Not 1 Line Found...
 				echo -e -n "\nERROR: Insufficient White Space to Remove "
 				echo "in Old ${_meta_name} Line!"
+				echo -e -n "\n\tNeed ${len_diff} Spaces, "
+				echo "Only Found $i..."
 				MANUAL_EDIT "${rundir}" "${datafile}" \
 					"${_xml_tag}" "${_meta_name}" "${_new_value}"
 				if [[ $? != 0 ]]; then
 					CHECK_PROCEED
 					echo -e "\nContinuing with Next Run Number..."
-					skip_run=1
-					break
+					return 35
 				else
-					continue
+					return 0
 				fi
 			fi
 
-			# Take Any Space We Can Get...! ;-D
-			ipts_new_line=`echo "${ipts_new_line}" | ${SED} 's/ //'`
+			# Take Any Space We Can Get (_Before_ This Tag)...! ;-D
+			ipts_new_line=`echo "${ipts_new_line}" \
+				| ${SED} "s@ <${_xml_tag}>@<${_xml_tag}>@"`
+					# Note: XML Tag Could Contain "/" for Embedded Tag!
 			cksedspc=$?
 
 			if [[ ${cksedspc} != 0 ]]; then
 				echo -e -n "\nERROR Stripping White Space "
 				echo "from Proposal Meta-Data Line...!"
+				echo -e -n "\nOnly Stripped Off $i Spaces, "
+				echo "Leaving ${_meta_name} Line Template as:"
+				echo -e "\n\t[${ipts_new_line}]"
 				MANUAL_EDIT "${rundir}" "${datafile}" \
 					"${_xml_tag}" "${_meta_name}" "${_new_value}"
 				if [[ $? != 0 ]]; then
 					CHECK_PROCEED
 					echo -e "\nContinuing with Next Run Number..."
-					skip_run=1
-					break
+					return 36
 				else
-					continue
+					return 0
 				fi
 			fi
 
 		done
 
-		# Skip This Run, We Had a Failure...
-		if [[ $skip_run == 1 ]]; then
-			return 33
-		fi
-
 		echo -e "\nResulting New/Old ${_meta_name} Line Template is:"
 		echo -e "\t[${ipts_new_line}]"
 
+	# New Meta-Data is _Same_ Length as Old Meta-Data, Yay! ;-D
 	else
 
 		echo -e -n "\nNew ${_meta_name} [${_new_value}] is "
@@ -1149,7 +1341,7 @@ UPDATE_PROPOSAL_METADATA()
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
 			echo -e "\nContinuing with Next Run Number..."
-			return 34
+			return 37
 		else
 			return 0
 		fi
@@ -1157,23 +1349,22 @@ UPDATE_PROPOSAL_METADATA()
 
 	echo -e "\nFinal ${_meta_name} Line Substitution:"
 	echo -e "\told: [${ipts_old_line}]"
+		# Allow Self-Indenting from XML Line(s)
 	echo -e "\tnew: [${ipts_new_line}]"
+		# Allow Self-Indenting from XML Line(s)
 
-	CHECK_PROCEED
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED
+	fi
 
 	#
 	# Append Substitution to List
+	# (Using Specific Line Number from Selected Old Meta-Data Line!)
 	#
 
-	SUBST_EXPRS="$SUBST_EXPRS -e \"s@${ipts_old_line}@${ipts_new_line}@\""
+	subst="${ipts_old_line_num}s@${ipts_old_line}@${ipts_new_line}@"
 
-	#
-	# Set/Save Old Value Global, If Specified...
-	#
-
-	if [[ -n "${_old_value_var}" ]]; then
-		eval "${_old_value_var}=\"${update_old_value}\""
-	fi
+	SUBST_EXPRS="$SUBST_EXPRS -e \"${subst}\""
 
 	#
 	# Done with This Proposal Meta-Data Update.
@@ -1238,8 +1429,8 @@ for run in ${RUN_NUMBERS} ; do
 
 	if [[ ${ckone} != 1 ]]; then
 		echo -e -n "\nERROR: Multiple Output Stream Files Found "
-		echo -e "for Run ${run}!\n"
-		echo -e "${datafile}\n"
+		echo "for Run ${run}!"
+		echo -e "\n${datafile}\n"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."
 		continue
@@ -1248,6 +1439,75 @@ for run in ${RUN_NUMBERS} ; do
 	echo -e -n "\nFound ${SMS_WHICH_DATA_FILE} ADARA Output Stream File "
 	echo "for Run ${run}:"
 	echo -e "\t[${datafile}]"
+
+	#
+	# Capture the Line Number Bounds of First/Last "RunInfo" Section,
+	# for Limiting Range of Subsequent Substitutions...
+	#
+
+	runinfo_lines_wnum=`${GREP} --text -n -e "<runinfo " -e "</runinfo>" \
+		"${rundir}/${datafile}"`
+	ckruninfolines=$?
+
+	if [[ ${ckruninfolines} != 0 ]]; then
+		echo -e -n "\nERROR Extracting RunInfo Section Lines "
+		echo "from Stream File for Run ${run}!"
+		echo -e "\n\t[${runinfo_lines_wnum}]"
+		### TODO: Try the "2nd" or "Next to Last" File...?
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	# Take First Set of RunInfo Lines of the First Data File...
+	if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
+		runinfo_lines_wnum=`echo "${runinfo_lines_wnum}" \
+			| ${HEAD} -2`
+		echo -e -n "\nUsing First Set of RunInfo Lines "
+		echo -e "of the First Data File for Run ${run}:\n"
+		echo "${runinfo_lines_wnum}" | ${SED} 's/runinfo.*/runinfo.../'
+			# Allow Self-Indenting from XML Line(s)
+	# Else Take Last Set of RunInfo Lines of the Last Data File...
+	else
+		runinfo_lines_wnum=`echo "${runinfo_lines_wnum}" \
+			| ${TAIL} -2`
+		echo -e -n "\nUsing Last Set of RunInfo Lines "
+		echo -e "of the Last Data File for Run ${run}:\n"
+		echo "${runinfo_lines_wnum}" | ${SED} 's/runinfo.*/runinfo.../'
+			# Allow Self-Indenting from XML Line(s)
+	fi
+
+	# Extract Starting/Ending Line Number Range...
+
+	runinfo_lines_start=`echo "${runinfo_lines_wnum}" \
+		| ${HEAD} -1 | ${AWK} -F ":" '{print $1}'`
+	ckawkruninfostart=$?
+
+	if [[ ${ckawkruninfostart} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Line Number for "
+		echo -n "${SMS_WHICH_DATA_FILE} "
+		echo "RunInfo Meta-Data Start Line...!"
+		echo -e "\n[${runinfo_lines_wnum}]"
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	runinfo_lines_end=`echo "${runinfo_lines_wnum}" \
+		| ${TAIL} -1 | ${AWK} -F ":" '{print $1}'`
+	ckawkruninfoend=$?
+
+	if [[ ${ckawkruninfoend} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Line Number for "
+		echo -n "${SMS_WHICH_DATA_FILE} "
+		echo "RunInfo Meta-Data End Line...!"
+		echo -e "\n[${runinfo_lines_wnum}]"
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	echo -e -n "\nFound Line Number Range for "
+	echo -n "${SMS_WHICH_DATA_FILE} "
+	echo -n "RunInfo Meta-Data - "
+	echo "Lines ${runinfo_lines_start} to ${runinfo_lines_end}."
 
 	#
 	# Initialize Substitute Expression List
@@ -1372,7 +1632,7 @@ for run in ${RUN_NUMBERS} ; do
 
 			LOOKUP_PROPOSAL_METADATA \
 				"id" "Proposal Users" "${new_user_list}" \
-				"old_user_list" "AllowMulti"
+				"" "old_user_list" "AllowMulti"
 			cklookup=$?
 
 			# Something Happened During Lookup...
@@ -1418,10 +1678,10 @@ for run in ${RUN_NUMBERS} ; do
 							echo "from Both Lists - Ok As Is!"
 
 							new_user_list=`echo "$new_user_list" \
-								| ${SED} -e "s/${new_user}//"`
+								| ${SED} -e "s/[[:space:]]*${new_user}//"`
 
 							old_user_list=`echo "$old_user_list" \
-								| ${SED} -e "s/${old_user}//"`
+								| ${SED} -e "s/[[:space:]]*${old_user}//"`
 
 							found=1
 
@@ -1453,22 +1713,20 @@ for run in ${RUN_NUMBERS} ; do
 
 				for new_user in ${new_user_list} ; do
 
+					# Get Next Unused/Unneeded Old Proposal User...
+					old_user=`echo "${old_user_list}" \
+						| ${AWK} '{print $1}'`
+
 					# Are There Any Old Users Left to Substitute?
-					if [[ -n ${old_user_list} ]]; then
-
-						# Get Next Unused/Unneeded Old Proposal User...
-						old_user=`echo "${old_user_list}" \
-							| ${AWK} '{print $1}'`
-
-						### ERROR CHECK HERE...? ;-Q
+					if [[ -n ${old_user} ]]; then
 
 						# Remove This New User from the List...
 						new_user_list=`echo "$new_user_list" \
-							| ${SED} -e "s/${new_user}//"`
+							| ${SED} -e "s/[[:space:]]*${new_user}//"`
 
 						# Remove This Old User from the List...
 						old_user_list=`echo "$old_user_list" \
-							| ${SED} -e "s/${old_user}//"`
+							| ${SED} -e "s/^[[:space:]]*${old_user}//"`
 
 						echo -e -n "\nSubstituting New User [${new_user}] "
 						echo "for Old User [${old_user}]."
@@ -1483,7 +1741,7 @@ for run in ${RUN_NUMBERS} ; do
 						if [[ ${ckupdate} != 0
 								|| "${USER_OLD}" != "${old_user}" ]]; then
 							echo -e -n "\nWARNING: Unable to Substitute "
-							echo -n "New Proposal User [${new_user}] "
+							echo "New Proposal User [${new_user}]"
 							echo "for Old User [${old_user}]...!"
 							echo -e -n "\n\tUSER_OLD = [${USER_OLD}] "
 							echo "vs. [${old_user}]"
@@ -1493,7 +1751,7 @@ for run in ${RUN_NUMBERS} ; do
 					else
 
 						echo -e -n "\nWARNING: Unable to Substitute "
-						echo -n "New Proposal User [${new_user}] "
+						echo "New Proposal User [${new_user}]"
 						echo "for Any Old Users - List Depleted...!"
 						echo -e "\nGiving Up on Remaining New User List:"
 						echo -e "\n\t[${new_user_list}]"
@@ -1577,7 +1835,7 @@ for run in ${RUN_NUMBERS} ; do
 
 	if [[ ${ckinstall} != 0 ]]; then
 		echo -e -n "\nERROR Installing and Checking "
-		echo -e "Modified Data File for Run ${run}!"
+		echo "Modified Data File for Run ${run}!"
 		echo -e "\nContinuing with Next Run Number..."
 		continue
 	fi

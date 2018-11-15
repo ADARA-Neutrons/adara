@@ -1,3 +1,10 @@
+
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
+
+#include <stdexcept>
+
 #include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -6,8 +13,6 @@
 #include <errno.h>
 #include <time.h>
 
-#include <stdexcept>
-
 #include <boost/filesystem.hpp>
 
 #include "StorageContainer.h"
@@ -15,11 +20,7 @@
 #include "StorageFile.h"
 #include "ADARA.h"
 
-#include "Logging.h"
-
 namespace fs = boost::filesystem;
-
-static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
 
 #define CONTAINER_MODE	(S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP)
 #define MARKER_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)
@@ -80,8 +81,11 @@ void StorageContainer::newFile(void)
 	m_newFile(m_cur_file);
 }
 
-off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
+bool StorageContainer::write(IoVector &iovec, uint32_t len, bool notify,
+		uint32_t *written)
 {
+	static uint32_t retry_count = 0;
+
 	/* We don't immediately close a file when we exceed the size limit
 	 * in order to avoid creating a new file just for the end-of-run
 	 * marker. Instead, we wait for the run to start or the next packet
@@ -95,7 +99,59 @@ off_t StorageContainer::write(IoVector &iovec, uint32_t len, bool notify)
 	if (!m_cur_file)
 		newFile();
 
-	return m_cur_file->write(iovec, len, notify);
+	// On File Write Error, Try to Close the Current Data File
+	// and Open a New One Here, Just in Case This Helps...
+	// Use an Error Counter to prevent File Thrashing...
+
+	bool doRetry;
+	bool writeOk;
+
+	do
+	{
+		writeOk = m_cur_file->write(iovec, len, notify, written);
+
+		// File Write Failed...!
+		if ( !writeOk ) {
+			// Rotate Current File and Retry...
+			if ( retry_count++ < 5 ) {
+				ERROR("Container Write Failed!"
+					<< " Try Rotating File & Retrying Write"
+					<< " m_cur_file="
+						<< ( m_cur_file ? m_cur_file->path() : "(null)" )
+					<< " retry_count=" << retry_count);
+				terminateFile();
+				newFile();
+				doRetry = true;
+			}
+			// Retry Count Exceeded, Fail Hard...!
+			else {
+				ERROR("Container Write Failed!"
+					<< " Retry Count Exceeded, HARD FAIL on Write...!"
+					<< " m_cur_file="
+						<< ( m_cur_file ? m_cur_file->path() : "(null)" )
+					<< " retry_count=" << retry_count);
+				doRetry = false;
+			}
+		}
+
+		// File Write Succeeded. :-D
+		else {
+			// We Were Buggered, But Now We've Recovered... Whew! ;-D
+			if ( retry_count ) {
+				ERROR("Container Recovered - Write Succeeded!"
+					<< " m_cur_file="
+						<< ( m_cur_file ? m_cur_file->path() : "(null)" )
+					<< " Resetting retry_count=" << retry_count << " -> 0");
+				// Reset Retry Count, We Got Through...
+				retry_count = 0;
+			}
+			// Note: No need to reset doRetry=false here.
+			// We will fall thru loop anyway, as writeOk=true... ;-D
+		}
+	}
+	while ( !writeOk && doRetry );
+
+	return( writeOk );
 }
 
 void StorageContainer::terminate(void)
@@ -124,8 +180,8 @@ void StorageContainer::notify(void)
 		m_cur_file->notify();
 }
 
-off_t StorageContainer::save(IoVector &iovec, uint32_t len,
-		uint32_t dataSourceId, bool notify)
+bool StorageContainer::save(IoVector &iovec, uint32_t len,
+		uint32_t dataSourceId, bool notify, uint32_t *written)
 {
 	// Verify the Saved Input Stream File for this Data Source,
 	// Create it as needed...
@@ -180,7 +236,12 @@ off_t StorageContainer::save(IoVector &iovec, uint32_t len,
 		StorageManager::saveCreated( dataSourceId );
 	}
 
-	return m_ds_input_files[dataSourceId]->save(iovec, len);
+	// TODO On Error, Should We Try to Close the Current
+	// Saved Stream File and Open a New One Here...?
+	// (Maybe with a Error Counter to prevent File Thrashing...?)
+	// Nawww... We don't want to pound on a troubled filesystem
+	// just to try and save our input stream data... Just let it go! ;-D
+	return m_ds_input_files[dataSourceId]->save(iovec, len, written);
 }
 
 void StorageContainer::pause(void)
@@ -313,13 +374,18 @@ StorageContainer::SharedPtr StorageContainer::create(
 		throw std::runtime_error("StorageContainer::StorageContainer()"
 					 " base strftime failed");
 
-	if (mkdirat(StorageManager::base_fd(), path, CONTAINER_MODE) &&
-							errno != EEXIST) {
-		int err = errno;
-		std::string msg("StorageContainer::StorageContainer(): "
-				"base mkdirat error: ");
-		msg += strerror(err);
-		throw std::runtime_error(msg);
+	if (mkdirat(StorageManager::base_fd(), path, CONTAINER_MODE)) {
+		// Don't "Pollute" Errno with Redundant Directory Creation...
+		if (errno == EEXIST) {
+			errno = 0;
+		}
+		else {
+			int err = errno;
+			std::string msg("StorageContainer::StorageContainer(): "
+					"base mkdirat error: ");
+			msg += strerror(err);
+			throw std::runtime_error(msg);
+		}
 	}
 
 	if (!strftime(path, sizeof(path), "%Y%m%d/%Y%m%d-%H%M%S", &tm))

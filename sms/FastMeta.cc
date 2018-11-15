@@ -1,26 +1,28 @@
-#include "FastMeta.h"
-#include "MetaDataMgr.h"
-#include "StorageManager.h"
+
 #include "Logging.h"
 
-#include "ADARA.h"
-
-#include <boost/foreach.hpp>
-#include <boost/lexical_cast.hpp>
-#include <boost/tokenizer.hpp>
-#include <boost/algorithm/string/trim.hpp>
-#include <boost/algorithm/string/split.hpp>
-#include <boost/algorithm/string/predicate.hpp>
-#include <boost/algorithm/string/classification.hpp>
+static LoggerPtr logger(Logger::getLogger("FastMeta"));
 
 #include <fstream>
 #include <string>
 #include <sstream>
+
 #include <stdint.h>
 
-using namespace boost::property_tree;
+#include <boost/algorithm/string/classification.hpp>
+#include <boost/algorithm/string/predicate.hpp>
+#include <boost/algorithm/string/split.hpp>
+#include <boost/algorithm/string/trim.hpp>
+#include <boost/lexical_cast.hpp>
+#include <boost/tokenizer.hpp>
+#include <boost/foreach.hpp>
 
-static LoggerPtr logger(Logger::getLogger("FastMeta"));
+#include "ADARA.h"
+#include "FastMeta.h"
+#include "MetaDataMgr.h"
+#include "StorageManager.h"
+
+using namespace boost::property_tree;
 
 void FastMeta::addDevices(const ptree &conf)
 {

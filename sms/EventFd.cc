@@ -1,22 +1,25 @@
 
-#include <boost/function.hpp>
-#include <fdManager.h>
-#include <sys/eventfd.h>
-#include <sstream>
-#include <stdint.h>
-#include <errno.h>
-
-#include <memory>
-#include <stdexcept>
-
-#include "ReadyAdapter.h"
-#include "EventFd.h"
 #include "Logging.h"
 
 static LoggerPtr logger(Logger::getLogger("SMS.EventFd"));
 
+#include <stdexcept>
+#include <sstream>
+#include <memory>
+
+#include <fdManager.h>
+#include <sys/eventfd.h>
+#include <stdint.h>
+#include <errno.h>
+
+#include <boost/lexical_cast.hpp>
+#include <boost/function.hpp>
+
+#include "ReadyAdapter.h"
+#include "EventFd.h"
+
 EventFd::EventFd( bool nonBlocking )
-	: m_nonBlocking(nonBlocking)
+	: m_ready(NULL), m_nonBlocking(nonBlocking)
 {
 	if ( nonBlocking )
 		init( EFD_NONBLOCK );
@@ -25,13 +28,37 @@ EventFd::EventFd( bool nonBlocking )
 }
 
 EventFd::EventFd( callback cb )
+	: m_ready(NULL)
 {
 	m_nonBlocking = true;
 	init( EFD_NONBLOCK );
-	m_ready.reset(new ReadyAdapter( m_fd, fdrRead, cb ));
+	// File Descriptor Created in init() (or std::runtime_error thrown...)
+	try {
+		m_ready = new ReadyAdapter( m_fd, fdrRead, cb );
+	} catch (std::exception &e) {
+		ERROR("EventFd(): Exception Creating ReadyAdapter: " << e.what());
+		m_ready = NULL; // just to be sure... ;-b
+		throw;
+	} catch (...) {
+		ERROR("EventFd(): Unknown Exception Creating ReadyAdapter");
+		m_ready = NULL; // just to be sure... ;-b
+		throw;
+	}
 }
 
-EventFd::~EventFd() { close( m_fd ); }
+EventFd::~EventFd()
+{
+	if (m_ready) {
+		delete m_ready;
+		m_ready = NULL;
+	}
+
+	if (m_fd >= 0) {
+		DEBUG("Close m_fd=" << m_fd);
+		close( m_fd );
+		m_fd = -1;
+	}
+}
 
 void EventFd::init( int flags )
 {
@@ -39,9 +66,14 @@ void EventFd::init( int flags )
 	if ( m_fd < 0 ) {
 		int e = errno;
 		std::string msg("Unable to create eventfd: ");
+		msg += "m_fd=";
+		msg += boost::lexical_cast<std::string>(m_fd);
+		msg += " - ";
 		msg += strerror(e);
+		m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error(msg);
 	}
+	DEBUG("New EventFD m_fd=" << m_fd);
 }
 
 bool EventFd::read( uint64_t & val )
@@ -85,15 +117,30 @@ bool EventFd::do_read( uint64_t & val )
 			//<< " bufptr=0x" << std::hex << (void *) bufptr << std::dec
 			//<< " remaining len=" << len);
 
+		// Check File Descriptor...
+		if ( m_fd < 0 ) {
+			ERROR("do_read(): Invalid File Descriptor (Still Dead)"
+				<< " m_fd=" << m_fd);
+			return( false );
+		}
+
 		// NOTE: This is Standard C Library read()... ;-o
 		rc = ::read( m_fd, bufptr, len );
 
 		if ( rc == (ssize_t) -1 ) {
 			if (errno != EAGAIN && errno != EINTR) {
 				int e = errno;
-				std::string msg("Unable to read eventfd: ");
-				msg += strerror(e);
-				throw std::runtime_error(msg);
+				ERROR("do_read(): Unable to Read eventfd: "
+					<< " m_fd=" << m_fd << " - "
+					<< strerror(e));
+				// *Don't* Throw Exception Here, Just Limp Along
+				// and Wait for Help/Restart... ;-D
+				if ( m_fd >= 0 ) {
+					DEBUG("Close Dead m_fd=" << m_fd);
+					close( m_fd );
+					m_fd = -1;
+				}
+				return( false );
 			} else if ( !m_nonBlocking ) {
 				DEBUG("do_read(): Read Returned rc=" << rc
 					<< " Continuing..." << " (cnt=" << cnt << ")");
@@ -144,14 +191,29 @@ bool EventFd::do_write( uint64_t val ) {
 			//<< " bufptr=0x" << std::hex << (void *) bufptr << std::dec
 			//<< " remaining len=" << len);
 
+		// Check File Descriptor...
+		if ( m_fd < 0 ) {
+			ERROR("do_write(): Invalid File Descriptor (Still Dead)"
+				<< " m_fd=" << m_fd);
+			return( false );
+		}
+
 		rc = write( m_fd, bufptr, len );
 
 		if ( rc == (ssize_t) -1 ) {
 			if (errno != EAGAIN && errno != EINTR) {
 				int e = errno;
-				std::string msg("Unable to write to eventfd: ");
-				msg += strerror(e);
-				throw std::runtime_error(msg);
+				ERROR("do_write(): Unable to Write to eventfd: "
+					<< " m_fd=" << m_fd << " - "
+					<< strerror(e));
+				// *Don't* Throw Exception Here, Just Limp Along
+				// and Wait for Help/Restart... ;-D
+				if ( m_fd >= 0 ) {
+					DEBUG("Close Dead m_fd=" << m_fd);
+					close( m_fd );
+					m_fd = -1;
+				}
+				return( false );
 			} else {
 				DEBUG("do_write(): Write Returned rc=" << rc
 					<< " Continuing..." << " (cnt=" << cnt << ")");

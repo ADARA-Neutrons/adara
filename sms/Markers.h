@@ -75,8 +75,8 @@ private:
 	void addNotesComment(void);
 	void addAnnotationComment(void);
 
-	void dumpRunNotesComment(void);
-	void dumpQueuedComments(void);
+	void dumpRunNotesComment( bool prologue = false );
+	void dumpQueuedComments( bool prologue = false );
 
 	void onPrologue(void);
 

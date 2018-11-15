@@ -1,4 +1,15 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
+
+#include <string>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <algorithm>
+#include <stdexcept>
+
 #include <errno.h>
 #include <stdio.h>
 #include <sys/types.h>
@@ -8,19 +19,11 @@
 #include <ctype.h>
 #include <stdint.h>
 #include <string.h>
-
-#include <string>
-#include <fstream>
-#include <sstream>
-#include <iomanip>
-#include <algorithm>
-#include <stdexcept>
+#include <time.h>
 
 #include <boost/algorithm/string.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
-
-#include <time.h>
 
 #include "ADARA.h"
 #include "StorageManager.h"
@@ -30,14 +33,10 @@
 #include "SMSControlPV.h"
 #include "ADARAUtils.h"
 #include "STSClientMgr.h"
-#include "Logging.h"
+#include "EventFd.h"
 #include "utils.h"
 
 namespace fs = boost::filesystem;
-
-static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
-
-#include "EventFd.h"   // (Uses logger... :-)
 
 class PoolsizePV : public smsStringPV {
 public:
@@ -81,7 +80,8 @@ public:
 			return;
 		}
 
-		DEBUG("Poolsize = " << poolsize << " -> MaxSize = " << maxSize);
+		DEBUG("Poolsize = " << poolsize << " -> MaxSize = " << maxSize
+			<< " (BlockSize=" << m_block_size << ")");
 
 		/* Compute Max Blocks Allowed from Max Size... */
 		uint64_t max_blocks_allowed = maxSize + m_block_size - 1;
@@ -155,7 +155,9 @@ public:
 		maxSize = fsstats.f_blocks * ((uint64_t) percent) / 100;
 		maxSize *= m_block_size;
 
-		DEBUG("Percent = " << percent << " -> MaxSize = " << maxSize);
+		DEBUG("Percent = " << percent << " -> MaxSize = " << maxSize
+			<< " (" << m_baseDir << ")"
+			<< " (BlockSize=" << m_block_size << ")");
 
 		/* Compute Max Blocks Allowed from Max Size... */
 		uint64_t max_blocks_allowed = maxSize + m_block_size - 1;
@@ -333,6 +335,9 @@ boost::shared_ptr<BlockSizePV> StorageManager::m_pvBlockSize;
 
 boost::shared_ptr<RescanRunDirPV> StorageManager::m_pvRescanRunDir;
 
+boost::shared_ptr<smsBooleanPV> StorageManager::m_pvComBusVerbose;
+bool StorageManager::m_combus_verbose;
+
 struct timespec StorageManager::m_scanStart;
 
 std::list<StorageContainer::SharedPtr> StorageManager::m_pendingRuns;
@@ -407,7 +412,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 	}
 
 	m_block_size = (uint64_t) stats.st_blksize;
-	DEBUG("Filesystem Block Size = " << m_block_size);
+	DEBUG("Filesystem (" << m_baseDir << ") Block Size = "
+		<< m_block_size);
 
 	// Max Blocks Allowed - Option Priorities:
 	//    1. if "max_blocks_allowed" is explicitly set go with that, else
@@ -432,7 +438,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 				throw std::runtime_error(msg);
 			}
 			DEBUG("Poolsize = " << m_poolsize
-				<< " -> MaxSize = " << maxSize);
+				<< " -> MaxSize = " << maxSize
+				<< " (BlockSize=" << m_block_size << ")");
 		} else {
 			DEBUG("Poolsize not in config: Use Percent (or default 80%).");
 			/* If the user doesn't specify a size, we'll use a percentage
@@ -447,7 +454,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 				msg += strerror(err);
 				throw std::runtime_error(msg);
 			}
-			DEBUG("Filesystem Total Blocks = " << fsstats.f_blocks);
+			DEBUG("Filesystem (" << m_baseDir << ") Total Blocks = "
+				<< fsstats.f_blocks);
 
 			m_percent = conf.get<int>("storage.percent", 80);
 			maxSize = ((uint64_t) fsstats.f_blocks)
@@ -455,7 +463,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 			maxSize *= m_block_size;
 
 			DEBUG("Percent = " << m_percent
-				<< " -> MaxSize = " << maxSize);
+				<< " -> MaxSize = " << maxSize
+				<< " (BlockSize=" << m_block_size << ")");
 		}
 
 		/* Compute Max Blocks Allowed from Max Size... */
@@ -466,6 +475,9 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 	set_max_blocks_allowed(max_blocks_allowed);
 
 	m_indexPeriod = conf.get<uint32_t>("storage.index_period", 300);
+
+	m_combus_verbose = conf.get<bool>("storage.combus_verbose", true);
+	DEBUG("ComBus Verbose Set to " << m_combus_verbose);
 
 	StorageFile::config(conf);
 }
@@ -508,7 +520,9 @@ bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 			DEBUG("Max Blocks Too Big: requested size="
 				<< (m_max_blocks_allowed * m_block_size)
 				<< " > filesystem size="
-				<< (fsstats.f_blocks * m_block_size));
+				<< (fsstats.f_blocks * m_block_size)
+				<< " (" << m_baseDir << ")"
+				<< " (BlockSize=" << m_block_size << ")");
 			m_max_blocks_allowed = (uint64_t) fsstats.f_blocks;
 			DEBUG("Max Blocks Allowed limited to "
 				<< m_max_blocks_allowed);
@@ -517,7 +531,9 @@ bool StorageManager::set_max_blocks_allowed(uint64_t max_blocks_allowed)
 		else {
 			DEBUG("Max Blocks Allowed verified less than filesystem size"
 				<< " (" << (m_max_blocks_allowed * m_block_size)
-				<< " <= " << (fsstats.f_blocks * m_block_size) << ")");
+				<< " <= " << (fsstats.f_blocks * m_block_size) << ")"
+				<< " (" << m_baseDir << ")"
+				<< " (BlockSize=" << m_block_size << ")");
 			return( false ); // requested value unchanged...
 		}
 	}
@@ -616,9 +632,24 @@ void StorageManager::init(void)
 	 * EPICS fdManager to be instantiated before they can register
 	 * their interest in descriptors.
 	 */
-	m_ioStartEvent = new EventFd();
-	m_ioCompleteEvent = new EventFd(
-		boost::bind( &StorageManager::ioCompleted ) );
+	try {
+		m_ioStartEvent = new EventFd();
+		m_ioCompleteEvent = new EventFd(
+			boost::bind( &StorageManager::ioCompleted ) );
+	}
+	catch ( std::exception &e )
+	{
+		std::string msg("StorageManager::init():");
+		msg += " Error Creating EventFds for Background I/O - ";
+		msg += e.what();
+		throw std::runtime_error(msg);
+	}
+	catch (...)
+	{
+		std::string msg("StorageManager::init():");
+		msg += " Error Creating EventFds for Background I/O";
+		throw std::runtime_error(msg);
+	}
 
 	if (cleanupRunFiles())
 		throw std::runtime_error("Unable to obtain initial run number");
@@ -691,12 +722,16 @@ void StorageManager::lateInit(void)
 	m_pvRescanRunDir = boost::shared_ptr<RescanRunDirPV>(new
 		RescanRunDirPV(prefix + ":RescanRunDir"));
 
+	m_pvComBusVerbose = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":ComBusVerbose"));
+
 	ctrl->addPV(m_pvPoolsize);
 	ctrl->addPV(m_pvPercent);
 	ctrl->addPV(m_pvMaxBlocksAllowed);
 	ctrl->addPV(m_pvMaxBlocksAllowedMultiplier);
 	ctrl->addPV(m_pvBlockSize);
 	ctrl->addPV(m_pvRescanRunDir);
+	ctrl->addPV(m_pvComBusVerbose);
 
 	/* Set the fencepost for the scan; any containers with a
 	 * date after this time have been generated as part of this
@@ -722,11 +757,15 @@ void StorageManager::lateInit(void)
 	/* Initialize Rescan Run Directory PV... */
 	m_pvRescanRunDir->update("", &m_scanStart);
 
+	/* Initialize ComBus Verbosity PV... */
+	m_pvComBusVerbose->update(m_combus_verbose, &m_scanStart);
+
 	/* Restore Any PVs to AutoSaved Config Values... */
 
 	struct timespec ts;
 	std::string value;
 	uint32_t uvalue;
+	bool bvalue;
 
 	if ( StorageManager::getAutoSavePV(
 			m_pvPoolsize->getName(), value, ts ) ) {
@@ -750,6 +789,12 @@ void StorageManager::lateInit(void)
 			m_pvMaxBlocksAllowedMultiplier->getName(), uvalue, ts ) ) {
 		m_max_blocks_allowed_multiplier = uvalue;
 		m_pvMaxBlocksAllowedMultiplier->update(uvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvComBusVerbose->getName(), bvalue, ts ) ) {
+		m_combus_verbose = bvalue;
+		m_pvComBusVerbose->update(bvalue, &ts);
 	}
 
 	/* We need a timestamp for the initial index entry; any timestamp
@@ -1143,7 +1188,11 @@ void StorageManager::pauseRecording(void)
 {
 	m_cur_container->pause();
 
-	if (m_cur_container->runNumber()) {
+	// Update ComBus Verbosity PV...
+	m_combus_verbose = m_pvComBusVerbose->value();
+
+	// (Optionally) Notify ComBus of Run Pause...
+	if (m_cur_container->runNumber() && m_combus_verbose) {
 		m_combus->sendUpdate(
 			m_cur_container->runNumber(), m_cur_container->propId(),
 			std::string("SMS run paused"));
@@ -1154,7 +1203,11 @@ void StorageManager::resumeRecording(void)
 {
 	m_cur_container->resume();
 
-	if (m_cur_container->runNumber()) {
+	// Update ComBus Verbosity PV...
+	m_combus_verbose = m_pvComBusVerbose->value();
+
+	// (Optionally) Notify ComBus of Run Pause...
+	if (m_cur_container->runNumber() && m_combus_verbose) {
 		m_combus->sendUpdate(
 			m_cur_container->runNumber(), m_cur_container->propId(),
 			std::string("SMS run resumed"));
@@ -1280,7 +1333,18 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 * to this location for replay after a snapshot.
 	 */
 	resumeLocation = m_cur_container->file()->size();
-	m_cur_container->write(iovec, len, notify);
+
+	// Write Data Packet to Disk...
+	if ( !m_cur_container->write(iovec, len, notify) ) {
+		// Something Went Wrong Trying to Write This Data to Disk! :-O
+		// We will therefore LOSE THIS EXPERIMENT DATA
+		// as a result of the error, so LOG IT HERE in the hopes
+		// it can be salvaged later...! ;-Q
+		std::stringstream ss;
+		ss << "LOST EXPERIMENT DATA packetType=0x"
+			<< std::hex << hdr->pkt_format << std::dec;
+		logIoVector(ss.str(), iovec);
+	}
 
 	/* Is it time to take a state snapshot? If we took one while writing
 	 * the current packet out -- ie, we started a new file -- then
@@ -1313,7 +1377,8 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 			<< " + blocks=" << blocks
 			<< " = " << (m_blocks_used + blocks)
 			<< " > m_max_blocks_allowed=" << m_max_blocks_allowed
-			<< ": goal=" << goal << ")";
+			<< ": goal=" << goal << ")"
+			<< " (BlockSize=" << m_block_size << ")";
 		requestPurge( goal, ss.str() );
 	}
 
@@ -1346,7 +1411,16 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 		startContainer( paused );
 	}
 
-	m_cur_container->save(iovec, len, dataSourceId, true);
+	// Write Saved Stream Packet to Disk...
+	if ( !m_cur_container->save(iovec, len, dataSourceId, true) ) {
+		// Something Went Wrong Trying to Write This Data to Disk! :-O
+		// We will therefore LOSE This Saved Input Stream Data
+		// as a result of the error, so LOG IT HERE in the hopes
+		// it can be salvaged later...! ;-Q
+		std::stringstream ss;
+		ss << "LOST Saved Input Stream Data dataSourceId=" << dataSourceId;
+		logIoVector(ss.str(), iovec);
+	}
 
 	/* Is it time to initiate a purge of old data?
 	 *
@@ -1367,7 +1441,8 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 			<< " + blocks=" << blocks
 			<< " = " << (m_blocks_used + blocks)
 			<< " > m_max_blocks_allowed=" << m_max_blocks_allowed
-			<< ": goal=" << goal << ")";
+			<< ": goal=" << goal << ")"
+			<< " (BlockSize=" << m_block_size << ")";
 		requestPurge( goal, ss.str() );
 	}
 }
@@ -1383,7 +1458,20 @@ void StorageManager::addPrologue(IoVector &iovec)
 	}
 
 	uint32_t len = validatePacket(iovec);
-	m_prologueFile->write(iovec, len, false);
+
+	// Write Prologue Packet to Disk...
+	if ( !m_prologueFile->write(iovec, len, false) ) {
+		// Something Went Wrong Trying to Write This Prologue Pkt to Disk!
+		// We will therefore LOSE THIS DATA as a result of the error,
+		// so LOG IT HERE in the hopes it can be salvaged later...! ;-Q
+		// Fortunately, We'll get Another Copy of this Prologue Pkt Data
+		// with the _Next_ Data File, so we _May_ Be Ok here...?
+		ADARA::Header *hdr = (ADARA::Header *) iovec[0].iov_base;
+		std::stringstream ss;
+		ss << "LOST Prologue Packet Data packetType=0x"
+			<< std::hex << hdr->pkt_format << std::dec;
+		logIoVector(ss.str(), iovec);
+	}
 }
 
 uint32_t StorageManager::validatePacket(const IoVector &iovec)
@@ -1412,6 +1500,34 @@ void StorageManager::addSavePrologue(IoVector &iovec,
 	 */
 	uint32_t len = validatePacket(iovec);
 	m_cur_container->save(iovec, len, dataSourceId, false);
+}
+
+void StorageManager::logIoVector(std::string label, IoVector &iovec)
+{
+	// Go Through IoVector and Convert Everything to String Format... ;-b
+
+	std::stringstream ss;
+
+	ss << std::hex << std::setfill('0');
+
+	ss << "[0x";
+
+	for (IoVector::iterator iovit = iovec.begin() ;
+			iovit != iovec.end() ; ++iovit)
+	{
+		uint8_t *bytes = (uint8_t *) iovit->iov_base;
+
+		for (uint32_t i=0 ; i < iovit->iov_len ; i++)
+		{
+			ss << std::setw(2) << static_cast<unsigned>(bytes[i]);
+		}
+	}
+
+	ss << "]";
+
+	ss << std::dec;
+
+	ERROR("logIoVector(): " << label << " - " << ss.str());
 }
 
 void StorageManager::scanDaily(const std::string &dir)

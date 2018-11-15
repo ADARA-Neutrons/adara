@@ -1,25 +1,40 @@
-#include "EPICS.h"
-#include "ReadyAdapter.h"
-#include "SignalEvents.h"
 
-#include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.SignalEvents"));
 
 #include <unistd.h>
 #include <errno.h>
 
-// #include "Logging.h"
+#include <boost/lexical_cast.hpp>
+#include <boost/bind.hpp>
 
-// static LoggerPtr logger(Logger::getLogger("SMS.SignalEvents"));
+#include "EPICS.h"
+#include "ReadyAdapter.h"
+#include "SignalEvents.h"
 
-ReadyAdapter *SignalEvents::m_read;
-int SignalEvents::m_fd = -1;
-sigset_t SignalEvents::m_sig_set;
-std::vector<SignalEvents::cbFunc> SignalEvents::m_sig_map;
+SignalEvents::SignalEvents()
+	: m_read(NULL), m_fd(-1)
+{
+}
+
+SignalEvents::~SignalEvents()
+{
+	if ( m_read ) {
+		delete m_read;
+		m_read = NULL;   // just to be sure... ;-b
+	}
+
+	if ( m_fd >= 0 ) {
+		DEBUG("Close m_fd=" << m_fd);
+		close( m_fd );
+		m_fd = -1;   // just to be sure... ;-b
+	}
+}
 
 void SignalEvents::check_init(void)
 {
-	if (m_fd != -1)
+	if (m_fd >= 0)
 		return;
 
 	m_sig_map.resize(SIGRTMAX+1);
@@ -30,15 +45,48 @@ void SignalEvents::check_init(void)
 		const char *err = strerror(errno);
 		std::string msg("Unable to create signalfd: ");
 		msg += err;
+		ERROR(msg);
+		m_fd = -1;   // just to be sure... ;-b
+		if ( m_read ) {
+			delete m_read;
+			m_read = NULL;   // just to be sure... ;-b
+		}
 		throw std::runtime_error(msg);
+	}
+	DEBUG("New SignalEvent SignalFD m_fd=" << m_fd);
+
+	// Free Any Previous ReadyAdapter...
+	if ( m_read ) {
+		delete m_read;
+		m_read = NULL;   // just to be sure... ;-b
 	}
 
 	try {
 		m_read = new ReadyAdapter(m_fd, fdrRead,
-					  boost::bind(&SignalEvents::signaled));
+			boost::bind(&SignalEvents::signaled, this));
+	} catch (std::exception &e) {
+		std::string msg(
+			"Exception Creating ReadyAdapter in check_init() - ");
+		msg += e.what();
+		ERROR(msg);
+		m_read = NULL;   // just to be sure... ;-b
+		if (m_fd >= 0) {
+			DEBUG("Close m_fd=" << m_fd);
+			close(m_fd);
+			m_fd = -1;   // just to be sure... ;-b
+		}
+		throw std::runtime_error(msg);
 	} catch (...) {
-		close(m_fd);
-		throw;
+		std::string msg(
+			"Unknown Exception Creating ReadyAdapter in check_init()");
+		ERROR(msg);
+		m_read = NULL;   // just to be sure... ;-b
+		if (m_fd >= 0) {
+			DEBUG("Close m_fd=" << m_fd);
+			close(m_fd);
+			m_fd = -1;   // just to be sure... ;-b
+		}
+		throw std::runtime_error(msg);
 	}
 }
 
@@ -47,9 +95,34 @@ void SignalEvents::registerHandler(int sig, cbFunc cb)
 	int rc;
 
 	check_init();
+
+	// Check for Duplicate Signal...
 	if (sigismember(&m_sig_set, sig)) {
 		std::string msg("Registering duplicate signal ");
 		msg += boost::lexical_cast<std::string>(sig);
+		if ( m_read ) {
+			delete m_read;
+			m_read = NULL;   // just to be sure... ;-b
+		}
+		if (m_fd >= 0) {
+			DEBUG("Close m_fd=" << m_fd);
+			close(m_fd);
+			m_fd = -1;   // just to be sure... ;-b
+		}
+		throw std::runtime_error(msg);
+	}
+
+	// Check File Descriptor...
+	if (m_fd < 0) {
+		std::string msg("registerHandler(): Invalid File Descriptor!");
+		msg += " signal=";
+		msg += boost::lexical_cast<std::string>(sig);
+		msg += " m_fd=";
+		msg += boost::lexical_cast<std::string>(m_fd);
+		if ( m_read ) {
+			delete m_read;
+			m_read = NULL;   // just to be sure... ;-b
+		}
 		throw std::runtime_error(msg);
 	}
 
@@ -61,8 +134,20 @@ void SignalEvents::registerHandler(int sig, cbFunc cb)
 		std::string msg("Unable to add signal ");
 		msg += boost::lexical_cast<std::string>(sig);
 		msg += " to signalfd: ";
+		msg += "m_fd=";
+		msg += boost::lexical_cast<std::string>(m_fd);
+		msg += " - ";
 		msg += err;
 		sigdelset(&m_sig_set, sig);
+		if ( m_read ) {
+			delete m_read;
+			m_read = NULL;   // just to be sure... ;-b
+		}
+		if (m_fd >= 0) {
+			DEBUG("Close m_fd=" << m_fd);
+			close(m_fd);
+			m_fd = -1;   // just to be sure... ;-b
+		}
 		throw std::runtime_error(msg);
 	}
 
@@ -78,7 +163,16 @@ void SignalEvents::registerHandler(int sig, cbFunc cb)
 		 * doesn't.
 		 */
 		sigdelset(&m_sig_set, sig);
-		signalfd(m_fd, &m_sig_set, SFD_NONBLOCK | SFD_CLOEXEC);
+		if ( m_read ) {
+			delete m_read;
+			m_read = NULL;   // just to be sure... ;-b
+		}
+		if (m_fd >= 0) {
+			signalfd(m_fd, &m_sig_set, SFD_NONBLOCK | SFD_CLOEXEC);
+			DEBUG("Close m_fd=" << m_fd);
+			close(m_fd);
+			m_fd = -1;   // just to be sure... ;-b
+		}
 		throw std::runtime_error(msg);
 	}
 }
@@ -97,17 +191,48 @@ int SignalEvents::allocateRTsig(cbFunc cb)
 	}
 
 	std::string msg("Unable to allocate RT signal");
+	if ( m_read ) {
+		delete m_read;
+		m_read = NULL;   // just to be sure... ;-b
+	}
+	if (m_fd >= 0) {
+		DEBUG("Close m_fd=" << m_fd);
+		close(m_fd);
+		m_fd = -1;   // just to be sure... ;-b
+	}
 	throw std::runtime_error(msg);
+}
+
+bool SignalEvents::valid(void)
+{
+	return( ( m_fd >= 0 ) && ( m_read ) );
 }
 
 void SignalEvents::signaled(void)
 {
+	// Note: *Don't* Throw Exceptions in signaled()...!
+	// (It will unnecessarily crash the SMS, so just let whatever
+	// communication "time out" and retry...! ;-D)
+
 	// DEBUG("signaled entry");
 
 	struct signalfd_siginfo info;
 	int rc;
 
 	for (;;) {
+
+		// Check File Descriptor...
+		if (m_fd < 0) {
+			ERROR("signaled(): Invalid File Descriptor!"
+				<< " m_fd=" << m_fd
+				<< " Freeing ReadyAdapter and Exiting Loop!");
+			if ( m_read ) {
+				delete m_read;
+				m_read = NULL;   // just to be sure... ;-b
+			}
+			return;
+		}
+
 		// NOTE: This is Standard C Library read()... ;-o
 		rc = read(m_fd, &info, sizeof(info));
 		if (rc <= 0) {
@@ -116,10 +241,20 @@ void SignalEvents::signaled(void)
 
 			rc = errno;
 
-			std::string msg;
-			msg = "Fatal error in SignalEvents::signaled: ";
-			msg += strerror(rc);
-			throw std::runtime_error(msg);
+			ERROR("signaled(): Fatal Read Error"
+				<< " m_fd=" << m_fd
+				<< " - " << strerror(rc)
+				<< ", Freeing ReadyAdapter and Exiting Loop!");
+			if ( m_read ) {
+				delete m_read;
+				m_read = NULL;   // just to be sure... ;-b
+			}
+			if (m_fd >= 0) {
+				DEBUG("Close m_fd=" << m_fd);
+				close(m_fd);
+				m_fd = -1;   // just to be sure... ;-b
+			}
+			return;
 		}
 
 		m_sig_map[info.ssi_signo](info);
@@ -127,3 +262,4 @@ void SignalEvents::signaled(void)
 
 	// DEBUG("signaled exit");
 }
+

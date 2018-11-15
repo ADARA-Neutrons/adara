@@ -1,4 +1,19 @@
 
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.Control"));
+
+#include <string>
+#include <sstream>
+#include <map>
+
+#include <time.h>
+#include <math.h>
+#include <stdint.h>
+
+#include <boost/lexical_cast.hpp>
+#include <boost/make_shared.hpp>
+
 #include "EPICS.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
@@ -15,23 +30,11 @@
 #include "MetaDataMgr.h"
 #include "FastMeta.h"
 #include "Markers.h"
-#include "Logging.h"
 #include "utils.h"
 
 #include "snsTiming.h"
 
-#include <string>
-#include <sstream>
-#include <map>
-#include <time.h>
-#include <math.h>
-#include <boost/lexical_cast.hpp>
-#include <boost/make_shared.hpp>
-#include <stdint.h>
-
 #include <cadef.h>
-
-static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 
 RateLimitedLogging::History RLLHistory_SMSControl;
 
@@ -47,6 +50,8 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_NO_RTDL_FOR_PULSE            8
 #define RLL_CHOPPER_SYNC_ISSUE           9
 #define RLL_CHOPPER_GLITCH_ISSUE        10
+#define RLL_BOGUS_PULSE_ENERGY_ZERO     11
+#define RLL_BOGUS_PULSE_ENERGY_BETA     12
 
 uint32_t SMSControl::m_targetStationNumber;
 
@@ -90,6 +95,12 @@ bool SMSControl::m_neutronEventSortByState;
 
 bool SMSControl::m_ignoreInterleavedSawtooth;
 
+uint32_t SMSControl::m_monitorTOFBits;
+uint32_t SMSControl::m_monitorTOFMask;
+
+uint32_t SMSControl::m_chopperTOFBits;
+uint32_t SMSControl::m_chopperTOFMask;
+
 class PopPulseBufferPV : public smsInt32PV {
 public:
 	PopPulseBufferPV(const std::string &name) :
@@ -131,19 +142,6 @@ public:
 };
 
 SMSControl *SMSControl::m_singleton = NULL;
-
-static uint32_t pulseEnergy(uint32_t ringPeriod)
-{
-	double ring_circumference = 248; // meters
-	double period = ringPeriod * 1e-12; // seconds
-	double v = ring_circumference / period; // m/s
-	double c = 299792458; // m/s
-	double beta = v / c;
-	double E0 = 938.257e6; // rest energy of proton, eV
-
-	/* Return pulse energy in eV */
-	return (E0 / sqrt(1 - (beta * beta))) - E0;
-}
 
 void SMSControl::config(const boost::property_tree::ptree &conf)
 {
@@ -254,6 +252,22 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 		conf.get<bool>("sms.ignore_interleaved_sawtooth", true);
 	INFO("Setting Ignore-Interleaved-Global-SAWTOOTH Flag to "
 		<< ( ( m_ignoreInterleavedSawtooth ) ? "True" : "False" ));
+
+	m_monitorTOFBits = conf.get<uint32_t>("sms.beam_monitor_tof_bits", 21);
+	INFO("Setting Beam Monitor TOF Bits to " << m_monitorTOFBits << ".");
+
+	// Set Beam Monitor TOF Mask Based on Number of Bits...
+	m_monitorTOFMask = ((uint32_t) -1) >> (32 - m_monitorTOFBits);
+	INFO("Setting Beam Monitor TOF Mask to 0x"
+		<< std::hex << m_monitorTOFMask << std::dec << ".");
+
+	m_chopperTOFBits = conf.get<uint32_t>("sms.chopper_tof_bits", 21);
+	INFO("Setting Chopper TOF Bits to " << m_chopperTOFBits << ".");
+
+	// Set Chopper TOF Mask Based on Number of Bits...
+	m_chopperTOFMask = ((uint32_t) -1) >> (32 - m_chopperTOFBits);
+	INFO("Setting Chopper TOF Mask to 0x"
+		<< std::hex << m_chopperTOFMask << std::dec << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -514,6 +528,16 @@ SMSControl::SMSControl() :
 							+ "IgnoreInterleavedGlobalSAWTOOTH",
 						/* AutoSave */ true));
 
+	m_pvMonitorTOFBits = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "BeamMonitorTOFBits", 0, INT32_MAX,
+						/* AutoSave */ true));
+
+	m_pvChopperTOFBits = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "ChopperTOFBits", 0, INT32_MAX,
+						/* AutoSave */ true));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -541,6 +565,8 @@ SMSControl::SMSControl() :
 	addPV(m_pvNeutronEventStateBits);
 	addPV(m_pvNeutronEventSortByState);
 	addPV(m_pvIgnoreInterleavedSawtooth);
+	addPV(m_pvMonitorTOFBits);
+	addPV(m_pvChopperTOFBits);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
 	addPV(m_pvCleanShutdown);
@@ -607,6 +633,12 @@ SMSControl::SMSControl() :
 	// Initialize Ignore Interleaved-Global-SAWTOOTH Flag...
 	m_pvIgnoreInterleavedSawtooth->update(
 		m_ignoreInterleavedSawtooth, &now );
+
+	// Initialize Beam Monitor TOF Bits PV...
+	m_pvMonitorTOFBits->update( m_monitorTOFBits, &now);
+
+	// Initialize Chopper TOF Bits PV...
+	m_pvChopperTOFBits->update( m_chopperTOFBits, &now);
 
 	// Initialize Fast "Last Pulse" Lookup...
 	PulseIdentifier m_lastPid(-1,-1);
@@ -681,6 +713,28 @@ SMSControl::SMSControl() :
 			m_pvIgnoreInterleavedSawtooth->getName(), bvalue, ts ) ) {
 		m_ignoreInterleavedSawtooth = bvalue;
 		m_pvIgnoreInterleavedSawtooth->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvMonitorTOFBits->getName(), uvalue, ts ) ) {
+		m_monitorTOFBits = uvalue;
+		m_pvMonitorTOFBits->update(uvalue, &ts);
+
+		// Set Beam Monitor TOF Mask Based on Number of Bits...
+		m_monitorTOFMask = ((uint32_t) -1) >> (32 - m_monitorTOFBits);
+		INFO("Setting Beam Monitor TOF Mask to 0x"
+			<< std::hex << m_monitorTOFMask << std::dec << ".");
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvChopperTOFBits->getName(), uvalue, ts ) ) {
+		m_chopperTOFBits = uvalue;
+		m_pvChopperTOFBits->update(uvalue, &ts);
+
+		// Set Chopper TOF Mask Based on Number of Bits...
+		m_chopperTOFMask = ((uint32_t) -1) >> (32 - m_chopperTOFBits);
+		INFO("Setting Chopper TOF Mask to 0x"
+			<< std::hex << m_chopperTOFMask << std::dec << ".");
 	}
 
 	// Initialize Next Run Number...
@@ -2046,7 +2100,7 @@ void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
 	}
 
 	uint32_t rising = (pixel & 1) << 31;
-	tof &= ((1U << 21) - 1);
+	tof &= m_monitorTOFMask;
 	tof |= rising;
 
 	mon->second.m_eventTof.push_back(tof);
@@ -2129,7 +2183,7 @@ void SMSControl::addChopperEvent(const ADARA::RawDataPkt &pkt,
 	 * these values; if this is not the case, we will need to handle
 	 * that here.
 	 */
-	tof &= (1U << 21) - 1;
+	tof &= m_chopperTOFMask;
 	tof *= 100;
 	tof <<= 1;
 	if (pixel & 1)
@@ -2200,9 +2254,10 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		pulse->m_charge = pkt.pulseCharge();
 	}
 
-	// Infrequently Check Live Control PV for Neutron Event State Handling
+	// Infrequently Check Live Control PV for Bit/Mask Handling
 	// (Once Per Minute...)
 	if ( !(++cnt % 3600) ) {
+		// Neutron Event State Bits
 		uint32_t tmp = m_pvNeutronEventStateBits->value();
 		if ( tmp != m_neutronEventStateBits ) {
 			ERROR("pulseEvents(): Number of Neutron Event State Bits"
@@ -2222,7 +2277,34 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					<< ".");
 			}
 		}
+		// Neutron Event Sort By State
 		m_neutronEventSortByState = m_pvNeutronEventSortByState->value();
+		// Beam Monitor TOF Bits
+		tmp = m_pvMonitorTOFBits->value();
+		if ( tmp != m_monitorTOFBits ) {
+			ERROR("pulseEvents(): Number of Beam Monitor TOF Bits"
+				<< " has been Changed from " << m_monitorTOFBits
+				<< " to " << tmp);
+			m_monitorTOFBits = tmp;
+
+			// Set Beam Monitor TOF Mask Based on Number of Bits...
+			m_monitorTOFMask = ((uint32_t) -1) >> (32 - m_monitorTOFBits);
+			INFO("Setting Beam Monitor TOF Mask to 0x"
+				<< std::hex << m_monitorTOFMask << std::dec << ".");
+		}
+		// Chopper TOF Bits
+		tmp = m_pvChopperTOFBits->value();
+		if ( tmp != m_chopperTOFBits ) {
+			ERROR("pulseEvents(): Number of Chopper TOF Bits"
+				<< " has been Changed from " << m_chopperTOFBits
+				<< " to " << tmp);
+			m_chopperTOFBits = tmp;
+
+			// Set Chopper TOF Mask Based on Number of Bits...
+			m_chopperTOFMask = ((uint32_t) -1) >> (32 - m_chopperTOFBits);
+			INFO("Setting Chopper TOF Mask to 0x"
+				<< std::hex << m_chopperTOFMask << std::dec << ".");
+		}
 	}
 
 	ADARA::Event translated;
@@ -2740,8 +2822,9 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 		// (This Pulse's PCharge comes from _Next_ Pulse...!)
 		if ( m_doPulsePchgCorrect || m_doPulseVetoCorrect ) {
 			PulseMap::iterator next = it;
-			if (++next != m_pulses.end())
+			if (++next != m_pulses.end()) {
 				correctPChargeVeto(it->second, next->second);
+			}
 			else {
 				/* Rate-limited logging of global sawtooth pulse */
 				std::string log_info;
@@ -2962,6 +3045,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 		}
 
 		// Build Various Packets for Pulse...
+
 		buildMonitorPacket(pulse);
 
 		// Choose Between Polarization State vs. "Normal" Banked Events...
@@ -2973,7 +3057,9 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 		}
 
 		buildChopperPackets(pulse);
+
 		buildFastMetaPackets(pulse);
+
 	} catch (std::runtime_error e) {
 		ERROR( ( m_recording ? "[RECORDING] " : "" )
 			<< "Failed to record pulse: " << e.what());
@@ -3397,6 +3483,63 @@ void SMSControl::buildFastMetaPackets(PulsePtr &pulse)
 
 	for (it = pulse->m_fastMetaEvents.begin(); it != end; ++it)
 		m_fastmeta->sendUpdate(pulse_id, it->pixel, it->tof);
+}
+
+uint32_t SMSControl::pulseEnergy(uint32_t ringPeriod)
+{
+	// Handle Bogus Ring Period...!
+	// (Can't Have Zero Ring Period, Equals Infinite Velocity...! ;-)
+	if ( ringPeriod == 0 ) {
+		// Skip Error Logging if We Don't Expect Any RTDLs Anyway...
+		// (The Ring Period will Always Be Zero, e.g. on HFIR Beamlines!)
+		if ( !m_noRTDLPulses ) {
+			/* Rate-limited logging of bogus ring period zero */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog(
+					RLLHistory_SMSControl,
+					RLL_BOGUS_PULSE_ENERGY_ZERO, "none",
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_recording ? "[RECORDING] " : "" )
+					<< "pulseEnergy(): Bogus Ring Period of Zero"
+					<< " - No RTDL for 1st Pulse After SMS Restart?"
+					<< " Setting Pulse Energy to Zero.");
+			}
+		}
+		// Just Return Zero Pulse Energy...
+		return( 0 );
+	}
+
+	double ring_circumference = 248; // meters
+	double period = ringPeriod * 1e-12; // seconds
+	double v = ring_circumference / period; // m/s
+	double c = 299792458; // m/s
+	double beta = v / c;
+	double E0 = 938.257e6; // rest energy of proton, eV
+
+	// Another Sanity Check, "Beta" Better Be < 1.0... ;-D
+	// (As Far As We Know, Can't Go Faster Than Light...? ;-D)
+	if ( beta >= 1.0 ) {
+		/* Rate-limited logging of bogus ring period zero */
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog(
+				RLLHistory_SMSControl,
+				RLL_BOGUS_PULSE_ENERGY_BETA, "none",
+				2, 10, 100, log_info ) ) {
+			ERROR(log_info
+				<< ( m_recording ? "[RECORDING] " : "" )
+				<< "pulseEnergy(): Bogus Pulse Data"
+				<< " ringPeriod=" << ringPeriod
+				<< " beta=" << beta
+				<< " - No Faster Than Light Ring Traversal!"
+				<< " Setting Pulse Energy to Zero.");
+		}
+		// Just Return Zero Pulse Energy...
+		return( 0 );
+	}
+
+	/* Return pulse energy in eV */
+	return (E0 / sqrt(1 - (beta * beta))) - E0;
 }
 
 void SMSControl::updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,

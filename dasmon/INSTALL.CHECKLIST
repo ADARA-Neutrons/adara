@@ -23,6 +23,11 @@ base directory in the filesystem, then you will need to update this
 source directory location for any configuration files being copied
 from the ADARA Git Repository.
 
+*** Note: to ensure proper file permissions for captured system files,
+please set your shell "umask" as follows before proceeding! ;-D
+
+   umask 0022
+
 # NOTE: If Verifying the State of an Existing Git Config Repository,
 # Please Skip Step 1.a. and Proceed to Step 1.b. :-D
 
@@ -263,21 +268,23 @@ from the ADARA Git Repository.
 
 	./confck
 
+### Skip for Dasmon Machines for Now...!
+### - Nothing Logged is Captured or Forwarded as an Email Notification...
 3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
 
-	ls -l /etc/rsyslog.pipes
+	###ls -l /etc/rsyslog.pipes
 
-	sudo mkdir /etc/rsyslog.pipes
+	###sudo mkdir /etc/rsyslog.pipes
 
-	sudo mknod /etc/rsyslog.pipes/criticalMessages p
+	###sudo mknod /etc/rsyslog.pipes/criticalMessages p
 
-	sudo chgrp snswheel /etc/rsyslog.pipes/criticalMessages
+	###sudo chgrp snswheel /etc/rsyslog.pipes/criticalMessages
 
-	sudo chmod 660 /etc/rsyslog.pipes/criticalMessages
+	###sudo chmod 660 /etc/rsyslog.pipes/criticalMessages
 
-	sudo cp ~/gitsrc/ADARA/rsyslogMailer /usr/local/bin
+	###sudo cp ~/gitsrc/ADARA/rsyslogMailer /usr/local/bin
 
-	sudo vi /etc/crontab
+	###sudo vi /etc/crontab
 
 		# Don't try to send crontab output to "root@ornl.gov" which doesn't exist
 		# MAILTO=root
@@ -286,14 +293,14 @@ from the ADARA Git Repository.
 
 		*/10 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
 
-	./confck
+	###./confck
 
-	cp /etc/crontab dasmond/etc.crontab
+	###cp /etc/crontab dasmond/etc.crontab
 
-	git add dasmond/etc.crontab
-	git commit dasmond/etc.crontab
+	###git add dasmond/etc.crontab
+	###git commit dasmond/etc.crontab
 
-	./confck
+	###./confck
 
 4. Administrator Crontab Setup:
 

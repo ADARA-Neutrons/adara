@@ -13,14 +13,20 @@ tools_adara_parser_CPPFLAGS = $(COMMON_CPPFLAGS) $(AM_CPPFLAGS)
 tools_adara_parser_LDADD = -lboost_program_options
 
 tools_adara_gen_SOURCES = tools/adara-gen.cc
-tools_adara_gen_CPPFLAGS = $(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) $(AM_CPPFLAGS)
-tools_adara_gen_LDFLAGS = $(EPICS_LDFLAGS) $(AM_LDFLAGS)
-tools_adara_gen_LDADD = $(EPICS_LIBS) -lboost_program_options -lpthread
+tools_adara_gen_CPPFLAGS = $(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) \
+		$(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) -DLOGCXX_LOGGING
+tools_adara_gen_LDFLAGS = $(EPICS_LDFLAGS) $(liblog4cxx_LDFLAGS) \
+		$(AM_LDFLAGS)
+tools_adara_gen_LDADD = $(EPICS_LIBS) $(liblog4cxx_LIBS) \
+		-lboost_program_options -lpthread
 
 tools_adara_pvgen_SOURCES = tools/adara-pvgen.cc
-tools_adara_pvgen_CPPFLAGS = $(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) $(AM_CPPFLAGS)
-tools_adara_pvgen_LDFLAGS = $(EPICS_LDFLAGS) $(AM_LDFLAGS)
-tools_adara_pvgen_LDADD = $(EPICS_LIBS) -lboost_program_options -lpthread
+tools_adara_pvgen_CPPFLAGS = $(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) \
+		$(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) -DLOGCXX_LOGGING
+tools_adara_pvgen_LDFLAGS = $(EPICS_LDFLAGS) $(liblog4cxx_LDFLAGS) \
+		$(AM_LDFLAGS)
+tools_adara_pvgen_LDADD = $(EPICS_LIBS) $(liblog4cxx_LIBS) \
+		-lboost_program_options -lpthread
 
 tools_adara_dump_SOURCES = tools/adara-dump.cc $(POSIX_PARSER)
 tools_adara_dump_CPPFLAGS = $(COMMON_CPPFLAGS) $(AM_CPPFLAGS)

@@ -1,9 +1,15 @@
 
-#include <boost/bind.hpp>
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.BeamMonitorConfig"));
+
 #include <sstream>
 #include <string>
+
 #include <stdint.h>
 #include <time.h>
+
+#include <boost/bind.hpp>
 
 #include "ADARA.h"
 #include "EPICS.h"
@@ -11,10 +17,6 @@
 #include "SMSControlPV.h"
 #include "BeamMonitorConfig.h"
 #include "StorageManager.h"
-
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.BeamMonitorConfig"));
 
 class BeamMonitorInfo {
 

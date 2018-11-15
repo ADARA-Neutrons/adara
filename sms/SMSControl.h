@@ -314,6 +314,14 @@ private:
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreInterleavedSawtooth;
 	static bool m_ignoreInterleavedSawtooth;
 
+	boost::shared_ptr<smsUint32PV> m_pvMonitorTOFBits;
+	static uint32_t m_monitorTOFBits;
+	static uint32_t m_monitorTOFMask;
+
+	boost::shared_ptr<smsUint32PV> m_pvChopperTOFBits;
+	static uint32_t m_chopperTOFBits;
+	static uint32_t m_chopperTOFMask;
+
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 
 	boost::shared_ptr<CleanShutdownPV> m_pvCleanShutdown;
@@ -347,6 +355,8 @@ private:
 	void buildMonitorPacket(PulsePtr &pulse);
 	void buildChopperPackets(PulsePtr &pulse);
 	void buildFastMetaPackets(PulsePtr &pulse);
+
+	uint32_t pulseEnergy(uint32_t ringPeriod);
 
 	friend class smsRecordingPV;
 };

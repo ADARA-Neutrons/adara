@@ -65,11 +65,12 @@ public:
 
 	static uint64_t fileSize(const std::string &path);
 
-	off_t write(IoVector &iovec, uint32_t len, bool do_notify = true);
+	bool write(IoVector &iovec, uint32_t len, bool do_notify = true,
+		uint32_t *written = NULL);
 	void terminate(ADARA::RunStatus::Enum status);
 	void notify(void);
 
-	off_t save(IoVector &iovec, uint32_t len);
+	bool save(IoVector &iovec, uint32_t len, uint32_t *written = NULL);
 	void terminateSave(void);
 
 	~StorageFile();

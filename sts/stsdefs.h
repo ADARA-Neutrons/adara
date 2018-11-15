@@ -11,7 +11,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.10.3"
+#define STS_VERSION "1.10.4"
 extern pid_t g_pid;
 
 #define STS_DOUBLE_EPSILON (0.00000000000001)
@@ -1129,7 +1129,14 @@ public:
             {
                 if ( i ) ss << ", ";
                 ss << this->valueToString( this->m_value_buffer[i] );
-                ss << " @ " << this->m_abs_time_buffer[i];
+                ss << " @ ";
+                ss << ( (unsigned long)( (this->m_abs_time_buffer[i])
+                            / NANO_PER_SECOND_LL )
+                        - ADARA::EPICS_EPOCH_OFFSET );
+                ss << "." << std::setfill('0') << std::setw(9)
+                    << ( (unsigned long)( (this->m_abs_time_buffer[i])
+                            % NANO_PER_SECOND_LL ) );
+                ss << " (" << this->m_abs_time_buffer[i] << ")";
             }
             ss << "]";
             ss << " (up to last_pre_pulse_index=";

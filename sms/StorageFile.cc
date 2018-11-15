@@ -1,3 +1,10 @@
+
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.StorageFile"));
+
+#include <string>
+
 #include <stdio.h>
 #include <stdint.h>
 #include <string.h>
@@ -9,18 +16,16 @@
 #include <fcntl.h>
 #include <limits.h>
 
+#include <boost/lexical_cast.hpp>
 #include <boost/filesystem.hpp>
 
 #include "ADARA.h"
 #include "StorageFile.h"
 #include "StorageContainer.h"
 #include "StorageManager.h"
-#include "Logging.h"
 #include "utils.h"
 
 namespace fs = boost::filesystem;
-
-static LoggerPtr logger(Logger::getLogger("SMS.StorageFile"));
 
 struct sync_packet {
 	ADARA::Header	hdr;
@@ -98,8 +103,11 @@ void StorageFile::put_fd(void)
 
 	m_fdRefs--;
 	if (!m_fdRefs) {
-		::close(m_fd);
-		m_fd = -1;
+		if (m_fd >= 0) {
+			DEBUG("Close m_fd=" << m_fd);
+			::close(m_fd);
+			m_fd = -1;
+		}
 	}
 }
 
@@ -149,8 +157,10 @@ void StorageFile::open(int flags)
 		msg += ") error: ";
 		msg += strerror(err);
 		ERROR(msg);
+		m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error("StorageFile::" + msg);
 	}
+	DEBUG("New File Descriptor m_fd=" << m_fd);
 
 	m_fdRefs = 1;
 }
@@ -177,16 +187,41 @@ void StorageFile::addSync(void)
 	sync.offset = m_size;
 
 	for (len = sizeof(sync); len; len -= rc) {
+
+		// Check File Descriptor...
+		if (m_fd < 0) {
+			ERROR("addSync(): Invalid File Descriptor!"
+				<< " m_fd=" << m_fd);
+			// This Will Require Cleanup of Raw Data File... ;-b
+			if (len != sizeof(sync)) {
+				ERROR("addSync(): BUMMER!"
+					<< " Partial Write Before Failure -"
+					<< " wrote " << (sizeof(sync) - len) << " bytes"
+					<< " of " << sizeof(sync) << " total");
+			}
+			break;   // need to update Sync Distance anyway...
+		}
+
 		rc = ::write(m_fd, p, len);
 		if (rc <= 0) {
 			if (errno == EAGAIN || errno == EINTR)
 				continue;
 
+			// *Don't* Throw Exception Here...!
+			// We can live without Sync point in Raw Data files...
+			// Whine Loudly tho. ;-D
 			int err = errno;
-			std::string msg("addSync() write error: ");
-			msg += strerror(err);
-			ERROR(msg);
-			throw std::runtime_error("StorageFile::" + msg);
+			ERROR("addSync() Write Error: "
+				<< "m_fd=" << m_fd << " - "
+				<< strerror(err));
+			// This Will Require Cleanup of Raw Data File... ;-b
+			if (len != sizeof(sync)) {
+				ERROR("addSync(): BUMMER!"
+					<< " Partial Write Before Failure -"
+					<< " wrote " << (sizeof(sync) - len) << " bytes"
+					<< " of " << sizeof(sync) << " total");
+			}
+			break;   // need to update Sync Distance anyway...
 		}
 
 		m_size += rc;
@@ -236,65 +271,138 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 		| ((uint32_t) m_addendum << 24);
 #endif
 
+	// Stuff Run Status Packet into IoVector for Write to Disk...
 	IoVector iovec(1);
 	iovec[0].iov_base = &spkt;
 	iovec[0].iov_len = sizeof(spkt);
-	write(iovec, sizeof(spkt), false);
+
+	// Write Run Status Packet to Disk...
+	if ( !write(iovec, sizeof(spkt), false) ) {
+		// Something Went Wrong Trying to Write This Run Status Pkt to Disk!
+		// We will therefore LOSE THIS DATA as a result of the error,
+		// so LOG IT HERE in the hopes it can be salvaged later...! ;-Q
+		// Fortunately, We'll get Another Copy of this Run Status Pkt
+		// with the _Next_ Data File, so we _May_ Be Ok here...?
+		std::stringstream ss;
+		ss << "LOST Run Status Packet fileNumber=" << m_fileNumber
+			<< " status=" << status;
+		StorageManager::logIoVector(ss.str(), iovec);
+	}
 }
 
-off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
+bool StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify,
+		uint32_t *written)
 {
 	// DEBUG("StorageFile::write() entry len=" << len
 		// << " nvecs=" << iovec.size());
 
-	struct iovec *vec = &iovec.front();
-	int nvecs = iovec.size();
-	int iovcnt;
-	ssize_t rc;
+	struct iovec *vec;
+	int nvecs;
 
-	while (len) {
-		iovcnt = nvecs;
-		if (iovcnt > IOV_MAX)
-			iovcnt = IOV_MAX;
+	uint32_t retry_count = 0;
+	bool partial = false;
+	bool ret;
 
-		rc = writev(m_fd, vec, iovcnt);
-		if (rc <= 0) {
-			if (errno == EAGAIN || errno == EINTR)
-				continue;
+	if ( written )
+		*written = 0;
 
-			int err = errno;
-			std::string msg("write(): writev() error: ");
-			msg += strerror(err);
-			ERROR(msg);
-			throw std::runtime_error("StorageFile::" + msg);
-		}
+	// On Non-Partial Write Errors, We _Retry_ the Write Twice to Be Sure!
+	do
+	{
+		// Reset to Start of the IoVector...
+		vec = &iovec.front();
+		nvecs = iovec.size();
 
-		m_syncDistance += rc;
-		m_size += rc;
+		uint32_t remaining = len;
 
-		if (rc == len)
-			break;
+		ret = true;
 
-		len -= rc;
-		while (rc) {
-			if (vec->iov_len <= (size_t) rc) {
-				rc -= vec->iov_len;
-				vec++;
-				nvecs--;
-			} else {
-				uint8_t *p = (uint8_t *) vec->iov_len;
-				p += rc;
-				vec->iov_base = p;
-				vec->iov_len -= rc;
+		ssize_t rc;
+		int iovcnt;
+
+		while ( remaining ) {
+			iovcnt = nvecs;
+			if ( iovcnt > IOV_MAX )
+				iovcnt = IOV_MAX;
+
+			// Check File Descriptor...
+			if ( m_fd < 0 ) {
+				ERROR("write(): Invalid File Descriptor!"
+					<< " m_fd=" << m_fd
+					<< " retry_count=" << retry_count);
+				// This Will Require Cleanup of Data File... ;-b
+				if ( partial ) {
+					ERROR("write(): BUMMER!"
+						<< " Partial IoVector Write Before Failure -"
+						<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+						<< " of " << iovec.size() << " total"
+						<< " (" << remaining << " bytes remaining");
+				}
+				retry_count = 3; // kick out of retry loop, not recoverable!
+				ret = false;
+				break;	// still need to check file oversize...
+			}
+
+			rc = writev( m_fd, vec, iovcnt );
+			if ( rc <= 0 ) {
+				if ( errno == EAGAIN || errno == EINTR )
+					continue;
+
+				// *Don't* Throw Exception Here...!
+				// Always Try to Forge On...!
+				int err = errno;
+				ERROR("write(): writev() Error:"
+					<< " m_fd=" << m_fd
+					<< " retry_count=" << retry_count << " - "
+					<< strerror(err));
+				// This Will Require Cleanup of the Data File... ;-b
+				if ( partial ) {
+					ERROR("write(): BUMMER!"
+						<< " Partial IoVector Write Before Failure -"
+						<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+						<< " of " << iovec.size() << " total"
+						<< " (" << remaining << " bytes remaining");
+				}
+				ret = false;
+				break;	// still need to check file oversize...
+			}
+
+			// We at least wrote _Part_ of this packet to disk!
+			// (Maybe all of it... :-)
+			partial = true;
+
+			if ( written )
+				*written += rc;
+
+			m_syncDistance += rc;
+			m_size += rc;
+
+			if ( rc == remaining )
 				break;
+
+			remaining -= rc;
+
+			while ( rc ) {
+				if ( vec->iov_len <= (size_t) rc ) {
+					rc -= vec->iov_len;
+					vec++;
+					nvecs--;
+				} else {
+					uint8_t *p = (uint8_t *) vec->iov_base;
+					p += rc;
+					vec->iov_base = p;
+					vec->iov_len -= rc;
+					rc = 0;
+				}
 			}
 		}
 	}
+	while ( ret == false && !partial && ++retry_count < 3 );
 
 	/* We want the final run status to be the last packet in the file,
 	 * so don't add a sync packet if we're no longer active.
 	 */
-	if (m_syncDistance >= m_max_sync_distance && m_active)
+	if ( m_syncDistance >= m_max_sync_distance && m_active )
 		addSync();
 
 	/* We don't check the file size unless we're notifying subscribers --
@@ -303,12 +411,12 @@ off_t StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify)
 	 * to stop recording before more data comes in, and we don't want
 	 * to have a file that's only contents are the "I'm done" indication.
 	 */
-	if (do_notify)
+	if ( do_notify )
 		notify();
 
 	// DEBUG("StorageFile::write() exit");
 
-	return m_size;
+	return( ret );
 }
 
 void StorageFile::notify(void)
@@ -341,60 +449,120 @@ void StorageFile::terminate(ADARA::RunStatus::Enum status)
 	put_fd();
 }
 
-off_t StorageFile::save(IoVector &iovec, uint32_t len)
+bool StorageFile::save(IoVector &iovec, uint32_t len, uint32_t *written)
 {
 	// DEBUG("StorageFile::save() entry len=" << len
 		// << " nvecs=" << iovec.size());
 
-	struct iovec *vec = &iovec.front();
-	int nvecs = iovec.size();
-	int iovcnt;
-	ssize_t rc;
+	struct iovec *vec;
+	int nvecs;
 
-	while (len) {
-		iovcnt = nvecs;
-		if (iovcnt > IOV_MAX)
-			iovcnt = IOV_MAX;
+	uint32_t retry_count = 0;
+	bool partial = false;
+	bool ret;
 
-		rc = writev(m_fd, vec, iovcnt);
-		if (rc <= 0) {
-			if (errno == EAGAIN || errno == EINTR)
-				continue;
+	if ( written )
+		*written = 0;
 
-			int err = errno;
-			std::string msg("save(): writev() error: ");
-			msg += strerror(err);
-			ERROR(msg);
-			throw std::runtime_error("StorageFile::" + msg);
-		}
+	// On Non-Partial Write Errors, We _Retry_ the Write Twice to Be Sure!
+	do
+	{
+		// Reset to Start of the IoVector...
+		vec = &iovec.front();
+		nvecs = iovec.size();
 
-		m_size += rc;
+		uint32_t remaining = len;
 
-		if (rc == len)
-			break;
+		ret = true;
 
-		len -= rc;
-		while (rc) {
-			if (vec->iov_len <= (size_t) rc) {
-				rc -= vec->iov_len;
-				vec++;
-				nvecs--;
-			} else {
-				uint8_t *p = (uint8_t *) vec->iov_len;
-				p += rc;
-				vec->iov_base = p;
-				vec->iov_len -= rc;
+		ssize_t rc;
+		int iovcnt;
+
+		while ( remaining ) {
+			iovcnt = nvecs;
+			if ( iovcnt > IOV_MAX )
+				iovcnt = IOV_MAX;
+
+			// Check File Descriptor...
+			if ( m_fd < 0 ) {
+				ERROR("save(): Invalid File Descriptor!"
+					<< " m_fd=" << m_fd
+					<< " retry_count=" << retry_count);
+				// This Will Require Cleanup of Saved Stream File... ;-b
+				if ( partial ) {
+					ERROR("save(): BUMMER!"
+						<< " Partial IoVector Write Before Failure -"
+						<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+						<< " of " << iovec.size() << " total"
+						<< " (" << remaining << " bytes remaining");
+				}
+				retry_count = 3; // kick out of retry loop, not recoverable!
+				ret = false;
+				break;	// still need to check file oversize...
+			}
+
+			rc = writev( m_fd, vec, iovcnt );
+			if ( rc <= 0 ) {
+				if ( errno == EAGAIN || errno == EINTR )
+					continue;
+
+				// *Don't* Throw Exception Here...!
+				// We can live without the Saved Input Stream files...
+				// Whine Loudly tho. ;-D
+				int err = errno;
+				ERROR("save(): writev() Error:"
+					<< " m_fd=" << m_fd
+					<< " retry_count=" << retry_count << " - "
+					<< strerror(err));
+				// This Will Require Cleanup of Saved Stream File... ;-b
+				if ( partial ) {
+					ERROR("save(): BUMMER!"
+						<< " Partial IoVector Write Before Failure -"
+						<< " wrote " << (iovec.size() - nvecs) << " iovecs"
+						<< " of " << iovec.size() << " total"
+						<< " (" << remaining << " bytes remaining");
+				}
+				ret = false;
+				break;	// still need to check file oversize...
+			}
+
+			// We at least wrote _Part_ of this packet to disk!
+			// (Maybe all of it... :-)
+			partial = true;
+
+			if ( written )
+				*written += rc;
+
+			m_size += rc;
+
+			if ( rc == remaining )
 				break;
+
+			remaining -= rc;
+
+			while ( rc ) {
+				if ( vec->iov_len <= (size_t) rc ) {
+					rc -= vec->iov_len;
+					vec++;
+					nvecs--;
+				} else {
+					uint8_t *p = (uint8_t *) vec->iov_base;
+					p += rc;
+					vec->iov_base = p;
+					vec->iov_len -= rc;
+					rc = 0;
+				}
 			}
 		}
 	}
+	while ( ret == false && !partial && ++retry_count < 3 );
 
-	if (m_size >= m_max_file_size)
+	if ( m_size >= m_max_file_size )
 		m_oversize = true;
 
 	// DEBUG("StorageFile::save() exit");
 
-	return m_size;
+	return( ret );
 }
 
 void StorageFile::terminateSave(void)
@@ -465,8 +633,10 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 		msg += ") mkstemp error: ";
 		msg += strerror(err);
 		ERROR(msg);
+		f->m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error("StorageFile::" + msg);
 	}
+	DEBUG("New State File Descriptor m_fd=" << f->m_fd);
 
 	try {
 		/* We did not increase the string length, but there is no
@@ -643,18 +813,23 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 
 	struct stat statbuf;
 	int err = fstat(f->m_fd, &statbuf);
-	if (err)
-		err = errno;
-	f->put_fd();
-
-	// Don't Throw An Exception Just Trying to Stat Some Old Data File...!
-	// (Whine Loudly Tho... ;-D)
 	if (err) {
+		err = errno;
+		// Whine Loudly... ;-D
 		std::string msg("importFile(");
 		msg += path;
 		msg += ") Stat Error: ";
+		msg += "f->m_fd=";
+		msg += boost::lexical_cast<std::string>(f->m_fd);
+		msg += " - ";
 		msg += strerror(err);
 		ERROR(msg);
+	}
+
+	f->put_fd();
+
+	// Don't Throw An Exception Just Trying to Stat Some Old Data File...!
+	if (err) {
 		return StorageFile::SharedPtr();
 	}
 

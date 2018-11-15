@@ -26,6 +26,7 @@ class PercentPV;
 class MaxBlocksPV;
 class BlockSizePV;
 class RescanRunDirPV;
+class smsBooleanPV;
 
 class StorageManager {
 public:
@@ -85,6 +86,8 @@ public:
 		iovec[0].iov_len = len;
 		addSavePrologue(iovec, dataSourceId);
 	}
+
+	static void logIoVector(std::string label, IoVector &iovec);
 
 	static int base_fd(void) { return m_base_fd; }
 
@@ -194,6 +197,9 @@ private:
 	static boost::shared_ptr<MaxBlocksPV> m_pvMaxBlocksAllowedMultiplier;
 	static boost::shared_ptr<BlockSizePV> m_pvBlockSize;
 	static boost::shared_ptr<RescanRunDirPV> m_pvRescanRunDir;
+
+	static boost::shared_ptr<smsBooleanPV> m_pvComBusVerbose;
+	static bool m_combus_verbose;
 
 	static struct timespec m_scanStart;
 	static uint64_t m_scannedBlocks;

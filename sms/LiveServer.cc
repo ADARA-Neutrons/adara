@@ -1,9 +1,15 @@
+
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <fcntl.h>
 #include <errno.h>
 #include <netdb.h>
 
+#include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
@@ -12,9 +18,6 @@
 #include "SMSControlPV.h"
 #include "LiveServer.h"
 #include "LiveClient.h"
-#include "Logging.h"
-
-static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
 
 class ListenStringPV : public smsStringPV {
 public:
@@ -35,7 +38,7 @@ public:
 		}
 
 		if ( ! m_liveServer->isInit() ) {
-			ERROR("ListenStringPV: " << m_pv_name << " PV value changed"
+			DEBUG("ListenStringPV: " << m_pv_name << " PV value changed"
 				<< " [" << value() << "]"
 				<< " But Live Server Not Yet Initialized - Ignore...");
 			return;
@@ -183,6 +186,7 @@ LiveServer::~LiveServer()
 		m_fdreg = NULL;
 	}
 	if ( m_fd >= 0 ) {
+		DEBUG("Close m_fd=" << m_fd);
 		close( m_fd );
 		m_fd = -1;
 	}
@@ -207,6 +211,7 @@ void LiveServer::setupListener(void)
 	}
 
 	if ( m_fd >= 0 ) {
+		DEBUG("Close m_fd=" << m_fd);
 		close( m_fd );
 		m_fd = -1;
 	}
@@ -266,12 +271,17 @@ void LiveServer::setupListener(void)
 	if (m_fd < 0) {
 		msg = "Unable to create socket: ";
 		msg += strerror(errno);
+		m_fd = -1;   // just to be sure... ;-b
 		goto error;
 	}
+	DEBUG("New Listener Socket m_fd=" << m_fd);
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
 	if (flags < 0 || fcntl(m_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
 		msg = "Unable to set socket non-blocking: ";
+		msg += "m_fd=";
+		msg += boost::lexical_cast<std::string>(m_fd);
+		msg += " - ";
 		msg += strerror(errno);
 		goto error_fd;
 	}
@@ -279,6 +289,9 @@ void LiveServer::setupListener(void)
 	val = 1;
 	if (setsockopt(m_fd, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(int)) < 0) {
 		msg = "Unable to SO_REUSEADDR: ";
+		msg += "m_fd=";
+		msg += boost::lexical_cast<std::string>(m_fd);
+		msg += " - ";
 		msg += strerror(errno);
 		goto error_fd;
 	}
@@ -289,12 +302,18 @@ void LiveServer::setupListener(void)
 		msg += ":";
 		msg += m_service;
 		msg += ": ";
+		msg += "m_fd=";
+		msg += boost::lexical_cast<std::string>(m_fd);
+		msg += " - ";
 		msg += strerror(errno);
 		goto error_fd;
 	}
 
 	if (listen(m_fd, 128)) {
 		msg = "Unable to listen: ";
+		msg += "m_fd=";
+		msg += boost::lexical_cast<std::string>(m_fd);
+		msg += " - ";
 		msg += strerror(errno);
 		goto error_fd;
 	}
@@ -309,11 +328,13 @@ void LiveServer::setupListener(void)
 	}
 	catch (std::exception &e) {
 		ERROR("setupListener(): Exception in Ready Adapter - " << e.what());
-		goto error_fdreg;
+		m_fdreg = NULL; // just to be sure... ;-b
+		goto error_fd;
 	}
 	catch (...) {
 		ERROR("setupListener(): Unknown Exception in Ready Adapter!");
-		goto error_fdreg;
+		m_fdreg = NULL; // just to be sure... ;-b
+		goto error_fd;
 	}
 
 	INFO("setupListener(): Adapter Ready for Connections");
@@ -324,16 +345,10 @@ void LiveServer::setupListener(void)
 
 	return;
 
-error_fdreg:
-
-	if ( m_fdreg ) {
-		delete m_fdreg;
-		m_fdreg = NULL;
-	}
-
 error_fd:
 
 	if ( m_fd >= 0 ) {
+		DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
 	}
@@ -382,6 +397,7 @@ void LiveServer::newConnection(void)
 		if (err == EINTR || err == EAGAIN || err == EWOULDBLOCK
 				|| err == ECONNABORTED) {
 			WARN("newConnection() Not-Really-An-Error"
+				<< " m_fd=" << m_fd
 				<< " (" << strerror(err) << ")");
 			return;
 		}
@@ -390,14 +406,17 @@ void LiveServer::newConnection(void)
 		if (err == ENOBUFS || err == ENOMEM || err == EMFILE
 				|| err == ENFILE) {
 			ERROR("newConnection() No Descriptors/Resources!"
+				<< " m_fd=" << m_fd
 				<< " (" << strerror(err) << ")");
 			return;
 		}
 
 		/* Some Other Accept Error... */
-		ERROR("newConnection() Accept Error: " << strerror(err));
+		ERROR("newConnection() Accept Error: "
+			<< " m_fd=" << m_fd << " (" << strerror(err) << ")");
 		return;
 	}
+	DEBUG("New Accept Socket rc=" << rc);
 
 	try {
 		// TODO may want to put LiveClient on list
@@ -405,12 +424,14 @@ void LiveServer::newConnection(void)
 		new LiveClient( this, rc );
 	}
 	catch (std::exception &e) {
-		ERROR("newConnection(): LiveClient() Exception - " << e.what());
+		ERROR("newConnection(): LiveClient() Exception "
+			<< "(rc=" << rc << ") - " << e.what());
 		close( rc );
 		return;
 	}
 	catch (...) {
-		ERROR("newConnection(): Unknown LiveClient() Exception!");
+		ERROR("newConnection(): Unknown LiveClient() Exception! "
+			<< "(rc=" << rc << ")");
 		close( rc );
 		return;
 	}

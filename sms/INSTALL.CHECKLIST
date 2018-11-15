@@ -23,6 +23,11 @@ base directory in the filesystem, then you will need to update this
 source directory location for any configuration files being copied
 from the ADARA Git Repository.
 
+*** Note: to ensure proper file permissions for captured system files,
+please set your shell "umask" as follows before proceeding! ;-D
+
+   umask 0022
+
 # NOTE: If Verifying the State of an Existing Git Config Repository,
 # Please Skip Step 1.a. and Proceed to Step 1.b. :-D 
 
