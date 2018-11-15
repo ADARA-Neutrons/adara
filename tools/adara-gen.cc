@@ -1,3 +1,12 @@
+
+#include "../sms/Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("ADARA-Gen"));
+
+#include <iostream>
+#include <vector>
+#include <list>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdint.h>
@@ -7,9 +16,6 @@
 #include <netdb.h>
 #include <signal.h>
 
-#include <iostream>
-#include <vector>
-#include <list>
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
