@@ -356,6 +356,8 @@ private:
 	void buildChopperPackets(PulsePtr &pulse);
 	void buildFastMetaPackets(PulsePtr &pulse);
 
+	uint32_t pulseEnergy(uint32_t ringPeriod);
+
 	friend class smsRecordingPV;
 };
 

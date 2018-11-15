@@ -50,6 +50,8 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_NO_RTDL_FOR_PULSE            8
 #define RLL_CHOPPER_SYNC_ISSUE           9
 #define RLL_CHOPPER_GLITCH_ISSUE        10
+#define RLL_BOGUS_PULSE_ENERGY_ZERO     11
+#define RLL_BOGUS_PULSE_ENERGY_BETA     12
 
 uint32_t SMSControl::m_targetStationNumber;
 
@@ -140,41 +142,6 @@ public:
 };
 
 SMSControl *SMSControl::m_singleton = NULL;
-
-static uint32_t pulseEnergy(uint32_t ringPeriod)
-{
-	// Handle Bogus Ring Period...!
-	// (Can't Have Zero Ring Period, Equals Infinite Velocity...! ;-)
-	if ( ringPeriod == 0 ) {
-		ERROR("pulseEnergy(): Bogus Ring Period of Zero"
-			<< " - No RTDL for 1st Pulse After SMS Restart?"
-			<< " Setting Pulse Energy to Zero.");
-		// Just Return Zero Pulse Energy...
-		return( 0 );
-	}
-
-	double ring_circumference = 248; // meters
-	double period = ringPeriod * 1e-12; // seconds
-	double v = ring_circumference / period; // m/s
-	double c = 299792458; // m/s
-	double beta = v / c;
-	double E0 = 938.257e6; // rest energy of proton, eV
-
-	// Another Sanity Check, "Beta" Better Be < 1.0... ;-D
-	// (As Far As We Know, Can't Go Faster Than Light...? ;-D)
-	if ( beta >= 1.0 ) {
-		ERROR("pulseEnergy(): Bogus Pulse Data"
-			<< " ringPeriod=" << ringPeriod
-			<< " beta=" << beta
-			<< " - No Faster Than Light Ring Traversal!"
-			<< " Setting Pulse Energy to Zero.");
-		// Just Return Zero Pulse Energy...
-		return( 0 );
-	}
-
-	/* Return pulse energy in eV */
-	return (E0 / sqrt(1 - (beta * beta))) - E0;
-}
 
 void SMSControl::config(const boost::property_tree::ptree &conf)
 {
@@ -3516,6 +3483,63 @@ void SMSControl::buildFastMetaPackets(PulsePtr &pulse)
 
 	for (it = pulse->m_fastMetaEvents.begin(); it != end; ++it)
 		m_fastmeta->sendUpdate(pulse_id, it->pixel, it->tof);
+}
+
+uint32_t SMSControl::pulseEnergy(uint32_t ringPeriod)
+{
+	// Handle Bogus Ring Period...!
+	// (Can't Have Zero Ring Period, Equals Infinite Velocity...! ;-)
+	if ( ringPeriod == 0 ) {
+		// Skip Error Logging if We Don't Expect Any RTDLs Anyway...
+		// (The Ring Period will Always Be Zero, e.g. on HFIR Beamlines!)
+		if ( !m_noRTDLPulses ) {
+			/* Rate-limited logging of bogus ring period zero */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog(
+					RLLHistory_SMSControl,
+					RLL_BOGUS_PULSE_ENERGY_ZERO, "none",
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_recording ? "[RECORDING] " : "" )
+					<< "pulseEnergy(): Bogus Ring Period of Zero"
+					<< " - No RTDL for 1st Pulse After SMS Restart?"
+					<< " Setting Pulse Energy to Zero.");
+			}
+		}
+		// Just Return Zero Pulse Energy...
+		return( 0 );
+	}
+
+	double ring_circumference = 248; // meters
+	double period = ringPeriod * 1e-12; // seconds
+	double v = ring_circumference / period; // m/s
+	double c = 299792458; // m/s
+	double beta = v / c;
+	double E0 = 938.257e6; // rest energy of proton, eV
+
+	// Another Sanity Check, "Beta" Better Be < 1.0... ;-D
+	// (As Far As We Know, Can't Go Faster Than Light...? ;-D)
+	if ( beta >= 1.0 ) {
+		/* Rate-limited logging of bogus ring period zero */
+		std::string log_info;
+		if ( RateLimitedLogging::checkLog(
+				RLLHistory_SMSControl,
+				RLL_BOGUS_PULSE_ENERGY_BETA, "none",
+				2, 10, 100, log_info ) ) {
+			ERROR(log_info
+				<< ( m_recording ? "[RECORDING] " : "" )
+				<< "pulseEnergy(): Bogus Pulse Data"
+				<< " ringPeriod=" << ringPeriod
+				<< " beta=" << beta
+				<< " - No Faster Than Light Ring Traversal!"
+				<< " Setting Pulse Energy to Zero.");
+		}
+		// Just Return Zero Pulse Energy...
+		return( 0 );
+	}
+
+	/* Return pulse energy in eV */
+	return (E0 / sqrt(1 - (beta * beta))) - E0;
 }
 
 void SMSControl::updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
