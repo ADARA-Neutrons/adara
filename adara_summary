@@ -109,6 +109,7 @@ declare -A nHostSMSDIntermittentRecovered
 declare -A nHostSMSDSetHWSourceIntermittent
 declare -A nHostSMSDFoundHWSourceIntermittent
 declare -A nHostSMSDMissingRingPeriod
+declare -A nHostSMSDBogusRingPeriodZero
 declare -A nHostSMSDSystemUninitialized
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
@@ -265,6 +266,7 @@ PARSE_LOG()
 		nHostSMSDSetHWSourceIntermittent[$host]=0
 		nHostSMSDFoundHWSourceIntermittent[$host]=0
 		nHostSMSDMissingRingPeriod[$host]=0
+		nHostSMSDBogusRingPeriodZero[$host]=0
 		nHostSMSDSystemUninitialized[$host]=0
 		nHostSMSDSystemNOTReady[$host]=0
 		nHostSMSDSystemReady[$host]=0
@@ -633,6 +635,12 @@ PARSE_LOG()
 			#echo "Missing ring period..."
 			nHostSMSDMissingRingPeriod[$host]=$(( \
 				nHostSMSDMissingRingPeriod[$host] + 1 ))
+
+		# "Bogus Ring Period of Zero" Log
+		elif [[ "$log" =~ Bogus${S}Ring${S}Period${S}of${S}Zero ]]; then
+			#echo "Bogus Ring Period of Zero..."
+			nHostSMSDBogusRingPeriodZero[$host]=$(( \
+				nHostSMSDBogusRingPeriodZero[$host] + 1 ))
 
 		# "System Uninitialized" Log
 		elif [[ "$log" =~ System${S}Uninitialized ]]; then
@@ -1505,6 +1513,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDMissingRTDLForProtonCharge[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDMissingRTDLForProtonCharge[$h]} "
 		echo "SMSD \"Missing RTDL for Setting Proton Charge\" Logs"
+	fi
+	if [[ ${nHostSMSDBogusRingPeriodZero[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSMSDBogusRingPeriodZero[$h]} "
+		echo "SMSD \"Bogus Ring Period of Zero\" Logs"
 	fi
 	if [[ ${nHostSMSDNewChopperId[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDNewChopperId[$h]} "
