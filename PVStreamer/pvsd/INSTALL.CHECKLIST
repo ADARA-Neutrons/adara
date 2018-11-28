@@ -276,7 +276,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	crontab -l
 
-5. Add SMS to Local Run Levels
+5. Add PVSD to Local Run Levels
 
 	chkconfig --list pvsd
 
