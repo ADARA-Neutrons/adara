@@ -1024,7 +1024,8 @@ NxGen::dumpProcessingStatistics(void)
         g_pid, "Overall STS Bandwidth", sts_bandwidth );
     usleep(30000); // give syslog a chance...
 
-    double overhead_ratio = run_bandwidth / sts_bandwidth;
+    double overhead_ratio = ( sts_bandwidth > 0.0 ) ?
+        ( run_bandwidth / sts_bandwidth ) : 0.0;
 
     syslog( LOG_INFO, "[%i] %s = %lf",
         g_pid, "STS Overhead Ratio", overhead_ratio );
