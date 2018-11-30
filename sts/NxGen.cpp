@@ -48,6 +48,7 @@ NxGen::NxGen
         a_chunk_size * a_anc_buf_chunk_count, // number of elements
         a_verbose ),
     m_gen_nexus(false),
+    m_nexus_init(false),
     m_nexus_filename(a_nexus_out_file),
     m_config_file(a_config_file),
     m_entry_path(string("/entry")),
@@ -393,7 +394,7 @@ NxGen::initializeNxBank
 
     try
     {
-        if ( m_gen_nexus)
+        if ( m_gen_nexus )
         {
             // Instrument bank group (contains *Both* Event and Histo data)
             makeGroup( a_bi->m_instr_path, "NXdetector" );
@@ -429,7 +430,7 @@ NxGen::initializeNxBank
             //     until later in bankFinalize()... :-)
 
             // NeXus Structures are Now Initialized
-            a_bi->m_nexus_init = true;
+            a_bi->m_nexus_bank_init = true;
         }
     }
     catch ( TraceException &e )
@@ -466,7 +467,7 @@ NxGen::makeMonitorInfo
             a_id, a_buf_reserve, a_idx_buf_reserve,
             a_config, a_known_monitor, *this );
 
-        if ( m_gen_nexus)
+        if ( m_gen_nexus )
         {
             makeGroup( mi->m_path, mi->m_group_type );
 
@@ -512,12 +513,20 @@ NxGen::makeMonitorInfo
 void
 NxGen::initialize()
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
+
+    if ( m_nexus_init )
+    {
+        syslog( LOG_INFO, "[%i] %s: Nexus File Already Initialized: %s",
+            g_pid, "NxGen::initialize()",
+            m_nexus_filename.c_str() );
+        return;
+    }
 
     try
     {
-        syslog( LOG_INFO, "[%i] Creating Nexus file: %s",
+        syslog( LOG_INFO, "[%i] Creating Nexus File: %s",
             g_pid, m_nexus_filename.c_str() );
 
         m_h5nx.H5NXcreate_file( m_nexus_filename );
@@ -593,11 +602,14 @@ NxGen::initialize()
         // Insert initial "not paused" value
         m_pause_time.push_back( 0.0 );
         m_pause_value.push_back( 0 );
+
+        // Set "NeXus Initialized" Flag, We're There! :-D
+        m_nexus_init = true;
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "initialization of nexus file ("
-            << m_nexus_filename << ") failed." )
+        RETHROW_TRACE( e, "Initialization of NeXus File ("
+            << m_nexus_filename << ") Failed." )
     }
 }
 
@@ -613,7 +625,7 @@ NxGen::finalize
     const STS::RunInfo &a_run_info          ///< [in] Run information object
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -971,7 +983,7 @@ NxGen::writeSTSConfigUnitsAttributes(
 void
 NxGen::dumpProcessingStatistics(void)
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     // Overall Run Statistics
@@ -1043,7 +1055,7 @@ NxGen::processBeamlineInfo
     const STS::BeamlineInfo & a_beamline_info   ///< [in] Beamline information object
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1099,7 +1111,7 @@ NxGen::processRunInfo
             THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, msg )
     }
 
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1264,7 +1276,7 @@ NxGen::processGeometry
     const std::string & a_xml   ///< [in] Geometry data in xml format
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1294,7 +1306,7 @@ NxGen::pulseBuffersReady
     STS::PulseInfo &a_pulse_info    ///< [in] Pulse data object
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1440,7 +1452,7 @@ NxGen::bankPidTOFBuffersReady
     STS::BankInfo &a_bank   ///< [in] Detector bank to write
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1457,7 +1469,7 @@ NxGen::bankPidTOFBuffersReady
             bi->initializeBank( false );
 
         // Make Sure NeXus Structures have been (Late) Initialized...
-        if ( !(bi->m_nexus_init) )
+        if ( !(bi->m_nexus_bank_init) )
             initializeNxBank( bi, false );
 
         // NeXus Event-based Data...
@@ -1517,7 +1529,7 @@ NxGen::bankIndexBuffersReady
     bool use_default_chunk_size     ///< [in] Use Default Chunk Size...?
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1534,7 +1546,7 @@ NxGen::bankIndexBuffersReady
             bi->initializeBank( false );
 
         // Make Sure NeXus Structures have been (Late) Initialized...
-        if ( !(bi->m_nexus_init) )
+        if ( !(bi->m_nexus_bank_init) )
             initializeNxBank( bi, false );
 
         // NeXus Event-based Data...
@@ -1598,7 +1610,7 @@ NxGen::bankPulseGap
     uint64_t        a_count     ///< [in] Number of missing pulses
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1611,7 +1623,7 @@ NxGen::bankPulseGap
         }
 
         // Make Sure NeXus Structures have been (Late) Initialized...
-        if ( !(bi->m_nexus_init) )
+        if ( !(bi->m_nexus_bank_init) )
             initializeNxBank( bi, false );
 
         // NeXus Event-based Data...
@@ -1648,7 +1660,7 @@ NxGen::bankFinalize
     STS::BankInfo &a_bank   ///< [in] Detector bank to finalize
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1661,7 +1673,7 @@ NxGen::bankFinalize
         }
 
         // Make Sure NeXus Structures have been (Late) Initialized...
-        if ( !(bi->m_nexus_init) )
+        if ( !(bi->m_nexus_bank_init) )
             initializeNxBank( bi, true );
 
         // NeXus Event-based Data...
@@ -1786,7 +1798,7 @@ NxGen::monitorTOFBuffersReady
     STS::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1841,7 +1853,7 @@ NxGen::monitorIndexBuffersReady
     bool use_default_chunk_size     ///< [in] Use Default Chunk Size...?
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1907,7 +1919,7 @@ NxGen::monitorPulseGap
 {
     try
     {
-        if (!m_gen_nexus)
+        if ( !m_gen_nexus )
             return;
 
         NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
@@ -1948,7 +1960,7 @@ NxGen::monitorFinalize
     STS::MonitorInfo &a_monitor     ///< [in] Monitor to finalize
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try

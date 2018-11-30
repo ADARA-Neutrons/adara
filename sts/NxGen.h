@@ -45,7 +45,7 @@ private:
         )
         :
             BankInfo(a_id, a_state, a_buf_reserve, a_idx_buf_reserve),
-            m_nexus_init(false),
+            m_nexus_bank_init(false),
             m_event_cur_size(0),
             m_index_cur_size(0),
             m_nxgen(a_nxgen)
@@ -113,7 +113,7 @@ private:
         std::string             m_data_path;        ///< Nexus path to Histo data dataset
         std::string             m_histo_pid_path;   ///< Nexus path to Histo PID dataset
         std::string             m_tofbin_path;      ///< Nexus path to Histo TOF Bin dataset
-        bool                    m_nexus_init;       ///< Are bank NeXus groups initialized?
+        bool                    m_nexus_bank_init;  ///< Are bank NeXus groups initialized?
         uint64_t                m_event_cur_size;   ///< Running size of TOF and PID datasets (same size)
         uint64_t                m_index_cur_size;   ///< Running size of event index dataset
         NxGen                  &m_nxgen;            ///< NxGen parent class
@@ -2502,6 +2502,7 @@ private:
                             const std::string &a_attribute, T a_value );
 
     bool                m_gen_nexus;            ///< Controls whether Nexus file is generated or not
+    bool                m_nexus_init;           ///< Has the Nexus file been Initialized yet or not?
     std::string         m_nexus_filename;       ///< Name of Nexus file
     std::string         m_config_file;          ///< Name of STS Config file
     std::vector<struct GroupInfo>
