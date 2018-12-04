@@ -612,7 +612,7 @@ USAGE()
 {
 	echo "usage:  liveconf \\"
 	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
-	echo "            [--repo=/home/controls/config] \\"
+	echo "            [--repo=/home/controls/config] [--alt=\"-mon\"] \\"
 	echo "            [status] [run_status] [sample_status] \\"
 	echo "            [data_status] [sys_status] \\"
 	echo "            [bmon_status] [detset_status] [combus_status] \\"
@@ -706,6 +706,7 @@ testonly=0
 terse=0
 quiet=0
 PRE="[NotSet]"
+ALT="" # for Alternate/Secondary SMS Deployments... ;-D
 for arg in "$@" ; do
 	# echo "arg=$arg"
 	key=`echo "$arg" | awk -F = '{print $1}'`
@@ -721,8 +722,16 @@ for arg in "$@" ; do
 			"   $SMSD_CONFIG\n\n"
 	elif [ "#$key#" == '#--repo#' ]; then
 		CONFIG_REPO="$value"
-		addToIntroOutput "Using Git Config Repository in:\n"
+		addToIntroOutput "Using Git Config Repository in:\n" \
 			"   $CONFIG_REPO\n\n"
+	elif [ "#$key#" == '#--alt#' ]; then
+		ALT="$value"
+		addToIntroOutput "Setting Alternate SMS Suffix to:\n" \
+			"   $ALT\n\n"
+		SMSD_CONFIG="/SNSlocal/sms${ALT}/conf/smsd.conf"
+		addToIntroOutput "Using SMS Alternate Daemon Config File in:\n" \
+			"   $SMSD_CONFIG\n\n"
+		# Note: Append $ALT to $CONFIG_REPO Below...!
 	elif [ "#$key#" == '#--option#' ]; then
 		command="option"
 		opt_arg="$value"
@@ -850,11 +859,13 @@ fi
 daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
 if [ "#$daq_ck#" == '#1#' ]; then
 	addToIntroOutput "[DAQ Beamline Host.]\n\n"
-	CONFIG_REPO="${CONFIG_REPO}-daq1"
+	CONFIG_REPO="${CONFIG_REPO}-daq1${ALT}"
 	config_branch=`echo "$config_host" | sed 's/\..*//'`
 else
+	CONFIG_REPO="${CONFIG_REPO}${ALT}"
 	config_branch="$config_blnum"
 fi
+config_branch="${config_branch}${ALT}"
 
 addToIntroOutput "Git Config Repository: [${CONFIG_REPO}].\n\n"
 
