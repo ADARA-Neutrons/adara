@@ -71,6 +71,8 @@ declare -A nHostlogs
 
 declare -A nHostUnknownLogs
 
+declare -A nHostAltLogs
+
 declare -A nHostSTSLDAPLookupUserName
 declare -A nHostSTSLDAPSearchFailed
 declare -A nHostSTSMoreThanOnePVValue
@@ -229,6 +231,8 @@ PARSE_LOG()
 
 		nHostUnknownLogs[$host]=0
 
+		nHostAltLogs[$host]=0
+
 		nHostSTSLDAPLookupUserName[$host]=0
 		nHostSTSLDAPSearchFailed[$host]=0
 		nHostSTSMoreThanOnePVValue[$host]=0
@@ -351,6 +355,12 @@ PARSE_LOG()
 
 	app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
 	#echo "App=[$app]"
+
+	# Flag Any "Alternate" or Additional SMSD Apps... (e.g. "-mon")
+	if [[ "$app" == "smsd-mon" ]]; then
+		nHostAltLogs[$host]=$(( nHostAltLogs[$host] + 1 ))
+		app="smsd"
+	fi
 
 	known=1
 
@@ -1196,6 +1206,7 @@ PARSE_LOG()
 		fi
 
 	else
+		#echo "*** Unknown App Log!"
 		nUnknownApp=$(( nUnknownApp + 1 ))
 		known=0
 	fi
@@ -1318,6 +1329,9 @@ for h in ${HostList} ; do
 	echo -e -n "\nHost [$h] - ${nHostlogs[$h]} Logs Total"
 	if [[ ${nHostUnknownLogs[$h]} -gt 0 ]]; then
 		echo -n ", *** ${nHostUnknownLogs[$h]} Unknown Logs! ***"
+	fi
+	if [[ ${nHostAltLogs[$h]} -gt 0 ]]; then
+		echo -n " [Alt=${nHostAltLogs[$h]}]"
 	fi
 	echo
 	# STS Error Stats...
