@@ -1221,7 +1221,10 @@ for f in ${FileList} ; do
 
 	lastFileFrom[${f}]=""
 
-	while read line ; do
+	while read -r ; do
+
+		# Retrieve the Line Read, Including Preceding Spaces...
+		line="$REPLY"
 
 		# Only Process Actual Log Messages...
 
