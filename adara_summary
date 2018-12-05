@@ -192,6 +192,7 @@ nUnknownDASMOND=0
 nUnknownSMSD=0
 nUnknownPVSD=0
 nUnknownSTS=0
+nUnknownApp=0
 nUnknownLogs=0
 
 nDASMOND=0
@@ -1193,6 +1194,10 @@ PARSE_LOG()
 			nUnknownDASMOND=$(( nUnknownDASMOND + 1 ))
 			known=0
 		fi
+
+	else
+		nUnknownApp=$(( nUnknownApp + 1 ))
+		known=0
 	fi
 
 	if [[ $known == 0 ]]; then
@@ -1804,6 +1809,9 @@ fi
 if [[ $nUnknownDASMOND -gt 0 ]]; then
 	echo "$nUnknownDASMOND Unknown DASMOND Logs"
 fi
+echo
+
+echo "Unknown App Messages: $nUnknownApp"
 echo
 
 echo "General Statistics:"
