@@ -89,9 +89,9 @@ please set your shell "umask" as follows before proceeding! ;-D
 	RedHat6:
 	vi .git/config
 		- add section:
-			[branch "YYY-daq1"]
+			[branch "YYY-daq1-mon"]
 				remote = origin
-				merge = refs/heads/YYY-daq1
+				merge = refs/heads/YYY-daq1-mon
 
 	RedHat7:
 	git branch --set-upstream-to=origin/${NEW} ${NEW}
@@ -222,13 +222,13 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 1.b. Verify State of Any Existing Git Config Repository:
 
-	pushd /home/controls/config-daq1/ ; git pull ; git diff ; git status
+	pushd /home/controls/config-daq1-mon/ ; git pull ; git diff ; git status
 
 	./confck
 
 	ifconfig [Obtain Local Beamline IP/Subnet Address, i.e. 10.111.14.255]
 
-	sudo vi ./sms-mon/smsd-mon.initscript
+	vi ./sms-mon/smsd-mon.initscript
 		- replace: EPICS_CA_ADDR_LIST="10.111.XXX.255 160.91.228.17"
 			-> e.g. with: EPICS_CA_ADDR_LIST="10.111.14.255"
 
