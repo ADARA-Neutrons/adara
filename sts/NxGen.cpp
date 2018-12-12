@@ -30,6 +30,8 @@ std::string NxGen::GroupNameIndex = "[XXX_INDEX_XXX]";
 NxGen::NxGen
 (
     int             a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
+    string         &a_work_root,                ///< [in] Work Directory Root
+    string         &a_work_base,                ///< [in] Work Directory Base
     string         &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
     string         &a_nexus_out_file,           ///< [in] Filename of output Nexus file (disabled if empty)
     string         &a_config_file,              ///< [in] Filename of STS Config file (disabled if empty)
@@ -43,7 +45,9 @@ NxGen::NxGen
     bool            a_verbose                   ///< [in] STS Verbosity
 )
 :
-    StreamParser( a_fd_in, a_adara_out_file, a_strict, a_gather_stats,
+    StreamParser( a_fd_in,
+        a_work_root, a_work_base, a_adara_out_file,
+        a_strict, a_gather_stats,
         a_chunk_size * a_event_buf_chunk_count, // number of elements
         a_chunk_size * a_anc_buf_chunk_count, // number of elements
         a_verbose ),
@@ -509,27 +513,46 @@ NxGen::makeMonitorInfo
  *
  * This method performs Nexus-specific initialization (creates file and
  * several HDF5 entries).
+ *
+ * Note: Returns "true" when NeXus file is Created and Initialized,
+ * else "false".
  */
-void
+bool
 NxGen::initialize()
 {
     if ( !m_gen_nexus )
-        return;
+        return( false );
 
     if ( m_nexus_init )
     {
         syslog( LOG_INFO, "[%i] %s: Nexus File Already Initialized: %s",
             g_pid, "NxGen::initialize()",
             m_nexus_filename.c_str() );
-        return;
+        usleep(30000); // give syslog a chance...
+        return( true );
+    }
+
+    // Do We Need to Construct a Working Directory Path...?
+    if ( !isWorkingDirectoryReady() )
+    {
+        syslog( LOG_WARNING,
+            "[%i] %s: %s: %s=[%s] %s=[%s]",
+            g_pid, "NxGen::initialize()",
+            "Still Missing Info for Working Directory Construction",
+            "FacilityName", getFacilityName().c_str(),
+            "BeamShortName", getBeamShortName().c_str() );
+        usleep(30000); // give syslog a chance...
+        return( false );
     }
 
     try
     {
-        syslog( LOG_INFO, "[%i] Creating Nexus File: %s",
-            g_pid, m_nexus_filename.c_str() );
+        syslog( LOG_INFO, "[%i] Creating Nexus File: %s%s",
+            g_pid, getWorkingDirectory().c_str(),
+            m_nexus_filename.c_str() );
+        usleep(30000); // give syslog a chance...
 
-        m_h5nx.H5NXcreate_file( m_nexus_filename );
+        m_h5nx.H5NXcreate_file( getWorkingDirectory() + m_nexus_filename );
 
         // Create general Nexus entries
         makeGroup( m_entry_path, "NXentry" );
@@ -611,6 +634,8 @@ NxGen::initialize()
         RETHROW_TRACE( e, "Initialization of NeXus File ("
             << m_nexus_filename << ") Failed." )
     }
+
+    return( true );
 }
 
 
@@ -967,8 +992,7 @@ NxGen::writeSTSConfigUnitsAttributes(
                 g_pid, "STS Error:",
                 G->name.c_str(), "No Matching Units PV Found",
                 "Missing PV Value or Config...?", ss.str().c_str() );
-            // give syslog a chance...
-            usleep(30000);
+            usleep(30000); // give syslog a chance...
         }
     }
 }
@@ -1057,6 +1081,17 @@ NxGen::processBeamlineInfo
 {
     if ( !m_gen_nexus )
         return;
+
+    // We've Got the Beamline Info Now, Try to Initialize the NeXus File
+    if ( !initialize() )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: Unable to Initialize NeXus File!",
+            g_pid, "STS Error:", "NxGen::processBeamlineInfo()" );
+        usleep(30000); // give syslog a chance...
+
+        // XXX TODO Retry Again Later...? (Nothing Depends on This Stuff?)
+        // Maybe retry at end in StreamParser::finalizeStreamProcessing() ?
+    }
 
     try
     {

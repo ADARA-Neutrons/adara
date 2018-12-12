@@ -2295,6 +2295,8 @@ public:
 
     NxGen(
         int a_fd_in,
+        std::string &a_work_root,
+        std::string &a_work_base,
         std::string &a_adara_out_file,
         std::string &a_nexus_out_file,
         std::string &a_config_file,
@@ -2312,7 +2314,7 @@ public:
 
 protected:
 
-    void                initialize(void);
+    bool                initialize(void);
     void                finalize( const STS::RunMetrics &a_run_metrics,
                             const STS::RunInfo &a_run_info );
     STS::PVInfoBase*    makePVInfo( const std::string &a_device_name,
