@@ -42,6 +42,8 @@ RateLimitedLogging::History RLLHistory_StreamParserH;
 StreamParser::StreamParser
 (
     int             a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
+    const string   &a_work_root,                ///< [in] Work Directory Root
+    const string   &a_work_base,                ///< [in] Work Directory Base
     const string   &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
@@ -59,6 +61,11 @@ StreamParser::StreamParser
     m_event_buf_write_thresh(a_event_buf_write_thresh),
     m_anc_buf_write_thresh(a_anc_buf_write_thresh),
     m_info_rcvd(0),
+    m_work_root(a_work_root),
+    m_work_base(a_work_base),
+    m_work_dir(""),
+    m_do_rename(true),
+    m_adara_out_file(a_adara_out_file),
     m_strict(a_strict),
     m_gen_adara(false),
     m_gather_stats(a_gather_stats),
@@ -70,10 +77,21 @@ StreamParser::StreamParser
     // (In case there are No Neutron Pulses, for Faking It...! ;-D)
     clock_gettime( CLOCK_REALTIME, &m_default_run_start_time );
 
-    if ( !a_adara_out_file.empty() )
+    if ( !m_adara_out_file.empty() )
     {
         m_gen_adara = true;
-        m_ofs_adara.open( a_adara_out_file.c_str(), ios_base::out | ios_base::binary );
+
+        // If We Already Have the Working Directory,
+        // Proceed with Opening the ADARA Output Stream File...
+        if ( isWorkingDirectoryReady() )
+        {
+            string adara_file_path = m_work_dir + m_adara_out_file;
+            syslog( LOG_INFO, "[%i] Creating ADARA Stream File: %s",
+                g_pid, adara_file_path.c_str() );
+            usleep(30000); // give syslog a chance...
+            m_ofs_adara.open( adara_file_path.c_str(),
+                ios_base::out | ios_base::binary );
+        }
     }
 
     m_pulse_info.times.reserve(m_anc_buf_write_thresh);
@@ -124,6 +142,98 @@ StreamParser::~StreamParser()
             }
             delete *ipv;
         }
+    }
+}
+
+
+bool
+StreamParser::isWorkingDirectoryReady()
+{
+    return ( m_work_dir.size() > 0
+        || ( m_work_root.size() == 0 && m_work_base.size() == 0 ) );
+}
+
+
+bool
+StreamParser::constructWorkingDirectory()
+{
+    // Do We Need to Construct a Working Directory Path...?
+    if ( m_work_dir.size() == 0
+            && ( m_work_root.size() > 0 || m_work_base.size() > 0 ) )
+    {
+        // Do We Have the Necessary Pieces
+        // to Construct the Working Directory?
+        if ( getFacilityName().size() > 0
+                && getBeamShortName().size() > 0 )
+        {
+            // Note: Work Root Must End in "/",
+            // as it might be _Just_ "/"...! ;-D
+            m_work_dir = ( m_work_root.size() > 0 ) ? m_work_root : "/";
+
+            m_work_dir += getFacilityName() + "/"
+                + getBeamShortName() + "/";
+
+            if ( m_work_base.size() > 0 )
+                m_work_dir += m_work_base + "/";
+
+            syslog( LOG_INFO, "[%i] Working Directory Constructed %s: %s",
+                g_pid, "from Run/Beamline Info", m_work_dir.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            return( true );
+        }
+        else
+        {
+            syslog( LOG_WARNING,
+                "[%i] %s: %s: %s=[%s] %s=[%s]",
+                g_pid, "NxGen::initialize()",
+                "Still Missing Info for Working Directory Construction",
+                "FacilityName", getFacilityName().c_str(),
+                "BeamShortName", getBeamShortName().c_str() );
+            usleep(30000); // give syslog a chance...
+
+            return( false );
+        }
+    }
+
+    // We Didn't Newly Construct Any Working Directory Here... ;-D
+    return( false );
+}
+
+
+void
+StreamParser::flushAdaraStreamBuffer()
+{
+    // Open the ADARA Stream File if Working Directory Now Constructed...
+    if ( isWorkingDirectoryReady() && ! m_ofs_adara.is_open() )
+    {
+        string adara_file_path = m_work_dir + m_adara_out_file;
+        syslog( LOG_INFO, "[%i] %s, Creating ADARA Stream File: %s",
+            g_pid, "Working Directory Created", adara_file_path.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_ofs_adara.open( adara_file_path.c_str(),
+            ios_base::out | ios_base::binary );
+    }
+
+    // Dump Any Queued Packets to the ADARA Stream File...
+    if ( m_ofs_adara.is_open() && m_adara_queue.size() > 0 )
+    {
+        syslog( LOG_INFO, "[%i] Dumping %d %s to ADARA Stream File: %s%s",
+            g_pid, (int) m_adara_queue.size(), "Queued Packets",
+            m_work_dir.c_str(), m_adara_out_file.c_str() );
+        usleep(30000); // give syslog a chance...
+
+        for ( std::vector<ADARA::Packet *>::iterator pkt =
+                    m_adara_queue.begin();
+                pkt != m_adara_queue.end() ; ++pkt )
+        {
+            m_ofs_adara.write(
+                (char *)(*pkt)->packet(), (*pkt)->packet_length() );
+
+            delete (*pkt);
+        }
+
+        m_adara_queue.clear();
     }
 }
 
@@ -312,7 +422,17 @@ StreamParser::rxPacket
         gatherStats( a_pkt );
 
     if ( m_gen_adara )
-        m_ofs_adara.write( (char *)a_pkt.packet(), a_pkt.packet_length() );
+    {
+        if ( m_ofs_adara.is_open() )
+        {
+            m_ofs_adara.write(
+                (char *)a_pkt.packet(), a_pkt.packet_length() );
+        }
+        else
+        {
+            m_adara_queue.push_back( new ADARA::Packet( a_pkt ) );
+        }
+    }
 
     switch (a_pkt.base_type())
     {
@@ -2045,8 +2165,8 @@ StreamParser::handleMonitorPulseGap
 /*! \brief This method processes Run Info ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA Run Info packets. The processRunInfo()
- * virtual method is used to communicate
+ * This method processes ADARA Run Info packets.
+ * The processRunInfo() virtual method is used to communicate
  * run info data to the stream adapter subclass.
  */
 bool
@@ -2475,6 +2595,12 @@ StreamParser::rxPacket
         }
     }
 
+    if ( !isWorkingDirectoryReady() )
+    {
+        if ( constructWorkingDirectory() )
+            flushAdaraStreamBuffer();
+    }
+
     receivedInfo( RUN_INFO_BIT );
 
     return false;
@@ -2526,6 +2652,12 @@ StreamParser::rxPacket
     m_beamline_info.instr_id = a_pkt.id();
     m_beamline_info.instr_shortname = a_pkt.shortName();
     m_beamline_info.instr_longname = a_pkt.longName();
+
+    if ( !isWorkingDirectoryReady() )
+    {
+        if ( constructWorkingDirectory() )
+            flushAdaraStreamBuffer();
+    }
 
     receivedInfo( INSTR_INFO_BIT );
 
@@ -4794,8 +4926,6 @@ StreamParser::processPulseID
 void
 StreamParser::updateRunInfo( const RunInfo &a_run_info )
 {
-    bool re_dump_run_header = false;
-
     // ILLEGAL UPDATE (Meta-Data Used in Preliminary ComBus Messaging!)
     if ( a_run_info.run_number != m_run_info.run_number ) {
         syslog( LOG_ERR,
@@ -5294,25 +5424,14 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         usleep(30000); // give syslog a chance...
         m_run_info.users = a_run_info.users;
     }
-
-    if ( re_dump_run_header )
-    {
-        syslog( LOG_INFO,
-            "[%i] UPDATED %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
-            "Target Station", m_beamline_info.target_station_number,
-            "Beamline", m_run_info.facility_name.c_str(),
-            m_beamline_info.instr_shortname.c_str(),
-            "Proposal", m_run_info.proposal_id.c_str(),
-            "Run", m_run_info.run_number );
-        usleep(30000); // give syslog a chance...
-    }
 }
 
 
 /*! \brief Processes state of received informational packets
  *
- * This method tracks which ADARA informational packets have been received and issues a processRunInfo() call once all
- * packets have been received.
+ * This method tracks which ADARA informational packets have been received
+ * and issues a processBeamlineInfo() call once all packets have
+ * been received.
  */
 void
 StreamParser::receivedInfo( InfoBit a_bit )

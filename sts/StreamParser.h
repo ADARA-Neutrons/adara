@@ -39,7 +39,10 @@ public:
         ERROR_BANK      = 0xfffffffe
     };
 
-    StreamParser( int a_fd, const std::string & a_adara_out_file,
+    StreamParser( int a_fd,
+        const std::string & a_work_root,
+        const std::string & a_work_base,
+        const std::string & a_adara_out_file,
         bool a_strict, bool a_gather_stats = false,
         uint32_t a_event_buf_write_thresh = 40960, // number of elems
         uint32_t a_ancillary_buf_write_thresh = 4096, // number of elems
@@ -64,6 +67,16 @@ public:
 
     bool infoReady() const
         { return (m_info_rcvd & INFO_SENT); }
+
+    bool isWorkingDirectoryReady(void);
+
+    bool constructWorkingDirectory(void);
+
+    void flushAdaraStreamBuffer(void);
+
+    std::string getWorkingDirectory(void) { return m_work_dir; }
+
+    bool getDoRename(void) { return m_do_rename; }
 
 private:
 
@@ -188,6 +201,7 @@ private:
     ProcessingState                         m_processing_state;         ///< Current (internal) processing state
     uint32_t                                m_pkt_recvd;                ///< Packet received-status bit mask
     std::ofstream                           m_ofs_adara;                ///< ADARA output file stream
+    std::vector<ADARA::Packet *>            m_adara_queue;              ///< ADARA output packet buffer
     uint64_t                                m_pulse_id;                 ///< ID of current pulse
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
     PulseInfo                               m_pulse_info;               ///< Neutron pulse data
@@ -201,6 +215,11 @@ private:
     BeamlineInfo                            m_beamline_info;            ///< Beamline (instrument) information
     RunInfo                                 m_run_info;                 ///< Run information
     RunMetrics                              m_run_metrics;              ///< Run metrics
+    std::string                             m_work_root;                ///< Working Directory Root
+    std::string                             m_work_base;                ///< Working Directory Base
+    std::string                             m_work_dir;                 ///< Working Directory
+    bool                                    m_do_rename;                ///< Can We Do a NeXus File Rename?
+    std::string                             m_adara_out_file;           ///< Filename of output ADARA stream file
     bool                                    m_strict;                   ///< Controls strict ADARA processing option
     bool                                    m_gen_adara;                ///< Controls generation of ADARA output stream file
     bool                                    m_gather_stats;             ///< Controls gathering of stream statistics
