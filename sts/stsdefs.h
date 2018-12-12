@@ -1333,7 +1333,7 @@ public:
 class IStreamAdapter
 {
 public:
-    virtual void            initialize() = 0;
+    virtual bool            initialize() = 0;
     virtual void            finalize( const RunMetrics &a_run_metrics,
                                 const RunInfo &a_run_info ) = 0;
     virtual void            dumpProcessingStatistics(void) = 0;
