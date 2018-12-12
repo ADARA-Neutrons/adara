@@ -332,14 +332,14 @@ int main( int argc, char** argv )
         //
         // *** New STS Work Directory Specification:
         //    ${WORK_ROOT}/${FACILITY}/${BEAMLINE}/${WORK_BASE}
-        // - if both "work_root" and "work_base" are specified, these
-        // values _Subsume_ any "work_path" value and activate the
+        // - if either "work_root" and/or "work_base" are specified,
+        // these values _Subsume_ any "work_path" value and activate the
         // new "delayed gratification" mode... ;-D
         //    -> where we _Wait_ until we know the FACILITY and BEAMLINE
         //    to actually construct the full Working Directory path.
         //
 
-        if ( work_root.size() && work_base.size() )
+        if ( work_root.size() || work_base.size() )
         {
             // Clear Out (Now Obsolete) "Work Path",
             // Favor New "Delayed Gratification: Mode. ;-D
@@ -347,8 +347,11 @@ int main( int argc, char** argv )
 
             // Make Sure Work Root Ends in "/"...
             // (It might be _Just_ "/"...! ;-D)
-            if ( work_root[ work_root.size() - 1 ] != '/' )
+            if ( work_root.size() == 0
+                    || work_root[ work_root.size() - 1 ] != '/' )
+            {
                 work_root += "/";
+            }
 
             syslog( LOG_INFO, "[%i] Working Directory Root set to: [%s]",
                 g_pid, work_root.c_str() );
