@@ -1054,7 +1054,7 @@ private:
 
                 // Else Ignore This PV...
                 // (or Maybe It's a Subsumed Duplicate?)
-                else if ( this->m_ignore )
+                else if ( m_nxgen.m_gen_nexus && this->m_ignore )
                 {
                     syslog( LOG_INFO, "[%i] %s %s - Ignoring %s%s",
                         g_pid, "NxGen::flushBuffers()",

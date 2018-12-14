@@ -884,6 +884,9 @@ NxGen::finalize
 void
 NxGen::checkSTSConfigElementUnitsPaths(void)
 {
+    if ( !m_gen_nexus )
+        return;
+
     // Check Each Config Group in Turn
     // for Any Saved ElementInfo Units Paths...
     for ( uint32_t g=0 ; g < m_config_groups.size() ; g++ )
@@ -1952,11 +1955,11 @@ NxGen::monitorPulseGap
     uint64_t            a_count     ///< [in] Number of missing pulses
 )
 {
+    if ( !m_gen_nexus )
+        return;
+
     try
     {
-        if ( !m_gen_nexus )
-            return;
-
         NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
         if ( !mi )
         {
@@ -2062,6 +2065,9 @@ NxGen::runComment
     const std::string &a_comment    ///< [in] Overall run comments
 )
 {
+    if ( !m_gen_nexus )
+        return;
+
     if ( m_haveRunComment ) {
         syslog( LOG_WARNING,
         "[%i] %s Duplicate Run Comment Specified (Discarded): %s",
@@ -2401,6 +2407,9 @@ NxGen::writeDeviceEnums
     vector<STS::PVEnumeratedType> &a_enumVec ///< [in/out] Vector of Enumerated Type Structs
 )
 {
+    if ( !m_gen_nexus )
+        return;
+
     for ( vector<STS::PVEnumeratedType>::iterator ienum =
                 a_enumVec.begin();
             ienum != a_enumVec.end(); ++ienum )
