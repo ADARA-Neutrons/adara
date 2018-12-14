@@ -136,6 +136,7 @@ private:
         :
             MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve,
                 a_config ),
+            m_nexus_monitor_init(false),
             m_index_cur_size(0),
             m_event_cur_size(0),
             m_nxgen(a_nxgen)
@@ -182,6 +183,7 @@ private:
         std::string             m_tof_path;         ///< Nexus path to TOF dataset
         std::string             m_data_path;        ///< Nexus path to Histo data dataset
         std::string             m_tofbin_path;      ///< Nexus path to Histo TOF Bins dataset
+        bool                    m_nexus_monitor_init; ///< Are bank NeXus groups initialized?
         uint64_t                m_index_cur_size;   ///< Running size of event index dataset
         uint64_t                m_event_cur_size;   ///< Running size of TOF dataset
         NxGen                  &m_nxgen;            ///< NxGen parent class
@@ -2338,6 +2340,7 @@ protected:
                             uint32_t a_idx_buf_reserve,
                             STS::BeamMonitorConfig *a_config,
                             bool a_known_monitor );
+    void                initializeNxMonitor( NxMonitorInfo *a_mi );
     void                processBeamlineInfo(
                             const STS::BeamlineInfo &a_beamline_info );
     void                processRunInfo( const STS::RunInfo &a_run_info,

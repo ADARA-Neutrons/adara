@@ -396,46 +396,50 @@ NxGen::initializeNxBank
     if ( !(a_bi->m_initialized) )
         a_bi->initializeBank( a_end_of_run );
 
+    if ( !m_gen_nexus )
+        return;
+
+    // Already Initialized...
+    if ( a_bi->m_nexus_bank_init )
+        return;
+
     try
     {
-        if ( m_gen_nexus )
+        // Instrument bank group (contains *Both* Event and Histo data)
+        makeGroup( a_bi->m_instr_path, "NXdetector" );
+
+        // NeXus Event-based Structures
+        if ( a_bi->m_has_event )
         {
-            // Instrument bank group (contains *Both* Event and Histo data)
-            makeGroup( a_bi->m_instr_path, "NXdetector" );
+            // (Defer creation/writing of actual Bank Pid/TOF data
+            //    to bankPidTOFBuffersReady(), create & write
+            //    in one shot...)
 
-            // NeXus Event-based Structures
-            if ( a_bi->m_has_event )
-            {
-                // (Defer creation/writing of actual Bank Pid/TOF data
-                //    to bankPidTOFBuffersReady(), create & write
-                //    in one shot...)
+            // (Defer creation/writing of actual Bank Event Index data
+            //    to bankIndexBuffersReady(), create & write
+            //    in one shot...)
 
-                // (Defer creation/writing of actual Bank Event Index data
-                //    to bankIndexBuffersReady(), create & write
-                //    in one shot...)
+            // Top-level Event data group
+            makeGroup( a_bi->m_event_path, "NXevent_data" );
 
-                // Top-level Event data group
-                makeGroup( a_bi->m_event_path, "NXevent_data" );
+            // (Defer linking of Top-level Event data, which
+            //     won't exist until later in bank*BuffersReady()...)
 
-                // (Defer linking of Top-level Event data, which
-                //     won't exist until later in bank*BuffersReady()...)
-
-                // (Defer linking of Pulse Time data, which won't exist
-                //     until later in bankFinalize()... :-)
-            }
-
-            // NeXus Histogram-based Structures
-            // ( a_bi->m_has_histo )
-
-            // (Defer creation/writing of actual histogram data
-            //     to bankFinalize(), create & write in one shot...)
-
-            // (Defer linking of histogram data, which won't exist
+            // (Defer linking of Pulse Time data, which won't exist
             //     until later in bankFinalize()... :-)
-
-            // NeXus Structures are Now Initialized
-            a_bi->m_nexus_bank_init = true;
         }
+
+        // NeXus Histogram-based Structures
+        // ( a_bi->m_has_histo )
+
+        // (Defer creation/writing of actual histogram data
+        //     to bankFinalize(), create & write in one shot...)
+
+        // (Defer linking of histogram data, which won't exist
+        //     until later in bankFinalize()... :-)
+
+        // NeXus Structures are Now Initialized
+        a_bi->m_nexus_bank_init = true;
     }
     catch ( TraceException &e )
     {
@@ -471,40 +475,74 @@ NxGen::makeMonitorInfo
             a_id, a_buf_reserve, a_idx_buf_reserve,
             a_config, a_known_monitor, *this );
 
-        if ( m_gen_nexus )
-        {
-            makeGroup( mi->m_path, mi->m_group_type );
-
-            // Histo-based Monitor
-            if ( mi->m_config != NULL )
-            {
-                // (Defer creation/writing of actual histogram data
-                //     to monitorFinalize(), create & write in one shot...)
-
-                writeScalar( mi->m_path, "distance",
-                    mi->m_config->distance, "" );
-                writeString( mi->m_path, "mode", "monitor" );
-            }
-
-            // Event-based Monitor (Nothing to Do Here, All Deferred! :-D)
-
-            // (Defer creation/writing of actual Monitor TOF data
-            //    to monitorTOFBuffersReady(), create & write
-            //    in one shot...)
-
-            // (Defer creation/writing of actual Monitor Event Index data
-            //    to monitorIndexBuffersReady(), create & write
-            //    in one shot...)
-
-            // (Defer creation of Pulse Time Link to monitorFinalize(),
-            //    after the Dataset is sure to have been created...)
-        }
+        // Initialization now done separately via
+        // NxGen::initializeNxMonitor(), to account for
+        // Working Directory resolution and  NeXus data file creation,
+        // which may be deferred...
 
         return mi;
     }
     catch ( TraceException &e )
     {
         RETHROW_TRACE( e, "makeMonitorInfo (mon: " << a_id << ") failed." )
+    }
+}
+
+
+/*! \brief Initialization method for MonitorInfo NeXus file groups
+ *
+ * Initialization of NeXus Monitor Groups, as extracted from original
+ * makeMonitorInfo() method, to enable Monitor data capture and bookkeeping
+ * prior to Working Directory resolution/NeXus data file creation.
+ */
+void
+NxGen::initializeNxMonitor
+(
+    NxMonitorInfo* a_mi        ///< [in] Ptr to NeXus Monitor info
+)
+{
+    if ( !m_gen_nexus )
+        return;
+
+    // Already Initialized...
+    if ( a_mi->m_nexus_monitor_init )
+        return;
+
+    try
+    {
+        makeGroup( a_mi->m_path, a_mi->m_group_type );
+
+        // Histo-based Monitor
+        if ( a_mi->m_config != NULL )
+        {
+            // (Defer creation/writing of actual histogram data
+            //     to monitorFinalize(), create & write in one shot...)
+
+            writeScalar( a_mi->m_path, "distance",
+                a_mi->m_config->distance, "" );
+            writeString( a_mi->m_path, "mode", "monitor" );
+        }
+
+        // Event-based Monitor (Nothing to Do Here, All Deferred! :-D)
+
+        // (Defer creation/writing of actual Monitor TOF data
+        //    to monitorTOFBuffersReady(), create & write
+        //    in one shot...)
+
+        // (Defer creation/writing of actual Monitor Event Index data
+        //    to monitorIndexBuffersReady(), create & write
+        //    in one shot...)
+
+        // (Defer creation of Pulse Time Link to monitorFinalize(),
+        //    after the Dataset is sure to have been created...)
+
+        // NeXus Structures are Now Initialized
+        a_mi->m_nexus_monitor_init = true;
+    }
+    catch ( TraceException &e )
+    {
+        RETHROW_TRACE( e, "initializeNxMonitor( id: " << a_mi->m_id
+            << " ) initialization failed." )
     }
 }
 
@@ -1690,7 +1728,8 @@ NxGen::bankPulseGap
 
 /*! \brief Finalizes bank data in Nexus file
  *
- * This method writes event counts for the specified bank to the Nexus file.
+ * This method writes event counts for the specified bank
+ * to the Nexus file.
  */
 void
 NxGen::bankFinalize
@@ -1848,6 +1887,10 @@ NxGen::monitorTOFBuffersReady
               "Invalid monitor object passed to monitorTOFBuffersReady()" )
         }
 
+        // Make Sure NeXus Structures have been Initialized...
+        if ( !(mi->m_nexus_monitor_init) )
+            initializeNxMonitor( mi );
+
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
         {
@@ -1902,6 +1945,10 @@ NxGen::monitorIndexBuffersReady
             THROW_TRACE( STS::ERR_CAST_FAILED,
             "Invalid monitor object passed to monitorIndexBuffersReady()" )
         }
+
+        // Make Sure NeXus Structures have been Initialized...
+        if ( !(mi->m_nexus_monitor_init) )
+            initializeNxMonitor( mi );
 
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
@@ -1967,6 +2014,10 @@ NxGen::monitorPulseGap
                 "Invalid monitor object passed to monitorPulseGap()" )
         }
 
+        // Make Sure NeXus Structures have been Initialized...
+        if ( !(mi->m_nexus_monitor_init) )
+            initializeNxMonitor( mi );
+
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
         {
@@ -2009,6 +2060,10 @@ NxGen::monitorFinalize
             THROW_TRACE( STS::ERR_CAST_FAILED,
                 "Invalid monitor object passed to monitorFinalize()" )
         }
+
+        // Make Sure NeXus Structures have been Initialized...
+        if ( !(mi->m_nexus_monitor_init) )
+            initializeNxMonitor( mi );
 
         // Histo-based Monitor
         if ( mi->m_config != NULL )
