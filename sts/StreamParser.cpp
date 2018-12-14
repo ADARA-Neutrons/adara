@@ -2119,7 +2119,7 @@ StreamParser::processMonitorEvents
  * must be corrected for the missing pulses to keep in synchronized
  * with the event stream. If a small gap is detected, values are inserted
  * directly into the internal index buffer; otherwise, gap processing is
- * deferred to the stream adatapter subclass via the monitorPulseGap()
+ * deferred to the stream adapter subclass via the monitorPulseGap()
  * virtual method. (It is expected that the virtual method should write
  * index values directly into the destination format to prevent excessive
  * memory consumption that would be caused by buffering the corrected
@@ -2138,7 +2138,9 @@ StreamParser::handleMonitorPulseGap
 
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
-    if ( a_mi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh )
+    // (OR, If Working Directory Not Yet Resolved...!)
+    if ( a_mi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh
+            || !isWorkingDirectoryReady() )
     {
         a_mi.m_index_buffer.resize( a_mi.m_index_buffer.size() + a_count,
             a_mi.m_event_count );
