@@ -46,7 +46,7 @@ NxGen::NxGen
 )
 :
     StreamParser( a_fd_in,
-        a_work_root, a_work_base, a_adara_out_file,
+        a_work_root, a_work_base, a_adara_out_file, a_config_file,
         a_strict, a_gather_stats,
         a_chunk_size * a_event_buf_chunk_count, // number of elements
         a_chunk_size * a_anc_buf_chunk_count, // number of elements
@@ -556,13 +556,14 @@ NxGen::initializeNxMonitor
  * else "false".
  */
 bool
-NxGen::initialize()
+NxGen::initialize( bool a_force_init )
 {
     if ( !m_gen_nexus )
         return( false );
 
     if ( m_nexus_init )
     {
+        // REMOVE ME...
         syslog( LOG_INFO, "[%i] %s: Nexus File Already Initialized: %s",
             g_pid, "NxGen::initialize()",
             m_nexus_filename.c_str() );
@@ -573,14 +574,32 @@ NxGen::initialize()
     // Do We Need to Construct a Working Directory Path...?
     if ( !isWorkingDirectoryReady() )
     {
-        syslog( LOG_WARNING,
-            "[%i] %s: %s: %s=[%s] %s=[%s]",
-            g_pid, "NxGen::initialize()",
-            "Still Missing Info for Working Directory Construction",
-            "FacilityName", getFacilityName().c_str(),
-            "BeamShortName", getBeamShortName().c_str() );
-        usleep(30000); // give syslog a chance...
-        return( false );
+        if ( a_force_init )
+        {
+            if ( constructWorkingDirectory( a_force_init ) )
+                flushAdaraStreamBuffer();
+
+            else
+            {
+                syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                    g_pid, "STS Error:", "NxGen::initialize()",
+                    "Failed to Force Construction of Working Directory",
+                    "Bailing... (Probably...)" );
+                usleep(30000); // give syslog a chance...
+                return( false );
+            }
+        }
+        else
+        {
+            syslog( LOG_WARNING,
+                "[%i] %s: %s: %s=[%s] %s=[%s]",
+                g_pid, "NxGen::initialize()",
+                "Still Missing Info for Working Directory Construction",
+                "FacilityName", getFacilityName().c_str(),
+                "BeamShortName", getBeamShortName().c_str() );
+            usleep(30000); // give syslog a chance...
+            return( false );
+        }
     }
 
     try
@@ -1689,6 +1708,19 @@ NxGen::bankPulseGap
     if ( !m_gen_nexus )
         return;
 
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data integrity...!)
+    if ( !initialize( true ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s count=%lu",
+            g_pid, "STS Error:", "NxGen::bankPulseGap()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Bank Pulse Gap Data!", a_count );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
     try
     {
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
@@ -2004,6 +2036,19 @@ NxGen::monitorPulseGap
 {
     if ( !m_gen_nexus )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data integrity...!)
+    if ( !initialize( true ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s count=%lu",
+            g_pid, "STS Error:", "NxGen::monitorPulseGap()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Monitor Pulse Gap Data!", a_count );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     try
     {

@@ -2316,7 +2316,7 @@ public:
 
 protected:
 
-    bool                initialize(void);
+    bool                initialize( bool a_force_init = false );
     void                finalize( const STS::RunMetrics &a_run_metrics,
                             const STS::RunInfo &a_run_info );
     STS::PVInfoBase*    makePVInfo( const std::string &a_device_name,
