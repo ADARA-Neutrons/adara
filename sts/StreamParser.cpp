@@ -2,6 +2,7 @@
 #include "TransCompletePkt.h"
 #include <iomanip>
 #include <sstream>
+#include <string>
 #include <string.h>
 #include <boost/algorithm/string.hpp>
 #include <unistd.h>
@@ -45,6 +46,7 @@ StreamParser::StreamParser
     const string   &a_work_root,                ///< [in] Work Directory Root
     const string   &a_work_base,                ///< [in] Work Directory Base
     const string   &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
+    const string   &a_config_file,              ///< [in] Path to STS Config file
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
     uint32_t        a_event_buf_write_thresh,   ///< [in] Event buffer write threshold (number of elements)
@@ -66,6 +68,7 @@ StreamParser::StreamParser
     m_work_dir(""),
     m_do_rename(true),
     m_adara_out_file(a_adara_out_file),
+    m_config_file(a_config_file),
     m_strict(a_strict),
     m_gen_adara(false),
     m_gather_stats(a_gather_stats),
@@ -155,7 +158,7 @@ StreamParser::isWorkingDirectoryReady()
 
 
 bool
-StreamParser::constructWorkingDirectory()
+StreamParser::constructWorkingDirectory( bool a_force_init )
 {
     // Do We Need to Construct a Working Directory Path...?
     if ( m_work_dir.size() == 0
@@ -176,8 +179,30 @@ StreamParser::constructWorkingDirectory()
             if ( m_work_base.size() > 0 )
                 m_work_dir += m_work_base + "/";
 
-            syslog( LOG_INFO, "[%i] Working Directory Constructed %s: %s",
-                g_pid, "from Run/Beamline Info", m_work_dir.c_str() );
+            syslog( LOG_INFO,
+                "[%i] %s: Working Directory Constructed %s: %s",
+                g_pid, "constructWorkingDirectory()",
+                "from Run/Beamline Info", m_work_dir.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            return( true );
+        }
+        else if ( a_force_init )
+        {
+            // In a pinch, Steal STS Config File Directory as Scratch...!
+            size_t last_slash = m_config_file.find_last_of("/");
+            if ( last_slash != string::npos )
+                m_work_dir = m_config_file.substr( 0, last_slash );
+            else
+                m_work_dir = ".";
+
+            m_work_dir += "/";
+
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s Working Directory Constructed %s (%s): %s",
+                g_pid, "STS Error:", "constructWorkingDirectory()",
+                "FORCE INIT", "from STS Config File Path",
+                m_config_file.c_str(), m_work_dir.c_str() );
             usleep(30000); // give syslog a chance...
 
             return( true );
@@ -1817,7 +1842,9 @@ StreamParser::handleBankPulseGap
 
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
-    if ( a_bi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh )
+    // (OR, If Working Directory Not Yet Resolved...!)
+    if ( a_bi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh
+            || !isWorkingDirectoryReady() )
     {
         a_bi.m_index_buffer.resize( a_bi.m_index_buffer.size() + a_count,
             a_bi.m_event_count );

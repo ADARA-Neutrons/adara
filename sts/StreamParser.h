@@ -43,6 +43,7 @@ public:
         const std::string & a_work_root,
         const std::string & a_work_base,
         const std::string & a_adara_out_file,
+        const std::string & a_config_file,
         bool a_strict, bool a_gather_stats = false,
         uint32_t a_event_buf_write_thresh = 40960, // number of elems
         uint32_t a_ancillary_buf_write_thresh = 4096, // number of elems
@@ -70,7 +71,7 @@ public:
 
     bool isWorkingDirectoryReady(void);
 
-    bool constructWorkingDirectory(void);
+    bool constructWorkingDirectory( bool a_force_init = false );
 
     void flushAdaraStreamBuffer(void);
 
@@ -220,6 +221,7 @@ private:
     std::string                             m_work_dir;                 ///< Working Directory
     bool                                    m_do_rename;                ///< Can We Do a NeXus File Rename?
     std::string                             m_adara_out_file;           ///< Filename of output ADARA stream file
+    std::string                             m_config_file;              ///< Path to STS Config file
     bool                                    m_strict;                   ///< Controls strict ADARA processing option
     bool                                    m_gen_adara;                ///< Controls generation of ADARA output stream file
     bool                                    m_gather_stats;             ///< Controls gathering of stream statistics

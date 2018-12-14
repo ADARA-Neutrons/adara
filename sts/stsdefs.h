@@ -455,9 +455,9 @@ public:
             if ( m_num_tof_bins < 2 )
             {
                 syslog( LOG_ERR,
-                    "[%i] %s %s %u Histogram Warning: num_tof_bins=%u < 2!",
+                    "[%i] %s %s %u Histogram Warning: %s=%u < 2!",
                     g_pid, "STS Error:", "Beam Monitor", m_id,
-                    m_num_tof_bins);
+                    "num_tof_bins", m_num_tof_bins);
                 usleep(30000); // give syslog a chance...
                 m_num_tof_bins = 2;
             }
@@ -1333,7 +1333,7 @@ public:
 class IStreamAdapter
 {
 public:
-    virtual bool            initialize() = 0;
+    virtual bool            initialize( bool a_force_init = false ) = 0;
     virtual void            finalize( const RunMetrics &a_run_metrics,
                                 const RunInfo &a_run_info ) = 0;
     virtual void            dumpProcessingStatistics(void) = 0;
