@@ -181,7 +181,7 @@ StreamParser::constructWorkingDirectory( bool a_force_init )
 
             syslog( LOG_INFO,
                 "[%i] %s: Working Directory Constructed %s: %s",
-                g_pid, "constructWorkingDirectory()",
+                g_pid, "StreamParser::constructWorkingDirectory()",
                 "from Run/Beamline Info", m_work_dir.c_str() );
             usleep(30000); // give syslog a chance...
 
@@ -200,7 +200,8 @@ StreamParser::constructWorkingDirectory( bool a_force_init )
 
             syslog( LOG_ERR,
                 "[%i] %s %s: %s Working Directory Constructed %s (%s): %s",
-                g_pid, "STS Error:", "constructWorkingDirectory()",
+                g_pid, "STS Error:",
+                "StreamParser::constructWorkingDirectory()",
                 "FORCE INIT", "from STS Config File Path",
                 m_config_file.c_str(), m_work_dir.c_str() );
             usleep(30000); // give syslog a chance...
@@ -211,7 +212,7 @@ StreamParser::constructWorkingDirectory( bool a_force_init )
         {
             syslog( LOG_WARNING,
                 "[%i] %s: %s: %s=[%s] %s=[%s]",
-                g_pid, "NxGen::initialize()",
+                g_pid, "StreamParser::constructWorkingDirectory()",
                 "Still Missing Info for Working Directory Construction",
                 "FacilityName", getFacilityName().c_str(),
                 "BeamShortName", getBeamShortName().c_str() );
