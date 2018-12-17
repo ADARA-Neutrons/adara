@@ -710,6 +710,19 @@ NxGen::finalize
     if ( !m_gen_nexus )
         return;
 
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some meta-data...!)
+    if ( !initialize( true ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STS Error:", "NxGen::finalize()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Final Run Meta-Data!" );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
     try
     {
         writeString( m_entry_path, "definition", "NXsnsevent" );
@@ -1821,6 +1834,19 @@ NxGen::bankFinalize
     if ( !m_gen_nexus )
         return;
 
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data...!!)
+    if ( !initialize( true ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s bank_id=%u",
+            g_pid, "STS Error:", "NxGen::bankFinalize()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Bank Histogram/Meta-Data!!", a_bank.m_id );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
     try
     {
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
@@ -2177,6 +2203,19 @@ NxGen::monitorFinalize
 {
     if ( !m_gen_nexus )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data...!!)
+    if ( !initialize( true ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s monitor_id=%u",
+            g_pid, "STS Error:", "NxGen::monitorFinalize()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Monitor Histogram/Meta-Data!!", a_monitor.m_id );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     try
     {
