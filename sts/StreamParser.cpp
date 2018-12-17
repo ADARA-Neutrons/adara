@@ -1423,7 +1423,9 @@ StreamParser::processPulseInfo
     }
 
     // Is is time to write pulse info?
-    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh )
+    // (And is the Working Directory/NeXus Data File Ready for Data...?)
+    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh
+            && isWorkingDirectoryReady() )
     {
         pulseBuffersReady( m_pulse_info );
 
@@ -1495,7 +1497,9 @@ StreamParser::processPulseInfo
     }
 
     // Is is time to write pulse info?
-    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh )
+    // (And is the Working Directory/NeXus Data File Ready for Data...?)
+    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh
+            && isWorkingDirectoryReady() )
     {
         pulseBuffersReady( m_pulse_info );
 
@@ -1644,7 +1648,10 @@ StreamParser::processBankEvents
             bi->m_last_pulse_with_data = m_pulse_count;
 
             // Check to see if Pid/TOF buffers are ready to write
-            if ( bi->m_tof_buffer_size >= m_event_buf_write_thresh )
+            // (And is the Working Directory/NeXus Data File
+            // Ready for Data...?)
+            if ( bi->m_tof_buffer_size >= m_event_buf_write_thresh
+                    && isWorkingDirectoryReady() )
             {
                 bankPidTOFBuffersReady( *bi );
 
@@ -1658,7 +1665,10 @@ StreamParser::processBankEvents
             }
 
             // Check to see if Index buffers are ready to write
-            if ( bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+            // (And is the Working Directory/NeXus Data File
+            // Ready for Data...?)
+            if ( bi->m_index_buffer.size() >= m_anc_buf_write_thresh
+                    && isWorkingDirectoryReady() )
             {
                 bankIndexBuffersReady( *bi, false );
 
@@ -2118,7 +2128,10 @@ StreamParser::processMonitorEvents
         //    to Enable Chunk Size Override Optimizations...! ;-D
 
         // Check to see if TOF buffers are ready to write
-        if ( imi->second->m_tof_buffer_size >= m_event_buf_write_thresh )
+        // (And is the Working Directory/NeXus Data File
+        // Ready for Data...?)
+        if ( imi->second->m_tof_buffer_size >= m_event_buf_write_thresh
+                && isWorkingDirectoryReady() )
         {
             monitorTOFBuffersReady( *imi->second );
     
@@ -2130,7 +2143,10 @@ StreamParser::processMonitorEvents
         }
 
         // Check to see if Event Index buffers are ready to write
-        if ( imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
+        // (And is the Working Directory/NeXus Data File
+        // Ready for Data...?)
+        if ( imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh
+                && isWorkingDirectoryReady() )
         {
             monitorIndexBuffersReady( *imi->second, false );
     
