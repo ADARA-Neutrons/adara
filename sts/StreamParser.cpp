@@ -5511,6 +5511,27 @@ StreamParser::receivedInfo( InfoBit a_bit )
 void
 StreamParser::finalizeStreamProcessing()
 {
+    // We're at the End of the Run Now,
+    // So No More Time to Wait for the Working Directory to resolve...!
+    // (Hopefully we at least have the Beamline Short Name by now...! ;-D)
+    // Force the Creation of "Some" Working Directory and then
+    // Try to Proceed to Create and Write a NeXus Data File...! ;-D
+    if ( !isWorkingDirectoryReady() )
+    {
+        if ( constructWorkingDirectory( true ) )
+            flushAdaraStreamBuffer();
+
+        else
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::finalizeStreamProcessing()",
+                "Failed to Force Construction of Working Directory",
+                "EPIC FAIL, This Was Our Last Chance...!! Bailing..." );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+    }
+
     // NOW Dump RunInfo Meta-Data to NeXus...!
     // - The Run is Over/Stopped, so there can be No More RunInfo Updates!
     processRunInfo( m_run_info, m_strict );
