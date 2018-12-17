@@ -1151,6 +1151,8 @@ NxGen::processBeamlineInfo
 
         // XXX TODO Retry Again Later...? (Nothing Depends on This Stuff?)
         // Maybe retry at end in StreamParser::finalizeStreamProcessing() ?
+
+        return;
     }
 
     try
@@ -1404,6 +1406,21 @@ NxGen::pulseBuffersReady
     if ( !m_gen_nexus )
         return;
 
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data...!!)
+    if ( !initialize( true ) )
+    {
+        vector<double>::iterator tstart = a_pulse_info.times.begin();
+        vector<double>::iterator tend = a_pulse_info.times.end(); tend--;
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s For Pulses from %lf to %lf.",
+            g_pid, "STS Error:", "NxGen::pulseBuffersReady()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Pulse Info Data!!", *tstart, *tend );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
     try
     {
         // Create Pulse Frequency/Time and Pulse Proton Charge Datasets
@@ -1563,6 +1580,22 @@ NxGen::bankPidTOFBuffersReady
         if ( !(bi->m_initialized) )
             bi->initializeBank( false );
 
+        // Do We Have a Valid Initialized NeXus Data File...?
+        // (We shouldn't get called if not, so if we do, better force it,
+        // lest we actually lose some data...!!)
+        if ( !initialize( true ) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
+                g_pid, "STS Error:", "NxGen::bankPidTOFBuffersReady()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Bank PID/TOF Data!!",
+                "bank_id", a_bank.m_id,
+                "event_cur_size", bi->m_event_cur_size,
+                "buffer_size", a_bank.m_tof_buffer_size );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+
         // Make Sure NeXus Structures have been (Late) Initialized...
         if ( !(bi->m_nexus_bank_init) )
             initializeNxBank( bi, false );
@@ -1639,6 +1672,22 @@ NxGen::bankIndexBuffersReady
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
             bi->initializeBank( false );
+
+        // Do We Have a Valid Initialized NeXus Data File...?
+        // (We shouldn't get called if not, so if we do, better force it,
+        // lest we actually lose some data...!!)
+        if ( !initialize( true ) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
+                g_pid, "STS Error:", "NxGen::bankIndexBuffersReady()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Bank Index Data!!",
+                "bank_id", a_bank.m_id,
+                "index_cur_size", bi->m_index_cur_size,
+                "buffer_size", a_bank.m_index_buffer.size() );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
 
         // Make Sure NeXus Structures have been (Late) Initialized...
         if ( !(bi->m_nexus_bank_init) )
@@ -1919,6 +1968,22 @@ NxGen::monitorTOFBuffersReady
               "Invalid monitor object passed to monitorTOFBuffersReady()" )
         }
 
+        // Do We Have a Valid Initialized NeXus Data File...?
+        // (We shouldn't get called if not, so if we do, better force it,
+        // lest we actually lose some data...!!)
+        if ( !initialize( true ) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
+                g_pid, "STS Error:", "NxGen::monitorTOFBuffersReady()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Monitor TOF Data!!",
+                "monitor_id", a_monitor.m_id,
+                "event_cur_size", mi->m_event_cur_size,
+                "buffer_size", a_monitor.m_tof_buffer_size );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+
         // Make Sure NeXus Structures have been Initialized...
         if ( !(mi->m_nexus_monitor_init) )
             initializeNxMonitor( mi );
@@ -1976,6 +2041,22 @@ NxGen::monitorIndexBuffersReady
         {
             THROW_TRACE( STS::ERR_CAST_FAILED,
             "Invalid monitor object passed to monitorIndexBuffersReady()" )
+        }
+
+        // Do We Have a Valid Initialized NeXus Data File...?
+        // (We shouldn't get called if not, so if we do, better force it,
+        // lest we actually lose some data...!!)
+        if ( !initialize( true ) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
+                g_pid, "STS Error:", "NxGen::monitorIndexBuffersReady()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Monitor Index Data!!",
+                "monitor_id", a_monitor.m_id,
+                "index_cur_size", mi->m_index_cur_size,
+                "buffer_size", a_monitor.m_index_buffer.size() );
+            usleep(30000); // give syslog a chance...
+            return;
         }
 
         // Make Sure NeXus Structures have been Initialized...
