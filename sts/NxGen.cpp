@@ -957,6 +957,23 @@ NxGen::checkSTSConfigElementUnitsPaths(void)
     if ( !m_gen_nexus )
         return;
 
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose the final meta-data...!!)
+    // Although if we just Forced Working Directory construction
+    // in StreamParser::finalizeStreamProcessing(), then
+    // Now May Be Our Chance to Finally Create a NeXus Data File...! ;-D
+    if ( !initialize( true ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STS Error:",
+            "NxGen::checkSTSConfigElementUnitsPaths()",
+            "Failed to Force Initialize NeXus File",
+            "Losing STS Config Element Units Meta-Data!" );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
     // Check Each Config Group in Turn
     // for Any Saved ElementInfo Units Paths...
     for ( uint32_t g=0 ; g < m_config_groups.size() ; g++ )
@@ -1223,6 +1240,22 @@ NxGen::processRunInfo
 
     if ( !m_gen_nexus )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose the final meta-data...!!)
+    // Although if we just Forced Working Directory construction
+    // in StreamParser::finalizeStreamProcessing(), then
+    // Now's Our First Chance to Finally Create a NeXus Data File...! ;-D
+    if ( !initialize( true ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STS Error:", "NxGen::processRunInfo()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Final Run Meta-Data!" );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     try
     {
@@ -2629,6 +2662,22 @@ NxGen::writeDeviceEnums
 {
     if ( !m_gen_nexus )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose the final meta-data...!!)
+    // Although if we just Forced Working Directory construction
+    // in StreamParser::finalizeStreamProcessing(), then
+    // Now May Be Our Chance to Finally Create a NeXus Data File...! ;-D
+    if ( !initialize( true ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STS Error:", "NxGen::writeDeviceEnums()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Device Enumeration Meta-Data!" );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     for ( vector<STS::PVEnumeratedType>::iterator ienum =
                 a_enumVec.begin();

@@ -713,7 +713,7 @@ private:
                     {
                         syslog( LOG_ERR,
                             "[%i] %s: %s %s %s %s, %s: %s",
-                            g_pid, "STS Error", "NxGen::flushBuffers()",
+                            g_pid, "STS Error", "NxPVInfo::flushBuffers()",
                             this->m_device_str.c_str(),
                             "Normalizing PV Value Times",
                             "with First Pulse Time",
@@ -732,7 +732,7 @@ private:
                         // TODO Add Rate-Limiting...?
                         syslog( LOG_ERR,
                             "[%i] %s: %s %s %s %s, %s: %s",
-                            g_pid, "STS Error", "NxGen::flushBuffers()",
+                            g_pid, "STS Error", "NxPVInfo::flushBuffers()",
                             this->m_device_str.c_str(),
                             "Non-Normalized PV Buffer Full",
                             "With No First Pulse Time Yet",
@@ -742,6 +742,21 @@ private:
 
                         return( -1 );
                     }
+                }
+
+                // Do We Have a Valid Initialized NeXus Data File...?
+                // (We shouldn't get called if not, so if we do, better
+                // force it, lest we actually lose PV value data...!!)
+                if ( m_nxgen.m_gen_nexus && !(m_nxgen.initialize( true )) )
+                {
+                    syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
+                        g_pid, "STS Error:", "NxPVInfo::flushBuffers()",
+                        "Failed to Force Initialize NeXus File",
+                        "Losing PV Value Data!!",
+                        this->m_device_str.c_str(),
+                        this->m_pv_str.c_str() );
+                    usleep(30000); // give syslog a chance...
+                    return( 0 );
                 }
 
                 // Write PV Values to NeXus File _If_ We're Writing to
@@ -758,7 +773,7 @@ private:
                     {
                         // TODO Add Rate-Limiting...?
                         syslog( LOG_WARNING, "[%i] %s: %s: %s for %s",
-                            g_pid, "Warning", "NxGen::flushBuffers()",
+                            g_pid, "Warning", "NxPVInfo::flushBuffers()",
                             "Deferring Write of Duplicate PV Log",
                             this->m_device_pv_str.c_str() );
                         usleep(30000); // give syslog a chance...
@@ -779,7 +794,7 @@ private:
                             syslog( LOG_ERR,
                                 "[%i] %s: %s %s: %s, %s: %s",
                                 g_pid, "STS Error",
-                                "NxGen::flushBuffers()",
+                                "NxPVInfo::flushBuffers()",
                                 this->m_device_str.c_str(),
                                 "String/Array PV Buffer Full",
                                 "Deferring to Run End",
@@ -897,7 +912,7 @@ private:
                             ss_dst << m_log_path << "/" << "enum";
 
                             syslog( LOG_INFO, "[%i] %s %s: %s %s to %s",
-                                g_pid, "NxGen::flushBuffers()",
+                                g_pid, "NxPVInfo::flushBuffers()",
                                 this->m_device_pv_str.c_str(),
                                 "Linking Enum Group",
                                 ss_src.str().c_str(),
@@ -917,7 +932,7 @@ private:
                                     syslog( LOG_ERR,
                                         "[%i] %s: %s %s: %d %s %s %s!",
                                         g_pid, "STS Error",
-                                        "NxGen::flushBuffers()",
+                                        "NxPVInfo::flushBuffers()",
                                         this->m_device_str.c_str(),
                                         m_value_enum_strings_not_found,
                                         "Enumerated Type Value Strings",
@@ -937,7 +952,7 @@ private:
 
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s for %s %s=%lu %s=%u",
-                                    g_pid, "NxGen::flushBuffers()",
+                                    g_pid, "NxPVInfo::flushBuffers()",
                                     this->m_device_str.c_str(),
                                     "Enumerated Type Value Strings",
                                     this->m_pv_str.c_str(),
@@ -980,7 +995,7 @@ private:
                                 syslog( LOG_ERR,
                                     "[%i] %s: %s %s: %s for %s - %s",
                                     g_pid, "STS Error",
-                                    "NxGen::flushBuffers()",
+                                    "NxPVInfo::flushBuffers()",
                                     this->m_device_str.c_str(),
                                     "Empty Enumerated Type Value Strings",
                                     this->m_pv_str.c_str(),
@@ -997,7 +1012,7 @@ private:
                         {
                             syslog( LOG_INFO,
                                 "[%i] %s %s: %s %s to Alias %s",
-                                g_pid, "NxGen::flushBuffers()",
+                                g_pid, "NxPVInfo::flushBuffers()",
                                 this->m_device_pv_str.c_str(),
                                 "Linking PV Channel",
                                 m_log_path.c_str(),
@@ -1022,7 +1037,7 @@ private:
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s %s: PV Channel %s %s - %s",
-                                    g_pid, "NxGen::flushBuffers()",
+                                    g_pid, "NxPVInfo::flushBuffers()",
                                     this->m_device_pv_str.c_str(),
                                     m_log_path.c_str(),
                                     "Already Has Target Group Link String",
@@ -1047,7 +1062,7 @@ private:
                     {
                         syslog( LOG_WARNING,
                             "[%i] Warning in %s: %s: PV %s",
-                            g_pid, "NxGen::flushBuffers()",
+                            g_pid, "NxPVInfo::flushBuffers()",
                             this->m_device_pv_str.c_str(),
                             "Was Already Finalized, Duplicate Key...?" );
                         usleep(30000); // give syslog a chance...
@@ -1059,7 +1074,7 @@ private:
                 else if ( m_nxgen.m_gen_nexus && this->m_ignore )
                 {
                     syslog( LOG_INFO, "[%i] %s %s - Ignoring %s%s",
-                        g_pid, "NxGen::flushBuffers()",
+                        g_pid, "NxPVInfo::flushBuffers()",
                         this->m_device_str.c_str(),
                         ( ( this->m_duplicate ) ? "Duplicate " : "" ),
                         this->m_pv_str.c_str() );
@@ -1075,7 +1090,7 @@ private:
                     {
                         syslog( LOG_INFO,
                             "[%i] %s %s: %s %s to Alias %s",
-                            g_pid, "NxGen::flushBuffers()",
+                            g_pid, "NxPVInfo::flushBuffers()",
                             this->m_device_pv_str.c_str(),
                             "Linking Duplicate PV Channel",
                             m_log_path.c_str(),
@@ -1104,7 +1119,7 @@ private:
                         {
                             syslog( LOG_INFO,
                                 "[%i] %s %s: %s PV Channel %s %s - %s",
-                                g_pid, "NxGen::flushBuffers()",
+                                g_pid, "NxPVInfo::flushBuffers()",
                                 this->m_device_pv_str.c_str(),
                                 "Duplicate", m_log_path.c_str(),
                                 "Already Has Target Group Link String",
@@ -2115,6 +2130,25 @@ private:
                 //"Config Group Membership..." );
             //usleep(30000); // give syslog a chance...
 
+            // Do We Have a Valid Initialized NeXus Data File...?
+            // (We shouldn't get called if not, so if we do, better
+            // force it, lest we actually lose STS Config meta-data...!!)
+            // Note: This is Just for Paranoia's Sake to Check Initialize
+            // here, because we only get called by NxPVInfo::flushBuffers()
+            // which _Also_ checks the NeXus Initialization... ;-D
+            if ( !(m_nxgen.initialize( true )) )
+            {
+                syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
+                    g_pid, "STS Error:",
+                    "NxPVInfo::createSTSConfigGroups()",
+                    "Failed to Force Initialize NeXus File",
+                    "Losing STS Config Meta-Data!!",
+                    this->m_device_str.c_str(),
+                    this->m_pv_str.c_str() );
+                usleep(30000); // give syslog a chance...
+                return;
+            }
+
             // Check Each Config Group in Turn
             // for a Pattern Match on This PV...
             for ( uint32_t g=0 ; g < m_nxgen.m_config_groups.size() ; g++ )
@@ -2213,6 +2247,25 @@ private:
             if ( !(m_nxgen.m_gen_nexus) || this->m_ignore
                     || !(m_nxgen.m_config_groups.size()) )
             {
+                return;
+            }
+
+            // Do We Have a Valid Initialized NeXus Data File...?
+            // (We shouldn't get called if not, so if we do, better
+            // force it, lest we actually lose the final meta-data...!!)
+            // Although if we just Forced Working Directory construction
+            // in StreamParser::finalizeStreamProcessing(), then
+            // Now's a Chance to Finally Create a NeXus Data File...! ;-D
+            if ( !(m_nxgen.initialize( true )) )
+            {
+                syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
+                    g_pid, "STS Error:",
+                    "NxPVInfo::createSTSConfigConditionalGroups()",
+                    "Failed to Force Initialize NeXus File",
+                    "Losing STS Conditional Config Groups!!",
+                    this->m_device_str.c_str(),
+                    this->m_pv_str.c_str() );
+                usleep(30000); // give syslog a chance...
                 return;
             }
 

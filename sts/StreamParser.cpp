@@ -4734,8 +4734,12 @@ StreamParser::pvValueUpdate
         pvinfo->addToStats(a_value);
 
     // Check for buffer write
-    if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
+    // (And is the Working Directory/NeXus Data File Ready for Data...?)
+    if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh
+            && isWorkingDirectoryReady() )
+    {
         pvinfo->flushBuffers( m_pulse_info.start_time, 0 );
+    }
 }
 
 template void StreamParser::pvValueUpdate<uint32_t>(
