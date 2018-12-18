@@ -487,8 +487,8 @@ int main( int argc, char** argv )
 
             doRename = nxgen->getDoRename();
 
-            syslog( LOG_INFO, "[%i] Working Directory: [%s] (doRename=%d)",
-                g_pid, work_dir.c_str(), doRename );
+            syslog( LOG_INFO, "[%i] Working Directory: [%s] (doRename=%s)",
+                g_pid, work_dir.c_str(), ( doRename ? "true" : "false" ) );
             usleep(30000); // give syslog a chance...
 
             if ( move )
