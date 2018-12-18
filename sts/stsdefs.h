@@ -1365,7 +1365,8 @@ public:
                                 const RunInfo &a_run_info ,
                                 const bool a_strict ) = 0;
     virtual void            processGeometry(
-                                const std::string &a_xml ) = 0;
+                                const std::string &a_xml,
+                                bool a_force_init = false ) = 0;
     virtual void            pulseBuffersReady(
                                 STS::PulseInfo &a_pulse_info ) = 0;
     virtual void            bankPidTOFBuffersReady(

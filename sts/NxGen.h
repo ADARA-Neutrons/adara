@@ -2399,7 +2399,8 @@ protected:
                             bool a_force_init = false );
     void                processRunInfo( const STS::RunInfo &a_run_info,
                             const bool a_strict );
-    void                processGeometry( const std::string &a_xml );
+    void                processGeometry( const std::string &a_xml,
+                            bool a_force_init = false );
     void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
     void                bankPidTOFBuffersReady( STS::BankInfo &a_bank );
     void                bankIndexBuffersReady( STS::BankInfo &a_bank,
@@ -2600,6 +2601,8 @@ private:
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
     std::string                 m_runComment;           /// Capture the Singular Run Comment for the Nexus file
     bool                        m_nexus_run_comment_init; /// Has the Nexus Run Comment been Initialized yet or not?
+    std::string                 m_geometryXml;          /// Capture the Geometry/IDF XML for the Nexus file
+    bool                        m_nexus_geometry_init;  /// Has the Nexus Geometry/IDF been Initialized yet or not?
     float                       m_duration;             /// Save Total Run Duration (seconds)
     uint64_t                    m_total_counts;         /// Total Run Event Counts
     uint64_t                    m_total_uncounts;       /// Total Run Event Uncounts

@@ -74,7 +74,8 @@ NxGen::NxGen
     m_pulse_info_cur_size(0),
     m_pulse_vetoes_cur_size(0),
     m_pulse_flags_cur_size(0),
-    m_nexus_run_comment_init(false)
+    m_nexus_run_comment_init(false),
+    m_nexus_geometry_init(false)
 {
     // Capture STS "Start of Processing Time"...
     clock_gettime( CLOCK_REALTIME, &m_sts_run_start_time );
@@ -786,6 +787,10 @@ NxGen::finalize
             }
         }
 
+        // Try to Make Sure We Have Geometry/IDF XML...
+        if ( !m_nexus_geometry_init && m_geometryXml.size() > 0 )
+            processGeometry( m_geometryXml, true );
+
         writeScalar( m_daslogs_freq_path, "minimum_value",
             a_run_metrics.freq_stats.min(), FREQ_UNITS );
         writeScalar( m_daslogs_freq_path, "maximum_value",
@@ -1465,11 +1470,52 @@ NxGen::processRunInfo
 void
 NxGen::processGeometry
 (
-    const std::string & a_xml   ///< [in] Geometry data in xml format
+    const std::string & a_xml,  ///< [in] Geometry data in xml format
+    bool a_force_init           ///< [in] Force Initialize?
 )
 {
+    // Check for Duplicate Geometry...
+    if ( m_geometryXml.size() > 0 && m_geometryXml.compare( a_xml ) ) {
+        syslog( LOG_WARNING, "[%i] %s %s: New [%s] != Orig [%s] - %s",
+            g_pid, "STS Error:", "Duplicate Geometry/IDF Specified",
+            a_xml.c_str(), m_geometryXml.c_str(),
+            "Ignoring..." );
+        usleep(30000); // give syslog a chance...
+    }
+
+    // Save for Future Reference (& Retries, if No Working Directory Yet!)
+    else {
+        m_geometryXml = a_xml;
+    }
+
     if ( !m_gen_nexus )
         return;
+
+    // Already Initialized...
+    if ( m_nexus_geometry_init )
+        return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    if ( !initialize( a_force_init ) )
+    {
+        if ( a_force_init )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::processGeometry()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Geometry/IDF XML Data!" );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::processGeometry()",
+                "Unable to Initialize NeXus File", "Retry Later..." );
+            usleep(30000); // give syslog a chance...
+        }
+        return;
+    }
 
     try
     {
@@ -1478,12 +1524,14 @@ NxGen::processGeometry
         writeString( geom_path, "description",
             "XML contents of the instrument IDF" );
         writeString( geom_path, "type", "text/xml" );
-        writeString( geom_path, "data", a_xml );
+        writeString( geom_path, "data", m_geometryXml );
     }
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "processGeometry() failed." )
     }
+
+    m_nexus_geometry_init = true;
 }
 
 
@@ -2375,16 +2423,17 @@ NxGen::runComment
             a_comment.c_str(), m_runComment.c_str(),
             "Discarding..." );
         usleep(30000); // give syslog a chance...
-        return;
     }
 
     // Save for Future Reference (& Retries, if No Working Directory Yet!)
-    m_runComment = a_comment;
+    else {
+        m_runComment = a_comment;
 
-    syslog( LOG_INFO, "[%i] %s: %s: [%s]",
-        g_pid, "NxGen::runComment()",
-        "Run Comment Set to", m_runComment.c_str() );
-    usleep(30000); // give syslog a chance...
+        syslog( LOG_INFO, "[%i] %s: %s: [%s]",
+            g_pid, "NxGen::runComment()",
+            "Run Comment Set to", m_runComment.c_str() );
+        usleep(30000); // give syslog a chance...
+    }
 
     if ( !m_gen_nexus )
         return;
@@ -2417,7 +2466,7 @@ NxGen::runComment
 
     try
     {
-        writeString( m_entry_path, "notes", a_comment );
+        writeString( m_entry_path, "notes", m_runComment );
     }
     catch( TraceException &e )
     {
