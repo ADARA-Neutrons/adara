@@ -1476,7 +1476,7 @@ NxGen::processGeometry
 {
     // Check for Duplicate Geometry...
     if ( m_geometryXml.size() > 0 && m_geometryXml.compare( a_xml ) ) {
-        syslog( LOG_WARNING, "[%i] %s %s: New [%s] != Orig [%s] - %s",
+        syslog( LOG_ERR, "[%i] %s %s: New [%s] != Orig [%s] - %s",
             g_pid, "STS Error:", "Duplicate Geometry/IDF Specified",
             a_xml.c_str(), m_geometryXml.c_str(),
             "Ignoring..." );
@@ -2418,7 +2418,7 @@ NxGen::runComment
 {
     // Always Handle Duplicate Run Comment, Even if Not Writing to NeXus.
     if ( m_runComment.size() > 0 && m_runComment.compare( a_comment ) ) {
-        syslog( LOG_WARNING, "[%i] %s %s: New [%s] != Orig [%s] - %s",
+        syslog( LOG_ERR, "[%i] %s %s: New [%s] != Orig [%s] - %s",
             g_pid, "STS Error:", "Duplicate Run Comment Specified",
             a_comment.c_str(), m_runComment.c_str(),
             "Discarding..." );

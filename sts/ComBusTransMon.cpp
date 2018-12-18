@@ -225,7 +225,7 @@ ComBusTransMon::commThread()
                     ss_info.str(), ss_err.str() );
 
                 if ( !m_combus->waitForConnect( 5 ) ) { 
-                    syslog( LOG_WARNING,
+                    syslog( LOG_ERR,
                     "[%i] STS Error: %s for Domain %s to URI %s as User %s",
                         g_pid, "ComBus Connection Timeout",
                         m_domain.c_str(), m_broker_uri.c_str(),
