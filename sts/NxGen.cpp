@@ -403,6 +403,20 @@ NxGen::initializeNxBank
     if ( a_bi->m_nexus_bank_init )
         return;
 
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data...!!)
+    if ( !initialize( true ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u",
+            g_pid, "STS Error:", "NxGen::initializeNxBank()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Bank Group/Data!!",
+            "bank_id", a_bi->m_id );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
     try
     {
         // Instrument bank group (contains *Both* Event and Histo data)
@@ -507,6 +521,20 @@ NxGen::initializeNxMonitor
     // Already Initialized...
     if ( a_mi->m_nexus_monitor_init )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data...!!)
+    if ( !initialize( true ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u",
+            g_pid, "STS Error:", "NxGen::initializeNxMonitor()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Monitor Group/Meta-Data!!",
+            "bank_id", a_mi->m_id );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     try
     {
