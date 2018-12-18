@@ -2415,7 +2415,8 @@ protected:
     void                monitorPulseGap( STS::MonitorInfo &a_monitor,
                             uint64_t a_count );
     void                monitorFinalize( STS::MonitorInfo &a_monitor );
-    void                runComment( const std::string &a_comment );
+    void                runComment( const std::string &a_comment,
+                            bool a_force_init = false );
     void                markerPause( double a_time, uint64_t tOrig,
                             const std::string &a_comment  );
     void                markerResume( double a_time, uint64_t tOrig,
@@ -2597,7 +2598,8 @@ private:
     std::multimap<uint64_t, std::pair<double, std::string> >
                                 m_comment_multimap;     /// Comment annotation nsec-to-timestamp/string map
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
-    bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
+    std::string                 m_runComment;           /// Capture the Singular Run Comment for the Nexus file
+    bool                        m_nexus_run_comment_init; /// Has the Nexus Run Comment been Initialized yet or not?
     float                       m_duration;             /// Save Total Run Duration (seconds)
     uint64_t                    m_total_counts;         /// Total Run Event Counts
     uint64_t                    m_total_uncounts;       /// Total Run Event Uncounts

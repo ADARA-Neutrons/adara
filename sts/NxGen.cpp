@@ -53,6 +53,7 @@ NxGen::NxGen
         a_verbose ),
     m_gen_nexus(false),
     m_nexus_init(false),
+    m_nexus_beamline_init(false),
     m_nexus_filename(a_nexus_out_file),
     m_config_file(a_config_file),
     m_entry_path(string("/entry")),
@@ -73,7 +74,7 @@ NxGen::NxGen
     m_pulse_info_cur_size(0),
     m_pulse_vetoes_cur_size(0),
     m_pulse_flags_cur_size(0),
-    m_haveRunComment(false)
+    m_nexus_run_comment_init(false)
 {
     // Capture STS "Start of Processing Time"...
     clock_gettime( CLOCK_REALTIME, &m_sts_run_start_time );
@@ -771,14 +772,18 @@ NxGen::finalize
             run_start_time_str );
 
         // Make Sure We Have "Some" Overall Run Comment... ;-D
-        if ( !m_haveRunComment ) {
-            std::string dummy = "(unset)";
-            syslog( LOG_INFO, "[%i] %s: %s - %s [%s]",
-                g_pid, "NxGen::finalize()",
-                "No Run Comment Has Been Set For This Run",
-                "Setting Dummy Empty Run Comment", dummy.c_str() );
-            usleep(30000); // give syslog a chance...
-            runComment( dummy );
+        if ( !m_nexus_run_comment_init ) {
+            if ( m_runComment.size() > 0 )
+                runComment( m_runComment, true );
+            else {
+                std::string dummy = "(unset)";
+                syslog( LOG_INFO, "[%i] %s: %s - %s [%s]",
+                    g_pid, "NxGen::finalize()",
+                    "No Run Comment Has Been Set For This Run",
+                    "Setting Dummy Empty Run Comment", dummy.c_str() );
+                usleep(30000); // give syslog a chance...
+                runComment( dummy, true );
+            }
         }
 
         writeScalar( m_daslogs_freq_path, "minimum_value",
@@ -2359,17 +2364,54 @@ NxGen::monitorFinalize
 void
 NxGen::runComment
 (
-    const std::string &a_comment    ///< [in] Overall run comments
+    const std::string &a_comment,   ///< [in] Overall run comments
+    bool a_force_init               ///< [in] Force Initialize?
 )
 {
+    // Always Handle Duplicate Run Comment, Even if Not Writing to NeXus.
+    if ( m_runComment.size() > 0 && m_runComment.compare( a_comment ) ) {
+        syslog( LOG_WARNING, "[%i] %s %s: New [%s] != Orig [%s] - %s",
+            g_pid, "STS Error:", "Duplicate Run Comment Specified",
+            a_comment.c_str(), m_runComment.c_str(),
+            "Discarding..." );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
+    // Save for Future Reference (& Retries, if No Working Directory Yet!)
+    m_runComment = a_comment;
+
+    syslog( LOG_INFO, "[%i] %s: %s: [%s]",
+        g_pid, "NxGen::runComment()",
+        "Run Comment Set to", m_runComment.c_str() );
+    usleep(30000); // give syslog a chance...
+
     if ( !m_gen_nexus )
         return;
 
-    if ( m_haveRunComment ) {
-        syslog( LOG_WARNING,
-        "[%i] %s Duplicate Run Comment Specified (Discarded): %s",
-            g_pid, "STS Error:", a_comment.c_str() );
-        usleep(30000); // give syslog a chance...
+    // Already Initialized...
+    if ( m_nexus_run_comment_init )
+        return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    if ( !initialize( a_force_init ) )
+    {
+        if ( a_force_init )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::runComment()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Run Comment Data!" );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::runComment()",
+                "Unable to Initialize NeXus File", "Retry Later..." );
+            usleep(30000); // give syslog a chance...
+        }
         return;
     }
 
@@ -2382,7 +2424,7 @@ NxGen::runComment
         RETHROW_TRACE( e, "runComment() failed." )
     }
 
-    m_haveRunComment = true;
+    m_nexus_run_comment_init = true;
 }
 
 

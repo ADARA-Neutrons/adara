@@ -1385,7 +1385,8 @@ public:
                                 uint64_t a_count ) = 0;
     virtual void            monitorFinalize(
                                 STS::MonitorInfo &a_monitor ) = 0;
-    virtual void            runComment( const std::string &a_comment ) = 0;
+    virtual void            runComment( const std::string &a_comment,
+                                bool a_force_init = false ) = 0;
     virtual void            markerPause( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
     virtual void            markerResume( double a_time, uint64_t tOrig,
