@@ -180,7 +180,7 @@ StreamParser::constructWorkingDirectory( bool a_force_init )
                 m_work_dir += m_work_base + "/";
 
             syslog( LOG_INFO,
-                "[%i] %s: Working Directory Constructed %s: %s",
+                "[%i] %s: Working Directory Constructed %s: [%s]",
                 g_pid, "StreamParser::constructWorkingDirectory()",
                 "from Run/Beamline Info", m_work_dir.c_str() );
             usleep(30000); // give syslog a chance...
@@ -198,12 +198,15 @@ StreamParser::constructWorkingDirectory( bool a_force_init )
 
             m_work_dir += "/";
 
+            m_do_rename = false;
+
             syslog( LOG_ERR,
-                "[%i] %s %s: %s Working Directory Constructed %s (%s): %s",
+                "[%i] %s %s: %s %s (%s): [%s] (Set doRename=%s)",
                 g_pid, "STS Error:",
-                "StreamParser::constructWorkingDirectory()",
-                "FORCE INIT", "from STS Config File Path",
-                m_config_file.c_str(), m_work_dir.c_str() );
+                "StreamParser::constructWorkingDirectory()", "FORCE INIT",
+                "Working Directory Constructed from STS Config File Path",
+                m_config_file.c_str(), m_work_dir.c_str(),
+                ( m_do_rename ? "true" : "false" ) );
             usleep(30000); // give syslog a chance...
 
             return( true );
@@ -563,8 +566,7 @@ StreamParser::rxPacket
         }
         else
         {
-            syslog( LOG_WARNING,
-                "[%i] %s Run Status Error: %s = %s.",
+            syslog( LOG_ERR, "[%i] %s Run Status Error: %s = %s.",
                 g_pid, "STS Error:", "Start-of-Run with Processing State",
                 getProcessingStateString().c_str() );
             usleep(30000); // give syslog a chance...
@@ -596,8 +598,7 @@ StreamParser::rxPacket
         }
         else
         {
-            syslog( LOG_WARNING,
-                "[%i] %s Run Status Error: %s = %s.",
+            syslog( LOG_ERR, "[%i] %s Run Status Error: %s = %s.",
                 g_pid, "STS Error:", "End-of-Run with Processing State",
                 getProcessingStateString().c_str() );
             usleep(30000); // give syslog a chance...
