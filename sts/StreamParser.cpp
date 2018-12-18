@@ -5536,7 +5536,11 @@ StreamParser::finalizeStreamProcessing()
         }
     }
 
-    // NOW Dump RunInfo Meta-Data to NeXus...!
+    // Make Sure the BeamlineInfo has been Recorded/Processed...
+    // (In case the Working Directory hadn't been resolved previously...)
+    processBeamlineInfo( m_beamline_info, true );
+
+    // NOW Record/Process RunInfo Meta-Data...!
     // - The Run is Over/Stopped, so there can be No More RunInfo Updates!
     processRunInfo( m_run_info, m_strict );
 

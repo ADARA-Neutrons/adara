@@ -1194,22 +1194,36 @@ NxGen::dumpProcessingStatistics(void)
 void
 NxGen::processBeamlineInfo
 (
-    const STS::BeamlineInfo & a_beamline_info   ///< [in] Beamline information object
+    const STS::BeamlineInfo & a_beamline_info,  ///< [in] Beamline information object
+    bool a_force_init                           ///< [in] Force Initialize?
 )
 {
     if ( !m_gen_nexus )
         return;
 
+    // Already Initialized...
+    if ( m_nexus_beamline_init )
+        return;
+
     // We've Got the Beamline Info Now, Try to Initialize the NeXus File
-    if ( !initialize() )
+    if ( !initialize( a_force_init ) )
     {
-        syslog( LOG_ERR, "[%i] %s %s: Unable to Initialize NeXus File!",
-            g_pid, "STS Error:", "NxGen::processBeamlineInfo()" );
-        usleep(30000); // give syslog a chance...
-
-        // XXX TODO Retry Again Later...? (Nothing Depends on This Stuff?)
-        // Maybe retry at end in StreamParser::finalizeStreamProcessing() ?
-
+        if ( a_force_init )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::processBeamlineInfo()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Beamline Meta-Data!" );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::processBeamlineInfo()",
+                "Unable to Initialize NeXus File", "Retry Later..." );
+            usleep(30000); // give syslog a chance...
+        }
         return;
     }
 
@@ -1232,6 +1246,8 @@ NxGen::processBeamlineInfo
                     "short_name", a_beamline_info.instr_shortname );
             }
         }
+
+        m_nexus_beamline_init = true;
     }
     catch( TraceException &e )
     {

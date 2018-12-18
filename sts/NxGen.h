@@ -2395,7 +2395,8 @@ protected:
                             bool a_known_monitor );
     void                initializeNxMonitor( NxMonitorInfo *a_mi );
     void                processBeamlineInfo(
-                            const STS::BeamlineInfo &a_beamline_info );
+                            const STS::BeamlineInfo &a_beamline_info,
+                            bool a_force_init = false );
     void                processRunInfo( const STS::RunInfo &a_run_info,
                             const bool a_strict );
     void                processGeometry( const std::string &a_xml );
@@ -2561,6 +2562,7 @@ private:
 
     bool                m_gen_nexus;            ///< Controls whether Nexus file is generated or not
     bool                m_nexus_init;           ///< Has the Nexus file been Initialized yet or not?
+    bool                m_nexus_beamline_init;  ///< Has the Nexus BeamlineInfo been Initialized yet or not?
     std::string         m_nexus_filename;       ///< Name of Nexus file
     std::string         m_config_file;          ///< Name of STS Config file
     std::vector<struct GroupInfo>

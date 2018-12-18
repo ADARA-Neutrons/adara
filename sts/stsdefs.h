@@ -1359,7 +1359,8 @@ public:
     virtual void            updateRunInfo(
                                 const RunInfo &a_run_info ) = 0;
     virtual void            processBeamlineInfo(
-                                const BeamlineInfo &a_beamline_info ) = 0;
+                                const BeamlineInfo &a_beamline_info,
+                                bool a_force_init = false ) = 0;
     virtual void            processRunInfo(
                                 const RunInfo &a_run_info ,
                                 const bool a_strict ) = 0;
