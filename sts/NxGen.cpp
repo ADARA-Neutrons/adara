@@ -1245,12 +1245,12 @@ NxGen::processBeamlineInfo
         writeString( m_instrument_path, "beamline",
             a_beamline_info.instr_id );
 
-        if ( a_beamline_info.instr_longname.size())
+        if ( a_beamline_info.instr_longname.size() )
         {
             writeString( m_instrument_path, "name",
                 a_beamline_info.instr_longname );
 
-            if ( a_beamline_info.instr_shortname.size())
+            if ( a_beamline_info.instr_shortname.size() )
             {
                 writeStringAttribute( m_instrument_path + "/name",
                     "short_name", a_beamline_info.instr_shortname );
