@@ -593,11 +593,10 @@ NxGen::initialize( bool a_force_init, string caller )
 
     if ( m_nexus_init )
     {
-        // REMOVE ME...
-        syslog( LOG_INFO, "[%i] %s: Nexus File Already Initialized: %s",
-            g_pid, "NxGen::initialize()",
-            m_nexus_filename.c_str() );
-        usleep(30000); // give syslog a chance...
+        //syslog( LOG_INFO, "[%i] %s: Nexus File Already Initialized: %s",
+            //g_pid, "NxGen::initialize()",
+            //m_nexus_filename.c_str() );
+        //usleep(30000); // give syslog a chance...
         return( true );
     }
 
