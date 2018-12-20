@@ -2,6 +2,7 @@
 #include "TransCompletePkt.h"
 #include <iomanip>
 #include <sstream>
+#include <string>
 #include <string.h>
 #include <boost/algorithm/string.hpp>
 #include <unistd.h>
@@ -42,7 +43,10 @@ RateLimitedLogging::History RLLHistory_StreamParserH;
 StreamParser::StreamParser
 (
     int             a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
+    const string   &a_work_root,                ///< [in] Work Directory Root
+    const string   &a_work_base,                ///< [in] Work Directory Base
     const string   &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
+    const string   &a_config_file,              ///< [in] Path to STS Config file
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
     uint32_t        a_event_buf_write_thresh,   ///< [in] Event buffer write threshold (number of elements)
@@ -59,6 +63,12 @@ StreamParser::StreamParser
     m_event_buf_write_thresh(a_event_buf_write_thresh),
     m_anc_buf_write_thresh(a_anc_buf_write_thresh),
     m_info_rcvd(0),
+    m_work_root(a_work_root),
+    m_work_base(a_work_base),
+    m_work_dir(""),
+    m_do_rename(true),
+    m_adara_out_file(a_adara_out_file),
+    m_config_file(a_config_file),
     m_strict(a_strict),
     m_gen_adara(false),
     m_gather_stats(a_gather_stats),
@@ -70,10 +80,21 @@ StreamParser::StreamParser
     // (In case there are No Neutron Pulses, for Faking It...! ;-D)
     clock_gettime( CLOCK_REALTIME, &m_default_run_start_time );
 
-    if ( !a_adara_out_file.empty() )
+    if ( !m_adara_out_file.empty() )
     {
         m_gen_adara = true;
-        m_ofs_adara.open( a_adara_out_file.c_str(), ios_base::out | ios_base::binary );
+
+        // If We Already Have the Working Directory,
+        // Proceed with Opening the ADARA Output Stream File...
+        if ( isWorkingDirectoryReady() )
+        {
+            string adara_file_path = m_work_dir + m_adara_out_file;
+            syslog( LOG_INFO, "[%i] Creating ADARA Stream File: %s",
+                g_pid, adara_file_path.c_str() );
+            usleep(30000); // give syslog a chance...
+            m_ofs_adara.open( adara_file_path.c_str(),
+                ios_base::out | ios_base::binary );
+        }
     }
 
     m_pulse_info.times.reserve(m_anc_buf_write_thresh);
@@ -124,6 +145,129 @@ StreamParser::~StreamParser()
             }
             delete *ipv;
         }
+    }
+}
+
+
+bool
+StreamParser::isWorkingDirectoryReady()
+{
+    return ( m_work_dir.size() > 0
+        || ( m_work_root.size() == 0 && m_work_base.size() == 0 ) );
+}
+
+
+bool
+StreamParser::constructWorkingDirectory( bool a_force_init, string caller )
+{
+    // Do We Need to Construct a Working Directory Path...?
+    if ( m_work_dir.size() == 0
+            && ( m_work_root.size() > 0 || m_work_base.size() > 0 ) )
+    {
+        // Do We Have the Necessary Pieces
+        // to Construct the Working Directory?
+        if ( getFacilityName().size() > 0
+                && getBeamShortName().size() > 0 )
+        {
+            // Note: Work Root Must End in "/",
+            // as it might be _Just_ "/"...! ;-D
+            m_work_dir = ( m_work_root.size() > 0 ) ? m_work_root : "/";
+
+            m_work_dir += getFacilityName() + "/"
+                + getBeamShortName() + "/";
+
+            if ( m_work_base.size() > 0 )
+                m_work_dir += m_work_base + "/";
+
+            syslog( LOG_INFO,
+                "[%i] %s: Working Directory Constructed %s: [%s]",
+                g_pid, "StreamParser::constructWorkingDirectory()",
+                "from Run/Beamline Info", m_work_dir.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            return( true );
+        }
+        else if ( a_force_init )
+        {
+            syslog( LOG_INFO, "[%i] %s: %s by Caller %s",
+                g_pid, "StreamParser::constructWorkingDirectory()",
+                "Forcing Initialization of Nexus File", caller.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            // In a pinch, Steal STS Config File Directory as Scratch...!
+            size_t last_slash = m_config_file.find_last_of("/");
+            if ( last_slash != string::npos )
+                m_work_dir = m_config_file.substr( 0, last_slash );
+            else
+                m_work_dir = ".";
+
+            m_work_dir += "/";
+
+            m_do_rename = false;
+
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s %s (%s): [%s] (Set doRename=%s)",
+                g_pid, "STS Error:",
+                "StreamParser::constructWorkingDirectory()", "FORCE INIT",
+                "Working Directory Constructed from STS Config File Path",
+                m_config_file.c_str(), m_work_dir.c_str(),
+                ( m_do_rename ? "true" : "false" ) );
+            usleep(30000); // give syslog a chance...
+
+            return( true );
+        }
+        else
+        {
+            syslog( LOG_WARNING,
+                "[%i] %s: %s: %s=[%s] %s=[%s]",
+                g_pid, "StreamParser::constructWorkingDirectory()",
+                "Still Missing Info for Working Directory Construction",
+                "FacilityName", getFacilityName().c_str(),
+                "BeamShortName", getBeamShortName().c_str() );
+            usleep(30000); // give syslog a chance...
+
+            return( false );
+        }
+    }
+
+    // We Didn't Newly Construct Any Working Directory Here... ;-D
+    return( false );
+}
+
+
+void
+StreamParser::flushAdaraStreamBuffer()
+{
+    // Open the ADARA Stream File if Working Directory Now Constructed...
+    if ( isWorkingDirectoryReady() && ! m_ofs_adara.is_open() )
+    {
+        string adara_file_path = m_work_dir + m_adara_out_file;
+        syslog( LOG_INFO, "[%i] %s, Creating ADARA Stream File: %s",
+            g_pid, "Working Directory Created", adara_file_path.c_str() );
+        usleep(30000); // give syslog a chance...
+        m_ofs_adara.open( adara_file_path.c_str(),
+            ios_base::out | ios_base::binary );
+    }
+
+    // Dump Any Queued Packets to the ADARA Stream File...
+    if ( m_ofs_adara.is_open() && m_adara_queue.size() > 0 )
+    {
+        syslog( LOG_INFO, "[%i] Dumping %d %s to ADARA Stream File: %s%s",
+            g_pid, (int) m_adara_queue.size(), "Queued Packets",
+            m_work_dir.c_str(), m_adara_out_file.c_str() );
+        usleep(30000); // give syslog a chance...
+
+        for ( std::vector<ADARA::Packet *>::iterator pkt =
+                    m_adara_queue.begin();
+                pkt != m_adara_queue.end() ; ++pkt )
+        {
+            m_ofs_adara.write(
+                (char *)(*pkt)->packet(), (*pkt)->packet_length() );
+
+            delete (*pkt);
+        }
+
+        m_adara_queue.clear();
     }
 }
 
@@ -312,7 +456,17 @@ StreamParser::rxPacket
         gatherStats( a_pkt );
 
     if ( m_gen_adara )
-        m_ofs_adara.write( (char *)a_pkt.packet(), a_pkt.packet_length() );
+    {
+        if ( m_ofs_adara.is_open() )
+        {
+            m_ofs_adara.write(
+                (char *)a_pkt.packet(), a_pkt.packet_length() );
+        }
+        else
+        {
+            m_adara_queue.push_back( new ADARA::Packet( a_pkt ) );
+        }
+    }
 
     switch (a_pkt.base_type())
     {
@@ -417,8 +571,7 @@ StreamParser::rxPacket
         }
         else
         {
-            syslog( LOG_WARNING,
-                "[%i] %s Run Status Error: %s = %s.",
+            syslog( LOG_ERR, "[%i] %s Run Status Error: %s = %s.",
                 g_pid, "STS Error:", "Start-of-Run with Processing State",
                 getProcessingStateString().c_str() );
             usleep(30000); // give syslog a chance...
@@ -450,8 +603,7 @@ StreamParser::rxPacket
         }
         else
         {
-            syslog( LOG_WARNING,
-                "[%i] %s Run Status Error: %s = %s.",
+            syslog( LOG_ERR, "[%i] %s Run Status Error: %s = %s.",
                 g_pid, "STS Error:", "End-of-Run with Processing State",
                 getProcessingStateString().c_str() );
             usleep(30000); // give syslog a chance...
@@ -1277,7 +1429,9 @@ StreamParser::processPulseInfo
     }
 
     // Is is time to write pulse info?
-    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh )
+    // (And is the Working Directory/NeXus Data File Ready for Data...?)
+    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh
+            && isWorkingDirectoryReady() )
     {
         pulseBuffersReady( m_pulse_info );
 
@@ -1349,7 +1503,9 @@ StreamParser::processPulseInfo
     }
 
     // Is is time to write pulse info?
-    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh )
+    // (And is the Working Directory/NeXus Data File Ready for Data...?)
+    if ( m_pulse_info.times.size() == m_anc_buf_write_thresh
+            && isWorkingDirectoryReady() )
     {
         pulseBuffersReady( m_pulse_info );
 
@@ -1498,7 +1654,10 @@ StreamParser::processBankEvents
             bi->m_last_pulse_with_data = m_pulse_count;
 
             // Check to see if Pid/TOF buffers are ready to write
-            if ( bi->m_tof_buffer_size >= m_event_buf_write_thresh )
+            // (And is the Working Directory/NeXus Data File
+            // Ready for Data...?)
+            if ( bi->m_tof_buffer_size >= m_event_buf_write_thresh
+                    && isWorkingDirectoryReady() )
             {
                 bankPidTOFBuffersReady( *bi );
 
@@ -1512,7 +1671,10 @@ StreamParser::processBankEvents
             }
 
             // Check to see if Index buffers are ready to write
-            if ( bi->m_index_buffer.size() >= m_anc_buf_write_thresh )
+            // (And is the Working Directory/NeXus Data File
+            // Ready for Data...?)
+            if ( bi->m_index_buffer.size() >= m_anc_buf_write_thresh
+                    && isWorkingDirectoryReady() )
             {
                 bankIndexBuffersReady( *bi, false );
 
@@ -1697,7 +1859,9 @@ StreamParser::handleBankPulseGap
 
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
-    if ( a_bi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh )
+    // (OR, If Working Directory Not Yet Resolved...!)
+    if ( a_bi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh
+            || !isWorkingDirectoryReady() )
     {
         a_bi.m_index_buffer.resize( a_bi.m_index_buffer.size() + a_count,
             a_bi.m_event_count );
@@ -1970,7 +2134,10 @@ StreamParser::processMonitorEvents
         //    to Enable Chunk Size Override Optimizations...! ;-D
 
         // Check to see if TOF buffers are ready to write
-        if ( imi->second->m_tof_buffer_size >= m_event_buf_write_thresh )
+        // (And is the Working Directory/NeXus Data File
+        // Ready for Data...?)
+        if ( imi->second->m_tof_buffer_size >= m_event_buf_write_thresh
+                && isWorkingDirectoryReady() )
         {
             monitorTOFBuffersReady( *imi->second );
     
@@ -1982,7 +2149,10 @@ StreamParser::processMonitorEvents
         }
 
         // Check to see if Event Index buffers are ready to write
-        if ( imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh )
+        // (And is the Working Directory/NeXus Data File
+        // Ready for Data...?)
+        if ( imi->second->m_index_buffer.size() >= m_anc_buf_write_thresh
+                && isWorkingDirectoryReady() )
         {
             monitorIndexBuffersReady( *imi->second, false );
     
@@ -1999,7 +2169,7 @@ StreamParser::processMonitorEvents
  * must be corrected for the missing pulses to keep in synchronized
  * with the event stream. If a small gap is detected, values are inserted
  * directly into the internal index buffer; otherwise, gap processing is
- * deferred to the stream adatapter subclass via the monitorPulseGap()
+ * deferred to the stream adapter subclass via the monitorPulseGap()
  * virtual method. (It is expected that the virtual method should write
  * index values directly into the destination format to prevent excessive
  * memory consumption that would be caused by buffering the corrected
@@ -2018,7 +2188,9 @@ StreamParser::handleMonitorPulseGap
 
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
-    if ( a_mi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh )
+    // (OR, If Working Directory Not Yet Resolved...!)
+    if ( a_mi.m_index_buffer.size() + a_count < m_anc_buf_write_thresh
+            || !isWorkingDirectoryReady() )
     {
         a_mi.m_index_buffer.resize( a_mi.m_index_buffer.size() + a_count,
             a_mi.m_event_count );
@@ -2045,8 +2217,8 @@ StreamParser::handleMonitorPulseGap
 /*! \brief This method processes Run Info ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
- * This method processes ADARA Run Info packets. The processRunInfo()
- * virtual method is used to communicate
+ * This method processes ADARA Run Info packets.
+ * The processRunInfo() virtual method is used to communicate
  * run info data to the stream adapter subclass.
  */
 bool
@@ -2475,6 +2647,12 @@ StreamParser::rxPacket
         }
     }
 
+    if ( !isWorkingDirectoryReady() )
+    {
+        if ( constructWorkingDirectory() )
+            flushAdaraStreamBuffer();
+    }
+
     receivedInfo( RUN_INFO_BIT );
 
     return false;
@@ -2526,6 +2704,12 @@ StreamParser::rxPacket
     m_beamline_info.instr_id = a_pkt.id();
     m_beamline_info.instr_shortname = a_pkt.shortName();
     m_beamline_info.instr_longname = a_pkt.longName();
+
+    if ( !isWorkingDirectoryReady() )
+    {
+        if ( constructWorkingDirectory() )
+            flushAdaraStreamBuffer();
+    }
 
     receivedInfo( INSTR_INFO_BIT );
 
@@ -4556,8 +4740,12 @@ StreamParser::pvValueUpdate
         pvinfo->addToStats(a_value);
 
     // Check for buffer write
-    if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh )
+    // (And is the Working Directory/NeXus Data File Ready for Data...?)
+    if ( pvinfo->m_value_buffer.size() >= m_anc_buf_write_thresh
+            && isWorkingDirectoryReady() )
+    {
         pvinfo->flushBuffers( m_pulse_info.start_time, 0 );
+    }
 }
 
 template void StreamParser::pvValueUpdate<uint32_t>(
@@ -4794,8 +4982,6 @@ StreamParser::processPulseID
 void
 StreamParser::updateRunInfo( const RunInfo &a_run_info )
 {
-    bool re_dump_run_header = false;
-
     // ILLEGAL UPDATE (Meta-Data Used in Preliminary ComBus Messaging!)
     if ( a_run_info.run_number != m_run_info.run_number ) {
         syslog( LOG_ERR,
@@ -5294,25 +5480,14 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         usleep(30000); // give syslog a chance...
         m_run_info.users = a_run_info.users;
     }
-
-    if ( re_dump_run_header )
-    {
-        syslog( LOG_INFO,
-            "[%i] UPDATED %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
-            "Target Station", m_beamline_info.target_station_number,
-            "Beamline", m_run_info.facility_name.c_str(),
-            m_beamline_info.instr_shortname.c_str(),
-            "Proposal", m_run_info.proposal_id.c_str(),
-            "Run", m_run_info.run_number );
-        usleep(30000); // give syslog a chance...
-    }
 }
 
 
 /*! \brief Processes state of received informational packets
  *
- * This method tracks which ADARA informational packets have been received and issues a processRunInfo() call once all
- * packets have been received.
+ * This method tracks which ADARA informational packets have been received
+ * and issues a processBeamlineInfo() call once all packets have
+ * been received.
  */
 void
 StreamParser::receivedInfo( InfoBit a_bit )
@@ -5346,7 +5521,35 @@ StreamParser::receivedInfo( InfoBit a_bit )
 void
 StreamParser::finalizeStreamProcessing()
 {
-    // NOW Dump RunInfo Meta-Data to NeXus...!
+    // We're at the End of the Run Now,
+    // So No More Time to Wait for the Working Directory to resolve...!
+    // (Hopefully we at least have the Beamline Short Name by now...! ;-D)
+    // Force the Creation of "Some" Working Directory and then
+    // Try to Proceed to Create and Write a NeXus Data File...! ;-D
+    if ( !isWorkingDirectoryReady() )
+    {
+        if ( constructWorkingDirectory( true,
+                "StreamParser::finalizeStreamProcessing()" ) )
+        {
+            flushAdaraStreamBuffer();
+        }
+
+        else
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::finalizeStreamProcessing()",
+                "Failed to Force Construction of Working Directory",
+                "EPIC FAIL, This Was Our Last Chance...!! Bailing..." );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+    }
+
+    // Make Sure the BeamlineInfo has been Recorded/Processed...
+    // (In case the Working Directory hadn't been resolved previously...)
+    processBeamlineInfo( m_beamline_info, true );
+
+    // NOW Record/Process RunInfo Meta-Data...!
     // - The Run is Over/Stopped, so there can be No More RunInfo Updates!
     processRunInfo( m_run_info, m_strict );
 

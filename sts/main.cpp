@@ -94,28 +94,76 @@ using namespace std;
 pid_t g_pid = 0;
 
 /**
+ * @brief renameFile - Attempts to rename a file to the specified path
+ * @param a_source - Full path to source file
+ * @param a_dest_path - Destination path (no filename)
+ * @param a_dest_filename - Destination filename
+ *
+ * This method attempts to rename the specified file to the specified path
+ * and filename. If the operation fails, an exception is thrown. This method
+ * can only succeed if the source and destination paths reside on the same
+ * physical device (uses a filesystem rename command to avoid copying data).
+ */
+void
+renameFile( const string &a_source,
+        const string &a_dest_path, const string &a_dest_filename )
+{
+    try
+    {
+        boost::filesystem::create_directories(
+            boost::filesystem::path( a_dest_path ) );
+        boost::filesystem::remove(
+            boost::filesystem::path( a_dest_path + "/" + a_dest_filename )
+        );
+        boost::filesystem::rename(
+            boost::filesystem::path( a_source ),
+            boost::filesystem::path( a_dest_path + "/" + a_dest_filename )
+        );
+    }
+    catch( boost::filesystem::filesystem_error &e )
+    {
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "Move of " << a_source << " to "
+                << a_dest_path << "/" << a_dest_filename
+                << " failed. {" << e.what() << "}" )
+    }
+}
+
+/**
  * @brief moveFile - Attempts to move a file to the specified path
  * @param a_source - Full path to source file
  * @param a_dest_path - Destination path (no filename)
  * @param a_dest_filename - Destination filename
  *
- * This method attempts to move the specified file to the specified path and
- * filename. If the operation fails, an exception is thrown. This method can
- * only succeed if the source and destination paths reside on the same phyiscal
- * device (uses a filesystem move command to avoid copying data).
+ * This method attempts to move the specified file to the specified path
+ * and filename. If the operation fails, an exception is thrown. This method
+ * actually moves the file instead of just renaming it, so it can succeed
+ * even if the source and destination paths do not reside on the same
+ * physical device.
  */
 void
-moveFile( const string &a_source, const string &a_dest_path, const string &a_dest_filename )
+moveFile( const string &a_source,
+        const string &a_dest_path, const string &a_dest_filename )
 {
     try
     {
-        boost::filesystem::create_directories( boost::filesystem::path( a_dest_path ));
-        boost::filesystem::remove( boost::filesystem::path( a_dest_path+"/"+a_dest_filename ));
-        boost::filesystem::rename( boost::filesystem::path( a_source ), boost::filesystem::path( a_dest_path+"/"+a_dest_filename ));
+        boost::filesystem::create_directories(
+            boost::filesystem::path( a_dest_path ) );
+        boost::filesystem::remove(
+            boost::filesystem::path( a_dest_path + "/" + a_dest_filename )
+        );
+        boost::filesystem::copy_file(
+            boost::filesystem::path( a_source ),
+            boost::filesystem::path( a_dest_path + "/" + a_dest_filename )
+        );
+        boost::filesystem::remove( boost::filesystem::path( a_source ) );
     }
     catch( boost::filesystem::filesystem_error &e )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "Move of " << a_source << " to " << a_dest_path << "/" << a_dest_filename << " failed. {" << e.what() << "}" )
+        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            "Move of " << a_source << " to "
+                << a_dest_path << "/" << a_dest_filename
+                << " failed. {" << e.what() << "}" )
     }
 }
 
@@ -175,7 +223,10 @@ int main( int argc, char** argv )
     STS::TranslationStatusCode  sms_code = STS::TS_SUCCESS;
     string                      sms_reason;
     bool                        interact;
-    string                      work_path;
+    string                      work_root;
+    string                      work_base;
+    string                      work_dir;
+    string                      work_path; // Obsolete... (work_root/base)
     string                      base_path;
     string                      config_file;
     unsigned long               chunk_size; // in Dataset Elements! :-O
@@ -199,11 +250,13 @@ int main( int argc, char** argv )
         "ADARA Common", ADARA::VERSION.c_str(),
         "ComBus", ADARA::ComBus::VERSION.c_str(),
         ADARA::TAG_NAME.c_str() );
+    usleep(30000); // give syslog a chance...
 
     try
     {
         bool strict;
         bool move;
+        bool doRename;
         bool verbose;
         bool gather_stats;
         bool suppress_adara;
@@ -227,6 +280,8 @@ int main( int argc, char** argv )
                 ("no-adara,a", po::bool_switch( &suppress_adara )->default_value( false ), "suppress adara output stream generation")
                 ("keep-temp,k", po::bool_switch( &keep_temp )->default_value( false ), "do not delete temporary output files on translation or move failure")
                 ("file,f",po::value<string>(),"read input from file instead of stdin")
+                ("work-root",po::value<string>( &work_root ),"set root path to construct working directory")
+                ("work-base",po::value<string>( &work_base ),"set base path to construct working directory")
                 ("work-path,w",po::value<string>( &work_path ),"set path to working directory")
                 ("base-path,b",po::value<string>( &base_path ),"set base cataloging path (none by defualt)")
                 ("config,C",po::value<string>( &config_file ),"set STS Config File path (none by defualt)")
@@ -274,19 +329,59 @@ int main( int argc, char** argv )
         if ( gather_stats && !interact )
             gather_stats = false;
 
+        //
+        // *** New STS Work Directory Specification:
+        //    ${WORK_ROOT}/${FACILITY}/${BEAMLINE}/${WORK_BASE}
+        // - if either "work_root" and/or "work_base" are specified,
+        // these values _Subsume_ any "work_path" value and activate the
+        // new "delayed gratification" mode... ;-D
+        //    -> where we _Wait_ until we know the FACILITY and BEAMLINE
+        //    to actually construct the full Working Directory path.
+        //
+
+        if ( work_root.size() || work_base.size() )
+        {
+            // Clear Out (Now Obsolete) "Work Path",
+            // Favor New "Delayed Gratification: Mode. ;-D
+            work_path.clear();
+
+            // Make Sure Work Root Ends in "/"...
+            // (It might be _Just_ "/"...! ;-D)
+            if ( work_root.size() == 0
+                    || work_root[ work_root.size() - 1 ] != '/' )
+            {
+                work_root += "/";
+            }
+
+            syslog( LOG_INFO, "[%i] Working Directory Root set to: [%s]",
+                g_pid, work_root.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            syslog( LOG_INFO, "[%i] Working Directory Base set to: [%s]",
+                g_pid, work_base.c_str() );
+            usleep(30000); // give syslog a chance...
+        }
+
         if ( work_path.size() )
         {
-            if ( work_path[work_path.size()-1] != '/' )
+            // Make Sure Work Path Ends in "/"...
+            if ( work_path[ work_path.size() - 1 ] != '/' )
                 work_path += "/";
+
+            syslog( LOG_INFO, "[%i] Working Directory Path set to: [%s]",
+                g_pid, work_path.c_str() );
+            usleep(30000); // give syslog a chance...
         }
 
         string tempName = genTempName();
 
         if ( !suppress_adara )
             adara_outfile = work_path + tempName + ".adara";
+                // "work_path" could be empty...
 
         if ( !suppress_nexus )
             nexus_outfile = work_path + tempName + ".nxs";
+                // "work_path" could be empty...
 
         if ( config_file.size() )
         {
@@ -297,6 +392,7 @@ int main( int argc, char** argv )
                 syslog( LOG_ERR,
                     "[%i] Stat Error on Config File: %s, %s - Ignoring...",
                     g_pid, config_file.c_str(), strerror(errno) );
+                usleep(30000); // give syslog a chance...
                 config_file.clear();
             }
             else if ( statbuf.st_size == 0 )
@@ -304,16 +400,19 @@ int main( int argc, char** argv )
                 syslog( LOG_ERR,
                     "[%i] Empty Config File: %s - Ignoring...",
                     g_pid, config_file.c_str() );
+                usleep(30000); // give syslog a chance...
                 config_file.clear();
             }
             else
             {
                 syslog( LOG_INFO, "[%i] STS Config File Specified: %s",
                     g_pid, config_file.c_str() );
+                usleep(30000); // give syslog a chance...
             }
         }
         else {
             syslog( LOG_ERR, "[%i] No STS Config File Specified", g_pid );
+            usleep(30000); // give syslog a chance...
         }
 
         // Only Dump Verbose STS Settings in Interactive Mode...!
@@ -327,7 +426,9 @@ int main( int argc, char** argv )
             cout << "  nexus file    : " << nexus_outfile << endl;
             cout << "  adara file    : " << adara_outfile << endl;
             cout << "  strict        : " << ( move ? "yes" : "no" ) << endl;
-            cout << "  work path     : " << work_path << endl;
+            cout << "  work root     : " << work_root << endl;
+            cout << "  work base     : " << work_base << endl;
+            cout << " (work path     : " << work_path << ")" << endl;
             cout << "  base path     : " << base_path << endl;
             cout << "  config file   : " << config_file << endl;
             cout << "  move nexus    : " << ( move ? "yes" : "no" ) << endl;
@@ -360,7 +461,8 @@ int main( int argc, char** argv )
                 dup2( nullfd, 2 );
             }
 
-            nxgen = new NxGen( infd, adara_outfile, nexus_outfile,
+            nxgen = new NxGen( infd,
+                work_root, work_base, adara_outfile, nexus_outfile,
                 config_file, strict, gather_stats, chunk_size,
                 evt_buf_size, anc_buf_size, cache_size, compression_level,
                 verbose );
@@ -375,10 +477,19 @@ int main( int argc, char** argv )
             nxgen->processStream();
 
             syslog( LOG_INFO, "[%i] Stream processing completed", g_pid );
+            usleep(30000); // give syslog a chance...
 
             nxgen->dumpProcessingStatistics();
 
             // If we make it here, translation succeeded
+
+            work_dir = nxgen->getWorkingDirectory();
+
+            doRename = nxgen->getDoRename();
+
+            syslog( LOG_INFO, "[%i] Working Directory: [%s] (doRename=%s)",
+                g_pid, work_dir.c_str(), ( doRename ? "true" : "false" ) );
+            usleep(30000); // give syslog a chance...
 
             if ( move )
             {
@@ -397,20 +508,54 @@ int main( int argc, char** argv )
                 string cat_nexus_file = cat_path + "nexus/"
                     + cat_name + ".nxs.h5";
 
-                // Try to move files
+                // Try to "move" (rename) files
                 if ( !adara_outfile.empty() )
                 {
-                    moveFile( adara_outfile,
-                        cat_path + "adara", cat_name + ".adara" );
+                    if ( doRename )
+                    {
+                        renameFile( work_dir + "/" + adara_outfile,
+                            cat_path + "adara", cat_name + ".adara" );
+
+                        syslog( LOG_INFO,
+                            "[%i] Successfully %s ADARA file to: %s%s%s%s",
+                            g_pid, "Renamed", cat_path.c_str(), "adara/",
+                            cat_name.c_str(), ".adara" );
+                        usleep(30000); // give syslog a chance...
+                    }
+                    else
+                    {
+                        moveFile( work_dir + "/" + adara_outfile,
+                            cat_path + "adara", cat_name + ".adara" );
+
+                        syslog( LOG_INFO,
+                            "[%i] Successfully %s ADARA file to: %s%s%s%s",
+                            g_pid, "Moved", cat_path.c_str(), "adara/",
+                            cat_name.c_str(), ".adara" );
+                        usleep(30000); // give syslog a chance...
+                    }
                 }
                 if ( !nexus_outfile.empty() )
                 {
-                    moveFile( nexus_outfile,
-                        cat_path + "nexus", cat_name + ".nxs.h5" );
+                    if ( doRename )
+                    {
+                        renameFile( work_dir + "/" + nexus_outfile,
+                            cat_path + "nexus", cat_name + ".nxs.h5" );
 
-                    syslog( LOG_INFO,
-                        "[%i] Successfully moved Nexus file to: %s",
-                        g_pid, cat_nexus_file.c_str() );
+                        syslog( LOG_INFO,
+                            "[%i] Successfully Renamed Nexus file to: %s",
+                            g_pid, cat_nexus_file.c_str() );
+                        usleep(30000); // give syslog a chance...
+                    }
+                    else
+                    {
+                        moveFile( work_dir + "/" + nexus_outfile,
+                            cat_path + "nexus", cat_name + ".nxs.h5" );
+
+                        syslog( LOG_INFO,
+                            "[%i] Successfully Moved Nexus file to: %s",
+                            g_pid, cat_nexus_file.c_str() );
+                        usleep(30000); // give syslog a chance...
+                    }
                 }
 
                 // Send finished messages to ComBus AND workflow manager
@@ -421,10 +566,13 @@ int main( int argc, char** argv )
             {
                 // Send finished messages to ComBus only
                 if ( monitor )
-                    monitor->success( false, nexus_outfile );
+                {
+                    monitor->success( false,
+                        work_dir + "/" + nexus_outfile );
+                }
             }
 
-            // Disable temp file deletion if translation / move succeeded
+            // Disable temp file deletion if translation/rename succeeded
             keep_temp = true;
 
             // Output stream statistics if enabled
@@ -474,6 +622,7 @@ int main( int argc, char** argv )
     {
         syslog( LOG_INFO, "[%i] STS failed: Translation%s failed. code: %u",
             g_pid, run_desc.c_str(), (unsigned int)sms_code );
+        usleep(30000); // give syslog a chance...
 
         // Notify ComBus Monitor of Failure...
         if ( monitor )
@@ -483,6 +632,7 @@ int main( int argc, char** argv )
     {
         syslog( LOG_INFO, "[%i] Translation%s succeeded",
             g_pid, run_desc.c_str() );
+        usleep(30000); // give syslog a chance...
     }
 
     if ( !interact )
@@ -515,6 +665,7 @@ int main( int argc, char** argv )
             syslog( LOG_INFO,
                 "[%i] STS failed: Translation Complete Message: %s",
                 g_pid, log_info.c_str() );
+            usleep(30000); // give syslog a chance...
         }
 
         send_status |= Utils::sendBytes( outfd,
@@ -524,12 +675,14 @@ int main( int argc, char** argv )
         {
             syslog( LOG_INFO,
                 "[%i] Notified SMS of translation status", g_pid );
+            usleep(30000); // give syslog a chance...
         }
         else
         {
             syslog( LOG_INFO,
                 "[%i] STS failed: Translation Complete/Heartbeat Msg: %s",
                 g_pid, log_info.c_str() );
+            usleep(30000); // give syslog a chance...
         }
 
         // Request shutdown of write socket - should initiate buffer flush
@@ -569,6 +722,7 @@ int main( int argc, char** argv )
             syslog( LOG_INFO,
                 "[%i] Warning: Extra Data Read from SMS socket cnt=%ld",
                 g_pid, cnt );
+            usleep(30000); // give syslog a chance...
         }
     }
     else if ( sms_code != STS::TS_SUCCESS )
@@ -577,6 +731,7 @@ int main( int argc, char** argv )
     }
 
     syslog( LOG_INFO, "[%i] Cleaning up", g_pid );
+    usleep(30000); // give syslog a chance...
 
     if ( monitor )
         delete monitor;
@@ -584,17 +739,19 @@ int main( int argc, char** argv )
     if ( nxgen )
         delete nxgen;
 
-    // Clean-up temp output files if translation or move failed
+    // Clean-up temp output files if translation or rename failed
     if ( !keep_temp && !nexus_outfile.empty() )
     {
         try {
             boost::filesystem::remove(
-                boost::filesystem::path( nexus_outfile ));
+                boost::filesystem::path( work_dir + "/" + nexus_outfile ) );
         }
         catch( ... )
         {
-            syslog( LOG_INFO, "[%i] Error Cleaning Up NeXus File at %s.",
-                g_pid, nexus_outfile.c_str() );
+            syslog( LOG_INFO,
+                "[%i] Error Cleaning Up NeXus File at %s/%s.",
+                g_pid, work_dir.c_str(), nexus_outfile.c_str() );
+            usleep(30000); // give syslog a chance...
         }
     }
 
@@ -602,16 +759,19 @@ int main( int argc, char** argv )
     {
         try {
             boost::filesystem::remove(
-                boost::filesystem::path( adara_outfile ));
+                boost::filesystem::path( work_dir + "/" + adara_outfile ) );
         }
         catch( ... )
         {
-            syslog( LOG_INFO, "[%i] Error Cleaning Up ADARA File at %s.",
-                g_pid, adara_outfile.c_str() );
+            syslog( LOG_INFO,
+                "[%i] Error Cleaning Up ADARA File at %s/%s.",
+                g_pid, work_dir.c_str(), adara_outfile.c_str() );
+            usleep(30000); // give syslog a chance...
         }
     }
 
     syslog( LOG_INFO, "[%i] Process exiting", g_pid );
+    usleep(30000); // give syslog a chance...
 
     return sms_code != STS::TS_SUCCESS;
 }

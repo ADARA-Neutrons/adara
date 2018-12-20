@@ -30,6 +30,8 @@ std::string NxGen::GroupNameIndex = "[XXX_INDEX_XXX]";
 NxGen::NxGen
 (
     int             a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
+    string         &a_work_root,                ///< [in] Work Directory Root
+    string         &a_work_base,                ///< [in] Work Directory Base
     string         &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
     string         &a_nexus_out_file,           ///< [in] Filename of output Nexus file (disabled if empty)
     string         &a_config_file,              ///< [in] Filename of STS Config file (disabled if empty)
@@ -43,11 +45,15 @@ NxGen::NxGen
     bool            a_verbose                   ///< [in] STS Verbosity
 )
 :
-    StreamParser( a_fd_in, a_adara_out_file, a_strict, a_gather_stats,
+    StreamParser( a_fd_in,
+        a_work_root, a_work_base, a_adara_out_file, a_config_file,
+        a_strict, a_gather_stats,
         a_chunk_size * a_event_buf_chunk_count, // number of elements
         a_chunk_size * a_anc_buf_chunk_count, // number of elements
         a_verbose ),
     m_gen_nexus(false),
+    m_nexus_init(false),
+    m_nexus_beamline_init(false),
     m_nexus_filename(a_nexus_out_file),
     m_config_file(a_config_file),
     m_entry_path(string("/entry")),
@@ -68,7 +74,8 @@ NxGen::NxGen
     m_pulse_info_cur_size(0),
     m_pulse_vetoes_cur_size(0),
     m_pulse_flags_cur_size(0),
-    m_haveRunComment(false)
+    m_nexus_run_comment_init(false),
+    m_nexus_geometry_init(false)
 {
     // Capture STS "Start of Processing Time"...
     clock_gettime( CLOCK_REALTIME, &m_sts_run_start_time );
@@ -391,46 +398,64 @@ NxGen::initializeNxBank
     if ( !(a_bi->m_initialized) )
         a_bi->initializeBank( a_end_of_run );
 
+    if ( !m_gen_nexus )
+        return;
+
+    // Already Initialized...
+    if ( a_bi->m_nexus_bank_init )
+        return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data...!!)
+    if ( !initialize( true, "NxGen::initializeNxBank()" ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u",
+            g_pid, "STS Error:", "NxGen::initializeNxBank()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Bank Group/Data!!",
+            "bank_id", a_bi->m_id );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
     try
     {
-        if ( m_gen_nexus)
+        // Instrument bank group (contains *Both* Event and Histo data)
+        makeGroup( a_bi->m_instr_path, "NXdetector" );
+
+        // NeXus Event-based Structures
+        if ( a_bi->m_has_event )
         {
-            // Instrument bank group (contains *Both* Event and Histo data)
-            makeGroup( a_bi->m_instr_path, "NXdetector" );
+            // (Defer creation/writing of actual Bank Pid/TOF data
+            //    to bankPidTOFBuffersReady(), create & write
+            //    in one shot...)
 
-            // NeXus Event-based Structures
-            if ( a_bi->m_has_event )
-            {
-                // (Defer creation/writing of actual Bank Pid/TOF data
-                //    to bankPidTOFBuffersReady(), create & write
-                //    in one shot...)
+            // (Defer creation/writing of actual Bank Event Index data
+            //    to bankIndexBuffersReady(), create & write
+            //    in one shot...)
 
-                // (Defer creation/writing of actual Bank Event Index data
-                //    to bankIndexBuffersReady(), create & write
-                //    in one shot...)
+            // Top-level Event data group
+            makeGroup( a_bi->m_event_path, "NXevent_data" );
 
-                // Top-level Event data group
-                makeGroup( a_bi->m_event_path, "NXevent_data" );
+            // (Defer linking of Top-level Event data, which
+            //     won't exist until later in bank*BuffersReady()...)
 
-                // (Defer linking of Top-level Event data, which
-                //     won't exist until later in bank*BuffersReady()...)
-
-                // (Defer linking of Pulse Time data, which won't exist
-                //     until later in bankFinalize()... :-)
-            }
-
-            // NeXus Histogram-based Structures
-            // ( a_bi->m_has_histo )
-
-            // (Defer creation/writing of actual histogram data
-            //     to bankFinalize(), create & write in one shot...)
-
-            // (Defer linking of histogram data, which won't exist
+            // (Defer linking of Pulse Time data, which won't exist
             //     until later in bankFinalize()... :-)
-
-            // NeXus Structures are Now Initialized
-            a_bi->m_nexus_init = true;
         }
+
+        // NeXus Histogram-based Structures
+        // ( a_bi->m_has_histo )
+
+        // (Defer creation/writing of actual histogram data
+        //     to bankFinalize(), create & write in one shot...)
+
+        // (Defer linking of histogram data, which won't exist
+        //     until later in bankFinalize()... :-)
+
+        // NeXus Structures are Now Initialized
+        a_bi->m_nexus_bank_init = true;
     }
     catch ( TraceException &e )
     {
@@ -466,34 +491,10 @@ NxGen::makeMonitorInfo
             a_id, a_buf_reserve, a_idx_buf_reserve,
             a_config, a_known_monitor, *this );
 
-        if ( m_gen_nexus)
-        {
-            makeGroup( mi->m_path, mi->m_group_type );
-
-            // Histo-based Monitor
-            if ( mi->m_config != NULL )
-            {
-                // (Defer creation/writing of actual histogram data
-                //     to monitorFinalize(), create & write in one shot...)
-
-                writeScalar( mi->m_path, "distance",
-                    mi->m_config->distance, "" );
-                writeString( mi->m_path, "mode", "monitor" );
-            }
-
-            // Event-based Monitor (Nothing to Do Here, All Deferred! :-D)
-
-            // (Defer creation/writing of actual Monitor TOF data
-            //    to monitorTOFBuffersReady(), create & write
-            //    in one shot...)
-
-            // (Defer creation/writing of actual Monitor Event Index data
-            //    to monitorIndexBuffersReady(), create & write
-            //    in one shot...)
-
-            // (Defer creation of Pulse Time Link to monitorFinalize(),
-            //    after the Dataset is sure to have been created...)
-        }
+        // Initialization now done separately via
+        // NxGen::initializeNxMonitor(), to account for
+        // Working Directory resolution and  NeXus data file creation,
+        // which may be deferred...
 
         return mi;
     }
@@ -504,23 +505,140 @@ NxGen::makeMonitorInfo
 }
 
 
+/*! \brief Initialization method for MonitorInfo NeXus file groups
+ *
+ * Initialization of NeXus Monitor Groups, as extracted from original
+ * makeMonitorInfo() method, to enable Monitor data capture and bookkeeping
+ * prior to Working Directory resolution/NeXus data file creation.
+ */
+void
+NxGen::initializeNxMonitor
+(
+    NxMonitorInfo* a_mi        ///< [in] Ptr to NeXus Monitor info
+)
+{
+    if ( !m_gen_nexus )
+        return;
+
+    // Already Initialized...
+    if ( a_mi->m_nexus_monitor_init )
+        return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data...!!)
+    if ( !initialize( true, "NxGen::initializeNxMonitor()" ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u",
+            g_pid, "STS Error:", "NxGen::initializeNxMonitor()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Monitor Group/Meta-Data!!",
+            "bank_id", a_mi->m_id );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
+    try
+    {
+        makeGroup( a_mi->m_path, a_mi->m_group_type );
+
+        // Histo-based Monitor
+        if ( a_mi->m_config != NULL )
+        {
+            // (Defer creation/writing of actual histogram data
+            //     to monitorFinalize(), create & write in one shot...)
+
+            writeScalar( a_mi->m_path, "distance",
+                a_mi->m_config->distance, "" );
+            writeString( a_mi->m_path, "mode", "monitor" );
+        }
+
+        // Event-based Monitor (Nothing to Do Here, All Deferred! :-D)
+
+        // (Defer creation/writing of actual Monitor TOF data
+        //    to monitorTOFBuffersReady(), create & write
+        //    in one shot...)
+
+        // (Defer creation/writing of actual Monitor Event Index data
+        //    to monitorIndexBuffersReady(), create & write
+        //    in one shot...)
+
+        // (Defer creation of Pulse Time Link to monitorFinalize(),
+        //    after the Dataset is sure to have been created...)
+
+        // NeXus Structures are Now Initialized
+        a_mi->m_nexus_monitor_init = true;
+    }
+    catch ( TraceException &e )
+    {
+        RETHROW_TRACE( e, "initializeNxMonitor( id: " << a_mi->m_id
+            << " ) initialization failed." )
+    }
+}
+
+
 /*! \brief Initializes Nexus output file
  *
  * This method performs Nexus-specific initialization (creates file and
  * several HDF5 entries).
+ *
+ * Note: Returns "true" when NeXus file is Created and Initialized,
+ * else "false".
  */
-void
-NxGen::initialize()
+bool
+NxGen::initialize( bool a_force_init, string caller )
 {
-    if (!m_gen_nexus)
-        return;
+    if ( !m_gen_nexus )
+        return( false );
+
+    if ( m_nexus_init )
+    {
+        //syslog( LOG_INFO, "[%i] %s: Nexus File Already Initialized: %s",
+            //g_pid, "NxGen::initialize()",
+            //m_nexus_filename.c_str() );
+        //usleep(30000); // give syslog a chance...
+        return( true );
+    }
+
+    // Do We Need to Construct a Working Directory Path...?
+    if ( !isWorkingDirectoryReady() )
+    {
+        if ( a_force_init )
+        {
+            if ( constructWorkingDirectory( a_force_init, caller ) )
+                flushAdaraStreamBuffer();
+
+            else
+            {
+                syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                    g_pid, "STS Error:", "NxGen::initialize()",
+                    "Failed to Force Construction of Working Directory",
+                    "Bailing... (Probably...)" );
+                usleep(30000); // give syslog a chance...
+                return( false );
+            }
+        }
+        else
+        {
+            syslog( LOG_WARNING,
+                "[%i] %s: %s: %s=[%s] %s=[%s]",
+                g_pid, "NxGen::initialize()",
+                "Still Missing Info for Working Directory Construction",
+                "FacilityName", getFacilityName().c_str(),
+                "BeamShortName", getBeamShortName().c_str() );
+            usleep(30000); // give syslog a chance...
+            return( false );
+        }
+    }
 
     try
     {
-        syslog( LOG_INFO, "[%i] Creating Nexus file: %s",
-            g_pid, m_nexus_filename.c_str() );
+        syslog( LOG_INFO, "[%i] Creating Nexus File: %s%s",
+            g_pid, getWorkingDirectory().c_str(),
+            m_nexus_filename.c_str() );
+        usleep(30000); // give syslog a chance...
 
-        m_h5nx.H5NXcreate_file( m_nexus_filename );
+        m_h5nx.H5NXcreate_file( getWorkingDirectory() + m_nexus_filename );
 
         // Create general Nexus entries
         makeGroup( m_entry_path, "NXentry" );
@@ -593,12 +711,17 @@ NxGen::initialize()
         // Insert initial "not paused" value
         m_pause_time.push_back( 0.0 );
         m_pause_value.push_back( 0 );
+
+        // Set "NeXus Initialized" Flag, We're There! :-D
+        m_nexus_init = true;
     }
     catch( TraceException &e )
     {
-        RETHROW_TRACE( e, "initialization of nexus file ("
-            << m_nexus_filename << ") failed." )
+        RETHROW_TRACE( e, "Initialization of NeXus File ("
+            << m_nexus_filename << ") Failed." )
     }
+
+    return( true );
 }
 
 
@@ -613,8 +736,21 @@ NxGen::finalize
     const STS::RunInfo &a_run_info          ///< [in] Run information object
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some meta-data...!)
+    if ( !initialize( true, "NxGen::finalize()" ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STS Error:", "NxGen::finalize()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Final Run Meta-Data!" );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     try
     {
@@ -636,15 +772,23 @@ NxGen::finalize
             run_start_time_str );
 
         // Make Sure We Have "Some" Overall Run Comment... ;-D
-        if ( !m_haveRunComment ) {
-            std::string dummy = "(unset)";
-            syslog( LOG_INFO, "[%i] %s: %s - %s [%s]",
-                g_pid, "NxGen::finalize()",
-                "No Run Comment Has Been Set For This Run",
-                "Setting Dummy Empty Run Comment", dummy.c_str() );
-            usleep(30000); // give syslog a chance...
-            runComment( dummy );
+        if ( !m_nexus_run_comment_init ) {
+            if ( m_runComment.size() > 0 )
+                runComment( m_runComment, true );
+            else {
+                std::string dummy = "(unset)";
+                syslog( LOG_INFO, "[%i] %s: %s - %s [%s]",
+                    g_pid, "NxGen::finalize()",
+                    "No Run Comment Has Been Set For This Run",
+                    "Setting Dummy Empty Run Comment", dummy.c_str() );
+                usleep(30000); // give syslog a chance...
+                runComment( dummy, true );
+            }
         }
+
+        // Try to Make Sure We Have Geometry/IDF XML...
+        if ( !m_nexus_geometry_init && m_geometryXml.size() > 0 )
+            processGeometry( m_geometryXml, true );
 
         writeScalar( m_daslogs_freq_path, "minimum_value",
             a_run_metrics.freq_stats.min(), FREQ_UNITS );
@@ -847,6 +991,26 @@ NxGen::finalize
 void
 NxGen::checkSTSConfigElementUnitsPaths(void)
 {
+    if ( !m_gen_nexus )
+        return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose the final meta-data...!!)
+    // Although if we just Forced Working Directory construction
+    // in StreamParser::finalizeStreamProcessing(), then
+    // Now May Be Our Chance to Finally Create a NeXus Data File...! ;-D
+    if ( !initialize( true, "NxGen::checkSTSConfigElementUnitsPaths()" ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STS Error:",
+            "NxGen::checkSTSConfigElementUnitsPaths()",
+            "Failed to Force Initialize NeXus File",
+            "Losing STS Config Element Units Meta-Data!" );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
     // Check Each Config Group in Turn
     // for Any Saved ElementInfo Units Paths...
     for ( uint32_t g=0 ; g < m_config_groups.size() ; g++ )
@@ -955,8 +1119,7 @@ NxGen::writeSTSConfigUnitsAttributes(
                 g_pid, "STS Error:",
                 G->name.c_str(), "No Matching Units PV Found",
                 "Missing PV Value or Config...?", ss.str().c_str() );
-            // give syslog a chance...
-            usleep(30000);
+            usleep(30000); // give syslog a chance...
         }
     }
 }
@@ -971,7 +1134,7 @@ NxGen::writeSTSConfigUnitsAttributes(
 void
 NxGen::dumpProcessingStatistics(void)
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     // Overall Run Statistics
@@ -1024,7 +1187,8 @@ NxGen::dumpProcessingStatistics(void)
         g_pid, "Overall STS Bandwidth", sts_bandwidth );
     usleep(30000); // give syslog a chance...
 
-    double overhead_ratio = run_bandwidth / sts_bandwidth;
+    double overhead_ratio = ( sts_bandwidth > 0.0 ) ?
+        ( run_bandwidth / sts_bandwidth ) : 0.0;
 
     syslog( LOG_INFO, "[%i] %s = %lf",
         g_pid, "STS Overhead Ratio", overhead_ratio );
@@ -1039,11 +1203,38 @@ NxGen::dumpProcessingStatistics(void)
 void
 NxGen::processBeamlineInfo
 (
-    const STS::BeamlineInfo & a_beamline_info   ///< [in] Beamline information object
+    const STS::BeamlineInfo & a_beamline_info,  ///< [in] Beamline information object
+    bool a_force_init                           ///< [in] Force Initialize?
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
+
+    // Already Initialized...
+    if ( m_nexus_beamline_init )
+        return;
+
+    // We've Got the Beamline Info Now, Try to Initialize the NeXus File
+    if ( !initialize( a_force_init ) )
+    {
+        if ( a_force_init )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::processBeamlineInfo()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Beamline Meta-Data!" );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::processBeamlineInfo()",
+                "Unable to Initialize NeXus File", "Retry Later..." );
+            usleep(30000); // give syslog a chance...
+        }
+        return;
+    }
 
     try
     {
@@ -1053,17 +1244,19 @@ NxGen::processBeamlineInfo
         writeString( m_instrument_path, "beamline",
             a_beamline_info.instr_id );
 
-        if ( a_beamline_info.instr_longname.size())
+        if ( a_beamline_info.instr_longname.size() )
         {
             writeString( m_instrument_path, "name",
                 a_beamline_info.instr_longname );
 
-            if ( a_beamline_info.instr_shortname.size())
+            if ( a_beamline_info.instr_shortname.size() )
             {
                 writeStringAttribute( m_instrument_path + "/name",
                     "short_name", a_beamline_info.instr_shortname );
             }
         }
+
+        m_nexus_beamline_init = true;
     }
     catch( TraceException &e )
     {
@@ -1098,8 +1291,24 @@ NxGen::processRunInfo
             THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, msg )
     }
 
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose the final meta-data...!!)
+    // Although if we just Forced Working Directory construction
+    // in StreamParser::finalizeStreamProcessing(), then
+    // Now's Our First Chance to Finally Create a NeXus Data File...! ;-D
+    if ( !initialize( true, "NxGen::processRunInfo()" ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STS Error:", "NxGen::processRunInfo()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Final Run Meta-Data!" );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     try
     {
@@ -1260,11 +1469,52 @@ NxGen::processRunInfo
 void
 NxGen::processGeometry
 (
-    const std::string & a_xml   ///< [in] Geometry data in xml format
+    const std::string & a_xml,  ///< [in] Geometry data in xml format
+    bool a_force_init           ///< [in] Force Initialize?
 )
 {
-    if (!m_gen_nexus)
+    // Check for Duplicate Geometry...
+    if ( m_geometryXml.size() > 0 && m_geometryXml.compare( a_xml ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: New [%s] != Orig [%s] - %s",
+            g_pid, "STS Error:", "Duplicate Geometry/IDF Specified",
+            a_xml.c_str(), m_geometryXml.c_str(),
+            "Ignoring..." );
+        usleep(30000); // give syslog a chance...
+    }
+
+    // Save for Future Reference (& Retries, if No Working Directory Yet!)
+    else {
+        m_geometryXml = a_xml;
+    }
+
+    if ( !m_gen_nexus )
         return;
+
+    // Already Initialized...
+    if ( m_nexus_geometry_init )
+        return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    if ( !initialize( a_force_init ) )
+    {
+        if ( a_force_init )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::processGeometry()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Geometry/IDF XML Data!" );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::processGeometry()",
+                "Unable to Initialize NeXus File", "Retry Later..." );
+            usleep(30000); // give syslog a chance...
+        }
+        return;
+    }
 
     try
     {
@@ -1273,12 +1523,14 @@ NxGen::processGeometry
         writeString( geom_path, "description",
             "XML contents of the instrument IDF" );
         writeString( geom_path, "type", "text/xml" );
-        writeString( geom_path, "data", a_xml );
+        writeString( geom_path, "data", m_geometryXml );
     }
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "processGeometry() failed." )
     }
+
+    m_nexus_geometry_init = true;
 }
 
 
@@ -1293,8 +1545,23 @@ NxGen::pulseBuffersReady
     STS::PulseInfo &a_pulse_info    ///< [in] Pulse data object
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data...!!)
+    if ( !initialize( true, "NxGen::pulseBuffersReady()" ) )
+    {
+        vector<double>::iterator tstart = a_pulse_info.times.begin();
+        vector<double>::iterator tend = a_pulse_info.times.end(); tend--;
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s For Pulses from %lf to %lf.",
+            g_pid, "STS Error:", "NxGen::pulseBuffersReady()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Pulse Info Data!!", *tstart, *tend );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     try
     {
@@ -1439,7 +1706,7 @@ NxGen::bankPidTOFBuffersReady
     STS::BankInfo &a_bank   ///< [in] Detector bank to write
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1455,8 +1722,24 @@ NxGen::bankPidTOFBuffersReady
         if ( !(bi->m_initialized) )
             bi->initializeBank( false );
 
+        // Do We Have a Valid Initialized NeXus Data File...?
+        // (We shouldn't get called if not, so if we do, better force it,
+        // lest we actually lose some data...!!)
+        if ( !initialize( true, "NxGen::bankPidTOFBuffersReady()" ) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
+                g_pid, "STS Error:", "NxGen::bankPidTOFBuffersReady()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Bank PID/TOF Data!!",
+                "bank_id", a_bank.m_id,
+                "event_cur_size", bi->m_event_cur_size,
+                "buffer_size", a_bank.m_tof_buffer_size );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+
         // Make Sure NeXus Structures have been (Late) Initialized...
-        if ( !(bi->m_nexus_init) )
+        if ( !(bi->m_nexus_bank_init) )
             initializeNxBank( bi, false );
 
         // NeXus Event-based Data...
@@ -1516,7 +1799,7 @@ NxGen::bankIndexBuffersReady
     bool use_default_chunk_size     ///< [in] Use Default Chunk Size...?
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1532,8 +1815,24 @@ NxGen::bankIndexBuffersReady
         if ( !(bi->m_initialized) )
             bi->initializeBank( false );
 
+        // Do We Have a Valid Initialized NeXus Data File...?
+        // (We shouldn't get called if not, so if we do, better force it,
+        // lest we actually lose some data...!!)
+        if ( !initialize( true, "NxGen::bankIndexBuffersReady()" ) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
+                g_pid, "STS Error:", "NxGen::bankIndexBuffersReady()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Bank Index Data!!",
+                "bank_id", a_bank.m_id,
+                "index_cur_size", bi->m_index_cur_size,
+                "buffer_size", a_bank.m_index_buffer.size() );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+
         // Make Sure NeXus Structures have been (Late) Initialized...
-        if ( !(bi->m_nexus_init) )
+        if ( !(bi->m_nexus_bank_init) )
             initializeNxBank( bi, false );
 
         // NeXus Event-based Data...
@@ -1597,8 +1896,21 @@ NxGen::bankPulseGap
     uint64_t        a_count     ///< [in] Number of missing pulses
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data integrity...!)
+    if ( !initialize( true, "NxGen::bankPulseGap()" ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s count=%lu",
+            g_pid, "STS Error:", "NxGen::bankPulseGap()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Bank Pulse Gap Data!", a_count );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     try
     {
@@ -1610,7 +1922,7 @@ NxGen::bankPulseGap
         }
 
         // Make Sure NeXus Structures have been (Late) Initialized...
-        if ( !(bi->m_nexus_init) )
+        if ( !(bi->m_nexus_bank_init) )
             initializeNxBank( bi, false );
 
         // NeXus Event-based Data...
@@ -1639,7 +1951,8 @@ NxGen::bankPulseGap
 
 /*! \brief Finalizes bank data in Nexus file
  *
- * This method writes event counts for the specified bank to the Nexus file.
+ * This method writes event counts for the specified bank
+ * to the Nexus file.
  */
 void
 NxGen::bankFinalize
@@ -1647,8 +1960,21 @@ NxGen::bankFinalize
     STS::BankInfo &a_bank   ///< [in] Detector bank to finalize
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data...!!)
+    if ( !initialize( true, "NxGen::bankFinalize()" ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s bank_id=%u",
+            g_pid, "STS Error:", "NxGen::bankFinalize()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Bank Histogram/Meta-Data!!", a_bank.m_id );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     try
     {
@@ -1660,7 +1986,7 @@ NxGen::bankFinalize
         }
 
         // Make Sure NeXus Structures have been (Late) Initialized...
-        if ( !(bi->m_nexus_init) )
+        if ( !(bi->m_nexus_bank_init) )
             initializeNxBank( bi, true );
 
         // NeXus Event-based Data...
@@ -1785,7 +2111,7 @@ NxGen::monitorTOFBuffersReady
     STS::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1796,6 +2122,26 @@ NxGen::monitorTOFBuffersReady
             THROW_TRACE( STS::ERR_CAST_FAILED,
               "Invalid monitor object passed to monitorTOFBuffersReady()" )
         }
+
+        // Do We Have a Valid Initialized NeXus Data File...?
+        // (We shouldn't get called if not, so if we do, better force it,
+        // lest we actually lose some data...!!)
+        if ( !initialize( true, "NxGen::monitorTOFBuffersReady()" ) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
+                g_pid, "STS Error:", "NxGen::monitorTOFBuffersReady()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Monitor TOF Data!!",
+                "monitor_id", a_monitor.m_id,
+                "event_cur_size", mi->m_event_cur_size,
+                "buffer_size", a_monitor.m_tof_buffer_size );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+
+        // Make Sure NeXus Structures have been Initialized...
+        if ( !(mi->m_nexus_monitor_init) )
+            initializeNxMonitor( mi );
 
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
@@ -1840,7 +2186,7 @@ NxGen::monitorIndexBuffersReady
     bool use_default_chunk_size     ///< [in] Use Default Chunk Size...?
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
 
     try
@@ -1851,6 +2197,26 @@ NxGen::monitorIndexBuffersReady
             THROW_TRACE( STS::ERR_CAST_FAILED,
             "Invalid monitor object passed to monitorIndexBuffersReady()" )
         }
+
+        // Do We Have a Valid Initialized NeXus Data File...?
+        // (We shouldn't get called if not, so if we do, better force it,
+        // lest we actually lose some data...!!)
+        if ( !initialize( true, "NxGen::monitorIndexBuffersReady()" ) )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
+                g_pid, "STS Error:", "NxGen::monitorIndexBuffersReady()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Monitor Index Data!!",
+                "monitor_id", a_monitor.m_id,
+                "index_cur_size", mi->m_index_cur_size,
+                "buffer_size", a_monitor.m_index_buffer.size() );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+
+        // Make Sure NeXus Structures have been Initialized...
+        if ( !(mi->m_nexus_monitor_init) )
+            initializeNxMonitor( mi );
 
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
@@ -1904,17 +2270,34 @@ NxGen::monitorPulseGap
     uint64_t            a_count     ///< [in] Number of missing pulses
 )
 {
+    if ( !m_gen_nexus )
+        return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data integrity...!)
+    if ( !initialize( true, "NxGen::monitorPulseGap()" ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s count=%lu",
+            g_pid, "STS Error:", "NxGen::monitorPulseGap()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Monitor Pulse Gap Data!", a_count );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
     try
     {
-        if (!m_gen_nexus)
-            return;
-
         NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
         if ( !mi )
         {
             THROW_TRACE( STS::ERR_CAST_FAILED,
                 "Invalid monitor object passed to monitorPulseGap()" )
         }
+
+        // Make Sure NeXus Structures have been Initialized...
+        if ( !(mi->m_nexus_monitor_init) )
+            initializeNxMonitor( mi );
 
         // Event-based Monitors Only...
         if ( mi->m_config == NULL )
@@ -1947,8 +2330,21 @@ NxGen::monitorFinalize
     STS::MonitorInfo &a_monitor     ///< [in] Monitor to finalize
 )
 {
-    if (!m_gen_nexus)
+    if ( !m_gen_nexus )
         return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose some data...!!)
+    if ( !initialize( true, "NxGen::monitorFinalize()" ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s monitor_id=%u",
+            g_pid, "STS Error:", "NxGen::monitorFinalize()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Monitor Histogram/Meta-Data!!", a_monitor.m_id );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
 
     try
     {
@@ -1958,6 +2354,10 @@ NxGen::monitorFinalize
             THROW_TRACE( STS::ERR_CAST_FAILED,
                 "Invalid monitor object passed to monitorFinalize()" )
         }
+
+        // Make Sure NeXus Structures have been Initialized...
+        if ( !(mi->m_nexus_monitor_init) )
+            initializeNxMonitor( mi );
 
         // Histo-based Monitor
         if ( mi->m_config != NULL )
@@ -2011,27 +2411,68 @@ NxGen::monitorFinalize
 void
 NxGen::runComment
 (
-    const std::string &a_comment    ///< [in] Overall run comments
+    const std::string &a_comment,   ///< [in] Overall run comments
+    bool a_force_init               ///< [in] Force Initialize?
 )
 {
-    if ( m_haveRunComment ) {
-        syslog( LOG_WARNING,
-        "[%i] %s Duplicate Run Comment Specified (Discarded): %s",
-            g_pid, "STS Error:", a_comment.c_str() );
+    // Always Handle Duplicate Run Comment, Even if Not Writing to NeXus.
+    if ( m_runComment.size() > 0 && m_runComment.compare( a_comment ) ) {
+        syslog( LOG_ERR, "[%i] %s %s: New [%s] != Orig [%s] - %s",
+            g_pid, "STS Error:", "Duplicate Run Comment Specified",
+            a_comment.c_str(), m_runComment.c_str(),
+            "Discarding..." );
         usleep(30000); // give syslog a chance...
+    }
+
+    // Save for Future Reference (& Retries, if No Working Directory Yet!)
+    else {
+        m_runComment = a_comment;
+
+        syslog( LOG_INFO, "[%i] %s: %s: [%s]",
+            g_pid, "NxGen::runComment()",
+            "Run Comment Set to", m_runComment.c_str() );
+        usleep(30000); // give syslog a chance...
+    }
+
+    if ( !m_gen_nexus )
+        return;
+
+    // Already Initialized...
+    if ( m_nexus_run_comment_init )
+        return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    if ( !initialize( a_force_init ) )
+    {
+        if ( a_force_init )
+        {
+            syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::runComment()",
+                "Failed to Force Initialize NeXus File",
+                "Losing Run Comment Data!" );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s: %s - %s",
+                g_pid, "STS Error:", "NxGen::runComment()",
+                "Unable to Initialize NeXus File", "Retry Later..." );
+            usleep(30000); // give syslog a chance...
+        }
         return;
     }
 
     try
     {
-        writeString( m_entry_path, "notes", a_comment );
+        writeString( m_entry_path, "notes", m_runComment );
     }
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "runComment() failed." )
     }
 
-    m_haveRunComment = true;
+    m_nexus_run_comment_init = true;
 }
 
 
@@ -2353,6 +2794,25 @@ NxGen::writeDeviceEnums
     vector<STS::PVEnumeratedType> &a_enumVec ///< [in/out] Vector of Enumerated Type Structs
 )
 {
+    if ( !m_gen_nexus )
+        return;
+
+    // Do We Have a Valid Initialized NeXus Data File...?
+    // (We shouldn't get called if not, so if we do, better force it,
+    // lest we actually lose the final meta-data...!!)
+    // Although if we just Forced Working Directory construction
+    // in StreamParser::finalizeStreamProcessing(), then
+    // Now May Be Our Chance to Finally Create a NeXus Data File...! ;-D
+    if ( !initialize( true, "NxGen::writeDeviceEnums()" ) )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STS Error:", "NxGen::writeDeviceEnums()",
+            "Failed to Force Initialize NeXus File",
+            "Losing Device Enumeration Meta-Data!" );
+        usleep(30000); // give syslog a chance...
+        return;
+    }
+
     for ( vector<STS::PVEnumeratedType>::iterator ienum =
                 a_enumVec.begin();
             ienum != a_enumVec.end(); ++ienum )

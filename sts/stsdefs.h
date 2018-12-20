@@ -11,7 +11,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.10.4"
+#define STS_VERSION "1.11.0"
 extern pid_t g_pid;
 
 #define STS_DOUBLE_EPSILON (0.00000000000001)
@@ -455,9 +455,9 @@ public:
             if ( m_num_tof_bins < 2 )
             {
                 syslog( LOG_ERR,
-                    "[%i] %s %s %u Histogram Warning: num_tof_bins=%u < 2!",
+                    "[%i] %s %s %u Histogram Warning: %s=%u < 2!",
                     g_pid, "STS Error:", "Beam Monitor", m_id,
-                    m_num_tof_bins);
+                    "num_tof_bins", m_num_tof_bins);
                 usleep(30000); // give syslog a chance...
                 m_num_tof_bins = 2;
             }
@@ -1333,7 +1333,8 @@ public:
 class IStreamAdapter
 {
 public:
-    virtual void            initialize() = 0;
+    virtual bool            initialize( bool a_force_init = false,
+                                std::string caller = "" ) = 0;
     virtual void            finalize( const RunMetrics &a_run_metrics,
                                 const RunInfo &a_run_info ) = 0;
     virtual void            dumpProcessingStatistics(void) = 0;
@@ -1359,12 +1360,14 @@ public:
     virtual void            updateRunInfo(
                                 const RunInfo &a_run_info ) = 0;
     virtual void            processBeamlineInfo(
-                                const BeamlineInfo &a_beamline_info ) = 0;
+                                const BeamlineInfo &a_beamline_info,
+                                bool a_force_init = false ) = 0;
     virtual void            processRunInfo(
                                 const RunInfo &a_run_info ,
                                 const bool a_strict ) = 0;
     virtual void            processGeometry(
-                                const std::string &a_xml ) = 0;
+                                const std::string &a_xml,
+                                bool a_force_init = false ) = 0;
     virtual void            pulseBuffersReady(
                                 STS::PulseInfo &a_pulse_info ) = 0;
     virtual void            bankPidTOFBuffersReady(
@@ -1384,7 +1387,8 @@ public:
                                 uint64_t a_count ) = 0;
     virtual void            monitorFinalize(
                                 STS::MonitorInfo &a_monitor ) = 0;
-    virtual void            runComment( const std::string &a_comment ) = 0;
+    virtual void            runComment( const std::string &a_comment,
+                                bool a_force_init = false ) = 0;
     virtual void            markerPause( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
     virtual void            markerResume( double a_time, uint64_t tOrig,

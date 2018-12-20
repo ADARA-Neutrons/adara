@@ -45,7 +45,7 @@ private:
         )
         :
             BankInfo(a_id, a_state, a_buf_reserve, a_idx_buf_reserve),
-            m_nexus_init(false),
+            m_nexus_bank_init(false),
             m_event_cur_size(0),
             m_index_cur_size(0),
             m_nxgen(a_nxgen)
@@ -113,7 +113,7 @@ private:
         std::string             m_data_path;        ///< Nexus path to Histo data dataset
         std::string             m_histo_pid_path;   ///< Nexus path to Histo PID dataset
         std::string             m_tofbin_path;      ///< Nexus path to Histo TOF Bin dataset
-        bool                    m_nexus_init;       ///< Are bank NeXus groups initialized?
+        bool                    m_nexus_bank_init;  ///< Are bank NeXus groups initialized?
         uint64_t                m_event_cur_size;   ///< Running size of TOF and PID datasets (same size)
         uint64_t                m_index_cur_size;   ///< Running size of event index dataset
         NxGen                  &m_nxgen;            ///< NxGen parent class
@@ -136,6 +136,7 @@ private:
         :
             MonitorInfo( a_id, a_buf_reserve, a_idx_buf_reserve,
                 a_config ),
+            m_nexus_monitor_init(false),
             m_index_cur_size(0),
             m_event_cur_size(0),
             m_nxgen(a_nxgen)
@@ -182,6 +183,7 @@ private:
         std::string             m_tof_path;         ///< Nexus path to TOF dataset
         std::string             m_data_path;        ///< Nexus path to Histo data dataset
         std::string             m_tofbin_path;      ///< Nexus path to Histo TOF Bins dataset
+        bool                    m_nexus_monitor_init; ///< Are bank NeXus groups initialized?
         uint64_t                m_index_cur_size;   ///< Running size of event index dataset
         uint64_t                m_event_cur_size;   ///< Running size of TOF dataset
         NxGen                  &m_nxgen;            ///< NxGen parent class
@@ -711,7 +713,7 @@ private:
                     {
                         syslog( LOG_ERR,
                             "[%i] %s: %s %s %s %s, %s: %s",
-                            g_pid, "STS Error", "NxGen::flushBuffers()",
+                            g_pid, "STS Error", "NxPVInfo::flushBuffers()",
                             this->m_device_str.c_str(),
                             "Normalizing PV Value Times",
                             "with First Pulse Time",
@@ -730,7 +732,7 @@ private:
                         // TODO Add Rate-Limiting...?
                         syslog( LOG_ERR,
                             "[%i] %s: %s %s %s %s, %s: %s",
-                            g_pid, "STS Error", "NxGen::flushBuffers()",
+                            g_pid, "STS Error", "NxPVInfo::flushBuffers()",
                             this->m_device_str.c_str(),
                             "Non-Normalized PV Buffer Full",
                             "With No First Pulse Time Yet",
@@ -740,6 +742,23 @@ private:
 
                         return( -1 );
                     }
+                }
+
+                // Do We Have a Valid Initialized NeXus Data File...?
+                // (We shouldn't get called if not, so if we do, better
+                // force it, lest we actually lose PV value data...!!)
+                if ( m_nxgen.m_gen_nexus
+                        && !(m_nxgen.initialize( true,
+                            "NxPVInfo::flushBuffers()" )) )
+                {
+                    syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
+                        g_pid, "STS Error:", "NxPVInfo::flushBuffers()",
+                        "Failed to Force Initialize NeXus File",
+                        "Losing PV Value Data!!",
+                        this->m_device_str.c_str(),
+                        this->m_pv_str.c_str() );
+                    usleep(30000); // give syslog a chance...
+                    return( 0 );
                 }
 
                 // Write PV Values to NeXus File _If_ We're Writing to
@@ -756,7 +775,7 @@ private:
                     {
                         // TODO Add Rate-Limiting...?
                         syslog( LOG_WARNING, "[%i] %s: %s: %s for %s",
-                            g_pid, "Warning", "NxGen::flushBuffers()",
+                            g_pid, "Warning", "NxPVInfo::flushBuffers()",
                             "Deferring Write of Duplicate PV Log",
                             this->m_device_pv_str.c_str() );
                         usleep(30000); // give syslog a chance...
@@ -777,7 +796,7 @@ private:
                             syslog( LOG_ERR,
                                 "[%i] %s: %s %s: %s, %s: %s",
                                 g_pid, "STS Error",
-                                "NxGen::flushBuffers()",
+                                "NxPVInfo::flushBuffers()",
                                 this->m_device_str.c_str(),
                                 "String/Array PV Buffer Full",
                                 "Deferring to Run End",
@@ -895,7 +914,7 @@ private:
                             ss_dst << m_log_path << "/" << "enum";
 
                             syslog( LOG_INFO, "[%i] %s %s: %s %s to %s",
-                                g_pid, "NxGen::flushBuffers()",
+                                g_pid, "NxPVInfo::flushBuffers()",
                                 this->m_device_pv_str.c_str(),
                                 "Linking Enum Group",
                                 ss_src.str().c_str(),
@@ -915,7 +934,7 @@ private:
                                     syslog( LOG_ERR,
                                         "[%i] %s: %s %s: %d %s %s %s!",
                                         g_pid, "STS Error",
-                                        "NxGen::flushBuffers()",
+                                        "NxPVInfo::flushBuffers()",
                                         this->m_device_str.c_str(),
                                         m_value_enum_strings_not_found,
                                         "Enumerated Type Value Strings",
@@ -935,7 +954,7 @@ private:
 
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s for %s %s=%lu %s=%u",
-                                    g_pid, "NxGen::flushBuffers()",
+                                    g_pid, "NxPVInfo::flushBuffers()",
                                     this->m_device_str.c_str(),
                                     "Enumerated Type Value Strings",
                                     this->m_pv_str.c_str(),
@@ -978,7 +997,7 @@ private:
                                 syslog( LOG_ERR,
                                     "[%i] %s: %s %s: %s for %s - %s",
                                     g_pid, "STS Error",
-                                    "NxGen::flushBuffers()",
+                                    "NxPVInfo::flushBuffers()",
                                     this->m_device_str.c_str(),
                                     "Empty Enumerated Type Value Strings",
                                     this->m_pv_str.c_str(),
@@ -995,7 +1014,7 @@ private:
                         {
                             syslog( LOG_INFO,
                                 "[%i] %s %s: %s %s to Alias %s",
-                                g_pid, "NxGen::flushBuffers()",
+                                g_pid, "NxPVInfo::flushBuffers()",
                                 this->m_device_pv_str.c_str(),
                                 "Linking PV Channel",
                                 m_log_path.c_str(),
@@ -1020,7 +1039,7 @@ private:
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s %s: PV Channel %s %s - %s",
-                                    g_pid, "NxGen::flushBuffers()",
+                                    g_pid, "NxPVInfo::flushBuffers()",
                                     this->m_device_pv_str.c_str(),
                                     m_log_path.c_str(),
                                     "Already Has Target Group Link String",
@@ -1045,7 +1064,7 @@ private:
                     {
                         syslog( LOG_WARNING,
                             "[%i] Warning in %s: %s: PV %s",
-                            g_pid, "NxGen::flushBuffers()",
+                            g_pid, "NxPVInfo::flushBuffers()",
                             this->m_device_pv_str.c_str(),
                             "Was Already Finalized, Duplicate Key...?" );
                         usleep(30000); // give syslog a chance...
@@ -1054,10 +1073,10 @@ private:
 
                 // Else Ignore This PV...
                 // (or Maybe It's a Subsumed Duplicate?)
-                else if ( this->m_ignore )
+                else if ( m_nxgen.m_gen_nexus && this->m_ignore )
                 {
                     syslog( LOG_INFO, "[%i] %s %s - Ignoring %s%s",
-                        g_pid, "NxGen::flushBuffers()",
+                        g_pid, "NxPVInfo::flushBuffers()",
                         this->m_device_str.c_str(),
                         ( ( this->m_duplicate ) ? "Duplicate " : "" ),
                         this->m_pv_str.c_str() );
@@ -1073,7 +1092,7 @@ private:
                     {
                         syslog( LOG_INFO,
                             "[%i] %s %s: %s %s to Alias %s",
-                            g_pid, "NxGen::flushBuffers()",
+                            g_pid, "NxPVInfo::flushBuffers()",
                             this->m_device_pv_str.c_str(),
                             "Linking Duplicate PV Channel",
                             m_log_path.c_str(),
@@ -1102,7 +1121,7 @@ private:
                         {
                             syslog( LOG_INFO,
                                 "[%i] %s %s: %s PV Channel %s %s - %s",
-                                g_pid, "NxGen::flushBuffers()",
+                                g_pid, "NxPVInfo::flushBuffers()",
                                 this->m_device_pv_str.c_str(),
                                 "Duplicate", m_log_path.c_str(),
                                 "Already Has Target Group Link String",
@@ -2113,6 +2132,26 @@ private:
                 //"Config Group Membership..." );
             //usleep(30000); // give syslog a chance...
 
+            // Do We Have a Valid Initialized NeXus Data File...?
+            // (We shouldn't get called if not, so if we do, better
+            // force it, lest we actually lose STS Config meta-data...!!)
+            // Note: This is Just for Paranoia's Sake to Check Initialize
+            // here, because we only get called by NxPVInfo::flushBuffers()
+            // which _Also_ checks the NeXus Initialization... ;-D
+            if ( !(m_nxgen.initialize( true,
+                    "NxPVInfo::createSTSConfigGroups()" )) )
+            {
+                syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
+                    g_pid, "STS Error:",
+                    "NxPVInfo::createSTSConfigGroups()",
+                    "Failed to Force Initialize NeXus File",
+                    "Losing STS Config Meta-Data!!",
+                    this->m_device_str.c_str(),
+                    this->m_pv_str.c_str() );
+                usleep(30000); // give syslog a chance...
+                return;
+            }
+
             // Check Each Config Group in Turn
             // for a Pattern Match on This PV...
             for ( uint32_t g=0 ; g < m_nxgen.m_config_groups.size() ; g++ )
@@ -2214,6 +2253,26 @@ private:
                 return;
             }
 
+            // Do We Have a Valid Initialized NeXus Data File...?
+            // (We shouldn't get called if not, so if we do, better
+            // force it, lest we actually lose the final meta-data...!!)
+            // Although if we just Forced Working Directory construction
+            // in StreamParser::finalizeStreamProcessing(), then
+            // Now's a Chance to Finally Create a NeXus Data File...! ;-D
+            if ( !(m_nxgen.initialize( true,
+                    "NxPVInfo::createSTSConfigConditionalGroups()" )) )
+            {
+                syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
+                    g_pid, "STS Error:",
+                    "NxPVInfo::createSTSConfigConditionalGroups()",
+                    "Failed to Force Initialize NeXus File",
+                    "Losing STS Conditional Config Groups!!",
+                    this->m_device_str.c_str(),
+                    this->m_pv_str.c_str() );
+                usleep(30000); // give syslog a chance...
+                return;
+            }
+
             try
             {
                 // Search for Activated STS Config Conditional Groups
@@ -2295,6 +2354,8 @@ public:
 
     NxGen(
         int a_fd_in,
+        std::string &a_work_root,
+        std::string &a_work_base,
         std::string &a_adara_out_file,
         std::string &a_nexus_out_file,
         std::string &a_config_file,
@@ -2312,7 +2373,8 @@ public:
 
 protected:
 
-    void                initialize(void);
+    bool                initialize( bool a_force_init = false,
+                            std::string caller = "" );
     void                finalize( const STS::RunMetrics &a_run_metrics,
                             const STS::RunInfo &a_run_info );
     STS::PVInfoBase*    makePVInfo( const std::string &a_device_name,
@@ -2336,11 +2398,14 @@ protected:
                             uint32_t a_idx_buf_reserve,
                             STS::BeamMonitorConfig *a_config,
                             bool a_known_monitor );
+    void                initializeNxMonitor( NxMonitorInfo *a_mi );
     void                processBeamlineInfo(
-                            const STS::BeamlineInfo &a_beamline_info );
+                            const STS::BeamlineInfo &a_beamline_info,
+                            bool a_force_init = false );
     void                processRunInfo( const STS::RunInfo &a_run_info,
                             const bool a_strict );
-    void                processGeometry( const std::string &a_xml );
+    void                processGeometry( const std::string &a_xml,
+                            bool a_force_init = false );
     void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
     void                bankPidTOFBuffersReady( STS::BankInfo &a_bank );
     void                bankIndexBuffersReady( STS::BankInfo &a_bank,
@@ -2356,7 +2421,8 @@ protected:
     void                monitorPulseGap( STS::MonitorInfo &a_monitor,
                             uint64_t a_count );
     void                monitorFinalize( STS::MonitorInfo &a_monitor );
-    void                runComment( const std::string &a_comment );
+    void                runComment( const std::string &a_comment,
+                            bool a_force_init = false );
     void                markerPause( double a_time, uint64_t tOrig,
                             const std::string &a_comment  );
     void                markerResume( double a_time, uint64_t tOrig,
@@ -2502,6 +2568,8 @@ private:
                             const std::string &a_attribute, T a_value );
 
     bool                m_gen_nexus;            ///< Controls whether Nexus file is generated or not
+    bool                m_nexus_init;           ///< Has the Nexus file been Initialized yet or not?
+    bool                m_nexus_beamline_init;  ///< Has the Nexus BeamlineInfo been Initialized yet or not?
     std::string         m_nexus_filename;       ///< Name of Nexus file
     std::string         m_config_file;          ///< Name of STS Config file
     std::vector<struct GroupInfo>
@@ -2536,7 +2604,10 @@ private:
     std::multimap<uint64_t, std::pair<double, std::string> >
                                 m_comment_multimap;     /// Comment annotation nsec-to-timestamp/string map
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
-    bool                        m_haveRunComment;       /// Flag to prevent Duplicate Run Comments in Nexus file
+    std::string                 m_runComment;           /// Capture the Singular Run Comment for the Nexus file
+    bool                        m_nexus_run_comment_init; /// Has the Nexus Run Comment been Initialized yet or not?
+    std::string                 m_geometryXml;          /// Capture the Geometry/IDF XML for the Nexus file
+    bool                        m_nexus_geometry_init;  /// Has the Nexus Geometry/IDF been Initialized yet or not?
     float                       m_duration;             /// Save Total Run Duration (seconds)
     uint64_t                    m_total_counts;         /// Total Run Event Counts
     uint64_t                    m_total_uncounts;       /// Total Run Event Uncounts

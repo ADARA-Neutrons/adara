@@ -71,6 +71,8 @@ declare -A nHostlogs
 
 declare -A nHostUnknownLogs
 
+declare -A nHostAltLogs
+
 declare -A nHostSTSLDAPLookupUserName
 declare -A nHostSTSLDAPSearchFailed
 declare -A nHostSTSMoreThanOnePVValue
@@ -109,6 +111,7 @@ declare -A nHostSMSDIntermittentRecovered
 declare -A nHostSMSDSetHWSourceIntermittent
 declare -A nHostSMSDFoundHWSourceIntermittent
 declare -A nHostSMSDMissingRingPeriod
+declare -A nHostSMSDBogusRingPeriodZero
 declare -A nHostSMSDSystemUninitialized
 declare -A nHostSMSDSystemNOTReady
 declare -A nHostSMSDSystemReady
@@ -191,6 +194,7 @@ nUnknownDASMOND=0
 nUnknownSMSD=0
 nUnknownPVSD=0
 nUnknownSTS=0
+nUnknownApp=0
 nUnknownLogs=0
 
 nDASMOND=0
@@ -226,6 +230,8 @@ PARSE_LOG()
 		nHostlogs[$host]=1
 
 		nHostUnknownLogs[$host]=0
+
+		nHostAltLogs[$host]=0
 
 		nHostSTSLDAPLookupUserName[$host]=0
 		nHostSTSLDAPSearchFailed[$host]=0
@@ -265,6 +271,7 @@ PARSE_LOG()
 		nHostSMSDSetHWSourceIntermittent[$host]=0
 		nHostSMSDFoundHWSourceIntermittent[$host]=0
 		nHostSMSDMissingRingPeriod[$host]=0
+		nHostSMSDBogusRingPeriodZero[$host]=0
 		nHostSMSDSystemUninitialized[$host]=0
 		nHostSMSDSystemNOTReady[$host]=0
 		nHostSMSDSystemReady[$host]=0
@@ -348,6 +355,12 @@ PARSE_LOG()
 
 	app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
 	#echo "App=[$app]"
+
+	# Flag Any "Alternate" or Additional SMSD Apps... (e.g. "-mon")
+	if [[ "$app" == "smsd-mon" ]]; then
+		nHostAltLogs[$host]=$(( nHostAltLogs[$host] + 1 ))
+		app="smsd"
+	fi
 
 	known=1
 
@@ -633,6 +646,12 @@ PARSE_LOG()
 			#echo "Missing ring period..."
 			nHostSMSDMissingRingPeriod[$host]=$(( \
 				nHostSMSDMissingRingPeriod[$host] + 1 ))
+
+		# "Bogus Ring Period of Zero" Log
+		elif [[ "$log" =~ Bogus${S}Ring${S}Period${S}of${S}Zero ]]; then
+			#echo "Bogus Ring Period of Zero..."
+			nHostSMSDBogusRingPeriodZero[$host]=$(( \
+				nHostSMSDBogusRingPeriodZero[$host] + 1 ))
 
 		# "System Uninitialized" Log
 		elif [[ "$log" =~ System${S}Uninitialized ]]; then
@@ -1185,6 +1204,11 @@ PARSE_LOG()
 			nUnknownDASMOND=$(( nUnknownDASMOND + 1 ))
 			known=0
 		fi
+
+	else
+		#echo "*** Unknown App Log!"
+		nUnknownApp=$(( nUnknownApp + 1 ))
+		known=0
 	fi
 
 	if [[ $known == 0 ]]; then
@@ -1213,7 +1237,10 @@ for f in ${FileList} ; do
 
 	lastFileFrom[${f}]=""
 
-	while read line ; do
+	while read -r ; do
+
+		# Retrieve the Line Read, Including Preceding Spaces...
+		line="$REPLY"
 
 		# Only Process Actual Log Messages...
 
@@ -1302,6 +1329,9 @@ for h in ${HostList} ; do
 	echo -e -n "\nHost [$h] - ${nHostlogs[$h]} Logs Total"
 	if [[ ${nHostUnknownLogs[$h]} -gt 0 ]]; then
 		echo -n ", *** ${nHostUnknownLogs[$h]} Unknown Logs! ***"
+	fi
+	if [[ ${nHostAltLogs[$h]} -gt 0 ]]; then
+		echo -n " [Alt=${nHostAltLogs[$h]}]"
 	fi
 	echo
 	# STS Error Stats...
@@ -1505,6 +1535,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDMissingRTDLForProtonCharge[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDMissingRTDLForProtonCharge[$h]} "
 		echo "SMSD \"Missing RTDL for Setting Proton Charge\" Logs"
+	fi
+	if [[ ${nHostSMSDBogusRingPeriodZero[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSMSDBogusRingPeriodZero[$h]} "
+		echo "SMSD \"Bogus Ring Period of Zero\" Logs"
 	fi
 	if [[ ${nHostSMSDNewChopperId[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDNewChopperId[$h]} "
@@ -1789,6 +1823,9 @@ fi
 if [[ $nUnknownDASMOND -gt 0 ]]; then
 	echo "$nUnknownDASMOND Unknown DASMOND Logs"
 fi
+echo
+
+echo "Unknown App Messages: $nUnknownApp"
 echo
 
 echo "General Statistics:"
