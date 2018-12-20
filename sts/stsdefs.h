@@ -1333,7 +1333,8 @@ public:
 class IStreamAdapter
 {
 public:
-    virtual bool            initialize( bool a_force_init = false ) = 0;
+    virtual bool            initialize( bool a_force_init = false,
+                                std::string caller = "" ) = 0;
     virtual void            finalize( const RunMetrics &a_run_metrics,
                                 const RunInfo &a_run_info ) = 0;
     virtual void            dumpProcessingStatistics(void) = 0;

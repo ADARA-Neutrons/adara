@@ -747,7 +747,9 @@ private:
                 // Do We Have a Valid Initialized NeXus Data File...?
                 // (We shouldn't get called if not, so if we do, better
                 // force it, lest we actually lose PV value data...!!)
-                if ( m_nxgen.m_gen_nexus && !(m_nxgen.initialize( true )) )
+                if ( m_nxgen.m_gen_nexus
+                        && !(m_nxgen.initialize( true,
+                            "NxPVInfo::flushBuffers()" )) )
                 {
                     syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
                         g_pid, "STS Error:", "NxPVInfo::flushBuffers()",
@@ -2136,7 +2138,8 @@ private:
             // Note: This is Just for Paranoia's Sake to Check Initialize
             // here, because we only get called by NxPVInfo::flushBuffers()
             // which _Also_ checks the NeXus Initialization... ;-D
-            if ( !(m_nxgen.initialize( true )) )
+            if ( !(m_nxgen.initialize( true,
+                    "NxPVInfo::createSTSConfigGroups()" )) )
             {
                 syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
                     g_pid, "STS Error:",
@@ -2256,7 +2259,8 @@ private:
             // Although if we just Forced Working Directory construction
             // in StreamParser::finalizeStreamProcessing(), then
             // Now's a Chance to Finally Create a NeXus Data File...! ;-D
-            if ( !(m_nxgen.initialize( true )) )
+            if ( !(m_nxgen.initialize( true,
+                    "NxPVInfo::createSTSConfigConditionalGroups()" )) )
             {
                 syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
                     g_pid, "STS Error:",
@@ -2369,7 +2373,8 @@ public:
 
 protected:
 
-    bool                initialize( bool a_force_init = false );
+    bool                initialize( bool a_force_init = false,
+                            std::string caller = "" );
     void                finalize( const STS::RunMetrics &a_run_metrics,
                             const STS::RunInfo &a_run_info );
     STS::PVInfoBase*    makePVInfo( const std::string &a_device_name,

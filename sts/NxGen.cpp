@@ -408,7 +408,7 @@ NxGen::initializeNxBank
     // Do We Have a Valid Initialized NeXus Data File...?
     // (We shouldn't get called if not, so if we do, better force it,
     // lest we actually lose some data...!!)
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::initializeNxBank()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u",
             g_pid, "STS Error:", "NxGen::initializeNxBank()",
@@ -527,7 +527,7 @@ NxGen::initializeNxMonitor
     // Do We Have a Valid Initialized NeXus Data File...?
     // (We shouldn't get called if not, so if we do, better force it,
     // lest we actually lose some data...!!)
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::initializeNxMonitor()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u",
             g_pid, "STS Error:", "NxGen::initializeNxMonitor()",
@@ -586,7 +586,7 @@ NxGen::initializeNxMonitor
  * else "false".
  */
 bool
-NxGen::initialize( bool a_force_init )
+NxGen::initialize( bool a_force_init, string caller )
 {
     if ( !m_gen_nexus )
         return( false );
@@ -606,7 +606,7 @@ NxGen::initialize( bool a_force_init )
     {
         if ( a_force_init )
         {
-            if ( constructWorkingDirectory( a_force_init ) )
+            if ( constructWorkingDirectory( a_force_init, caller ) )
                 flushAdaraStreamBuffer();
 
             else
@@ -743,7 +743,7 @@ NxGen::finalize
     // Do We Have a Valid Initialized NeXus Data File...?
     // (We shouldn't get called if not, so if we do, better force it,
     // lest we actually lose some meta-data...!)
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::finalize()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s",
             g_pid, "STS Error:", "NxGen::finalize()",
@@ -1001,7 +1001,7 @@ NxGen::checkSTSConfigElementUnitsPaths(void)
     // Although if we just Forced Working Directory construction
     // in StreamParser::finalizeStreamProcessing(), then
     // Now May Be Our Chance to Finally Create a NeXus Data File...! ;-D
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::checkSTSConfigElementUnitsPaths()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s",
             g_pid, "STS Error:",
@@ -1301,7 +1301,7 @@ NxGen::processRunInfo
     // Although if we just Forced Working Directory construction
     // in StreamParser::finalizeStreamProcessing(), then
     // Now's Our First Chance to Finally Create a NeXus Data File...! ;-D
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::processRunInfo()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s",
             g_pid, "STS Error:", "NxGen::processRunInfo()",
@@ -1552,7 +1552,7 @@ NxGen::pulseBuffersReady
     // Do We Have a Valid Initialized NeXus Data File...?
     // (We shouldn't get called if not, so if we do, better force it,
     // lest we actually lose some data...!!)
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::pulseBuffersReady()" ) )
     {
         vector<double>::iterator tstart = a_pulse_info.times.begin();
         vector<double>::iterator tend = a_pulse_info.times.end(); tend--;
@@ -1726,7 +1726,7 @@ NxGen::bankPidTOFBuffersReady
         // Do We Have a Valid Initialized NeXus Data File...?
         // (We shouldn't get called if not, so if we do, better force it,
         // lest we actually lose some data...!!)
-        if ( !initialize( true ) )
+        if ( !initialize( true, "NxGen::bankPidTOFBuffersReady()" ) )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
                 g_pid, "STS Error:", "NxGen::bankPidTOFBuffersReady()",
@@ -1819,7 +1819,7 @@ NxGen::bankIndexBuffersReady
         // Do We Have a Valid Initialized NeXus Data File...?
         // (We shouldn't get called if not, so if we do, better force it,
         // lest we actually lose some data...!!)
-        if ( !initialize( true ) )
+        if ( !initialize( true, "NxGen::bankIndexBuffersReady()" ) )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
                 g_pid, "STS Error:", "NxGen::bankIndexBuffersReady()",
@@ -1903,7 +1903,7 @@ NxGen::bankPulseGap
     // Do We Have a Valid Initialized NeXus Data File...?
     // (We shouldn't get called if not, so if we do, better force it,
     // lest we actually lose some data integrity...!)
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::bankPulseGap()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s count=%lu",
             g_pid, "STS Error:", "NxGen::bankPulseGap()",
@@ -1967,7 +1967,7 @@ NxGen::bankFinalize
     // Do We Have a Valid Initialized NeXus Data File...?
     // (We shouldn't get called if not, so if we do, better force it,
     // lest we actually lose some data...!!)
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::bankFinalize()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s bank_id=%u",
             g_pid, "STS Error:", "NxGen::bankFinalize()",
@@ -2127,7 +2127,7 @@ NxGen::monitorTOFBuffersReady
         // Do We Have a Valid Initialized NeXus Data File...?
         // (We shouldn't get called if not, so if we do, better force it,
         // lest we actually lose some data...!!)
-        if ( !initialize( true ) )
+        if ( !initialize( true, "NxGen::monitorTOFBuffersReady()" ) )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
                 g_pid, "STS Error:", "NxGen::monitorTOFBuffersReady()",
@@ -2202,7 +2202,7 @@ NxGen::monitorIndexBuffersReady
         // Do We Have a Valid Initialized NeXus Data File...?
         // (We shouldn't get called if not, so if we do, better force it,
         // lest we actually lose some data...!!)
-        if ( !initialize( true ) )
+        if ( !initialize( true, "NxGen::monitorIndexBuffersReady()" ) )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
                 g_pid, "STS Error:", "NxGen::monitorIndexBuffersReady()",
@@ -2277,7 +2277,7 @@ NxGen::monitorPulseGap
     // Do We Have a Valid Initialized NeXus Data File...?
     // (We shouldn't get called if not, so if we do, better force it,
     // lest we actually lose some data integrity...!)
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::monitorPulseGap()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s count=%lu",
             g_pid, "STS Error:", "NxGen::monitorPulseGap()",
@@ -2337,7 +2337,7 @@ NxGen::monitorFinalize
     // Do We Have a Valid Initialized NeXus Data File...?
     // (We shouldn't get called if not, so if we do, better force it,
     // lest we actually lose some data...!!)
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::monitorFinalize()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s monitor_id=%u",
             g_pid, "STS Error:", "NxGen::monitorFinalize()",
@@ -2804,7 +2804,7 @@ NxGen::writeDeviceEnums
     // Although if we just Forced Working Directory construction
     // in StreamParser::finalizeStreamProcessing(), then
     // Now May Be Our Chance to Finally Create a NeXus Data File...! ;-D
-    if ( !initialize( true ) )
+    if ( !initialize( true, "NxGen::writeDeviceEnums()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s",
             g_pid, "STS Error:", "NxGen::writeDeviceEnums()",

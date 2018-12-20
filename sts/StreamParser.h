@@ -71,7 +71,8 @@ public:
 
     bool isWorkingDirectoryReady(void);
 
-    bool constructWorkingDirectory( bool a_force_init = false );
+    bool constructWorkingDirectory( bool a_force_init = false,
+        std::string caller = "" );
 
     void flushAdaraStreamBuffer(void);
 

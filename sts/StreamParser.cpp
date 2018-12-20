@@ -158,7 +158,7 @@ StreamParser::isWorkingDirectoryReady()
 
 
 bool
-StreamParser::constructWorkingDirectory( bool a_force_init )
+StreamParser::constructWorkingDirectory( bool a_force_init, string caller )
 {
     // Do We Need to Construct a Working Directory Path...?
     if ( m_work_dir.size() == 0
@@ -189,6 +189,11 @@ StreamParser::constructWorkingDirectory( bool a_force_init )
         }
         else if ( a_force_init )
         {
+            syslog( LOG_INFO, "[%i] %s: %s by Caller %s",
+                g_pid, "StreamParser::constructWorkingDirectory()",
+                "Forcing Initialization of Nexus File", caller.c_str() );
+            usleep(30000); // give syslog a chance...
+
             // In a pinch, Steal STS Config File Directory as Scratch...!
             size_t last_slash = m_config_file.find_last_of("/");
             if ( last_slash != string::npos )
@@ -5523,8 +5528,11 @@ StreamParser::finalizeStreamProcessing()
     // Try to Proceed to Create and Write a NeXus Data File...! ;-D
     if ( !isWorkingDirectoryReady() )
     {
-        if ( constructWorkingDirectory( true ) )
+        if ( constructWorkingDirectory( true,
+                "StreamParser::finalizeStreamProcessing()" ) )
+        {
             flushAdaraStreamBuffer();
+        }
 
         else
         {
