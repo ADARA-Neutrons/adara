@@ -466,7 +466,8 @@ InputAdapter::configFileMonitorThread()
                                 << " InputAdapter::"
                                 << "configFileMonitorThread():"
                                 << " Failed to Parse"
-                                << " EPICS beamline.xml Config File!";
+                                << " EPICS Beam Config File!"
+                                << " [" << m_config_file << "]";
 
                             syslog( LOG_ERR, "%s", ss.str().c_str() );
                             usleep(33333); // give syslog a chance...
@@ -487,8 +488,9 @@ InputAdapter::configFileMonitorThread()
             ss << "PVSD ERROR:"
                 << " InputAdapter::configFileMonitorThread():"
                 << " Exception Parsing"
-                << " EPICS beamline.xml Config File!"
-                << "[" << e.what() << "]";
+                << " EPICS Beam Config File!"
+                << " [" << m_config_file << "]"
+                << " [" << e.what() << "]";
 
             syslog( LOG_ERR, "%s", ss.str().c_str() );
 
@@ -502,7 +504,8 @@ InputAdapter::configFileMonitorThread()
             ss << "PVSD ERROR:"
                 << " InputAdapter::configFileMonitorThread():"
                 << " Unexpected Exception Parsing"
-                << " EPICS beamline.xml Config File!";
+                << " EPICS Beam Config File!"
+                << " [" << m_config_file << "]";
 
             syslog( LOG_ERR, "%s", ss.str().c_str() );
 
