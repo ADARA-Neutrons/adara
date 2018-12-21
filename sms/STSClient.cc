@@ -365,7 +365,9 @@ more:
 
 void STSClient::sendDataDone(void)
 {
-	uint32_t data_done_pkt[4] = { 0, 0x00400C00, 0, 0 };
+	uint32_t data_done_pkt[4] =
+		{ 0, ADARA_PKT_TYPE( ADARA::PacketType::DATA_DONE_TYPE,
+			ADARA::PacketType::DATA_DONE_VERSION ), 0, 0 };
 
 	std::string log_info;
 
