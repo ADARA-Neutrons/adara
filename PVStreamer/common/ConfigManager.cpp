@@ -80,7 +80,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
     if ( idev != m_devices.end() )
     {
         // Note: DeviceDescriptor's Operator== Does _Not_ Compare
-        // Device ID (m_id) or Ready Status (m_ready)!
+        // Device ID (m_id), Active Status PV or Ready Status (m_ready)!
         if ( a_descriptor == *idev->second )
         {
             if ( a_descriptor.m_id != idev->second->m_id )
