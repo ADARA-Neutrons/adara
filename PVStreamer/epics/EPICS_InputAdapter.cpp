@@ -555,7 +555,6 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
 
     vector<pair<string,string> >::iterator ipv;
     bool res = false;
-    stringstream sstr;
 
     // Count Device IDs from Here (_Not_ in ConfigManager::defineDevice()!)
     // -> Don't Wait for Devices to Go Active!
@@ -576,6 +575,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
             string  dev_name;
             string  pv_name;
             string  pv_conn;
+            string  active_pv_conn;
             vector<pair<string,string> > pvs;
 
             // Skip to beamline section
@@ -605,12 +605,18 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
 
                             bool is_active = false;
 
+                            active_pv_conn.clear();
+
                             if ( xmlGetAttribute( node, "active", value ))
                             {
-                                // Active Device
-                                if ( value == "true" )
+                                // "Active" Device
+                                // - Either Static "true" or Via Status PV
+                                if ( value.compare( "false" ) )
                                 {
                                     is_active = true;
+
+                                    if ( value.compare( "true" ) )
+                                        active_pv_conn = value;
 
                                     dev_name.clear();
                                     pvs.clear();
@@ -705,7 +711,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                         }
                                     }
 
-                                    if ( dev_name.empty())
+                                    if ( dev_name.empty() )
                                     {
                                         // It's an Error to Omit the
                                         // Device Name
@@ -717,21 +723,30 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                             "Device ID", id );
                                         throw -1;
                                     }
-                                    else if ( pvs.size())
+                                    else if ( pvs.size() )
                                     {
                                         DeviceDescriptor *dev =
                                             new DeviceDescriptor( dev_name,
-                                                m_source, EPICS_PROTOCOL );
+                                                m_source, EPICS_PROTOCOL,
+                                                active_pv_conn );
 
                                         dev->m_id = id;
 
+                                        string activeStr = "";
+                                        if ( !active_pv_conn.empty() )
+                                        {
+                                            activeStr = " (Active PV Conn ["
+                                                + active_pv_conn + "])";
+                                        }
+
                                         syslog( LOG_ERR,
-                                            "%s::%s(): %s [%s] -> %s = %d",
+                                       "%s::%s: %s [%s] -> %s = %d%s",
                                             "InputAdapter",
-                                            "parseConfigBuffer",
+                                            "parseConfigBuffer()",
                                             "Active Device",
                                             dev_name.c_str(),
-                                            "Device ID", id );
+                                            "Device ID", id,
+                                            activeStr.c_str() );
                                         // give syslog a chance...
                                         usleep(33333);
 
