@@ -79,11 +79,13 @@ EnumDescriptor::operator==( const map<int32_t, string> &a_enum_vals ) const
 PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
         const string &a_name, const string &a_connection,
         PVType a_type, uint32_t a_elem_count,
-        EnumDescriptor *a_enum, const string &a_units )
+        EnumDescriptor *a_enum, const string &a_units,
+        bool a_is_active_pv )
     : m_device(a_device), m_id(0),
     m_name(a_name), m_connection(a_connection),
     m_type(a_type), m_elem_count(a_elem_count),
-    m_enum(a_enum), m_units(a_units), m_ignore(false)
+    m_enum(a_enum), m_units(a_units),
+    m_is_active_pv(a_is_active_pv), m_ignore(false)
 {
     if ( m_type == PV_ENUM && !m_enum )
     {
@@ -103,7 +105,8 @@ PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
     : m_device(a_device), m_id(a_source.m_id),
     m_name(a_source.m_name), m_connection(a_source.m_connection),
     m_type(a_source.m_type), m_elem_count(a_source.m_elem_count),
-    m_enum(0), m_units(a_source.m_units), m_ignore(false)
+    m_enum(0), m_units(a_source.m_units),
+    m_is_active_pv(a_source.m_is_active_pv), m_ignore(false)
 {
     if ( m_type == PV_ENUM && a_source.m_enum )
         m_enum = a_device->m_enums[a_source.m_enum->m_id - 1];
@@ -120,6 +123,7 @@ PVDescriptor::operator==( const PVDescriptor &a_desc ) const
             && m_type == a_desc.m_type
             && m_elem_count == a_desc.m_elem_count
             && m_units == a_desc.m_units
+            && m_is_active_pv == a_desc.m_is_active_pv
             && m_ignore == a_desc.m_ignore )
     {
         res = true;
@@ -182,21 +186,45 @@ PVDescriptor::setMetadata( PVType a_type, uint32_t a_elem_count,
 
 
 DeviceDescriptor::DeviceDescriptor( const string &a_device_name,
-        const string &a_source, Protocol a_protocol )
+        const string &a_source, Protocol a_protocol,
+        const string &a_active_pv_conn )
     : m_id(0), m_name(a_device_name), m_protocol(a_protocol),
-    m_source(a_source), m_ready(0)
+    m_source(a_source), m_active_pv_conn(a_active_pv_conn), m_ready(0)
 {
+    // Set Up Any "Active Status" PV Descriptor...
+    if ( m_active_pv_conn.empty() )
+    {
+        m_active_pv = (PVDescriptor *) NULL;
+        m_active = true;
+    }
+    else
+    {
+        m_active_pv = new PVDescriptor( this,
+            m_active_pv_conn, m_active_pv_conn,
+            PV_INT, 1, 0, "", true );
+        m_active = false;
+    }
 }
 
 
 DeviceDescriptor::DeviceDescriptor( const DeviceDescriptor &a_source )
     : m_id(a_source.m_id), m_name(a_source.m_name),
     m_protocol(a_source.m_protocol), m_source(a_source.m_source),
+    m_active_pv_conn(a_source.m_active_pv_conn),
+    m_active(a_source.m_active),
     m_ready(0)
 {
+    // Copy Enums _Before_ Any PVs (Including "Active Status" PV! ;-D).
     for ( vector<EnumDescriptor*>::const_iterator e =
             a_source.m_enums.begin(); e != a_source.m_enums.end(); ++e )
         m_enums.push_back( new EnumDescriptor( **e ));
+
+    // Set Up Any "Active Status" PV Descriptor...
+    if ( a_source.m_active_pv != NULL )
+        m_active_pv = new PVDescriptor( this, *(a_source.m_active_pv) );
+    else
+        m_active_pv = (PVDescriptor *) NULL;
+    // Inherit "m_active" value from source instance...
 
     for( vector<PVDescriptor*>::const_iterator p = a_source.m_pvs.begin();
             p != a_source.m_pvs.end(); ++p )
@@ -206,6 +234,8 @@ DeviceDescriptor::DeviceDescriptor( const DeviceDescriptor &a_source )
 
 DeviceDescriptor::~DeviceDescriptor()
 {
+    delete m_active_pv;
+
     for ( vector<PVDescriptor*>::iterator p = m_pvs.begin();
             p != m_pvs.end(); ++p )
     {
@@ -315,7 +345,7 @@ DeviceDescriptor::getPvByConnection( const string &a_pv_connection ) const
 /**
  * @brief Equality operator to determine if two descriptors are exactly the same or not
  * @param a_desc - Descriptor to compare against
- * @return False if descriptors are different, true if they are exactly the same (_Not_ comparing Device ID or Ready Status...!)
+ * @return False if descriptors are different, true if they are exactly the same (_Not_ comparing Device ID, Active/PV or Ready Status...!)
  */
 bool
 DeviceDescriptor::operator==( const DeviceDescriptor &a_desc ) const
@@ -324,7 +354,7 @@ DeviceDescriptor::operator==( const DeviceDescriptor &a_desc ) const
 
     // If device name, protocol, and source differ,
     // then devices are not the same
-    // (Note: Ignore Temp Device's ID and "Ready" Count Here!)
+    // (Note: Ignore Temp Device's ID, Active/PV and "Ready" Count Here!)
     if ( m_name == a_desc.m_name
             && m_protocol == a_desc.m_protocol
             && m_source == a_desc.m_source
@@ -362,13 +392,16 @@ ostream&
 DeviceDescriptor::print( ostream &a_out ) const
 {
     a_out << m_id << "," << m_name << "," << m_protocol << "," << m_source
-        << "," << m_ready << endl;
+        << "," << "[" << m_active_pv_conn << "]=" << m_active << ","
+        << m_ready << endl;
 /*
-    a_out << "ID:    " << m_id << endl;
-    a_out << "Name:  " << m_name << endl;
-    a_out << "Prot:  " << m_protocol << endl;
-    a_out << "Src:   " << m_source << endl;
-    a_out << "Ready: " << m_ready << endl;
+    a_out << "ID:        " << m_id << endl;
+    a_out << "Name:      " << m_name << endl;
+    a_out << "Prot:      " << m_protocol << endl;
+    a_out << "Src:       " << m_source << endl;
+    a_out << "Active PV: " << m_active_pv_conn << endl;
+    a_out << "Active:    " << m_active << endl;
+    a_out << "Ready:     " << m_ready << endl;
 */
     for ( vector<PVDescriptor*>::const_iterator p = m_pvs.begin();
             p != m_pvs.end(); ++p )

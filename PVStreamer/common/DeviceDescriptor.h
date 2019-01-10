@@ -61,13 +61,15 @@ public:
     uint32_t            m_elem_count;
     EnumDescriptor     *m_enum;
     string              m_units;
+    bool                m_is_active_pv;
     bool                m_ignore;
 
 private:
     PVDescriptor( DeviceDescriptor *a_device,
         const string &a_name, const string &a_connection,
         PVType a_type, uint32_t a_elem_count,
-        EnumDescriptor *a_enum, const string &a_units );
+        EnumDescriptor *a_enum, const string &a_units,
+        bool a_is_active_pv = false );
     PVDescriptor( DeviceDescriptor *a_device,
         const PVDescriptor &a_source );
     ~PVDescriptor() {}
@@ -80,7 +82,8 @@ class DeviceDescriptor
 {
 public:
     DeviceDescriptor( const string &a_device_name,
-            const string &a_source, Protocol a_protocol );
+            const string &a_source, Protocol a_protocol,
+            const string &a_active_pv_conn = "" );
     DeviceDescriptor( const DeviceDescriptor &a_source );
     ~DeviceDescriptor();
 
@@ -103,6 +106,9 @@ public:
     string                          m_name;
     Protocol                        m_protocol;
     string                          m_source;
+    string                          m_active_pv_conn;
+    PVDescriptor                   *m_active_pv;
+    bool                            m_active;
     vector<PVDescriptor*>           m_pvs;
     vector<EnumDescriptor*>         m_enums;
     size_t                          m_ready;
