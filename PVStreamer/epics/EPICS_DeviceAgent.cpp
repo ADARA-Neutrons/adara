@@ -195,6 +195,28 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                         if ( ich->second.m_chan_state != UNINITIALIZED )
                             ich->second.m_chan_state = INFO_NEEDED;
                     }
+                    else
+                    {
+                        syslog( LOG_ERR,
+                            "%s %s: %s%s for %s PV <%s> - %s!",
+                            "PVSD ERROR:", "DeviceAgent::update()",
+                            deviceStr.c_str(), "Channel Info Not Found",
+                            "Active Status",
+                            old_desc->m_active_pv->m_connection.c_str(),
+                            "Internal Bookkeeping Linkage Not Updated" );
+                        usleep(33333); // give syslog a chance...
+                    }
+                }
+                else
+                {
+                    syslog( LOG_ERR,
+                        "%s %s: %s%s for %s PV <%s> - %s!",
+                        "PVSD ERROR:", "DeviceAgent::update()",
+                        deviceStr.c_str(), "PV Index/Channel ID Not Found",
+                        "Active Status",
+                        old_desc->m_active_pv->m_connection.c_str(),
+                        "Internal Bookkeeping Linkage Not Updated" );
+                    usleep(33333); // give syslog a chance...
                 }
             }
         }
@@ -242,6 +264,26 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                         if ( ich->second.m_chan_state != UNINITIALIZED )
                             ich->second.m_chan_state = INFO_NEEDED;
                     }
+                    else
+                    {
+                        syslog( LOG_ERR,
+                            "%s %s: %s%s for PV <%s> - %s!",
+                            "PVSD ERROR:", "DeviceAgent::update()",
+                            deviceStr.c_str(), "Channel Info Not Found",
+                            old_pv->m_connection.c_str(),
+                            "Internal Bookkeeping Linkage Not Updated" );
+                        usleep(33333); // give syslog a chance...
+                    }
+                }
+                else
+                {
+                    syslog( LOG_ERR,
+                        "%s %s: %s%s for PV <%s> - %s!",
+                        "PVSD ERROR:", "DeviceAgent::update()",
+                        deviceStr.c_str(), "PV Index/Channel ID Not Found",
+                        old_pv->m_connection.c_str(),
+                        "Internal Bookkeeping Linkage Not Updated" );
+                    usleep(33333); // give syslog a chance...
                 }
             }
         }
