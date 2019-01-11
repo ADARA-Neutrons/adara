@@ -42,6 +42,15 @@ private:
 class PVDescriptor
 {
 public:
+    PVDescriptor( DeviceDescriptor *a_device,
+        const string &a_name, const string &a_connection,
+        PVType a_type, uint32_t a_elem_count,
+        EnumDescriptor *a_enum, const string &a_units,
+        bool a_is_active_pv = false );
+    PVDescriptor( DeviceDescriptor *a_device,
+        const PVDescriptor &a_source );
+    ~PVDescriptor() {}
+
     bool                operator==( const PVDescriptor &a_desc ) const;
     bool                operator!=( const PVDescriptor &a_desc ) const;
     bool                equalMetadata( PVType a_type, uint32_t a_elem_count,
@@ -63,16 +72,6 @@ public:
     string              m_units;
     bool                m_is_active_pv;
     bool                m_ignore;
-
-private:
-    PVDescriptor( DeviceDescriptor *a_device,
-        const string &a_name, const string &a_connection,
-        PVType a_type, uint32_t a_elem_count,
-        EnumDescriptor *a_enum, const string &a_units,
-        bool a_is_active_pv = false );
-    PVDescriptor( DeviceDescriptor *a_device,
-        const PVDescriptor &a_source );
-    ~PVDescriptor() {}
 
     friend class DeviceDescriptor;
 };
