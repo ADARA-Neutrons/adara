@@ -131,16 +131,6 @@ InputAdapter::getDevicesStatus(
 
         idev->second->deviceStatus( ready_pvs, total_pvs, hung, active );
 
-        syslog( LOG_DEBUG,
-            "%s: Device Status for [%s] %s=%u %s=%u %s=%u %s=%u",
-            "InputAdapter::getDevicesStatus()",
-            idev->second->get_desc()->m_name.c_str(),
-            "ready_pvs", ready_pvs,
-            "total_pvs", total_pvs,
-            "hung", hung,
-            "active", active );
-        usleep(33333); // give syslog a chance...
-
         if ( !active )
             a_inactiveDeviceCount++;
 
