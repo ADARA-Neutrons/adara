@@ -46,7 +46,7 @@ public:
     bool    stopped(void);
 
     void    deviceStatus( uint32_t &a_ready_pvs, uint32_t &a_total_pvs,
-                bool &a_hung );
+                bool &a_hung, bool &a_active );
 
 private:
     enum ChanState
@@ -113,7 +113,7 @@ private:
     boost::mutex                m_mutex;
     boost::condition_variable   m_state_cond;
     bool                        m_state_changed;
-    bool                        m_active;
+    bool                        m_agent_active;
     struct ca_client_context   *m_epics_context;
     time_t                      m_device_init_timeout;
     boost::thread              *m_monitor_thread;

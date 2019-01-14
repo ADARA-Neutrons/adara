@@ -38,7 +38,7 @@ DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api,
         time_t a_device_init_timeout )
     : m_stream_api(a_stream_api), m_dev_desc(0),
       m_defined(false), m_hung(false),
-      m_state_changed(false), m_active(true),
+      m_state_changed(false), m_agent_active(true),
       m_epics_context(a_epics_context),
       m_device_init_timeout(a_device_init_timeout)
 {
@@ -61,7 +61,7 @@ DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api,
  */
 DeviceAgent::~DeviceAgent()
 {
-    m_active = false;
+    m_agent_active = false;
     stop();
 
     // Wake up ctrl thread and wait for it to exit
@@ -535,7 +535,7 @@ DeviceAgent::stopped(void)
  */
 void
 DeviceAgent::deviceStatus( uint32_t &a_ready_pvs, uint32_t &a_total_pvs,
-        bool &a_hung )
+        bool &a_hung, bool &a_active )
 {
     // Return Number of "Ready" PVs and Total PVs Defined for Device...
     DeviceDescriptor *dev = m_dev_desc ? m_dev_desc : m_dev_record.get();
@@ -545,6 +545,9 @@ DeviceAgent::deviceStatus( uint32_t &a_ready_pvs, uint32_t &a_total_pvs,
 
     // Return Device Hung Status
     a_hung = m_hung;
+
+    // Return Device Active Status
+    a_active = dev->m_active;
 }
 
 
@@ -734,7 +737,7 @@ DeviceAgent::controlThread()
                 m_state_cond.wait( lock );
 
             // Exit loop if DeviceAgent instance is shutting down
-            if ( !m_active )
+            if ( !m_agent_active )
                 break;
 
             // Might have been woken spuriously
@@ -1035,7 +1038,7 @@ DeviceAgent::monitorThread()
      */
 
     // Run until DeviceAgent is shutdown/destroyed
-    while ( m_active )
+    while ( m_agent_active )
     {
         sleep(1);
 
