@@ -359,36 +359,52 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
  * @brief Removes a device from configuration database
  * @param a_record - Device to undefine
  *
- * This method undefines a device (removes from configuration database). This method results in stream
- * packets being emitted to set the undefined device PVs to "disconnected" state, followed by a
- * "device undefined" packet. Note that the device pointers in these messages are shared pointer, so
- * the device record will persist until the emitted packets are consumed and cleared.
+ * This method undefines a device (removes from configuration database).
+ * This method results in stream packets being emitted to set the
+ * undefined device PVs to "disconnected" state, followed by a
+ * "device undefined" packet. Note that the device pointers in these
+ * messages are shared pointer, so the device record will persist
+ * until the emitted packets are consumed and cleared (even if device
+ * is actually deleted).
  */
 void
-ConfigManager::undefineDevice( DeviceRecordPtr &a_record )
+ConfigManager::undefineDevice( DeviceRecordPtr &a_record,
+        bool a_delete_device )
 {
     syslog( LOG_ERR,
-        "%s %s: Un-defining device: [%s] %s/%lu (Device ID=%d)",
+        "%s %s: Un-defining device: [%s] %s/%lu (Device ID=%d) %s=%u",
         "PVSD ERROR:", "ConfigManager::undefineDevice()",
         a_record->m_name.c_str(), a_record->m_source.c_str(),
-        (unsigned long)a_record->m_protocol, a_record->m_id );
+        (unsigned long)a_record->m_protocol, a_record->m_id,
+        "delete_device", a_delete_device );
     usleep(33333); // give syslog a chance...
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    // Compare to the latest configuration records (those in trash don't matter)
-    string key = makeDeviceKey( a_record->m_name, a_record->m_source, a_record->m_protocol );
+    // Compare to the latest configuration records
+    // (those in trash don't matter)
+    string key = makeDeviceKey(
+        a_record->m_name, a_record->m_source, a_record->m_protocol );
 
     map<string,DeviceRecordPtr>::iterator idev = m_devices.find( key );
     if ( idev != m_devices.end())
     {
-        // Send PV disconnected packets for old PVs that are not in new descriptor
-        for ( vector<PVDescriptor*>::iterator ipv = idev->second->m_pvs.begin(); ipv != idev->second->m_pvs.end(); ++ipv )
+        // Send PV disconnected packets for old PVs
+        // (that are not in new descriptor, if being re-defined...)
+        for ( vector<PVDescriptor*>::iterator ipv =
+                    idev->second->m_pvs.begin();
+                ipv != idev->second->m_pvs.end(); ++ipv )
+        {
             sendPvUndefined( idev->second, *ipv );
+        }
 
-        sendDeviceUndefined( idev->second );
+        // Actually Delete the Device (All the Way Down the Pipeline...)
+        if ( a_delete_device )
+        {
+            sendDeviceUndefined( idev->second );
 
-        m_devices.erase( idev );
+            m_devices.erase( idev );
+        }
     }
 }
 

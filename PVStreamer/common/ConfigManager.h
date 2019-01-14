@@ -37,7 +37,8 @@ public:
                         const std::string &a_source, Protocol a_protocol );
     DeviceRecordPtr defineDevice( DeviceDescriptor &a_descriptor,
                         bool &a_device_changed );
-    void            undefineDevice( DeviceRecordPtr &a_record );
+    void            undefineDevice( DeviceRecordPtr &a_record,
+                        bool a_delete_device = true );
     void            attach( IInputAdapterAPI *a_stream_api );
     uint32_t        getOffset(void) { return m_offset; }
 
