@@ -111,12 +111,14 @@ InputAdapter::numInactiveDevices()
 void
 InputAdapter::getDevicesStatus(
         uint32_t &a_partialDeviceCount, uint32_t &a_hungDeviceCount,
+        uint32_t &a_inactiveDeviceCount, // via Active Status PV State
         uint32_t &a_readyPVCount, uint32_t &a_totalPVCount )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
     a_partialDeviceCount = 0;
     a_hungDeviceCount = 0;
+    a_inactiveDeviceCount = 0;
 
     a_readyPVCount = 0;
     a_totalPVCount = 0;
@@ -125,11 +127,24 @@ InputAdapter::getDevicesStatus(
             idev != m_dev_agents.end(); ++idev )
     {
         uint32_t ready_pvs, total_pvs;
-        bool hung;
+        bool hung, active;
 
-        idev->second->deviceStatus( ready_pvs, total_pvs, hung );
+        idev->second->deviceStatus( ready_pvs, total_pvs, hung, active );
 
-        if ( hung )
+        syslog( LOG_DEBUG,
+            "%s: Device Status for [%s] %s=%u %s=%u %s=%u %s=%u",
+            "InputAdapter::getDevicesStatus()",
+            idev->second->get_desc()->m_name.c_str(),
+            "ready_pvs", ready_pvs,
+            "total_pvs", total_pvs,
+            "hung", hung,
+            "active", active );
+        usleep(33333); // give syslog a chance...
+
+        if ( !active )
+            a_inactiveDeviceCount++;
+
+        else if ( hung )
             a_hungDeviceCount++;
 
         else if ( ready_pvs < total_pvs )
