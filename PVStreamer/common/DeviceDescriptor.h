@@ -71,6 +71,7 @@ public:
     EnumDescriptor     *m_enum;
     string              m_units;
     bool                m_is_active_pv;
+    bool                m_is_active;
     bool                m_ignore;
 
     friend class DeviceDescriptor;
