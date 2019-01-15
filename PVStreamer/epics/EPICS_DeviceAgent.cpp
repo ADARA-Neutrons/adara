@@ -865,6 +865,13 @@ DeviceAgent::controlThread()
                     // Save new device record
                     m_dev_record = new_rec;
 
+                    std::string deviceStr = "";
+                    if ( m_dev_record != NULL )
+                    {
+                        deviceStr = " Device ["
+                            + m_dev_record->m_name + "]";
+                    }
+
                     // Update channel info objects with new device & pv
                     // pointers (replaces m_dev_desc pointers)
                     for ( idx = m_pv_index.begin();
@@ -896,13 +903,6 @@ DeviceAgent::controlThread()
                             }
                             else
                             {
-                                std::string deviceStr = "";
-                                if ( m_dev_record != NULL )
-                                {
-                                    deviceStr = " Device ["
-                                        + m_dev_record->m_name + "]";
-                                }
-
                                 syslog( LOG_ERR, "%s %s: %s%s %s=%s - %s",
                                     "PVSD ERROR:",
                                     "DeviceAgent::controlThread()",
@@ -937,6 +937,35 @@ DeviceAgent::controlThread()
                     // Delete temporary device descriptor
                     delete m_dev_desc;
                     m_dev_desc = 0;
+
+                    // Now, If Device is Inactive, "Soft-Delete" Device
+                    // (i.e. Don't _Actually_ Delete It, Just Pretend!)
+                    if ( m_dev_record->m_active_pv
+                            && !(m_dev_record->m_active_pv->m_is_active) )
+                    {
+                        if ( m_dev_record.get() )
+                        {
+                            m_stream_api.getCfgMgr().undefineDevice(
+                                m_dev_record,
+                                /* Don't Delete Device! */ false );
+                        }
+                        else
+                        {
+                            std::string pvStr = " for PV <"
+                                + m_dev_record->m_active_pv->m_name + "> ("
+                                + m_dev_record->m_active_pv->m_connection
+                                + ")";
+
+                            syslog( LOG_ERR,
+                                "%s %s: %s%s%s [%s = %u (%s)]",
+                                "PVSD ERROR:",
+                                "DeviceAgent::controlThread()",
+                                "Couldn't Soft-Undefine Now-Inactive",
+                                deviceStr.c_str(), pvStr.c_str(),
+                                "active", 0, "false" );
+                            usleep(33333); // give syslog a chance...
+                        }
+                    }
                 }
 
                 // Device Not Ready to Define, Some PVs Still Pending...
@@ -1320,6 +1349,9 @@ DeviceAgent::epicsConnectionHandler(
                     if ( ich->second.m_device != NULL )
                         ich->second.m_device->m_active = false;
 
+                    // Save Active Status to PV Descriptor...
+                    ich->second.m_pv->m_is_active = false;
+
                     std::string deviceStr = " *** NO DEVICE ***";
                     if ( ich->second.m_device != NULL )
                     {
@@ -1342,6 +1374,26 @@ DeviceAgent::epicsConnectionHandler(
                         deviceStr.c_str(), pvStr.c_str(),
                         "active", "false" );
                     usleep(33333); // give syslog a chance...
+
+                    // Device has Gone Inactive, "Soft-Delete" Device
+                    // (i.e. Don't _Actually_ Delete It, Just Pretend!)
+                    if ( m_dev_record.get() )
+                    {
+                        m_stream_api.getCfgMgr().undefineDevice(
+                            m_dev_record,
+                            /* Don't Delete Device! */ false );
+                    }
+                    else
+                    {
+                        syslog( LOG_ERR,
+                            "%s %s: %s%s%s [%s = %u (%s)]",
+                            "PVSD ERROR:",
+                            "DeviceAgent::epicsConnectionHandler()",
+                            "Couldn't Soft-Undefine Now-Inactive",
+                            deviceStr.c_str(), pvStr.c_str(),
+                            "active", 0, "false" );
+                        usleep(33333); // give syslog a chance...
+                    }
 
                     // Don't Send Variable Value Updates
                     // for Active Status PVs...!
@@ -1595,6 +1647,9 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                 if ( ich->second.m_pv != NULL
                         && ich->second.m_pv->m_is_active_pv )
                 {
+                    // Save Active Status to PV Descriptor...
+                    ich->second.m_pv->m_is_active = active_state;
+
                     std::string deviceStr = " *** NO DEVICE ***";
                     if ( ich->second.m_device != NULL )
                     {
