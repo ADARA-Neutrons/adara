@@ -88,6 +88,7 @@ declare -A nHostSTSSkipIdenticalVarValues
 declare -A nHostSTSPurgePrePulseVarValues
 declare -A nHostSTSIgnoreSubsumedVarValues
 declare -A nHostSTSSubsumedAllDupVarValues
+declare -A nHostSTSUnableToInitialize
 declare -A nHostSTSConnectionFailed
 declare -A nHostSTSParserStoppedUnexpect
 declare -A nHostSTSTranslationFailed
@@ -248,6 +249,7 @@ PARSE_LOG()
 		nHostSTSPurgePrePulseVarValues[$host]=0
 		nHostSTSIgnoreSubsumedVarValues[$host]=0
 		nHostSTSSubsumedAllDupVarValues[$host]=0
+		nHostSTSUnableToInitialize[$host]=0
 		nHostSTSConnectionFailed[$host]=0
 		nHostSTSParserStoppedUnexpect[$host]=0
 		nHostSTSTranslationFailed[$host]=0
@@ -475,6 +477,14 @@ PARSE_LOG()
 			#echo "PV Has Subsumed All Duplicate PV Log Values..."
 			nHostSTSSubsumedAllDupVarValues[$host]=$(( \
 				nHostSTSSubsumedAllDupVarValues[$host] + 1 ))
+
+		# "Unable to Initialize NeXus File - Retry Later..." Log
+		elif [[ "$log" =~ \
+				Unable${S}to${S}Initialize${S}NeXus${S}File${S}-${S}Retry \
+		]]; then
+			#echo "Unable to Initialize NeXus File - Retry Later..."
+			nHostSTSUnableToInitialize[$host]=$(( \
+				nHostSTSUnableToInitialize[$host] + 1 ))
 
 		# "Connection Failed, Not Done Processing" Log
 		elif [[ "$log" =~ \
@@ -1390,6 +1400,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTSMoreThanOnePVValue[$h]} "
 		echo "STS \"More Than 1 PV Value for\" Logs"
+	fi
+	if [[ ${nHostSTSUnableToInitialize[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTSUnableToInitialize[$h]} "
+		echo "STS \"Unable to Initialize NeXus File - Retry\" Logs"
 	fi
 	if [[ ${nHostSTSPurgePrePulseVarValues[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTSPurgePrePulseVarValues[$h]} "
