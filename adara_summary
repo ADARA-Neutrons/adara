@@ -145,6 +145,7 @@ declare -A nHostSMSDSTSConnectionFailed
 declare -A nHostSMSDLostConnectionToSTS
 declare -A nHostSMSDLiveClientLogs
 declare -A nHostSMSDConnResetByPeer
+declare -A nHostSMSDNoSuchFileOrDirectory
 declare -A nHostSMSDEPICSCAException
 declare -A nHostSMSDActiveMQException
 declare -A nHostSMSDComBusBroadcastError
@@ -307,6 +308,7 @@ PARSE_LOG()
 		nHostSMSDLostConnectionToSTS[$host]=0
 		nHostSMSDLiveClientLogs[$host]=0
 		nHostSMSDConnResetByPeer[$host]=0
+		nHostSMSDNoSuchFileOrDirectory[$host]=0
 		nHostSMSDEPICSCAException[$host]=0
 		nHostSMSDActiveMQException[$host]=0
 		nHostSMSDComBusBroadcastError[$host]=0
@@ -884,6 +886,15 @@ PARSE_LOG()
 			#echo "fileDescriptorManager: Connection reset by peer..."
 			nHostSMSDConnResetByPeer[$host]=$(( \
 				nHostSMSDConnResetByPeer[$host] + 1 ))
+
+		# "fileDescriptorManager.process() returned with errno=2:
+		# No such file or directory" Log
+		elif [[ "$log" =~ \
+				fileDescriptorManager.process\(\)${S}returned${S}with${S}errno=2:${S}No${S}such${S}file${S}or${S}directory \
+		]]; then
+			#echo "fileDescriptorManager: No such file or directory..."
+			nHostSMSDNoSuchFileOrDirectory[$host]=$(( \
+				nHostSMSDNoSuchFileOrDirectory[$host] + 1 ))
 
 		# "Caught EPICS Exception" Log
 		elif [[ "$log" =~ \
@@ -1519,7 +1530,8 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDConnResetByPeer[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDConnResetByPeer[$h]} "
-		echo "SMSD \"fileDescriptorManager Connection reset by peer\" Logs"
+		echo \
+		"SMSD \"fileDescriptorManager: Connection reset by peer\" Logs"
 	fi
 	if [[ ${nHostSMSDBogusRTDLDistantPast[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDBogusRTDLDistantPast[$h]} "
@@ -1572,6 +1584,11 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDNewChopperId[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDNewChopperId[$h]} "
 		echo "SMSD \"New Chopper id=\" Logs"
+	fi
+	if [[ ${nHostSMSDNoSuchFileOrDirectory[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSMSDNoSuchFileOrDirectory[$h]} "
+		echo \
+		"SMSD \"fileDescriptorManager: No such file or directory\" Logs"
 	fi
 	if [[ ${nHostSMSDIdentifiedIntermittent[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDIdentifiedIntermittent[$h]} "
