@@ -144,6 +144,7 @@ declare -A nHostSMSDLastEventSource
 declare -A nHostSMSDSTSConnectionFailed
 declare -A nHostSMSDLostConnectionToSTS
 declare -A nHostSMSDLiveClientLogs
+declare -A nHostSMSDConnResetByPeer
 declare -A nHostSMSDEPICSCAException
 declare -A nHostSMSDActiveMQException
 declare -A nHostSMSDComBusBroadcastError
@@ -305,6 +306,7 @@ PARSE_LOG()
 		nHostSMSDSTSConnectionFailed[$host]=0
 		nHostSMSDLostConnectionToSTS[$host]=0
 		nHostSMSDLiveClientLogs[$host]=0
+		nHostSMSDConnResetByPeer[$host]=0
 		nHostSMSDEPICSCAException[$host]=0
 		nHostSMSDActiveMQException[$host]=0
 		nHostSMSDComBusBroadcastError[$host]=0
@@ -873,6 +875,15 @@ PARSE_LOG()
 			#echo "LiveClient..."
 			nHostSMSDLiveClientLogs[$host]=$(( \
 				nHostSMSDLiveClientLogs[$host] + 1 ))
+
+		# "fileDescriptorManager.process() returned with errno=104:
+		# Connection reset by peer" Log
+		elif [[ "$log" =~ \
+				fileDescriptorManager.process\(\)${S}returned${S}with${S}errno=104:${S}Connection${S}reset${S}by${S}peer \
+		]]; then
+			#echo "fileDescriptorManager: Connection reset by peer..."
+			nHostSMSDConnResetByPeer[$host]=$(( \
+				nHostSMSDConnResetByPeer[$host] + 1 ))
 
 		# "Caught EPICS Exception" Log
 		elif [[ "$log" =~ \
@@ -1505,6 +1516,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDPulseBufferOverflow[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDPulseBufferOverflow[$h]} "
 		echo "SMSD \"Internal Pulse Buffer Overflow\" Logs"
+	fi
+	if [[ ${nHostSMSDConnResetByPeer[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDConnResetByPeer[$h]} "
+		echo "SMSD \"fileDescriptorManager Connection reset by peer\" Logs"
 	fi
 	if [[ ${nHostSMSDBogusRTDLDistantPast[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDBogusRTDLDistantPast[$h]} "
