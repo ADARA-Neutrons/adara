@@ -85,9 +85,9 @@ PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
     m_name(a_name), m_connection(a_connection),
     m_type(a_type), m_elem_count(a_elem_count),
     m_enum(a_enum), m_units(a_units),
-    m_is_active_pv(a_is_active_pv), m_is_active(true),
-    m_ignore(false)
+    m_is_active_pv(a_is_active_pv), m_is_active(true)
 {
+    // Validate Enum Descriptor for Enum Typed PVs...
     if ( m_type == PV_ENUM && !m_enum )
     {
         std::stringstream ss;
@@ -98,6 +98,9 @@ PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
             << " units=" << a_units;
         throw runtime_error( ss.str() );
     }
+
+    // Always Ignore Any Active Status PVs (Unless Subsuming A Regular PV!)
+    m_ignore = ( m_is_active_pv ) ? true : false;
 }
 
 
@@ -108,8 +111,10 @@ PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
     m_type(a_source.m_type), m_elem_count(a_source.m_elem_count),
     m_enum(0), m_units(a_source.m_units),
     m_is_active_pv(a_source.m_is_active_pv),
-    m_is_active(a_source.m_is_active), m_ignore(false)
+    m_is_active(a_source.m_is_active),
+    m_ignore(a_source.m_ignore)
 {
+    // Capture Enum Descriptor for Enum Typed PVs...
     if ( m_type == PV_ENUM && a_source.m_enum )
         m_enum = a_device->m_enums[a_source.m_enum->m_id - 1];
 }
