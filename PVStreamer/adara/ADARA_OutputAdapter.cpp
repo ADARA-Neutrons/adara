@@ -319,35 +319,81 @@ OutputAdapter::buildDDP( OutPacket &a_adara_pkt,
 
         sstr << "  <process_variables>" << endl;
 
+        if ( a_device->m_active_pv && !(a_device->m_active_pv->m_ignore) )
+        {
+            sstr << "    <process_variable>" << endl;
+            sstr << "      <pv_name>"
+                << a_device->m_active_pv->m_name << "</pv_name>"
+                << endl;
+            sstr << "      <pv_connection>"
+                << a_device->m_active_pv->m_connection
+                << "</pv_connection>" << endl;
+            sstr << "      <pv_id>"
+                << a_device->m_active_pv->m_id << "</pv_id>" << endl;
+            if ( a_device->m_active_pv->m_type == PV_ENUM )
+            {
+                sstr << "      <pv_type>enum_"
+                    << setw(2) << setfill('0')
+                    << a_device->m_active_pv->m_enum->m_id
+                    << "</pv_type>" << endl;
+            }
+            else
+            {
+                sstr << "      <pv_type>"
+                    << getPVTypeXML(a_device->m_active_pv->m_type)
+                    << "</pv_type>" << endl;
+            }
+            if ( a_device->m_active_pv->m_units.size() )
+            {
+                sstr << "      <pv_units>"
+                    << a_device->m_active_pv->m_units
+                    << "</pv_units>" << endl;
+            }
+            if ( a_device->m_active_pv->m_ignore )
+            {
+                sstr << "      <pv_ignore>"
+                    << a_device->m_active_pv->m_ignore
+                    << "</pv_ignore>" << endl;
+            }
+            sstr << "    </process_variable>" << endl;
+        }
+
         for ( vector<PVDescriptor*>::const_iterator ipv =
                     a_device->m_pvs.begin();
                 ipv != a_device->m_pvs.end(); ++ipv )
         {
             sstr << "    <process_variable>" << endl;
-            sstr << "      <pv_name>" << (*ipv)->m_name << "</pv_name>"
+            sstr << "      <pv_name>"
+                << (*ipv)->m_name << "</pv_name>"
                 << endl;
-            sstr << "      <pv_connection>" << (*ipv)->m_connection
+            sstr << "      <pv_connection>"
+                << (*ipv)->m_connection
                 << "</pv_connection>" << endl;
-            sstr << "      <pv_id>" << (*ipv)->m_id << "</pv_id>" << endl;
+            sstr << "      <pv_id>"
+                << (*ipv)->m_id << "</pv_id>" << endl;
             if ( (*ipv)->m_type == PV_ENUM )
             {
                 sstr << "      <pv_type>enum_"
-                    << setw(2) << setfill('0') << (*ipv)->m_enum->m_id
+                    << setw(2) << setfill('0')
+                    << (*ipv)->m_enum->m_id
                     << "</pv_type>" << endl;
             }
             else
             {
-                sstr << "      <pv_type>" << getPVTypeXML((*ipv)->m_type)
+                sstr << "      <pv_type>"
+                    << getPVTypeXML((*ipv)->m_type)
                     << "</pv_type>" << endl;
             }
             if ( (*ipv)->m_units.size() )
             {
-                sstr << "      <pv_units>" << (*ipv)->m_units
+                sstr << "      <pv_units>"
+                    << (*ipv)->m_units
                     << "</pv_units>" << endl;
             }
             if ( (*ipv)->m_ignore )
             {
-                sstr << "      <pv_ignore>" << (*ipv)->m_ignore
+                sstr << "      <pv_ignore>"
+                    << (*ipv)->m_ignore
                     << "</pv_ignore>" << endl;
             }
             sstr << "    </process_variable>" << endl;
@@ -657,6 +703,17 @@ OutputAdapter::defineDevice( DeviceRecordPtr a_device )
     // Add this device to configured device list
     m_devices.insert( a_device );
 
+    // Add a PV state entry for the Active Status PV, If It's Not Ignored!
+    if ( a_device->m_active_pv && !(a_device->m_active_pv->m_ignore) )
+    {
+        PVState state = PVState();
+
+        state.m_time.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
+        state.m_time.nsec = 0;
+
+        m_pv_state[a_device->m_active_pv] = state;
+    }
+
     // Insert new PV state entries with disconnected status
     for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin();
             ipv != a_device->m_pvs.end(); ++ipv )
@@ -692,6 +749,40 @@ OutputAdapter::redefineDevice(
     map<PVDescriptor*,PVState>::iterator old_state;
     PVDescriptor *old_pv;
     bool found;
+
+    // Transfer any Active Status PV State to new device, If Not Ignored!
+    if ( a_device->m_active_pv && !(a_device->m_active_pv->m_ignore) )
+    {
+        found = false;
+
+        // (Exactly) Same Active Status PV as Before, Re-Use State...
+        if ( a_old_device->m_active_pv
+            && !(a_old_device->m_active_pv->m_ignore)
+            && !(a_old_device->m_active_pv->m_name.compare(
+                a_device->m_active_pv->m_name ))
+            && !(a_old_device->m_active_pv->m_connection.compare(
+                a_device->m_active_pv->m_connection )) )
+        {
+            old_state = m_pv_state.find( a_old_device->m_active_pv );
+            if ( old_state != m_pv_state.end() )
+            {
+                m_pv_state[a_device->m_active_pv] = old_state->second;
+                found = true;
+            }
+        }
+
+        if ( !found )
+        {
+            PVState state =
+                PVState( ::ADARA::VariableStatus::NOT_REPORTED,
+                    ::ADARA::VariableSeverity::INVALID );
+
+            state.m_time.sec = (uint32_t)time(0) - EPICS_TIME_OFFSET;
+            state.m_time.nsec = 0;
+
+            m_pv_state[a_device->m_active_pv] = state;
+        }
+    }
 
     // Transfer last-known PVState to new state entries
     // (keyed on new PVDescriptor instances)
@@ -749,6 +840,16 @@ OutputAdapter::undefineDevice( DeviceRecordPtr a_device )
     // Remove all pv state entries associated with device
     map<PVDescriptor*,PVState>::iterator ipv_state;
 
+    // Remove any Active Status PV State, If Not Ignored!
+    if ( a_device->m_active_pv && !(a_device->m_active_pv->m_ignore) )
+    {
+        ipv_state = m_pv_state.find( a_device->m_active_pv );
+        if ( ipv_state != m_pv_state.end() )
+        {
+            m_pv_state.erase( ipv_state );
+        }
+    }
+
     for ( vector<PVDescriptor*>::iterator ipv = a_device->m_pvs.begin();
             ipv != a_device->m_pvs.end(); ++ipv )
     {
@@ -778,6 +879,34 @@ OutputAdapter::updatePV( PVDescriptor *a_pv, PVState &a_state )
     if ( ipv_state != m_pv_state.end() )
     {
         ipv_state->second = a_state;
+    }
+
+    else
+    {
+        stringstream sstr;
+        if ( a_pv != NULL && a_pv->m_device != NULL )
+        {
+            sstr << "Device [" << a_pv->m_device->m_name << "]"
+                << " (device id=" << a_pv->m_device->m_id << ")";
+        }
+        else
+        {
+            sstr << "*** NO DEVICE ***";
+        }
+        if ( a_pv != NULL )
+        {
+            sstr << " PV <" << a_pv->m_name << ">"
+                << " (" << a_pv->m_connection << ")";
+        }
+        else
+        {
+            sstr << " *** NO PV ***";
+        }
+        syslog( LOG_ERR,
+            "%s %s: %s - PV Descriptor Not Found for State Update! %s",
+            "PVSD ERROR:", "OutputAdapter::updatePV()", sstr.str().c_str(),
+            "Ignoring..." );
+        usleep(33333); // give syslog a chance...
     }
 }
 
