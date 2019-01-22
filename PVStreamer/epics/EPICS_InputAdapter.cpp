@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/system/error_code.hpp>
@@ -649,10 +650,15 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                                     cnode );
                                                 if ( !tmp_node )
                                                 {
+                                                    stringstream ss;
+                                                    ss << "InputAdapter::"
+                                                    << "parseConfigBuffer()"
+                                                    << ": PV Name is"
+                                                    << " missing or empty";
                                                     syslog( LOG_ERR,
-                                                        "%s %s: PV Name is missing or empty",
+                                                        "%s %s",
                                                         "PVSD ERROR:",
-                                                        "InputAdapter::parseConfigBuffer()" );
+                                                        ss.str().c_str() );
                                                     throw -1;
                                                 }
 
@@ -703,12 +709,18 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                                     else
                                                         pv_name = pv_conn;
 
+                                                    stringstream ss;
+                                                    ss << "InputAdapter::"
+                                                    << "parseConfigBuffer()"
+                                                    << ": Device ["
+                                                    << dev_name << "]: "
+                                                    << "Ignoring Non-Logged"
+                                                    << " PV <" << pv_conn
+                                                    << "> (" << pv_name
+                                                    << ")";
                                                     syslog( LOG_WARNING,
-                                                        "%s: Device [%s]: Ignoring Non-Logged PV <%s> (%s)",
-                                                        "InputAdapter::parseConfigBuffer()",
-                                                        dev_name.c_str(),
-                                                        pv_conn.c_str(),
-                                                        pv_name.c_str() );
+                                                        "%s",
+                                                        ss.str().c_str() );
                                                     // give syslog a chance
                                                     usleep(33333);
                                                 }
@@ -745,7 +757,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                         }
 
                                         syslog( LOG_ERR,
-                                       "%s::%s: %s [%s] -> %s = %d%s",
+                                            "%s::%s: %s [%s] -> %s = %d%s",
                                             "InputAdapter",
                                             "parseConfigBuffer()",
                                             "Active Device",
@@ -758,11 +770,53 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                         for ( ipv = pvs.begin();
                                             ipv != pvs.end(); ++ipv )
                                         {
-                                            // Don't know type or units yet
-                                            // - just use any value
-                                            dev->definePV(
-                                                ipv->first, ipv->second,
-                                                PV_INT, 1, 0, "" );
+                                            // Subsume Any PV References
+                                            // to the Active Status PV...!
+                                            if ( !ipv->second.compare(
+                                                    active_pv_conn ) )
+                                            {
+                                                // *Don't* Ignore This
+                                                // Active Status PV, Send
+                                                // Its Value Updates Thru!
+                                                dev->m_active_pv->m_ignore =
+                                                    false;
+
+                                                // Capture Any Alias from
+                                                // the PV Being Subsumed...!
+                                                string aliasStr = "";
+                                                if ( ipv->second.compare(
+                                                        ipv->first ) )
+                                                {
+                                                    dev->m_active_pv->m_name
+                                                        = ipv->first;
+
+                                                    aliasStr =
+                                                        " (Use PV Alias ["
+                                                        + ipv->first + "])";
+                                                }
+
+                                                stringstream ss;
+                                                ss << "InputAdapter::"
+                                                << "parseConfigBuffer()"
+                                                << ": Active Status PV"
+                                                << " Subsumes Device PV!"
+                                                << " [" << dev_name << "]"
+                                                << " -> Device ID = " << id
+                                                << activeStr << aliasStr;
+                                                syslog( LOG_ERR, "%s",
+                                                    ss.str().c_str() );
+                                                // give syslog a chance...
+                                                usleep(33333);
+                                            }
+
+                                            else
+                                            {
+                                                // Don't know type/units yet
+                                                // - just use any value
+                                                dev->definePV(
+                                                    ipv->first, ipv->second,
+                                                    PV_INT, 1, 0, "" );
+                                            }
                                         }
 
                                         a_devices.push_back( dev );
