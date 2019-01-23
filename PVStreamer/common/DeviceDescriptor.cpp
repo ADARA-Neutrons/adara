@@ -85,7 +85,7 @@ PVDescriptor::PVDescriptor( DeviceDescriptor *a_device,
     m_name(a_name), m_connection(a_connection),
     m_type(a_type), m_elem_count(a_elem_count),
     m_enum(a_enum), m_units(a_units),
-    m_is_active_pv(a_is_active_pv), m_is_active(true)
+    m_is_active_pv(a_is_active_pv), m_is_active(false)
 {
     // Validate Enum Descriptor for Enum Typed PVs...
     if ( m_type == PV_ENUM && !m_enum )
