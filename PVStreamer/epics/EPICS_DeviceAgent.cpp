@@ -154,8 +154,7 @@ DeviceAgent::update( DeviceDescriptor *a_device )
         // Handle Any Active Status PV Channel...
         if ( a_device->m_active_pv )
         {
-            // Create New Active Status PV Channel,
-            // Else Reuse Any Existing Active Status PV Channel...
+            // Create New Active Status PV Channel
             if ( old_desc->m_active_pv == NULL
                     || old_desc->m_active_pv_conn.compare(
                         a_device->m_active_pv_conn ) )
@@ -164,7 +163,8 @@ DeviceAgent::update( DeviceDescriptor *a_device )
             }
 
             // Active Status PV channel is shared between
-            // old and new device, reuse connection
+            // Old and New Device, Reuse Any Existing
+            // Active Status PV Channel...
             else
             {
                 std::string pvStr = "";
@@ -184,6 +184,10 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                     "DeviceAgent::update()", deviceStr.c_str(),
                     pvStr.c_str() );
                 usleep(33333); // give syslog a chance...
+
+                // Inherit the Active Status from Old Active Status PV
+                a_device->m_active_pv->m_is_active =
+                    old_desc->m_active_pv->m_is_active;
 
                 // Update Active PV pointer on channel info
                 idx = m_pv_index.find(
