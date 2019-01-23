@@ -398,9 +398,11 @@ DeviceDescriptor::operator!=( const DeviceDescriptor &a_desc ) const
 ostream&
 DeviceDescriptor::print( ostream &a_out ) const
 {
-    a_out << m_id << "," << m_name << "," << m_protocol << "," << m_source
-        << "," << "[" << m_active_pv_conn << "]=" << m_active << ","
-        << m_ready << endl;
+    a_out << "id=" << m_id << "," << "name=" << m_name << ","
+        << "protocol=" << m_protocol << "," << "source=" << m_source << ","
+        << "active_pv_conn=" << "[" << m_active_pv_conn << "]" << ","
+        << "active=" << m_active << ","
+        << "ready=" << m_ready;
 /*
     a_out << "ID:        " << m_id << endl;
     a_out << "Name:      " << m_name << endl;
@@ -410,9 +412,18 @@ DeviceDescriptor::print( ostream &a_out ) const
     a_out << "Active:    " << m_active << endl;
     a_out << "Ready:     " << m_ready << endl;
 */
+    if ( m_active_pv )
+    {
+        a_out << "," << "active_pv:";
+        m_active_pv->print( a_out );
+    }
+
     for ( vector<PVDescriptor*>::const_iterator p = m_pvs.begin();
             p != m_pvs.end(); ++p )
+    {
+        a_out << "," << "pv:";
         (*p)->print( a_out );
+    }
 
     return a_out;
 }
@@ -421,14 +432,17 @@ DeviceDescriptor::print( ostream &a_out ) const
 ostream&
 PVDescriptor::print( ostream &a_out ) const
 {
-    a_out << "  " << m_id << "," << m_name << "," << m_connection << ","
-        << m_type << "[" << m_elem_count << "]," << m_units << ","
-        << "ignore=" << m_ignore << endl;
+    a_out << "id=" << m_id << "," << "name=" << m_name << ","
+        << "connection=" << m_connection << ","
+        << "type=" << m_type << "[" << m_elem_count << "]" << ","
+        << "units=" << m_units << ","
+        << "is_active_pv=" << m_is_active_pv << ","
+        << "is_active=" << m_is_active << ","
+        << "ignore=" << m_ignore;
     if ( m_enum )
     {
-        a_out << "    enum: ";
+        a_out << "," << "enum:";
         m_enum->print(a_out);
-        a_out << endl;
     }
 
 /*
