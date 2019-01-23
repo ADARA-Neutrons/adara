@@ -170,13 +170,13 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                 std::string pvStr = "";
                 if ( old_desc->m_active_pv != NULL )
                 {
-                    pvStr = " for Active Status PV <"
+                    pvStr = " from Old Active Status PV <"
                         + old_desc->m_active_pv->m_name + "> ("
                         + old_desc->m_active_pv->m_connection + ")";
                 }
                 else
                 {
-                    pvStr = " for Active Status PV ("
+                    pvStr = " from Old Active Status PV ("
                         + old_desc->m_active_pv_conn + ")";
                 }
 
@@ -252,7 +252,8 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                         + (*ipv)->m_device->m_name + "] - ";
                 }
 
-                syslog( LOG_INFO, "%s: %sReusing Channel for PV <%s> (%s)",
+                syslog( LOG_INFO,
+                    "%s: %sReusing Channel from Old PV <%s> (%s)",
                     "DeviceAgent::update()", deviceStr.c_str(),
                     (*ipv)->m_name.c_str(), (*ipv)->m_connection.c_str() );
                 usleep(33333); // give syslog a chance...
@@ -968,6 +969,12 @@ DeviceAgent::controlThread()
                                 deviceStr.c_str(), pvStr.c_str(),
                                 "active", 1, "true" );
                             usleep(33333); // give syslog a chance...
+
+                            // If We Didn't Just Send the PV Values
+                            // (Because the Device Didn't Change)
+                            // Then Send Them Now! ;-D
+                            if ( !device_changed )
+                                sendCurrentValues();
                         }
 
                         // If Device is Inactive, "Soft-Delete" Device
