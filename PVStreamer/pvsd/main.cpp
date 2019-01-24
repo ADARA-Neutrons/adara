@@ -56,7 +56,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.6.10"
+#define PVSD_VERSION "1.7.0"
 
 bool g_active = true;
 bool g_child_signal = false;
