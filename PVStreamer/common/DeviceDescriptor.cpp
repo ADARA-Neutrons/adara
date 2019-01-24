@@ -370,10 +370,70 @@ DeviceDescriptor::operator==( const DeviceDescriptor &a_desc ) const
         const PVDescriptor *ppv;
         res = true;
 
+        // When an Active Status PV Subsumes a Regular Device PV,
+        // it can Ghost the Presence of the PV's Existence...! ;-)
+        if ( m_active_pv && !(m_active_pv->m_ignore) )
+        {
+            ppv = a_desc.getPvByName( m_active_pv->m_name );
+
+            // If found, compare PVs...
+            if ( ppv && *ppv != *m_active_pv )
+            {
+                return false;
+            }
+
+            // Else Compare Matching Active Status PVs...
+            else if ( ppv == 0 &&
+                    ( m_active_pv_conn.compare( a_desc.m_active_pv_conn )
+                        || *(a_desc.m_active_pv) != *m_active_pv ) )
+            {
+                return false;
+            }
+        }
+
+        // Check Regular Device PVs...
         for ( vector<PVDescriptor*>::const_iterator ipv = m_pvs.begin();
                 ipv != m_pvs.end(); ++ipv )
         {
             ppv = a_desc.getPvByName( (*ipv)->m_name );
+
+            // If not found, devices differ
+            if ( ppv == 0 || *ppv != **ipv )
+            {
+                res = false;
+                break;
+            }
+        }
+
+        // Check Both Ways!! ;-D
+
+        // When an Active Status PV Subsumes a Regular Device PV,
+        // it can Ghost the Presence of the PV's Existence...! ;-)
+        if ( a_desc.m_active_pv && !(a_desc.m_active_pv->m_ignore) )
+        {
+            ppv = getPvByName( a_desc.m_active_pv->m_name );
+
+            // If found, compare PVs...
+            if ( ppv && *ppv != *(a_desc.m_active_pv) )
+            {
+                return false;
+            }
+
+            // Else Compare Matching Active Status PVs...
+            else if ( ppv == 0 &&
+                    ( a_desc.m_active_pv_conn.compare( m_active_pv_conn )
+                        || *m_active_pv != *(a_desc.m_active_pv) ) )
+            {
+                return false;
+            }
+        }
+
+        // Check Regular Device PVs...
+        for ( vector<PVDescriptor*>::const_iterator ipv =
+                    a_desc.m_pvs.begin();
+                ipv != a_desc.m_pvs.end(); ++ipv )
+        {
+            ppv = getPvByName( (*ipv)->m_name );
 
             // If not found, devices differ
             if ( ppv == 0 || *ppv != **ipv )
