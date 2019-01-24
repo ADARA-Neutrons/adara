@@ -553,6 +553,13 @@ ConfigManager::makeDeviceKey( const string &a_device_name, const string &a_sourc
  * client issues. This method cannot prevent other data sources from
  * injecting Device Descriptor packets with conflicting names. This
  * condition must be trapped by the SMS.
+ *
+ * Addendum: As of the end of 2018, the ADARA STS has gotten much smarter
+ * about recognizing "Duplicate PVs" and Collapsing any redundant values
+ * into a single Merged PV Log. So we can be more cavalier now too,
+ * and only look for PV Name/Alias Clashes that are Distinct from the
+ * EPICS PV Connection Strings. It's actually "Ok" now to have the
+ * Same PV requested in Multiple Devices, just no Name/Alias Clashes...! ;-D
  */
 void
 ConfigManager::makePvNamesUnique( const string &a_key,
@@ -572,7 +579,10 @@ ConfigManager::makePvNamesUnique( const string &a_key,
         for ( ipv = idev->second->m_pvs.begin();
                 ipv != idev->second->m_pvs.end(); ++ipv )
         {
-            names.insert( (*ipv)->m_name );
+            // Only Consider Names/Aliases that are Distinct from
+            // the Given PV's Connection String... ;-D
+            if ( (*ipv)->m_name.compare( (*ipv)->m_connection ) )
+                names.insert( (*ipv)->m_name );
         }
     }
 
@@ -582,6 +592,11 @@ ConfigManager::makePvNamesUnique( const string &a_key,
     for ( ipv = a_descriptor.m_pvs.begin();
             ipv != a_descriptor.m_pvs.end(); ++ipv )
     {
+        // Only Check Names/Aliases that are Distinct from
+        // the Given PV's Connection String... ;-D
+        if ( !(*ipv)->m_name.compare( (*ipv)->m_connection ) )
+            continue;
+
         count = 0;
         new_name = (*ipv)->m_name;
 
@@ -603,13 +618,13 @@ ConfigManager::makePvNamesUnique( const string &a_key,
         if ( count )
         {
             syslog( LOG_ERR,
-          "%s %s: %s [%s] (Device ID=%d): %s from <%s> to <%s> (PV ID=%d)!",
-                "PVSD ERROR:",
-                "ConfigManager::makePvNamesUnique()", "Device",
-                a_descriptor.m_name.c_str(), a_descriptor.m_id,
-                "Renaming Name-Clash PV",
+                "%s %s: %s [%s] (%s=%d): %s <%s> to <%s> (%s) (PV ID=%d)!",
+                "PVSD ERROR:", "ConfigManager::makePvNamesUnique()",
+                "Device", a_descriptor.m_name.c_str(),
+                "Device ID", a_descriptor.m_id,
+                "Renaming Name-Clash PV from",
                 (*ipv)->m_name.c_str(), new_name.c_str(),
-                (*ipv)->m_id );
+                (*ipv)->m_connection.c_str(), (*ipv)->m_id );
             usleep(33333); // give syslog a chance...
 
             (*ipv)->m_name = new_name;
