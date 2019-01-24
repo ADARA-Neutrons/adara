@@ -131,8 +131,6 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                     a_device->m_active_pv_conn ) )
         {
             disconnectPV( old_desc->m_active_pv, lock );
-
-            old_desc->m_active_pv = (PVDescriptor *) NULL;
         }
 
         for ( ipv = old_desc->m_pvs.begin();
