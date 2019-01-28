@@ -2546,6 +2546,7 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 			if ( !(m_noRegisteredEventSourcesCount++ % 36000) ) {
 				ERROR( ( m_recording ? "[RECORDING] " : "" )
 					<< "pulseRTDL: Pulse with No Registered Event Sources!"
+					<< std::hex << " 0x" << pulse->m_id.first << std::dec
 					<< " (m_noRegisteredEventSources="
 					<< ( m_noRegisteredEventSources ? "true" : "false" )
 					<< " numEventSources=" << pulse->m_numEventSources
@@ -2562,6 +2563,7 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 				ERROR(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "pulseRTDL: RTDL Out of Order with Raw Data"
+					<< std::hex << " 0x" << pulse->m_id.first << std::dec
 					<< " - Pulse Not Pending...?"
 					<< " Marking Partial...");
 			}
@@ -3062,7 +3064,10 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 
 	} catch (std::runtime_error e) {
 		ERROR( ( m_recording ? "[RECORDING] " : "" )
-			<< "Failed to record pulse: " << e.what());
+			<< "Failed to record pulse: "
+			<< " id=0x" << std::hex << pulse->m_id.first
+			<< " dup=0x" << pulse->m_id.second << std::dec
+			<< " - " << e.what());
 
 		/* Abuse std::logic_error here somewhat -- we want failure to
 		 * write data to be fatal, but don't have a way to distinguish
@@ -3404,6 +3409,8 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 									<< "buildChopperPackets():"
 									<< " *** Chopper " << cit->first
 									<< " Event Synchronization Error!"
+									<< std::hex << " 0x"
+										<< pulse->m_id.first << std::dec
 									<< " 1st Event TOF1=" << tof
 									<< " > 2nd Event TOF2=" << tof2
 									<< " and TOF1 in Neighborhood of"
@@ -3434,6 +3441,8 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 									<< "buildChopperPackets():"
 									<< " *** Chopper " << cit->first
 									<< " Glitch Event Error!"
+									<< std::hex << " 0x"
+										<< pulse->m_id.first << std::dec
 									<< " 1st Event TOF1=" << tof
 									<< " > 2nd Event TOF2=" << tof2
 									<< " and TOF1 in Neighborhood of"
