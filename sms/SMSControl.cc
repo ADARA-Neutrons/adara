@@ -3411,8 +3411,9 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 									<< "buildChopperPackets():"
 									<< " *** Chopper " << cit->first
 									<< " Event Synchronization Error!"
-									<< std::hex << " pulse=0x"
-										<< pulse->m_id.first << std::dec
+									<< std::hex << " (pulse=0x"
+										<< pulse->m_id.first << ")"
+										<< std::dec
 									<< " 1st Event TOF1=" << tof
 									<< " > 2nd Event TOF2=" << tof2
 									<< " and TOF1 in Neighborhood of"
@@ -3443,8 +3444,9 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 									<< "buildChopperPackets():"
 									<< " *** Chopper " << cit->first
 									<< " Glitch Event Error!"
-									<< std::hex << " pulse=0x"
-										<< pulse->m_id.first << std::dec
+									<< std::hex << " (pulse=0x"
+										<< pulse->m_id.first << ")"
+										<< std::dec
 									<< " 1st Event TOF1=" << tof
 									<< " > 2nd Event TOF2=" << tof2
 									<< " and TOF1 in Neighborhood of"
