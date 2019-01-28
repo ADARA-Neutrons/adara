@@ -126,6 +126,7 @@ declare -A nHostSMSDDataSourceTimedOutRetry
 declare -A nHostSMSDBogusRTDLDistantPast
 declare -A nHostSMSDBogusRTDLDistantFuture
 declare -A nHostSMSDNoRTDLForPulse
+declare -A nHostSMSDRTDLOutOfOrderWithRawData
 declare -A nHostSMSDMissingRTDLForProtonCharge
 declare -A nHostSMSDNoMorePulsesForCorrect
 declare -A nHostSMSDNewChopperId
@@ -289,6 +290,7 @@ PARSE_LOG()
 		nHostSMSDBogusRTDLDistantPast[$host]=0
 		nHostSMSDBogusRTDLDistantFuture[$host]=0
 		nHostSMSDNoRTDLForPulse[$host]=0
+		nHostSMSDRTDLOutOfOrderWithRawData[$host]=0
 		nHostSMSDMissingRTDLForProtonCharge[$host]=0
 		nHostSMSDNoMorePulsesForCorrect[$host]=0
 		nHostSMSDNewChopperId[$host]=0
@@ -754,6 +756,13 @@ PARSE_LOG()
 			#echo "NO RTDL for Pulse..."
 			nHostSMSDNoRTDLForPulse[$host]=$(( \
 				nHostSMSDNoRTDLForPulse[$host] + 1 ))
+
+		# "RTDL Out of Order with Raw Data" Log
+		elif [[ "$log" =~ \
+				RTDL${S}Out${S}of${S}Order${S}with${S}Raw${S}Data ]]; then
+			#echo "RTDL Out of Order with Raw Data..."
+			nHostSMSDRTDLOutOfOrderWithRawData[$host]=$(( \
+				nHostSMSDRTDLOutOfOrderWithRawData[$host] + 1 ))
 
 		# "Missing RTDL for Setting Proton Charge" Log
 		elif [[ "$log" =~ \
@@ -1540,6 +1549,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDBogusRTDLDistantFuture[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDBogusRTDLDistantFuture[$h]} "
 		echo "SMSD \"Bogus Pulse Time from Distant Future\" Logs"
+	fi
+	if [[ ${nHostSMSDRTDLOutOfOrderWithRawData[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDRTDLOutOfOrderWithRawData[$h]} "
+		echo "SMSD \"RTDL Out of Order with Raw Data\" Logs"
 	fi
 	if [[ ${nHostSMSDLocalSAWTOOTHRTDL[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDLocalSAWTOOTHRTDL[$h]} "
