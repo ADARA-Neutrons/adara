@@ -2546,7 +2546,8 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 			if ( !(m_noRegisteredEventSourcesCount++ % 36000) ) {
 				ERROR( ( m_recording ? "[RECORDING] " : "" )
 					<< "pulseRTDL: Pulse with No Registered Event Sources!"
-					<< std::hex << " 0x" << pulse->m_id.first << std::dec
+					<< std::hex << " pulse=0x"
+						<< pulse->m_id.first << std::dec
 					<< " (m_noRegisteredEventSources="
 					<< ( m_noRegisteredEventSources ? "true" : "false" )
 					<< " numEventSources=" << pulse->m_numEventSources
@@ -2563,7 +2564,8 @@ void SMSControl::pulseRTDL(const ADARA::RTDLPkt &pkt, uint32_t dup)
 				ERROR(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "pulseRTDL: RTDL Out of Order with Raw Data"
-					<< std::hex << " 0x" << pulse->m_id.first << std::dec
+					<< std::hex << " pulse=0x"
+						<< pulse->m_id.first << std::dec
 					<< " - Pulse Not Pending...?"
 					<< " Marking Partial...");
 			}
@@ -3409,7 +3411,7 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 									<< "buildChopperPackets():"
 									<< " *** Chopper " << cit->first
 									<< " Event Synchronization Error!"
-									<< std::hex << " 0x"
+									<< std::hex << " pulse=0x"
 										<< pulse->m_id.first << std::dec
 									<< " 1st Event TOF1=" << tof
 									<< " > 2nd Event TOF2=" << tof2
@@ -3441,7 +3443,7 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 									<< "buildChopperPackets():"
 									<< " *** Chopper " << cit->first
 									<< " Glitch Event Error!"
-									<< std::hex << " 0x"
+									<< std::hex << " pulse=0x"
 										<< pulse->m_id.first << std::dec
 									<< " 1st Event TOF1=" << tof
 									<< " > 2nd Event TOF2=" << tof2
