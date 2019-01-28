@@ -49,6 +49,7 @@ public:
     void            getDevicesStatus(
                         uint32_t &a_partialDeviceCount,
                         uint32_t &a_hungDeviceCount,
+                        uint32_t &a_inactiveDeviceCount,
                         uint32_t &a_readyPVCount,
                         uint32_t &a_totalPVCount );
 private:

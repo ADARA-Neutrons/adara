@@ -38,7 +38,7 @@ DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api,
         time_t a_device_init_timeout )
     : m_stream_api(a_stream_api), m_dev_desc(0),
       m_defined(false), m_hung(false),
-      m_state_changed(false), m_active(true),
+      m_state_changed(false), m_agent_active(true),
       m_epics_context(a_epics_context),
       m_device_init_timeout(a_device_init_timeout)
 {
@@ -61,7 +61,7 @@ DeviceAgent::DeviceAgent( IInputAdapterAPI &a_stream_api,
  */
 DeviceAgent::~DeviceAgent()
 {
-    m_active = false;
+    m_agent_active = false;
     stop();
 
     // Wake up ctrl thread and wait for it to exit
@@ -124,6 +124,15 @@ DeviceAgent::update( DeviceDescriptor *a_device )
             "DeviceAgent::update()", deviceStr.c_str() );
         usleep(33333); // give syslog a chance...
 
+        // If Active Status PV Connection Changed,
+        // Delete Old PV Subscription.
+        if ( old_desc->m_active_pv
+                && old_desc->m_active_pv_conn.compare(
+                    a_device->m_active_pv_conn ) )
+        {
+            disconnectPV( old_desc->m_active_pv, lock );
+        }
+
         for ( ipv = old_desc->m_pvs.begin();
                 ipv != old_desc->m_pvs.end(); ++ipv )
         {
@@ -139,6 +148,86 @@ DeviceAgent::update( DeviceDescriptor *a_device )
         syslog( LOG_INFO, "%s: %sReuse/Create New PV Channels...",
             "DeviceAgent::update()", deviceStr.c_str() );
         usleep(33333); // give syslog a chance...
+
+        // Handle Any Active Status PV Channel...
+        if ( a_device->m_active_pv )
+        {
+            // Create New Active Status PV Channel
+            if ( old_desc->m_active_pv == NULL
+                    || old_desc->m_active_pv_conn.compare(
+                        a_device->m_active_pv_conn ) )
+            {
+                connectPV( a_device->m_active_pv );
+            }
+
+            // Active Status PV channel is shared between
+            // Old and New Device, Reuse Any Existing
+            // Active Status PV Channel...
+            else
+            {
+                std::string pvStr = "";
+                if ( old_desc->m_active_pv != NULL )
+                {
+                    pvStr = " from Old Active Status PV <"
+                        + old_desc->m_active_pv->m_name + "> ("
+                        + old_desc->m_active_pv->m_connection + ")";
+                }
+                else
+                {
+                    pvStr = " from Old Active Status PV ("
+                        + old_desc->m_active_pv_conn + ")";
+                }
+
+                syslog( LOG_INFO, "%s: %sReusing Channel%s",
+                    "DeviceAgent::update()", deviceStr.c_str(),
+                    pvStr.c_str() );
+                usleep(33333); // give syslog a chance...
+
+                // Inherit the Active Status from Old Active Status PV
+                a_device->m_active_pv->m_is_active =
+                    old_desc->m_active_pv->m_is_active;
+
+                // Update Active PV pointer on channel info
+                idx = m_pv_index.find(
+                    old_desc->m_active_pv->m_connection );
+                if ( idx != m_pv_index.end() )
+                {
+                    ich = m_chan_info.find( idx->second );
+                    if ( ich != m_chan_info.end() )
+                    {
+                        // Update PV to new Active Status PV
+                        ich->second.m_pv = a_device->m_active_pv;
+                        // Old device record is no longer valid - reset
+                        ich->second.m_device.reset();
+
+                        // Re-acquire metadata just in case it changed
+                        // (only if connected)
+                        if ( ich->second.m_chan_state != UNINITIALIZED )
+                            ich->second.m_chan_state = INFO_NEEDED;
+                    }
+                    else
+                    {
+                        syslog( LOG_ERR,
+                            "%s %s: %s%s%s - %s!",
+                            "PVSD ERROR:", "DeviceAgent::update()",
+                            deviceStr.c_str(), "Channel Info Not Found",
+                            pvStr.c_str(),
+                            "Internal Bookkeeping Linkage Not Updated" );
+                        usleep(33333); // give syslog a chance...
+                    }
+                }
+                else
+                {
+                    syslog( LOG_ERR,
+                        "%s %s: %s%s%s - %s!",
+                        "PVSD ERROR:", "DeviceAgent::update()",
+                        deviceStr.c_str(), "PV Index/Channel ID Not Found",
+                        pvStr.c_str(),
+                        "Internal Bookkeeping Linkage Not Updated" );
+                    usleep(33333); // give syslog a chance...
+                }
+            }
+        }
 
         for ( ipv = a_device->m_pvs.begin();
                 ipv != a_device->m_pvs.end(); ++ipv )
@@ -161,7 +250,8 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                         + (*ipv)->m_device->m_name + "] - ";
                 }
 
-                syslog( LOG_INFO, "%s: %sReusing channel for PV <%s> (%s)",
+                syslog( LOG_INFO,
+                    "%s: %sReusing Channel from Old PV <%s> (%s)",
                     "DeviceAgent::update()", deviceStr.c_str(),
                     (*ipv)->m_name.c_str(), (*ipv)->m_connection.c_str() );
                 usleep(33333); // give syslog a chance...
@@ -183,6 +273,26 @@ DeviceAgent::update( DeviceDescriptor *a_device )
                         if ( ich->second.m_chan_state != UNINITIALIZED )
                             ich->second.m_chan_state = INFO_NEEDED;
                     }
+                    else
+                    {
+                        syslog( LOG_ERR,
+                            "%s %s: %s%s for PV <%s> - %s!",
+                            "PVSD ERROR:", "DeviceAgent::update()",
+                            deviceStr.c_str(), "Channel Info Not Found",
+                            old_pv->m_connection.c_str(),
+                            "Internal Bookkeeping Linkage Not Updated" );
+                        usleep(33333); // give syslog a chance...
+                    }
+                }
+                else
+                {
+                    syslog( LOG_ERR,
+                        "%s %s: %s%s for PV <%s> - %s!",
+                        "PVSD ERROR:", "DeviceAgent::update()",
+                        deviceStr.c_str(), "PV Index/Channel ID Not Found",
+                        old_pv->m_connection.c_str(),
+                        "Internal Bookkeeping Linkage Not Updated" );
+                    usleep(33333); // give syslog a chance...
                 }
             }
         }
@@ -198,6 +308,9 @@ DeviceAgent::update( DeviceDescriptor *a_device )
         syslog( LOG_INFO, "%s: %sCreate New PV Channels...",
             "DeviceAgent::update()", deviceStr.c_str() );
         usleep(33333); // give syslog a chance...
+
+        if ( a_device->m_active_pv )
+            connectPV( a_device->m_active_pv );
 
         for ( ipv = a_device->m_pvs.begin();
                 ipv != a_device->m_pvs.end(); ++ipv )
@@ -431,15 +544,19 @@ DeviceAgent::stopped(void)
  */
 void
 DeviceAgent::deviceStatus( uint32_t &a_ready_pvs, uint32_t &a_total_pvs,
-        bool &a_hung )
+        bool &a_hung, bool &a_active )
 {
     // Return Number of "Ready" PVs and Total PVs Defined for Device...
     DeviceDescriptor *dev = m_dev_desc ? m_dev_desc : m_dev_record.get();
     a_ready_pvs = dev->m_ready;
-    a_total_pvs = dev->m_pvs.size();
+    a_total_pvs = dev->m_pvs.size()
+        + ( ( dev->m_active_pv ) ? 1 : 0 );
 
     // Return Device Hung Status
     a_hung = m_hung;
+
+    // Return Device Active Status
+    a_active = dev->m_active;
 }
 
 
@@ -629,7 +746,7 @@ DeviceAgent::controlThread()
                 m_state_cond.wait( lock );
 
             // Exit loop if DeviceAgent instance is shutting down
-            if ( !m_active )
+            if ( !m_agent_active )
                 break;
 
             // Might have been woken spuriously
@@ -650,7 +767,7 @@ DeviceAgent::controlThread()
                     // cout <<  "IN, chan: " << ich->first
                          // << " ca_type = " << ich->second.m_ca_type
                          // << " ca_element_count = "
-                         // << ich->second.m_ca_elem_count'
+                         // << ich->second.m_ca_elem_count
                          // << " for PV: "
                          // << ich->second.m_pv->m_connection << endl;
 
@@ -688,7 +805,7 @@ DeviceAgent::controlThread()
                         // cout <<  "IA, chan: " << ich->first
                              // << " ca_type = " << ich->second.m_ca_type
                              // << " ca_element_count = "
-                             // << ich->second.m_ca_elem_count'
+                             // << ich->second.m_ca_elem_count
                              // << " for PV: "
                              // << ich->second.m_pv->m_connection << endl;
 
@@ -743,7 +860,9 @@ DeviceAgent::controlThread()
             // and the SMS should handle the PV state appropriately.
             if ( m_dev_desc && !m_defined && ready > 0 )
             {
-                if ( ready == m_dev_desc->m_pvs.size() )
+                if ( ready ==
+                        ( m_dev_desc->m_pvs.size()
+                            + ( ( m_dev_desc->m_active_pv ) ? 1 : 0 ) ) )
                 {
                     // Define Device with ConfigManager - this will return
                     // the "real" DeviceDescriptor record
@@ -755,21 +874,62 @@ DeviceAgent::controlThread()
                     // Save new device record
                     m_dev_record = new_rec;
 
+                    std::string deviceStr = "";
+                    if ( m_dev_record != NULL )
+                    {
+                        deviceStr = " Device ["
+                            + m_dev_record->m_name + "]";
+                    }
+
                     // Update channel info objects with new device & pv
                     // pointers (replaces m_dev_desc pointers)
                     for ( idx = m_pv_index.begin();
                             idx != m_pv_index.end(); ++idx )
                     {
-                        // Careful! PV names can be changed in new_rec
-                        // due to name conflicts!!!
-                        pv = m_dev_record->getPvByConnection( idx->first );
                         ich = m_chan_info.find( idx->second );
-                        if ( pv && ich != m_chan_info.end() )
+                        if ( ich != m_chan_info.end() )
                         {
-                            // Replace temporary device and PV records
-                            // with new managed records
-                            ich->second.m_device = m_dev_record;
-                            ich->second.m_pv = pv;
+                            // Careful! PV names can be changed in new_rec
+                            // due to name conflicts!!!
+                            if ( (pv = m_dev_record->getPvByConnection(
+                                    idx->first )) )
+                            {
+                                // Replace temporary device and PV records
+                                // with new managed records
+                                ich->second.m_device = m_dev_record;
+                                ich->second.m_pv = pv;
+                            }
+                            // Handle Any Active Status PV...
+                            else if ( m_dev_record->m_active_pv
+                                    && !m_dev_record->m_active_pv_conn
+                                        .compare( idx->first ) )
+                            {
+                                // Replace temporary device and PV records
+                                // with new managed records
+                                ich->second.m_device = m_dev_record;
+                                ich->second.m_pv =
+                                    m_dev_record->m_active_pv;
+                            }
+                            else
+                            {
+                                syslog( LOG_ERR, "%s %s: %s%s %s=%s - %s",
+                                    "PVSD ERROR:",
+                                    "DeviceAgent::controlThread()",
+                                    "Missing PV for", deviceStr.c_str(),
+                                    "connection", idx->first.c_str(),
+                                    "Ignoring..." );
+                                usleep(33333); // give syslog a chance...
+                            }
+                        }
+                        else
+                        {
+                            syslog( LOG_ERR, "%s %s: %s %lx %s %s - %s",
+                                "PVSD ERROR:",
+                                "DeviceAgent::controlThread()",
+                                "Missing Channel Info", (long) idx->second,
+                                "for PV", idx->first.c_str(),
+                                "Ignoring..." );
+                            usleep(33333); // give syslog a chance...
                         }
                     }
 
@@ -786,6 +946,69 @@ DeviceAgent::controlThread()
                     // Delete temporary device descriptor
                     delete m_dev_desc;
                     m_dev_desc = 0;
+
+                    // Now, Check Any Saved Device "Active Status"...
+                    if ( m_dev_record->m_active_pv )
+                    {
+                        std::string pvStr = " for PV <"
+                            + m_dev_record->m_active_pv->m_name + "> ("
+                            + m_dev_record->m_active_pv->m_connection
+                            + ")";
+
+                        if ( m_dev_record->m_active_pv->m_is_active )
+                        {
+                            m_dev_record->m_active = true;
+
+                            syslog( LOG_INFO,
+                                "%s: %s %s -%s%s [%s = %u (%s)]",
+                                "DeviceAgent::controlThread()",
+                                "Mark Device Active",
+                                "from Active Status PV",
+                                deviceStr.c_str(), pvStr.c_str(),
+                                "active", 1, "true" );
+                            usleep(33333); // give syslog a chance...
+
+                            // If We Didn't Just Send the PV Values
+                            // (Because the Device Didn't Change)
+                            // Then Send Them Now! ;-D
+                            if ( !device_changed )
+                                sendCurrentValues();
+                        }
+
+                        // If Device is Inactive, "Soft-Delete" Device
+                        // (i.e. Don't _Actually_ Delete It, Just Pretend!)
+                        else
+                        {
+                            m_dev_record->m_active = false;
+
+                            syslog( LOG_INFO,
+                                "%s: %s %s -%s%s [%s = %u (%s)]",
+                                "DeviceAgent::controlThread()",
+                                "Mark Device Inactive",
+                                "from Active Status PV",
+                                deviceStr.c_str(), pvStr.c_str(),
+                                "active", 0, "false" );
+                            usleep(33333); // give syslog a chance...
+
+                            if ( m_dev_record.get() )
+                            {
+                                m_stream_api.getCfgMgr().undefineDevice(
+                                    m_dev_record,
+                                    /* Don't Delete Device! */ false );
+                            }
+                            else
+                            {
+                                syslog( LOG_ERR,
+                                    "%s %s: %s%s%s [%s = %u (%s)]",
+                                    "PVSD ERROR:",
+                                    "DeviceAgent::controlThread()",
+                                    "Couldn't Soft-Undefine Now-Inactive",
+                                    deviceStr.c_str(), pvStr.c_str(),
+                                    "active", 0, "false" );
+                                usleep(33333); // give syslog a chance...
+                            }
+                        }
+                    }
                 }
 
                 // Device Not Ready to Define, Some PVs Still Pending...
@@ -807,7 +1030,9 @@ DeviceAgent::controlThread()
                     syslog( LOG_INFO,
                         "%s: %sWaiting for %ld Pending PV Connections: %s",
                         "DeviceAgent::controlThread()", deviceStr.c_str(),
-                        m_dev_desc->m_pvs.size() - ready,
+                        m_dev_desc->m_pvs.size()
+                            + ( ( m_dev_desc->m_active_pv ) ? 1 : 0 )
+                            - ready,
                         ss.str().c_str() );
                     usleep(33333); // give syslog a chance...
 
@@ -885,7 +1110,7 @@ DeviceAgent::monitorThread()
      */
 
     // Run until DeviceAgent is shutdown/destroyed
-    while ( m_active )
+    while ( m_agent_active )
     {
         sleep(1);
 
@@ -917,6 +1142,7 @@ DeviceAgent::monitorThread()
                         ss << string("Device [") + dev_name;
                         ss << "] INIT HUNG, Check beamline.xml - ";
                         ss << ( m_dev_desc->m_pvs.size()
+                            + ( ( m_dev_desc->m_active_pv ) ? 1 : 0 )
                             - m_dev_desc->m_ready );
                         ss << " PVs Pending!";
                         ADARA::ComBus::SignalAssertMessage sigmsg( sid,
@@ -1153,6 +1379,74 @@ DeviceAgent::epicsConnectionHandler(
                 ich->second.m_pv_state.m_status = epicsAlarmComm;
                 ich->second.m_pv_state.m_severity = epicsSevMajor;
 
+                // Lost Connection for PV, Clean Things Up...
+                if ( ich->second.m_pv != NULL )
+                {
+                    // Always Save Active Status to PV Descriptor...
+                    // (This PV Could Become an Active Status PV... ;-D)
+                    ich->second.m_pv->m_is_active = false;
+
+                    // Lost Connection for Active Status PV...!
+                    if ( ich->second.m_pv->m_is_active_pv )
+                    {
+                        // If Active Status PV Goes Away,
+                        // Set Device "Inactive"
+                        if ( ich->second.m_device != NULL )
+                            ich->second.m_device->m_active = false;
+
+                        std::string deviceStr = " *** NO DEVICE ***";
+                        if ( ich->second.m_device != NULL )
+                        {
+                            deviceStr = " Device ["
+                                + ich->second.m_device->m_name + "]";
+                        }
+
+                        std::string pvStr = "";
+                        if ( ich->second.m_pv != NULL )
+                        {
+                            pvStr = " Active Status PV <"
+                                + ich->second.m_pv->m_name + "> ("
+                                + ich->second.m_pv->m_connection + ")";
+                        }
+
+                        syslog( LOG_ERR, "%s %s: %s%s%s [%s = %s]",
+                            "PVSD ERROR:",
+                            "DeviceAgent::epicsConnectionHandler()",
+                            "Lost Active Status PV Connection for",
+                            deviceStr.c_str(), pvStr.c_str(),
+                            "active", "false" );
+                        usleep(33333); // give syslog a chance...
+
+                        // Device has Gone Inactive, "Soft-Delete" Device
+                        // (i.e. Don't _Actually_ Delete It, Just Pretend!)
+                        if ( m_dev_record.get() )
+                        {
+                            m_stream_api.getCfgMgr().undefineDevice(
+                                m_dev_record,
+                                /* Don't Delete Device! */ false );
+                        }
+                        else
+                        {
+                            syslog( LOG_ERR,
+                                "%s %s: %s%s%s [%s = %u (%s)]",
+                                "PVSD ERROR:",
+                                "DeviceAgent::epicsConnectionHandler()",
+                                "Couldn't Soft-Undefine Now-Inactive",
+                                deviceStr.c_str(), pvStr.c_str(),
+                                "active", 0, "false" );
+                            usleep(33333); // give syslog a chance...
+                        }
+
+                        // Don't Send Variable Value Updates
+                        // for Active Status PVs...!
+                        // (Unless Active Status PV is Marked
+                        // to _Not_ Ignore, Because it Subsumed
+                        // a Regular Device PV...)
+                        if ( ich->second.m_pv->m_ignore )
+                            return;
+                    }
+                }
+
                 // Do not try to send value/alarm data unless
                 // device is fully defined
                 if ( !m_defined )
@@ -1274,6 +1568,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                 // Extract PV state from type-specific data structure
                 PVState &state = ich->second.m_pv_state;
 
+                bool active_state = false;
+
                 switch ( a_args.type )
                 {
                 case DBR_TIME_STRING:
@@ -1282,6 +1578,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     updateState<struct dbr_time_string>(
                         a_args.dbr, state );
                     state.m_elem_count = a_args.count;
+                    if ( !state.m_str_val.compare("true") )
+                        active_state = true;
                     break;
                 case DBR_TIME_SHORT:
                     // Could be Scalar Numerical Value
@@ -1302,6 +1600,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     }
                     updateState<struct dbr_time_short>(
                         a_args.dbr, state );
+                    if ( state.m_int_val )
+                        active_state = true;
                     break;
                 case DBR_TIME_FLOAT:
                     // Could be Scalar Numerical Value
@@ -1322,6 +1622,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     }
                     updateState<struct dbr_time_float>(
                         a_args.dbr, state );
+                    if ( state.m_double_val )
+                        active_state = true;
                     break;
                 case DBR_TIME_ENUM:
                     state.m_uint_val = (uint32_t)
@@ -1329,6 +1631,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     state.m_elem_count = a_args.count;
                     updateState<struct dbr_time_enum>(
                         a_args.dbr, state );
+                    if ( state.m_uint_val )
+                        active_state = true;
                     break;
                 case DBR_TIME_CHAR:
                     // Could be (Scalar Numerical) Character
@@ -1340,6 +1644,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                         &((struct dbr_time_char *)a_args.dbr)->value;
                     state.m_elem_count = a_args.count;
                     updateState<struct dbr_time_char>( a_args.dbr, state );
+                    if ( state.m_uint_val )
+                        active_state = true;
                     break;
                 case DBR_TIME_LONG:
                     // Could be Scalar Numerical Value
@@ -1360,6 +1666,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     }
                     updateState<struct dbr_time_long>(
                         a_args.dbr, state );
+                    if ( state.m_int_val )
+                        active_state = true;
                     break;
                 case DBR_TIME_DOUBLE:
                     // Could be Scalar Numerical Value
@@ -1380,9 +1688,115 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     }
                     updateState<struct dbr_time_double>(
                         a_args.dbr, state );
+                    if ( state.m_double_val )
+                        active_state = true;
                     break;
                 default:
                     break;
+                }
+
+                // Set PV/Device Status as Needed from Value Update...
+                if ( ich->second.m_pv != NULL )
+                {
+                    // Always Save Active Status to PV Descriptor...
+                    // (This PV Could Become an Active Status PV... ;-D)
+                    ich->second.m_pv->m_is_active = active_state;
+
+                    // Set Device Active Status
+                    // If This PV is an Active Status PV...
+                    if ( ich->second.m_pv->m_is_active_pv )
+                    {
+                        std::string deviceStr = " *** NO DEVICE ***";
+                        if ( ich->second.m_device != NULL )
+                        {
+                            deviceStr = " Device ["
+                                + ich->second.m_device->m_name + "]";
+                        }
+
+                        std::string pvStr = "";
+                        if ( ich->second.m_pv != NULL )
+                        {
+                            pvStr = " from Active Status PV <"
+                                + ich->second.m_pv->m_name + "> ("
+                                + ich->second.m_pv->m_connection + ")";
+                        }
+
+                        if ( ich->second.m_device != NULL )
+                        {
+                            syslog( LOG_ERR,
+                                "%s %s: %s%s%s [%s = %u (%s) -> %u (%s)]",
+                                "PVSD ERROR:",
+                                "DeviceAgent::epicsEventHandler()",
+                                "Setting Active Status for",
+                                deviceStr.c_str(), pvStr.c_str(),
+                                "active",
+                                ich->second.m_device->m_active,
+                                ( (ich->second.m_device->m_active)
+                                    ? "true" : "false" ),
+                                active_state,
+                                ( active_state ? "true" : "false" ) );
+                            usleep(33333); // give syslog a chance...
+
+                            ich->second.m_device->m_active = active_state;
+
+                            // Setting Device Active, Send PV Values...
+                            if ( active_state )
+                            {
+                                sendCurrentValues();
+                            }
+
+                            // Device has Gone Inactive,
+                            // "Soft-Delete" Device
+                            // (i.e. Don't _Actually_ Delete It,
+                            // Just Pretend!)
+                            else
+                            {
+                                if ( m_dev_record.get() )
+                                {
+                                    m_stream_api.getCfgMgr()
+                                        .undefineDevice(
+                                            m_dev_record,
+                                            /* Don't Delete Device! */
+                                            false );
+                                }
+                                else
+                                {
+                                    syslog( LOG_ERR,
+                                        "%s %s: %s %s%s%s [%s = %u (%s)]",
+                                        "PVSD ERROR:",
+                                        "DeviceAgent::epicsEventHandler()",
+                                        "Couldn't Soft-Undefine",
+                                        "Now-Inactive",
+                                        deviceStr.c_str(), pvStr.c_str(),
+                                        "active", active_state,
+                                        ( active_state
+                                            ? "true" : "false" ) );
+                                    usleep(33333);
+                                    // give syslog a chance...
+                                }
+                            }
+                        }
+                        else
+                        {
+                            syslog( LOG_ERR,
+                                "%s %s: %s%s%s [%s = %u (%s)]",
+                                "PVSD ERROR:",
+                                "DeviceAgent::epicsEventHandler()",
+                                "FAILED to Set Active Status for",
+                                deviceStr.c_str(), pvStr.c_str(),
+                                "active", active_state,
+                                ( active_state ? "true" : "false" ) );
+                            usleep(33333); // give syslog a chance...
+                        }
+
+                        // Don't Send Variable Value Updates
+                        // for Active Status PVs...!
+                        // (Unless Active Status PV is Marked
+                        // to _Not_ Ignore, Because it Subsumed
+                        // a Regular Device PV...)
+                        if ( ich->second.m_pv->m_ignore )
+                            return;
+                    }
                 }
 
                 // Send value/alarm data if device is fully defined
@@ -1431,7 +1845,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                         }
                         else
                         {
-                            syslog( LOG_ERR, "%s %s: %s %s%s",
+                            syslog( LOG_ERR, "%s %s: %s%s%s",
                                 "PVSD ERROR:",
                                 "DeviceAgent::epicsEventHandler()",
                                 "Queue Deactivated, Ignore VariableUpdate",
@@ -1459,7 +1873,7 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                             + ich->second.m_pv->m_connection + ")";
                     }
 
-                    syslog( LOG_ERR, "%s %s: %s %s%s",
+                    syslog( LOG_ERR, "%s %s: %s%s%s",
                         "PVSD ERROR:",
                         "DeviceAgent::epicsEventHandler()",
                         "Device Not Yet Defined, Ignore VariableUpdate",
@@ -1567,6 +1981,35 @@ DeviceAgent::sendCurrentValues()
     for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin();
             ich != m_chan_info.end(); ++ich )
     {
+        std::string deviceStr = "";
+        if ( ich->second.m_device != NULL )
+        {
+            deviceStr = " Device ["
+                + ich->second.m_device->m_name + "]";
+        }
+
+        std::string pvStr = "";
+        if ( ich->second.m_pv != NULL )
+        {
+            pvStr = " for PV <"
+                + ich->second.m_pv->m_name + "> ("
+                + ich->second.m_pv->m_connection + ")";
+        }
+
+        // Don't Send Variable Value Updates for Active Status PVs...!
+        if ( ich->second.m_pv != NULL
+                && ich->second.m_pv->m_is_active_pv
+                && ich->second.m_pv->m_ignore )
+        {
+            syslog( LOG_INFO, "%s: %s%s%s",
+                "DeviceAgent::sendCurrentValues()",
+                "Don't Send Active Status PV State for",
+                deviceStr.c_str(), pvStr.c_str() );
+            usleep(33333); // give syslog a chance...
+
+            continue;
+        }
+
         bool timeout;
         StreamPacket *pkt = m_stream_api.getFreePacket( 5000, timeout );
         if ( pkt )
@@ -1576,34 +2019,21 @@ DeviceAgent::sendCurrentValues()
             pkt->pv = ich->second.m_pv;
             pkt->state = ich->second.m_pv_state;
 
-            //cout << "Sending PV " << ich->second.m_device->m_id
-                //<< "." << ich->second.m_pv->m_id
-                //<< " on chid " << ich->first
-                //<< ", stat = " <<  pkt->state.m_status
-                //<< ", sev: " <<  pkt->state.m_severity << endl;
+            //syslog( LOG_DEBUG, "%s: %s%s%s %s=%u %s=%u",
+                //"DeviceAgent::sendCurrentValues()",
+                //"Sending PV State for",
+                //deviceStr.c_str(), pvStr.c_str(),
+                //"status", ich->second.m_pv_state.m_status,
+                //"severity", ich->second.m_pv_state.m_severity );
+            //usleep(33333); // give syslog a chance...
 
             m_stream_api.putFilledPacket( pkt );
         }
         else
         {
-            std::string deviceStr = "";
-            if ( ich->second.m_device != NULL )
-            {
-                deviceStr = " Device ["
-                    + ich->second.m_device->m_name + "]";
-            }
-
-            std::string pvStr = "";
-            if ( ich->second.m_pv != NULL )
-            {
-                pvStr = " for PV <"
-                    + ich->second.m_pv->m_name + "> ("
-                    + ich->second.m_pv->m_connection + ")";
-            }
-
             if ( m_stream_api.getFreeQueueActive() )
             {
-                syslog( LOG_ERR, "%s %s: %s %s%s [%s = %lu]",
+                syslog( LOG_ERR, "%s %s: %s%s%s [%s = %lu]",
                     "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
                     "No Free Packets! VariableUpdate Lost for",
                     deviceStr.c_str(), pvStr.c_str(),
@@ -1613,7 +2043,7 @@ DeviceAgent::sendCurrentValues()
             }
             else
             {
-                syslog( LOG_ERR, "%s %s: %s %s%s",
+                syslog( LOG_ERR, "%s %s: %s%s%s",
                     "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
                     "Queue Deactivated, Ignore VariableUpdate for",
                     deviceStr.c_str(), pvStr.c_str() );

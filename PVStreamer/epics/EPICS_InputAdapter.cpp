@@ -1,5 +1,6 @@
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/path.hpp>
 #include <boost/system/error_code.hpp>
@@ -111,12 +112,14 @@ InputAdapter::numInactiveDevices()
 void
 InputAdapter::getDevicesStatus(
         uint32_t &a_partialDeviceCount, uint32_t &a_hungDeviceCount,
+        uint32_t &a_inactiveDeviceCount, // via Active Status PV State
         uint32_t &a_readyPVCount, uint32_t &a_totalPVCount )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
 
     a_partialDeviceCount = 0;
     a_hungDeviceCount = 0;
+    a_inactiveDeviceCount = 0;
 
     a_readyPVCount = 0;
     a_totalPVCount = 0;
@@ -125,11 +128,14 @@ InputAdapter::getDevicesStatus(
             idev != m_dev_agents.end(); ++idev )
     {
         uint32_t ready_pvs, total_pvs;
-        bool hung;
+        bool hung, active;
 
-        idev->second->deviceStatus( ready_pvs, total_pvs, hung );
+        idev->second->deviceStatus( ready_pvs, total_pvs, hung, active );
 
-        if ( hung )
+        if ( !active )
+            a_inactiveDeviceCount++;
+
+        else if ( hung )
             a_hungDeviceCount++;
 
         else if ( ready_pvs < total_pvs )
@@ -466,7 +472,8 @@ InputAdapter::configFileMonitorThread()
                                 << " InputAdapter::"
                                 << "configFileMonitorThread():"
                                 << " Failed to Parse"
-                                << " EPICS beamline.xml Config File!";
+                                << " EPICS Beam Config File!"
+                                << " [" << m_config_file << "]";
 
                             syslog( LOG_ERR, "%s", ss.str().c_str() );
                             usleep(33333); // give syslog a chance...
@@ -487,8 +494,9 @@ InputAdapter::configFileMonitorThread()
             ss << "PVSD ERROR:"
                 << " InputAdapter::configFileMonitorThread():"
                 << " Exception Parsing"
-                << " EPICS beamline.xml Config File!"
-                << "[" << e.what() << "]";
+                << " EPICS Beam Config File!"
+                << " [" << m_config_file << "]"
+                << " [" << e.what() << "]";
 
             syslog( LOG_ERR, "%s", ss.str().c_str() );
 
@@ -502,7 +510,8 @@ InputAdapter::configFileMonitorThread()
             ss << "PVSD ERROR:"
                 << " InputAdapter::configFileMonitorThread():"
                 << " Unexpected Exception Parsing"
-                << " EPICS beamline.xml Config File!";
+                << " EPICS Beam Config File!"
+                << " [" << m_config_file << "]";
 
             syslog( LOG_ERR, "%s", ss.str().c_str() );
 
@@ -552,7 +561,6 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
 
     vector<pair<string,string> >::iterator ipv;
     bool res = false;
-    stringstream sstr;
 
     // Count Device IDs from Here (_Not_ in ConfigManager::defineDevice()!)
     // -> Don't Wait for Devices to Go Active!
@@ -573,6 +581,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
             string  dev_name;
             string  pv_name;
             string  pv_conn;
+            string  active_pv_conn;
             vector<pair<string,string> > pvs;
 
             // Skip to beamline section
@@ -602,12 +611,18 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
 
                             bool is_active = false;
 
+                            active_pv_conn.clear();
+
                             if ( xmlGetAttribute( node, "active", value ))
                             {
-                                // Active Device
-                                if ( value == "true" )
+                                // "Active" Device
+                                // - Either Static "true" or Via Status PV
+                                if ( value.compare( "false" ) )
                                 {
                                     is_active = true;
+
+                                    if ( value.compare( "true" ) )
+                                        active_pv_conn = value;
 
                                     dev_name.clear();
                                     pvs.clear();
@@ -635,10 +650,15 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                                     cnode );
                                                 if ( !tmp_node )
                                                 {
+                                                    stringstream ss;
+                                                    ss << "InputAdapter::"
+                                                    << "parseConfigBuffer()"
+                                                    << ": PV Name is"
+                                                    << " missing or empty";
                                                     syslog( LOG_ERR,
-                                                        "%s %s: PV Name is missing or empty",
+                                                        "%s %s",
                                                         "PVSD ERROR:",
-                                                        "InputAdapter::parseConfigBuffer()" );
+                                                        ss.str().c_str() );
                                                     throw -1;
                                                 }
 
@@ -689,12 +709,18 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                                     else
                                                         pv_name = pv_conn;
 
+                                                    stringstream ss;
+                                                    ss << "InputAdapter::"
+                                                    << "parseConfigBuffer()"
+                                                    << ": Device ["
+                                                    << dev_name << "]: "
+                                                    << "Ignoring Non-Logged"
+                                                    << " PV <" << pv_conn
+                                                    << "> (" << pv_name
+                                                    << ")";
                                                     syslog( LOG_WARNING,
-                                                        "%s: Device [%s]: Ignoring Non-Logged PV <%s> (%s)",
-                                                        "InputAdapter::parseConfigBuffer()",
-                                                        dev_name.c_str(),
-                                                        pv_conn.c_str(),
-                                                        pv_name.c_str() );
+                                                        "%s",
+                                                        ss.str().c_str() );
                                                     // give syslog a chance
                                                     usleep(33333);
                                                 }
@@ -702,7 +728,7 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                         }
                                     }
 
-                                    if ( dev_name.empty())
+                                    if ( dev_name.empty() )
                                     {
                                         // It's an Error to Omit the
                                         // Device Name
@@ -714,32 +740,83 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                             "Device ID", id );
                                         throw -1;
                                     }
-                                    else if ( pvs.size())
+                                    else if ( pvs.size() )
                                     {
                                         DeviceDescriptor *dev =
                                             new DeviceDescriptor( dev_name,
-                                                m_source, EPICS_PROTOCOL );
+                                                m_source, EPICS_PROTOCOL,
+                                                active_pv_conn );
 
                                         dev->m_id = id;
 
+                                        string activeStr = "";
+                                        if ( !active_pv_conn.empty() )
+                                        {
+                                            activeStr = " (Active PV Conn ["
+                                                + active_pv_conn + "])";
+                                        }
+
                                         syslog( LOG_ERR,
-                                            "%s::%s(): %s [%s] -> %s = %d",
+                                            "%s::%s: %s [%s] -> %s = %d%s",
                                             "InputAdapter",
-                                            "parseConfigBuffer",
+                                            "parseConfigBuffer()",
                                             "Active Device",
                                             dev_name.c_str(),
-                                            "Device ID", id );
+                                            "Device ID", id,
+                                            activeStr.c_str() );
                                         // give syslog a chance...
                                         usleep(33333);
 
                                         for ( ipv = pvs.begin();
                                             ipv != pvs.end(); ++ipv )
                                         {
-                                            // Don't know type or units yet
-                                            // - just use any value
-                                            dev->definePV(
-                                                ipv->first, ipv->second,
-                                                PV_INT, 1, 0, "" );
+                                            // Subsume Any PV References
+                                            // to the Active Status PV...!
+                                            if ( !ipv->second.compare(
+                                                    active_pv_conn ) )
+                                            {
+                                                // *Don't* Ignore This
+                                                // Active Status PV, Send
+                                                // Its Value Updates Thru!
+                                                dev->m_active_pv->m_ignore =
+                                                    false;
+
+                                                // Capture Any Alias from
+                                                // the PV Being Subsumed...!
+                                                string aliasStr = "";
+                                                if ( ipv->second.compare(
+                                                        ipv->first ) )
+                                                {
+                                                    dev->m_active_pv->m_name
+                                                        = ipv->first;
+
+                                                    aliasStr =
+                                                        " (Use PV Alias ["
+                                                        + ipv->first + "])";
+                                                }
+
+                                                stringstream ss;
+                                                ss << "InputAdapter::"
+                                                << "parseConfigBuffer()"
+                                                << ": Active Status PV"
+                                                << " Subsumes Device PV!"
+                                                << " [" << dev_name << "]"
+                                                << " -> Device ID = " << id
+                                                << activeStr << aliasStr;
+                                                syslog( LOG_ERR, "%s",
+                                                    ss.str().c_str() );
+                                                // give syslog a chance...
+                                                usleep(33333);
+                                            }
+
+                                            else
+                                            {
+                                                // Don't know type/units yet
+                                                // - just use any value
+                                                dev->definePV(
+                                                    ipv->first, ipv->second,
+                                                    PV_INT, 1, 0, "" );
+                                            }
                                         }
 
                                         a_devices.push_back( dev );

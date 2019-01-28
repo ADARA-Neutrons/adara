@@ -56,7 +56,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.6.10"
+#define PVSD_VERSION "1.7.0"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -339,10 +339,12 @@ int main(int argc, char *argv[])
             if ( !( count % 300 ) )
             {
                 uint32_t partialDeviceCount, hungDeviceCount;
+                uint32_t inactiveDeviceCount;
                 uint32_t readyPVCount, totalPVCount;
 
                 input->getDevicesStatus(
                     partialDeviceCount, hungDeviceCount,
+                    inactiveDeviceCount,
                     readyPVCount, totalPVCount );
 
                 std::string logPrefix = "";
@@ -360,13 +362,15 @@ int main(int argc, char *argv[])
                 ss << partialDeviceCount;
                 ss << " Partial, ";
                 ss << hungDeviceCount;
-                ss << " Hung), ";
+                ss << " Hung, ";
+                ss << inactiveDeviceCount;
+                ss << " Inactive), ";
                 ss << readyPVCount;
                 ss << " Ready PVs, ";
                 ss << totalPVCount;
                 ss << " Total PVs, ";
                 ss << input->numInactiveDevices();
-                ss << " Inactive Input Devices, ";
+                ss << " Deactivated Input Devices, ";
                 ss << output->numConnected();
                 ss << " Output Adapters Connected, ";
                 ss << output->numDevices();

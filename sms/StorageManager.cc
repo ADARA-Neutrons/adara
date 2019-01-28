@@ -1018,6 +1018,7 @@ bool StorageManager::cleanupRunFiles(void)
 				<< strerror(e));
 			return true;
 		}
+		errno = 0; // reset errno for possible ENOENT...
 
 		return false;
 	}
@@ -2660,6 +2661,7 @@ bool StorageManager::retireIndexDir(bool remove)
 		if (!faccessat(m_base_fd, name.c_str(), 0,
 				AT_SYMLINK_NOFOLLOW) || errno != ENOENT)
 			continue;
+		errno = 0; // reset errno for possible ENOENT...
 
 		if (renameat(m_base_fd, m_stateDirPrefix.c_str(),
 				m_base_fd, name.c_str()) < 0) {

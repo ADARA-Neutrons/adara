@@ -80,12 +80,12 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
     if ( idev != m_devices.end() )
     {
         // Note: DeviceDescriptor's Operator== Does _Not_ Compare
-        // Device ID (m_id) or Ready Status (m_ready)!
+        // Device ID (m_id), Active Status PV or Ready Status (m_ready)!
         if ( a_descriptor == *idev->second )
         {
             if ( a_descriptor.m_id != idev->second->m_id )
             {
-                syslog( LOG_INFO, "%s %s: %s: [%s] %s/%lu, (%s %d -> %d)",
+                syslog( LOG_ERR, "%s %s: %s: [%s] %s/%lu, (%s %d -> %d)",
                     "PVSD ERROR:", "ConfigManager::defineDevice()",
                     "Device Definition Unchanged",
                     a_descriptor.m_name.c_str(),
@@ -122,6 +122,50 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
                 // Descriptor has not changed, just return existing record
                 record = idev->second;
             }
+
+            // Make Sure Any Updated Active Status PV is Used...
+            if ( !a_descriptor.m_active_pv_conn.empty() )
+            {
+                // If the Active Status PV Changed, Re-Create It...
+                if ( a_descriptor.m_active_pv_conn.compare(
+                    record->m_active_pv_conn ) )
+                {
+                    syslog( LOG_ERR, "%s %s: %s: [%s] (%s: [%s] -> [%s])",
+                        "PVSD ERROR:", "ConfigManager::defineDevice()",
+                        "Re-Creating Active Status PV",
+                        a_descriptor.m_name.c_str(),
+                        "*** Active Status PV Connection Changed",
+                        record->m_active_pv_conn.c_str(),
+                        a_descriptor.m_active_pv_conn.c_str() );
+                    usleep(33333); // give syslog a chance...
+
+                    delete record->m_active_pv;
+
+                    record->m_active_pv_conn =
+                        a_descriptor.m_active_pv_conn;
+
+                    record->m_active_pv = new PVDescriptor( record.get(),
+                        *(a_descriptor.m_active_pv) );
+
+                    record->m_active = a_descriptor.m_active;
+                }
+            }
+
+            // Otherwise, Clear Out Any Active Status Meta-Data...
+            else if ( !record->m_active_pv_conn.empty() )
+            {
+                syslog( LOG_ERR, "%s %s: %s: [%s] (%s: [%s] -> [])",
+                    "PVSD ERROR:", "ConfigManager::defineDevice()",
+                    "Removing Active Status PV",
+                    a_descriptor.m_name.c_str(),
+                    "New Descriptor No Longer Has Active Status PV",
+                    record->m_active_pv_conn.c_str() );
+                usleep(33333); // give syslog a chance...
+
+                delete record->m_active_pv;
+                record->m_active_pv_conn.clear();
+                record->m_active = true;
+            }
         }
         else
         {
@@ -130,7 +174,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
 
             if ( a_descriptor.m_id != idev->second->m_id )
             {
-                syslog( LOG_INFO,
+                syslog( LOG_ERR,
                     "%s %s: Re-defining Device: [%s] %s/%lu (%s %d -> %d)",
                     "PVSD ERROR:", "ConfigManager::defineDevice()",
                     a_descriptor.m_name.c_str(),
@@ -142,7 +186,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
             }
             else
             {
-                syslog( LOG_INFO,
+                syslog( LOG_ERR,
                     "%s %s: Re-defining Device: [%s] %s/%lu (Device ID=%d)",
                     "PVSD ERROR:", "ConfigManager::defineDevice()",
                     a_descriptor.m_name.c_str(),
@@ -158,6 +202,11 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
                 a_descriptor ); // Deep Copy, Keep ID!
 
             // Initialize New Descriptor PV IDs to Zero (just to be sure!)
+            if ( new_desc->m_active_pv
+                    && !(new_desc->m_active_pv->m_ignore) )
+            {
+                new_desc->m_active_pv->m_id = 0;
+            }
             vector<PVDescriptor*>::iterator ipv;
             for ( ipv = new_desc->m_pvs.begin();
                     ipv != new_desc->m_pvs.end(); ++ipv )
@@ -168,6 +217,63 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
             // Create PV IDs Set: Sorted Unique Element List
             // - Use for Generating Guaranteed-Unique *New* PV Ids...! ;-D
             std::set<Identifier> pv_ids;
+
+            // Clean Up Any Old Active Status PV that Subsumed a Device PV
+            if ( idev->second->m_active_pv
+                    && !(idev->second->m_active_pv->m_ignore) )
+            {
+                bool used_id = false;
+
+                // Does the New Device's Active Status PV Also Subsume a PV?
+                if ( new_desc->m_active_pv
+                    && !(new_desc->m_active_pv->m_ignore) )
+                {
+                    // Re-Use Active Status PV ID, They're the Same PV...
+                    // (Consider Diff Alias Name as Diff PV for Bookkeeping)
+                    if ( !(new_desc->m_active_pv->m_name.compare(
+                            idev->second->m_active_pv->m_name ))
+                        && !(new_desc->m_active_pv->m_connection.compare(
+                            idev->second->m_active_pv->m_connection )) )
+                    {
+                        new_desc->m_active_pv->m_id =
+                            idev->second->m_active_pv->m_id;
+
+                        pv_ids.insert( new_desc->m_active_pv->m_id );
+
+                        used_id = true;
+
+                        syslog( LOG_INFO,
+                        "%s: %s [%s] (%s=%d) %s <%s> (%s) - %s PV ID=%d",
+                            "ConfigManager::defineDevice()",
+                            "Device", new_desc->m_name.c_str(),
+                            "Device ID", new_desc->m_id,
+                            "Active Status PV Persists",
+                            new_desc->m_active_pv->m_name.c_str(),
+                            new_desc->m_active_pv->m_connection.c_str(),
+                            "Keep", new_desc->m_active_pv->m_id );
+                        usleep(33333); // give syslog a chance...
+                    }
+                }
+
+                // If Old Active Status PV ID Not Used,
+                // Just Clean Up the Old Active Statue PV...
+                if ( !used_id )
+                {
+                    syslog( LOG_ERR,
+                    "%s %s: %s [%s] (%s=%d) %s <%s> (%s) (PV ID=%d)",
+                        "PVSD ERROR:", "ConfigManager::defineDevice()",
+                        "Device", new_desc->m_name.c_str(),
+                        "Device ID", new_desc->m_id,
+                        "Undefining Old Active Status PV",
+                        idev->second->m_active_pv->m_name.c_str(),
+                        idev->second->m_active_pv->m_connection.c_str(),
+                        idev->second->m_active_pv->m_id );
+                    usleep(33333); // give syslog a chance...
+
+                    sendPvUndefined( idev->second,
+                        idev->second->m_active_pv );
+                }
+            }
 
             // Check Old Descriptor PVs against New Descriptor's PVs...
             // - If Found, Re-Use PV ID...
@@ -181,7 +287,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
                 // Not in New Descriptor
                 if ( !(new_pv = new_desc->getPvByName( (*ipv)->m_name )) )
                 {
-                    syslog( LOG_INFO,
+                    syslog( LOG_ERR,
                     "%s %s: %s [%s] (Device ID=%d) %s <%s> (%s) (PV ID=%d)",
                         "PVSD ERROR:", "ConfigManager::defineDevice()",
                         "Device", new_desc->m_name.c_str(), new_desc->m_id,
@@ -218,6 +324,35 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
 
             Identifier next_id = 1;
 
+            // Check If the New Active Status PV Subsumed a Device PV
+            // And Needs a PV ID... ;-D
+            if ( new_desc->m_active_pv
+                    && !(new_desc->m_active_pv->m_ignore)
+                    && new_desc->m_active_pv->m_id == 0 )
+            {
+                // Find a Free ID
+                // (Not Re-Used from Old IDs or a Recent New...)
+                std::set<Identifier>::iterator idi;
+                while ( (idi = pv_ids.find( next_id )) != pv_ids.end() )
+                    next_id++;
+
+                new_desc->m_active_pv->m_id = next_id++;
+
+                // Mark this PV ID, to be sure for the next guy... ;-D
+                pv_ids.insert( new_desc->m_active_pv->m_id );
+
+                syslog( LOG_ERR,
+                    "%s %s: %s [%s] (%s=%d) %s <%s> (%s) - %s PV ID=%d",
+                    "PVSD ERROR:", "ConfigManager::defineDevice()",
+                    "Device", new_desc->m_name.c_str(),
+                    "Device ID", new_desc->m_id,
+                    "Found New Active Status PV",
+                    new_desc->m_active_pv->m_name.c_str(),
+                    new_desc->m_active_pv->m_connection.c_str(),
+                    "Assign", new_desc->m_active_pv->m_id );
+                usleep(33333); // give syslog a chance...
+            }
+
             for ( ipv = new_desc->m_pvs.begin();
                     ipv != new_desc->m_pvs.end(); ++ipv )
             {
@@ -235,10 +370,11 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
                     // Mark this PV ID, to be sure for the next guy... ;-D
                     pv_ids.insert( (*ipv)->m_id );
 
-                    syslog( LOG_INFO,
-                "%s %s: %s [%s] (Device ID=%d) %s <%s> (%s) - %s PV ID=%d",
+                    syslog( LOG_ERR,
+                        "%s %s: %s [%s] (%s=%d) %s <%s> (%s) - %s PV ID=%d",
                         "PVSD ERROR:", "ConfigManager::defineDevice()",
-                        "Device", new_desc->m_name.c_str(), new_desc->m_id,
+                        "Device", new_desc->m_name.c_str(),
+                        "Device ID", new_desc->m_id,
                         "Found New PV",
                         (*ipv)->m_name.c_str(),
                         (*ipv)->m_connection.c_str(),
@@ -268,7 +404,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
         DeviceDescriptor *new_desc =
             new DeviceDescriptor( a_descriptor ); // Deep Copy, Keep ID!
 
-        syslog( LOG_INFO,
+        syslog( LOG_ERR,
             "%s %s: Defining New Device: [%s] %s/%lu (Device ID=%d)",
             "PVSD ERROR:", "ConfigManager::defineDevice()",
             a_descriptor.m_name.c_str(), a_descriptor.m_source.c_str(),
@@ -277,16 +413,36 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
         usleep(33333); // give syslog a chance...
 
         // PV IDs can be assigned arbitrarily for new devices
+
         Identifier id = 1;
+
+        if ( new_desc->m_active_pv
+                && !(new_desc->m_active_pv->m_ignore) )
+        {
+            new_desc->m_active_pv->m_id = id++;
+
+            syslog( LOG_ERR,
+                "%s %s: %s [%s] (%s=%d) %s <%s> (%s) - Assign PV ID=%d",
+                "PVSD ERROR:", "ConfigManager::defineDevice()",
+                "Device", new_desc->m_name.c_str(),
+                "Device ID", new_desc->m_id,
+                "New Active Status PV",
+                new_desc->m_active_pv->m_name.c_str(),
+                new_desc->m_active_pv->m_connection.c_str(),
+                new_desc->m_active_pv->m_id );
+            usleep(33333); // give syslog a chance...
+        }
+
         for ( vector<PVDescriptor*>::iterator ipv = new_desc->m_pvs.begin();
                 ipv != new_desc->m_pvs.end(); ++ipv )
         {
             (*ipv)->m_id = id++;
 
-            syslog( LOG_INFO,
-        "%s %s: %s [%s] (Device ID=%d) New PV <%s> (%s) - Assign PV ID=%d",
+            syslog( LOG_ERR,
+                "%s %s: %s [%s] (%s=%d) New PV <%s> (%s) - Assign PV ID=%d",
                 "PVSD ERROR:", "ConfigManager::defineDevice()",
-                "Device", new_desc->m_name.c_str(), new_desc->m_id,
+                "Device", new_desc->m_name.c_str(),
+                "Device ID", new_desc->m_id,
                 (*ipv)->m_name.c_str(),
                 (*ipv)->m_connection.c_str(),
                 (*ipv)->m_id );
@@ -313,36 +469,52 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
  * @brief Removes a device from configuration database
  * @param a_record - Device to undefine
  *
- * This method undefines a device (removes from configuration database). This method results in stream
- * packets being emitted to set the undefined device PVs to "disconnected" state, followed by a
- * "device undefined" packet. Note that the device pointers in these messages are shared pointer, so
- * the device record will persist until the emitted packets are consumed and cleared.
+ * This method undefines a device (removes from configuration database).
+ * This method results in stream packets being emitted to set the
+ * undefined device PVs to "disconnected" state, followed by a
+ * "device undefined" packet. Note that the device pointers in these
+ * messages are shared pointer, so the device record will persist
+ * until the emitted packets are consumed and cleared (even if device
+ * is actually deleted).
  */
 void
-ConfigManager::undefineDevice( DeviceRecordPtr &a_record )
+ConfigManager::undefineDevice( DeviceRecordPtr &a_record,
+        bool a_delete_device )
 {
-    syslog( LOG_INFO,
-        "%s %s: Un-defining device: [%s] %s/%lu (Device ID=%d)",
+    syslog( LOG_ERR,
+        "%s %s: Un-defining device: [%s] %s/%lu (Device ID=%d) %s=%u",
         "PVSD ERROR:", "ConfigManager::undefineDevice()",
         a_record->m_name.c_str(), a_record->m_source.c_str(),
-        (unsigned long)a_record->m_protocol, a_record->m_id );
+        (unsigned long)a_record->m_protocol, a_record->m_id,
+        "delete_device", a_delete_device );
     usleep(33333); // give syslog a chance...
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
-    // Compare to the latest configuration records (those in trash don't matter)
-    string key = makeDeviceKey( a_record->m_name, a_record->m_source, a_record->m_protocol );
+    // Compare to the latest configuration records
+    // (those in trash don't matter)
+    string key = makeDeviceKey(
+        a_record->m_name, a_record->m_source, a_record->m_protocol );
 
     map<string,DeviceRecordPtr>::iterator idev = m_devices.find( key );
     if ( idev != m_devices.end())
     {
-        // Send PV disconnected packets for old PVs that are not in new descriptor
-        for ( vector<PVDescriptor*>::iterator ipv = idev->second->m_pvs.begin(); ipv != idev->second->m_pvs.end(); ++ipv )
+        // Send PV disconnected packets for old PVs
+        // (that are not in new descriptor, if being re-defined...)
+        for ( vector<PVDescriptor*>::iterator ipv =
+                    idev->second->m_pvs.begin();
+                ipv != idev->second->m_pvs.end(); ++ipv )
+        {
             sendPvUndefined( idev->second, *ipv );
+        }
 
-        sendDeviceUndefined( idev->second );
+        // Actually Delete the Device (All the Way Down the Pipeline...)
+        if ( a_delete_device )
+        {
+            sendDeviceUndefined( idev->second );
 
-        m_devices.erase( idev );
+            m_devices.erase( idev );
+        }
     }
 }
 
@@ -381,6 +553,13 @@ ConfigManager::makeDeviceKey( const string &a_device_name, const string &a_sourc
  * client issues. This method cannot prevent other data sources from
  * injecting Device Descriptor packets with conflicting names. This
  * condition must be trapped by the SMS.
+ *
+ * Addendum: As of the end of 2018, the ADARA STS has gotten much smarter
+ * about recognizing "Duplicate PVs" and Collapsing any redundant values
+ * into a single Merged PV Log. So we can be more cavalier now too,
+ * and only look for PV Name/Alias Clashes that are Distinct from the
+ * EPICS PV Connection Strings. It's actually "Ok" now to have the
+ * Same PV requested in Multiple Devices, just no Name/Alias Clashes...! ;-D
  */
 void
 ConfigManager::makePvNamesUnique( const string &a_key,
@@ -400,7 +579,10 @@ ConfigManager::makePvNamesUnique( const string &a_key,
         for ( ipv = idev->second->m_pvs.begin();
                 ipv != idev->second->m_pvs.end(); ++ipv )
         {
-            names.insert( (*ipv)->m_name );
+            // Only Consider Names/Aliases that are Distinct from
+            // the Given PV's Connection String... ;-D
+            if ( (*ipv)->m_name.compare( (*ipv)->m_connection ) )
+                names.insert( (*ipv)->m_name );
         }
     }
 
@@ -410,6 +592,11 @@ ConfigManager::makePvNamesUnique( const string &a_key,
     for ( ipv = a_descriptor.m_pvs.begin();
             ipv != a_descriptor.m_pvs.end(); ++ipv )
     {
+        // Only Check Names/Aliases that are Distinct from
+        // the Given PV's Connection String... ;-D
+        if ( !(*ipv)->m_name.compare( (*ipv)->m_connection ) )
+            continue;
+
         count = 0;
         new_name = (*ipv)->m_name;
 
@@ -431,13 +618,13 @@ ConfigManager::makePvNamesUnique( const string &a_key,
         if ( count )
         {
             syslog( LOG_ERR,
-          "%s %s: %s [%s] (Device ID=%d): %s from <%s> to <%s> (PV ID=%d)!",
-                "PVSD ERROR:",
-                "ConfigManager::makePvNamesUnique()", "Device",
-                a_descriptor.m_name.c_str(), a_descriptor.m_id,
-                "Renaming Name-Clash PV",
+                "%s %s: %s [%s] (%s=%d): %s <%s> to <%s> (%s) (PV ID=%d)!",
+                "PVSD ERROR:", "ConfigManager::makePvNamesUnique()",
+                "Device", a_descriptor.m_name.c_str(),
+                "Device ID", a_descriptor.m_id,
+                "Renaming Name-Clash PV from",
                 (*ipv)->m_name.c_str(), new_name.c_str(),
-                (*ipv)->m_id );
+                (*ipv)->m_connection.c_str(), (*ipv)->m_id );
             usleep(33333); // give syslog a chance...
 
             (*ipv)->m_name = new_name;

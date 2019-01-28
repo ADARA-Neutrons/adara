@@ -1540,6 +1540,19 @@ if [[ $PROG == "SMS_Daemon" ]]; then
 	liveconf confck
 fi
 
+echo -e -n "\nOk to Proceed (yes/No/quit) "
+
+read proceed_ck
+proceed_ck=`echo "$proceed_ck" | tr '[:upper:]' '[:lower:]'`
+
+if [[ "$proceed_ck" == ""
+		|| "$proceed_ck" == "n" || "$proceed_ck" == "no" \
+		|| "$proceed_ck" == "q" || "$proceed_ck" == "quit" ]]; then
+	echo -e "\nExiting Deploy Script at User's Request." \
+		| tee -a $LOG
+	exit 0
+fi
+
 #
 # Check the Run/Recording Status of the SMS Daemon Before Restarting...
 #
