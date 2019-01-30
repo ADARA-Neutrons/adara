@@ -83,6 +83,7 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
         // Device ID (m_id), Active Status PV or Ready Status (m_ready)!
         if ( a_descriptor == *idev->second )
         {
+            // Check for Device ID Re-Numbered...
             if ( a_descriptor.m_id != idev->second->m_id )
             {
                 syslog( LOG_ERR, "%s %s: %s: [%s] %s/%lu, (%s %d -> %d)",
@@ -144,8 +145,8 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
                     record->m_active_pv_conn =
                         a_descriptor.m_active_pv_conn;
 
-                    record->m_active_pv = new PVDescriptor( record.get(),
-                        *(a_descriptor.m_active_pv) );
+                    record->m_active_pv = new PVDescriptor(
+                        record.get(), *(a_descriptor.m_active_pv) );
 
                     record->m_active = a_descriptor.m_active;
                 }
