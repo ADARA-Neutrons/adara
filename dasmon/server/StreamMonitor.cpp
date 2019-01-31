@@ -1958,7 +1958,7 @@ StreamMonitor::dbThread()
     PGresult *res;
     map<PVKey,PVInfoBase*>::iterator ipvm;
     string arr_str;
-    char buf[500];
+    char buf[5000];
     bool send_all =  true;
     bool update;
     int  i;
