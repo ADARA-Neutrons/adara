@@ -1,0 +1,153 @@
+#!/bin/bash
+#
+# ADARA Monitor
+#
+# Periodically Process & Display Summary Statistics for
+# Extracted ADARA "Critical ADARA Syslog Error" Log Messages.
+#
+
+ADARA_SUMMARY="$HOME/gitsrc/ADARA/adara_summary"
+
+CACHE_DIR="/SNSlocal/sms/data/rsyslog.cache"
+
+#
+# Dump Usage
+#
+
+USAGE()
+{
+	echo "usage:  adara_monitor [--adara_summary=<path>] \\"
+	echo "                      [--cache_dir=<CACHE_DIR>] [-h|--help]"
+	echo
+
+	echo "where:"
+	echo
+
+	echo "--adara_summary=<path>   = path to ADARA Summary script"
+	echo "                           [${ADARA_SUMMARY}]"
+	echo
+	echo "--cache_dir=<CACHE_DIR>  = location of local error cache files"
+	echo "                           [${CACHE_DIR}]"
+	echo
+	echo "   -h|--help         = display this usage information"
+	echo
+}
+
+for arg in "$@" ; do
+	# echo "arg=$arg"
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+	# echo "key=$key"
+	# echo "value=$value"
+	if [ "#$key#" == '#--help#' ]; then
+		USAGE
+		exit 0
+	elif [ "#$key#" == '#--adara_summary#' ]; then
+		if [ -x "$value" ]; then
+			ADARA_SUMMARY="$value"
+			echo -e "\nUsing ADARA Summary Script in:\n\t[${CACHE_DIR}]"
+		else
+			echo -e "\nError: ADARA Summary Script Not Found/Executable!"
+			echo -e "\t[$value]"
+			/bin/ls -l "$value"
+			USAGE
+			exit -3
+		fi
+	elif [ "#$key#" == '#--cache_dir#' ]; then
+		if [ -d "$value" ]; then
+			CACHE_DIR="$value"
+			echo -e "\nUsing Syslog Error Cache in:\n\t[${CACHE_DIR}]"
+		else
+			echo -e "\nError: Cache Directory Not Found!\n\t[$value]"
+			/bin/ls -l "$value"
+			USAGE
+			exit -2
+		fi
+	else
+		echo -e "\nError: Unknown Option/Unrecognized File:\n [${key}]"
+		USAGE
+		exit -1
+	fi
+done
+
+# Make Sure ADARA Summary is Present and Executable...
+if [[ ! -x ${ADARA_SUMMARY} ]]; then
+	echo -e "\nError: ADARA Summary Script Not Found/Executable!"
+	echo -e "\t[${ADARA_SUMMARY}]"
+	/bin/ls -l "${ADARA_SUMMARY}"
+	USAGE
+	exit -4
+fi
+
+#
+# Generate Initial ADARA Summary...
+#
+
+date
+
+${ADARA_SUMMARY} ${CACHE_DIR}/*.txt
+
+last_time=`date +"%s"`
+
+#
+# Main Interactive Loop
+#
+
+CMD_USAGE()
+{
+	echo -e "\nADARA Monitor Interactive Command Usage:\n"
+
+	echo -e "<space> or <tab>  = Refresh the Latest ADARA Summary\n"
+	echo -e "     C or c       = Clear Current Local Syslog Error Cache\n"
+	echo -e "     Q or q       = Quit ADARA Monitor\n"
+	echo -e "   H or h or ?    = Display this Interactive Command Usage\n"
+	echo
+}
+
+while [ true ]; do
+
+	# Check for Interactive Command Input...
+	IFS= read -t 10 -n 1 -s cmd
+
+	# Got a Command, Execute It...
+	if [[ $? == 0 ]]; then
+
+		if [[ "$cmd" == "Q" || "$cmd" == "q" ]]; then
+			echo -e "\nExiting ADARA Monitor at User's Request.\n"
+			exit 0
+		elif [[ "$cmd" == " " || "$cmd" == "\t" ]]; then
+			echo -e "\nRefreshing ADARA Summary...\n"
+			date
+			${ADARA_SUMMARY} ${CACHE_DIR}/*.txt
+			last_time=`date +"%s"`
+		elif [[ "$cmd" == "C" || "$cmd" == "c" ]]; then
+			echo -e "\nClearing ADARA Summary Statistics...\n"
+			# XXX
+		elif [[ "$cmd" == "H" || "$cmd" == "h" || "$cmd" == "?" ]]; then
+			CMD_USAGE
+		elif [[ "$cmd" == "" ]]; then
+			# Pass Thru Carriage Returns... ;-D
+			echo
+		else
+			CMD_USAGE
+			echo -e "\nError: Unknown Interactive Command [$cmd]...!"
+		fi
+	fi
+
+	#
+	# Calculate Elapsed Time Since Last ADARA Summary...
+	#
+
+	now=`date +"%s"`
+
+	elapsed=$(( now - last_time ))
+
+	if [[ $elapsed -gt 60 ]]; then
+		echo -e "\nAuto-Refreshing Latest ADARA Summary."
+		date
+		${ADARA_SUMMARY} ${CACHE_DIR}/*.txt
+		last_time=`date +"%s"`
+	fi
+
+done
+
