@@ -15,7 +15,9 @@ S="[[:space:]]"
 
 USAGE()
 {
-	echo "usage:  adara_summary [FILE1 [FILE2 . . . ]] [-h|--help]"
+	echo
+	echo "usage:  adara_summary [FILE1 [FILE2 . . . ]] \\"
+	echo "                      [--terse] [-h|--help]"
 	echo
 
 	echo "where:"
@@ -23,11 +25,16 @@ USAGE()
 
 	echo "   FILE1, FILE2...   = list of captured email files to summarize"
 	echo "                       (else reads from stdin...)"
+	echo
+	echo "    --terse          = only display essential/non-zero values"
+	echo
 	echo "   -h|--help         = display this usage information"
 	echo
 }
 
 FileList=""
+
+Terse=0
 
 for arg in "$@" ; do
 	# echo "arg=$arg"
@@ -35,7 +42,9 @@ for arg in "$@" ; do
 	value=`echo "$arg" | awk -F = '{print $2}'`
 	# echo "key=$key"
 	# echo "value=$value"
-	if [ "#$key#" == '#--help#' ]; then
+	if [[ "#$key#" == '#--terse#' ]]; then
+		Terse=1
+	elif [[ "#$key#" == '#-h#' || "#$key#" == '#--help#' ]]; then
 		USAGE
 		exit 0
 	else
@@ -1267,8 +1276,11 @@ PARSE_LOG()
 #
 
 echo
-echo "Processing File List: ${FileList}"
-echo
+
+if [[ ${Terse} == 0 ]]; then
+	echo "Processing File List: ${FileList}"
+	echo
+fi
 
 last_hdr_from=""
 
@@ -1363,9 +1375,14 @@ done
 # Done, Dump Statistics...
 #
 
-echo -e "\n--- Statistics Summary ---\n"
+echo -e "\n--- Statistics Summary ---"
 
-echo "Per Host Statistics:"
+nHosts=`echo "${HostList}" | wc | awk '{print $2}'`
+
+if [[ $nHosts -gt 1 ]]; then
+	echo -e "\nPer Host Statistics:"
+fi
+
 for h in ${HostList} ; do
 	echo -e -n "\nHost [$h] - ${nHostlogs[$h]} Logs Total"
 	if [[ ${nHostUnknownLogs[$h]} -gt 0 ]]; then
@@ -1869,36 +1886,50 @@ if [[ $nDASMOND -gt 0 ]]; then
 fi
 echo
 
-echo "Unknown Log/Error Messages: $nUnknownLogs"
-if [[ $nUnknownSTS -gt 0 ]]; then
-	echo "$nUnknownSTS Unknown STS Logs"
+if [[ $nUnknownLogs -gt 0 ]]; then
+	echo "Unknown Log/Error Messages: $nUnknownLogs"
+	if [[ $nUnknownSTS -gt 0 ]]; then
+		echo "$nUnknownSTS Unknown STS Logs"
+	fi
+	if [[ $nUnknownSMSD -gt 0 ]]; then
+		echo "$nUnknownSMSD Unknown SMSD Logs"
+	fi
+	if [[ $nUnknownPVSD -gt 0 ]]; then
+		echo "$nUnknownPVSD Unknown PVSD Logs"
+	fi
+	if [[ $nUnknownDASMOND -gt 0 ]]; then
+		echo "$nUnknownDASMOND Unknown DASMOND Logs"
+	fi
+	echo
 fi
-if [[ $nUnknownSMSD -gt 0 ]]; then
-	echo "$nUnknownSMSD Unknown SMSD Logs"
-fi
-if [[ $nUnknownPVSD -gt 0 ]]; then
-	echo "$nUnknownPVSD Unknown PVSD Logs"
-fi
-if [[ $nUnknownDASMOND -gt 0 ]]; then
-	echo "$nUnknownDASMOND Unknown DASMOND Logs"
-fi
-echo
 
-echo "Unknown App Messages: $nUnknownApp"
-echo
+if [[ $nUnknownApp -gt 0 ]]; then
+	echo "Unknown App Messages: $nUnknownApp"
+	echo
+fi
 
 echo "General Statistics:"
-echo "$nemail Emails Found"
-echo "$nlog Lines of Log Input"
-echo "$nhdr Lines of Non-Log Header Input"
-echo "$nblank Blank Lines of Input"
+if [[ $nemail -gt 0 ]]; then
+	echo "$nemail Emails Found"
+fi
+if [[ ${Terse} == 0 || $nlog -gt 0 ]]; then
+	echo "$nlog Lines of Log Input"
+fi
+if [[ $nhdr -gt 0 ]]; then
+	echo "$nhdr Lines of Non-Log Header Input"
+fi
+if [[ $nblank -gt 0 ]]; then
+	echo "$nblank Blank Lines of Input"
+fi
 echo
 
-echo "Last Email Per File:"
-for f in ${FileList} ; do
-	if [[ -n "${lastFileFrom[$f]}" ]]; then
-		echo -e "[$f]:\n   ${lastFileFrom[$f]}"
-	fi
-done
-echo
+if [[ $nemail -gt 0 ]]; then
+	echo "Last Email Per File:"
+	for f in ${FileList} ; do
+		if [[ -n "${lastFileFrom[$f]}" ]]; then
+			echo -e "[$f]:\n   ${lastFileFrom[$f]}"
+		fi
+	done
+	echo
+fi
 
