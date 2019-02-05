@@ -80,14 +80,40 @@ if [[ ! -x ${ADARA_SUMMARY} ]]; then
 fi
 
 #
+# Set Up ADARA Monitor Summary Log...
+#
+
+SUMMARY="AdaraMonitorSummary.$$.log"
+
+#
 # Generate Initial ADARA Summary...
 #
 
-date
+LAST_CACHE_STATE=""
+LAST_TIME=0
 
-${ADARA_SUMMARY} ${CACHE_DIR}/*.txt
+DO_SUMMARY()
+{
+	echo
 
-last_time=`date +"%s"`
+	date
+
+	/bin/rm ${CACHE_DIR}/${SUMMARY} > /dev/null 2>&1
+
+	${ADARA_SUMMARY} --terse ${CACHE_DIR}/*.txt > ${CACHE_DIR}/${SUMMARY}
+
+	LAST_CACHE_STATE=`/bin/ls -ld ${CACHE_DIR}`
+
+	/bin/cat ${CACHE_DIR}/${SUMMARY}
+
+	LAST_TIME=`date +"%s"`
+
+	date
+
+	echo
+}
+
+DO_SUMMARY
 
 #
 # Main Interactive Loop
@@ -117,9 +143,7 @@ while [ true ]; do
 			exit 0
 		elif [[ "$cmd" == " " || "$cmd" == "\t" ]]; then
 			echo -e "\nRefreshing ADARA Summary...\n"
-			date
-			${ADARA_SUMMARY} ${CACHE_DIR}/*.txt
-			last_time=`date +"%s"`
+			DO_SUMMARY
 		elif [[ "$cmd" == "C" || "$cmd" == "c" ]]; then
 			echo -e "\nClearing ADARA Summary Statistics...\n"
 			# XXX
@@ -135,18 +159,27 @@ while [ true ]; do
 	fi
 
 	#
+	# Check for Changes to Local Cache Directory...
+	#
+
+	cache_state=`/bin/ls -ld ${CACHE_DIR}`
+
+	if [[ ${cache_state} != ${LAST_CACHE_STATE} ]]; then
+		echo -e "\nLocal Cache Directory Changed, Refreshing ADARA Summary."
+		DO_SUMMARY
+	fi
+
+	#
 	# Calculate Elapsed Time Since Last ADARA Summary...
 	#
 
 	now=`date +"%s"`
 
-	elapsed=$(( now - last_time ))
+	elapsed=$(( now - LAST_TIME ))
 
-	if [[ $elapsed -gt 60 ]]; then
+	if [[ $elapsed -gt 180 ]]; then
 		echo -e "\nAuto-Refreshing Latest ADARA Summary."
-		date
-		${ADARA_SUMMARY} ${CACHE_DIR}/*.txt
-		last_time=`date +"%s"`
+		DO_SUMMARY
 	fi
 
 done
