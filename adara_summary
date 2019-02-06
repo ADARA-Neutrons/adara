@@ -17,7 +17,7 @@ USAGE()
 {
 	echo
 	echo "usage:  adara_summary [FILE1 [FILE2 . . . ]] \\"
-	echo "                      [--terse] [-h|--help]"
+	echo "                      [--terse] [--nostdin] [-h|--help]"
 	echo
 
 	echo "where:"
@@ -28,12 +28,15 @@ USAGE()
 	echo
 	echo "    --terse          = only display essential/non-zero values"
 	echo
+	echo "   --nostdin         = require file list, do not read from stdin"
+	echo
 	echo "   -h|--help         = display this usage information"
 	echo
 }
 
 FileList=""
 
+NoStdIn=0
 Terse=0
 
 for arg in "$@" ; do
@@ -44,6 +47,8 @@ for arg in "$@" ; do
 	# echo "value=$value"
 	if [[ "#$key#" == '#--terse#' ]]; then
 		Terse=1
+	elif [[ "#$key#" == '#--nostdin#' ]]; then
+		NoStdIn=1
 	elif [[ "#$key#" == '#-h#' || "#$key#" == '#--help#' ]]; then
 		USAGE
 		exit 0
@@ -64,8 +69,13 @@ done
 #
 
 if [[ -z "${FileList}" ]]; then
-	echo "No Input Files Specified: Reading from /dev/stdin..."
-	FileList="/dev/stdin"
+	if [[ ${NoStdIn} == 1 ]]; then
+		echo -e "\nError: No Input Files Specified... Exiting...\n"
+		exit 0
+	else
+		echo "No Input Files Specified: Reading from /dev/stdin..."
+		FileList="/dev/stdin"
+	fi
 fi
 
 #
