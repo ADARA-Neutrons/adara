@@ -100,7 +100,14 @@ DO_SUMMARY()
 
 	/bin/rm ${CACHE_DIR}/${SUMMARY} > /dev/null 2>&1
 
-	${ADARA_SUMMARY} --terse ${CACHE_DIR}/*.txt > ${CACHE_DIR}/${SUMMARY}
+	# Remove Globbed File List If None Found...
+	shopt -s nullglob
+
+	${ADARA_SUMMARY} --terse --nostdin ${CACHE_DIR}/*.txt \
+		> ${CACHE_DIR}/${SUMMARY}
+
+	# Restore Normal Shell Globbing...
+	shopt -u nullglob
 
 	LAST_CACHE_STATE=`/bin/ls -ld ${CACHE_DIR}`
 
@@ -114,6 +121,24 @@ DO_SUMMARY()
 }
 
 DO_SUMMARY
+
+#
+# Clear Local Cache Directory...
+#
+
+CLEAR_CACHE()
+{
+	echo -e -n "\nRemoving Any Processed Local Cache Files "
+	echo -e "or Leftover Summaries:\n"
+
+	# Remove Any Older Files than the Current ADARA Summary File...
+	find ${CACHE_DIR}/ -mindepth 1 -not -cnewer ${CACHE_DIR}/${SUMMARY} \
+		-and -not -path ${CACHE_DIR}/${SUMMARY} \
+		-print -exec /bin/rm -f {} \;
+
+	# Generate a New ADARA Summary Now...
+	DO_SUMMARY
+}
 
 #
 # Main Interactive Loop
@@ -142,11 +167,11 @@ while [ true ]; do
 			echo -e "\nExiting ADARA Monitor at User's Request.\n"
 			exit 0
 		elif [[ "$cmd" == " " || "$cmd" == "\t" ]]; then
-			echo -e "\nRefreshing ADARA Summary...\n"
+			echo -e "\nRefreshing ADARA Summary..."
 			DO_SUMMARY
 		elif [[ "$cmd" == "C" || "$cmd" == "c" ]]; then
-			echo -e "\nClearing ADARA Summary Statistics...\n"
-			# XXX
+			echo -e "\nClearing ADARA Summary Statistics..."
+			CLEAR_CACHE
 		elif [[ "$cmd" == "H" || "$cmd" == "h" || "$cmd" == "?" ]]; then
 			CMD_USAGE
 		elif [[ "$cmd" == "" ]]; then
