@@ -10,19 +10,25 @@ ADARA_SUMMARY="$HOME/gitsrc/ADARA/adara_summary"
 
 CACHE_DIR="/SNSlocal/rsyslog.cache"
 
+ALT="" # for Alternate/Secondary SMS Deployments... ;-D
+
 #
 # Dump Usage
 #
 
 USAGE()
 {
-	echo "usage:  adara_monitor [--adara_summary=<path>] \\"
+	echo
+	echo "usage:  adara_monitor [--alt=\"-mon\"] \\"
+	echo "                      [--adara_summary=<path>] \\"
 	echo "                      [--cache_dir=<CACHE_DIR>] [-h|--help]"
 	echo
 
 	echo "where:"
 	echo
 
+	echo "   --alt=\"-mon\"          = run for Alternate SMS Suffix"
+	echo
 	echo "--adara_summary=<path>   = path to ADARA Summary script"
 	echo "                           [${ADARA_SUMMARY}]"
 	echo
@@ -42,6 +48,9 @@ for arg in "$@" ; do
 	if [ "#$key#" == '#--help#' ]; then
 		USAGE
 		exit 0
+	elif [ "#$key#" == '#--alt#' ]; then
+		ALT="--alt=$value"
+		echo -e "\nUsing Alternate SMS Suffix:  --alt=[${value}]"
 	elif [ "#$key#" == '#--adara_summary#' ]; then
 		if [ -x "$value" ]; then
 			ADARA_SUMMARY="$value"
@@ -103,7 +112,7 @@ DO_SUMMARY()
 	# Remove Globbed File List If None Found...
 	shopt -s nullglob
 
-	${ADARA_SUMMARY} --terse --nostdin ${CACHE_DIR}/*.txt \
+	${ADARA_SUMMARY} --terse --nostdin ${ALT} ${CACHE_DIR}/*.txt \
 		> ${CACHE_DIR}/${SUMMARY}
 
 	# Restore Normal Shell Globbing...
