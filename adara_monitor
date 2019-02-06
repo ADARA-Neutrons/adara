@@ -8,7 +8,7 @@
 
 ADARA_SUMMARY="$HOME/gitsrc/ADARA/adara_summary"
 
-CACHE_DIR="/SNSlocal/sms/data/rsyslog.cache"
+CACHE_DIR="/SNSlocal/rsyslog.cache"
 
 #
 # Dump Usage
