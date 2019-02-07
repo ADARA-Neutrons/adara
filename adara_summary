@@ -17,7 +17,8 @@ USAGE()
 {
 	echo
 	echo "usage:  adara_summary [FILE1 [FILE2 . . . ]] \\"
-	echo "                      [--terse] [--nostdin] [-h|--help]"
+	echo "                      [--terse] [--nostdin] \\"
+	echo "                      [--alt=\"-mon\"] [--help|-h]"
 	echo
 
 	echo "where:"
@@ -30,7 +31,9 @@ USAGE()
 	echo
 	echo "   --nostdin         = require file list, do not read from stdin"
 	echo
-	echo "   -h|--help         = display this usage information"
+	echo "   --alt=\"-mon\"      = summarize for Alternate SMS Suffix"
+	echo
+	echo "   --help | -h       = display this usage information"
 	echo
 }
 
@@ -38,6 +41,8 @@ FileList=""
 
 NoStdIn=0
 Terse=0
+
+ALT="" # for Alternate/Secondary SMS Deployments... ;-D
 
 for arg in "$@" ; do
 	# echo "arg=$arg"
@@ -49,6 +54,9 @@ for arg in "$@" ; do
 		Terse=1
 	elif [[ "#$key#" == '#--nostdin#' ]]; then
 		NoStdIn=1
+	elif [[ "#$key#" == '#--alt#' ]]; then
+		ALT="$value"
+		echo -e "\nUsing Alternate SMS Suffix: --alt=\"${ALT}\""
 	elif [[ "#$key#" == '#-h#' || "#$key#" == '#--help#' ]]; then
 		USAGE
 		exit 0
@@ -383,17 +391,24 @@ PARSE_LOG()
 	app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
 	#echo "App=[$app]"
 
-	# Flag Any "Alternate" or Additional SMSD Apps... (e.g. "-mon")
-	if [[ "$app" == "smsd-mon" ]]; then
-		nHostAltLogs[$host]=$(( nHostAltLogs[$host] + 1 ))
-		app="smsd"
-	fi
+	known=0
 
-	known=1
+	# Flag Any "Alternate" or Additional SMSD Apps... (e.g. "-mon")
+	if [[ -z ${ALT} && "$app" =~ smsd-.* ]]; then
+		nHostAltLogs[$host]=$(( nHostAltLogs[$host] + 1 ))
+		known=1
+	elif [[ "$app" == "smsd-${ALT}" ]]; then
+		app="smsd"
+	elif [[ -n ${ALT} && "$app" == "smsd" ]]; then
+		nHostAltLogs[$host]=$(( nHostAltLogs[$host] + 1 ))
+		known=1
+	fi
 
 	if [[ "$app" == "sts" ]]; then
 
 		nSTS=$(( nSTS + 1 ))
+
+		known=1
 
 		# Strip Off STS PID and Error Prefix...
 		if [[ "$log" =~ sts:${S}STS${S}Error: ]]; then
@@ -632,6 +647,8 @@ PARSE_LOG()
 	elif [[ "$app" == "smsd" ]]; then
 
 		nSMSD=$(( nSMSD + 1 ))
+
+		known=1
 
 		# Strip Off SMS Error Prefix...
 		if [[ "$log" =~ smsd:${S}ERROR ]]; then
@@ -993,6 +1010,8 @@ PARSE_LOG()
 
 		nPVSD=$(( nPVSD + 1 ))
 
+		known=1
+
 		# Strip Off PVSD ERROR Prefix...
 		if [[ "$log" =~ pvsd:${S}PVSD${S}ERROR ]]; then
 			log=`echo "$log" | \
@@ -1208,6 +1227,8 @@ PARSE_LOG()
 
 		nDASMOND=$(( nDASMOND + 1 ))
 
+		known=1
+
 		# Strip Off DASMOND Prefix...
 		log=`echo "$log" | \
 			awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
@@ -1265,10 +1286,9 @@ PARSE_LOG()
 			known=0
 		fi
 
-	else
+	elif [[ $known == 0 ]]; then
 		#echo "*** Unknown App Log!"
 		nUnknownApp=$(( nUnknownApp + 1 ))
-		known=0
 	fi
 
 	if [[ $known == 0 ]]; then
@@ -1906,32 +1926,6 @@ if [[ $nDASMOND -gt 0 ]]; then
 	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
 
-if [[ $nUnknownLogs -gt 0 ]]; then
-	echo -e "\nUnknown Log/Error Messages: $nUnknownLogs"
-	separator=""
-	if [[ $nUnknownSTS -gt 0 ]]; then
-		echo $newline "${separator}$nUnknownSTS Unknown STS Logs"
-		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
-	fi
-	if [[ $nUnknownSMSD -gt 0 ]]; then
-		echo $newline "${separator}$nUnknownSMSD Unknown SMSD Logs"
-		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
-	fi
-	if [[ $nUnknownPVSD -gt 0 ]]; then
-		echo $newline "${separator}$nUnknownPVSD Unknown PVSD Logs"
-		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
-	fi
-	if [[ $nUnknownDASMOND -gt 0 ]]; then
-		echo $newline "${separator}$nUnknownDASMOND Unknown DASMOND Logs"
-		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
-	fi
-fi
-
-if [[ $nUnknownApp -gt 0 ]]; then
-	echo -e "\nUnknown App Messages: $nUnknownApp"
-	separator=""
-fi
-
 if [[ ${Terse} == 0 ]]; then
 	echo -e "\nGeneral Statistics:"
 else
@@ -1960,6 +1954,32 @@ if [[ $nblank -gt 0 ]]; then
 	if [[ ${Terse} == 1 ]]; then label="Blank Lines" ; fi
 	echo $newline "${separator}$nblank ${label}"
 	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+fi
+
+if [[ $nUnknownLogs -gt 0 ]]; then
+	echo -e "\nUnknown Log/Error Messages: $nUnknownLogs"
+	separator=""
+	if [[ $nUnknownSTS -gt 0 ]]; then
+		echo $newline "${separator}$nUnknownSTS Unknown STS Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+	fi
+	if [[ $nUnknownSMSD -gt 0 ]]; then
+		echo $newline "${separator}$nUnknownSMSD Unknown SMSD Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+	fi
+	if [[ $nUnknownPVSD -gt 0 ]]; then
+		echo $newline "${separator}$nUnknownPVSD Unknown PVSD Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+	fi
+	if [[ $nUnknownDASMOND -gt 0 ]]; then
+		echo $newline "${separator}$nUnknownDASMOND Unknown DASMOND Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+	fi
+fi
+
+if [[ $nUnknownApp -gt 0 ]]; then
+	echo -e "\nUnknown App Messages: $nUnknownApp"
+	separator=""
 fi
 
 if [[ $nemail -gt 0 ]]; then
