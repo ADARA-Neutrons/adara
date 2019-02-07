@@ -50,7 +50,7 @@ for arg in "$@" ; do
 		exit 0
 	elif [[ "#$key#" == '#--alt#' ]]; then
 		ALTOPT="--alt=$value"
-		echo -e "\nUsing Alternate SMS Suffix: --alt=[${value}]"
+		echo -e "\nUsing Alternate SMS Suffix: --alt=\"${value}\""
 	elif [[ "#$key#" == '#--adara_summary#' ]]; then
 		if [ -x "$value" ]; then
 			ADARA_SUMMARY="$value"
