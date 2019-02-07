@@ -70,7 +70,7 @@ done
 
 if [[ -z "${FileList}" ]]; then
 	if [[ ${NoStdIn} == 1 ]]; then
-		echo -e "\nError: No Input Files Specified... Exiting...\n"
+		echo -e "\nNO ERRORS/FILES. Done.\n"
 		exit 0
 	else
 		echo "No Input Files Specified: Reading from /dev/stdin..."
@@ -1881,65 +1881,98 @@ for h in ${HostList} ; do
 done
 echo
 
-echo "Per App Statistics:"
+separator=""
+newline=""
+
+if [[ ${Terse} == 0 ]]; then
+	echo "Per App Statistics:"
+else
+	newline="-n"
+fi
 if [[ $nSTS -gt 0 ]]; then
-	echo "$nSTS STS Logs"
+	echo $newline "${separator}$nSTS STS Logs"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
 if [[ $nSMSD -gt 0 ]]; then
-	echo "$nSMSD SMSD Logs"
+	echo $newline "${separator}$nSMSD SMSD Logs"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
 if [[ $nPVSD -gt 0 ]]; then
-	echo "$nPVSD PVSD Logs"
+	echo $newline "${separator}$nPVSD PVSD Logs"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
 if [[ $nDASMOND -gt 0 ]]; then
-	echo "$nDASMOND DASMOND Logs"
+	echo $newline "${separator}$nDASMOND DASMOND Logs"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
-echo
 
 if [[ $nUnknownLogs -gt 0 ]]; then
-	echo "Unknown Log/Error Messages: $nUnknownLogs"
+	echo -e "\nUnknown Log/Error Messages: $nUnknownLogs"
+	separator=""
 	if [[ $nUnknownSTS -gt 0 ]]; then
-		echo "$nUnknownSTS Unknown STS Logs"
+		echo $newline "${separator}$nUnknownSTS Unknown STS Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 	fi
 	if [[ $nUnknownSMSD -gt 0 ]]; then
-		echo "$nUnknownSMSD Unknown SMSD Logs"
+		echo $newline "${separator}$nUnknownSMSD Unknown SMSD Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 	fi
 	if [[ $nUnknownPVSD -gt 0 ]]; then
-		echo "$nUnknownPVSD Unknown PVSD Logs"
+		echo $newline "${separator}$nUnknownPVSD Unknown PVSD Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 	fi
 	if [[ $nUnknownDASMOND -gt 0 ]]; then
-		echo "$nUnknownDASMOND Unknown DASMOND Logs"
+		echo $newline "${separator}$nUnknownDASMOND Unknown DASMOND Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 	fi
-	echo
 fi
 
 if [[ $nUnknownApp -gt 0 ]]; then
-	echo "Unknown App Messages: $nUnknownApp"
-	echo
+	echo -e "\nUnknown App Messages: $nUnknownApp"
+	separator=""
 fi
 
-echo "General Statistics:"
-if [[ $nemail -gt 0 ]]; then
-	echo "$nemail Emails Found"
+if [[ ${Terse} == 0 ]]; then
+	echo -e "\nGeneral Statistics:"
+else
+	separator=": "
 fi
-if [[ ${Terse} == 0 || $nlog -gt 0 ]]; then
-	echo "$nlog Lines of Log Input"
+if [[ $nemail -gt 0 ]]; then
+	label="Emails Found"
+	if [[ ${Terse} == 1 ]]; then label="Emails" ; fi
+	echo $newline "${separator}$nemail ${label}"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+fi
+if [[ $nlog -gt 0 ]]; then
+	label="Lines of Log Input"
+	if [[ ${Terse} == 1 ]]; then label="Log Lines" ; fi
+	echo $newline "${separator}$nlog ${label}"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
 if [[ $nhdr -gt 0 ]]; then
-	echo "$nhdr Lines of Non-Log Header Input"
+	label="Lines of Non-Log Header Input"
+	if [[ ${Terse} == 1 ]]; then label="Header Lines" ; fi
+	echo $newline "${separator}$nhdr ${label}"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
 if [[ $nblank -gt 0 ]]; then
-	echo "$nblank Blank Lines of Input"
+	label="Blank Lines of Input"
+	if [[ ${Terse} == 1 ]]; then label="Blank Lines" ; fi
+	echo $newline "${separator}$nblank ${label}"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
-echo
 
 if [[ $nemail -gt 0 ]]; then
-	echo "Last Email Per File:"
+	echo -e "\nLast Email Per File:"
 	for f in ${FileList} ; do
 		if [[ -n "${lastFileFrom[$f]}" ]]; then
 			echo -e "[$f]:\n   ${lastFileFrom[$f]}"
 		fi
 	done
-	echo
 fi
+
+# Finish Any Open-Ended Output Line...
+if [[ ${Terse} == 1 ]]; then echo ; fi
+
+echo
 
