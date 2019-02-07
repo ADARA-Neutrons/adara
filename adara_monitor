@@ -124,6 +124,20 @@ DO_SUMMARY()
 
 	LAST_TIME=`date +"%s"`
 
+	# Check for Intervening User Input, Which Should Probably Be Ignored
+	# (Especially a "Clear Cache" Command, which probably referred to
+	# the Results of the _Previous_ ADARA Summary Output...! ;-D)
+
+	# Check for Input Already Waiting (Timeout = 0.1, as 0 works weirdly...)
+	IFS= read -t 0.1 -s cmd
+
+	# Got a Command, Ignore It...!
+	if [[ $? == 0 && "$cmd" != "" ]]; then
+		echo -n "Warning: User Input Received During ADARA Summary Update! "
+		echo "Ignoring User Command(s) [$cmd]..."
+		echo
+	fi
+
 	date
 
 	echo
