@@ -210,7 +210,7 @@ while [ true ]; do
 
 	cache_state=`/bin/ls -ld ${CACHE_DIR}`
 
-	if [[ ${cache_state} != ${LAST_CACHE_STATE} ]]; then
+	if [[ "${cache_state}" != "${LAST_CACHE_STATE}" ]]; then
 		echo -e "\nLocal Cache Directory Changed, Refreshing ADARA Summary."
 		DO_SUMMARY
 	fi
