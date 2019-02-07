@@ -21,7 +21,7 @@ USAGE()
 	echo
 	echo "usage:  adara_monitor [--alt=\"-mon\"] \\"
 	echo "                      [--adara_summary=<path>] \\"
-	echo "                      [--cache_dir=<CACHE_DIR>] [-h|--help]"
+	echo "                      [--cache_dir=<CACHE_DIR>] [--help|-h]"
 	echo
 
 	echo "where:"
@@ -35,7 +35,7 @@ USAGE()
 	echo " --cache_dir=<CACHE_DIR>  = location of local error cache files"
 	echo "                            [${CACHE_DIR}]"
 	echo
-	echo "     -h | --help          = display this usage information"
+	echo "     --help | -h          = display this usage information"
 	echo
 }
 
