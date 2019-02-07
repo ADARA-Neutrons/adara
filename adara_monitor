@@ -27,15 +27,15 @@ USAGE()
 	echo "where:"
 	echo
 
-	echo "   --alt=\"-mon\"          = run for Alternate SMS Suffix"
+	echo "    --alt=\"-mon\"          = run for Alternate SMS Suffix"
 	echo
-	echo "--adara_summary=<path>   = path to ADARA Summary script"
-	echo "                           [${ADARA_SUMMARY}]"
+	echo " --adara_summary=<path>   = path to ADARA Summary script"
+	echo "                            [${ADARA_SUMMARY}]"
 	echo
-	echo "--cache_dir=<CACHE_DIR>  = location of local error cache files"
-	echo "                           [${CACHE_DIR}]"
+	echo " --cache_dir=<CACHE_DIR>  = location of local error cache files"
+	echo "                            [${CACHE_DIR}]"
 	echo
-	echo "   -h|--help         = display this usage information"
+	echo "     -h | --help          = display this usage information"
 	echo
 }
 
@@ -45,13 +45,13 @@ for arg in "$@" ; do
 	value=`echo "$arg" | awk -F = '{print $2}'`
 	# echo "key=$key"
 	# echo "value=$value"
-	if [ "#$key#" == '#--help#' ]; then
+	if [[ "#$key#" == '#-h#' || "#$key#" == '#--help#' ]]; then
 		USAGE
 		exit 0
-	elif [ "#$key#" == '#--alt#' ]; then
+	elif [[ "#$key#" == '#--alt#' ]]; then
 		ALT="--alt=$value"
 		echo -e "\nUsing Alternate SMS Suffix:  --alt=[${value}]"
-	elif [ "#$key#" == '#--adara_summary#' ]; then
+	elif [[ "#$key#" == '#--adara_summary#' ]]; then
 		if [ -x "$value" ]; then
 			ADARA_SUMMARY="$value"
 			echo -e "\nUsing ADARA Summary Script in:\n\t[${CACHE_DIR}]"
@@ -62,7 +62,7 @@ for arg in "$@" ; do
 			USAGE
 			exit -3
 		fi
-	elif [ "#$key#" == '#--cache_dir#' ]; then
+	elif [[ "#$key#" == '#--cache_dir#' ]]; then
 		if [ -d "$value" ]; then
 			CACHE_DIR="$value"
 			echo -e "\nUsing Syslog Error Cache in:\n\t[${CACHE_DIR}]"
