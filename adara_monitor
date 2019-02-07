@@ -139,8 +139,6 @@ DO_SUMMARY()
 	fi
 
 	date
-
-	echo
 }
 
 DO_SUMMARY
