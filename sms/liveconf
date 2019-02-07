@@ -619,7 +619,7 @@ USAGE()
 	echo "            [live_status] [bandwidth] [confck] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] \\"
-	echo "            [--terse] [--quiet] [--help]"
+	echo "            [--terse] [--quiet] [--help|-h]"
 	echo
 
 	echo "where:"
@@ -632,7 +632,7 @@ USAGE()
 	echo "   --testonly            = *don't* actually change anything!"
 	echo "   --terse               = display minimal output details"
 	echo "   --quiet               = display NO ConfCk output unless error"
-	echo "   --help                = display this help/usage information"
+	echo "   --help | -h           = display this help/usage information"
 	echo
 
 	echo "Available Commands:"
@@ -713,18 +713,18 @@ for arg in "$@" ; do
 	value=`echo "$arg" | awk -F = '{print $2}'`
 	# echo "key=$key"
     # echo "value=$value"
-	if [ "#$key#" == '#--beamline#' ]; then
+	if [[ "#$key#" == '#--beamline#' ]]; then
 		PRE="$value"
 		addToIntroOutput "Setting EPICS PV Prefix to: $PRE\n\n"
-	elif [ "#$key#" == '#--config#' ]; then
+	elif [[ "#$key#" == '#--config#' ]]; then
 		SMSD_CONFIG="$value"
 		addToIntroOutput "Using SMS Daemon Config File in:\n" \
 			"   $SMSD_CONFIG\n\n"
-	elif [ "#$key#" == '#--repo#' ]; then
+	elif [[ "#$key#" == '#--repo#' ]]; then
 		CONFIG_REPO="$value"
 		addToIntroOutput "Using Git Config Repository in:\n" \
 			"   $CONFIG_REPO\n\n"
-	elif [ "#$key#" == '#--alt#' ]; then
+	elif [[ "#$key#" == '#--alt#' ]]; then
 		ALT="$value"
 		addToIntroOutput "Setting Alternate SMS Suffix to:\n" \
 			"   $ALT\n\n"
@@ -732,26 +732,26 @@ for arg in "$@" ; do
 		addToIntroOutput "Using SMS Alternate Daemon Config File in:\n" \
 			"   $SMSD_CONFIG\n\n"
 		# Note: Append $ALT to $CONFIG_REPO Below...!
-	elif [ "#$key#" == '#--option#' ]; then
+	elif [[ "#$key#" == '#--option#' ]]; then
 		command="option"
 		opt_arg="$value"
 		addToIntroOutput "Setting Command to:\n" \
 			"   $command $opt_arg\n\n"
-	elif [ "#$key#" == '#--skiplive#' ]; then
+	elif [[ "#$key#" == '#--skiplive#' ]]; then
 		skiplive=1
 		addToIntroOutput \
 			"*** Skipping Live Config - Update Config File Only!\n\n"
-	elif [ "#$key#" == '#--testonly#' ]; then
+	elif [[ "#$key#" == '#--testonly#' ]]; then
 		testonly=1
 		addToIntroOutput \
 			"*** TEST RUN ONLY! ***\n\nNothing will change/commit!\n\n"
-	elif [ "#$key#" == '#--terse#' ]; then
+	elif [[ "#$key#" == '#--terse#' ]]; then
 		terse=1
 		addToIntroOutput "Setting for Terse Operation.\n\n"
-	elif [ "#$key#" == '#--quiet#' ]; then
+	elif [[ "#$key#" == '#--quiet#' ]]; then
 		quiet=1
 		addToIntroOutput "Setting for Quiet Operation.\n\n"
-	elif [ "#$key#" == '#--help#' ]; then
+	elif [[ "#$key#" == '#-h#' || "#$key#" == '#--help#' ]]; then
 		echo -e -n "$introOutput"
 		USAGE
 		exit -1
