@@ -388,21 +388,26 @@ PARSE_LOG()
 	fi
 	#echo "HostLogCount[$host]=${nHostlogs[$host]}"
 
-	app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
-	#echo "App=[$app]"
+	base_app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
+	#echo "base_app=[$base_app]"
 
 	known=0
 
 	# Flag Any "Alternate" or Additional SMSD Apps... (e.g. "-mon")
-	if [[ -z ${ALT} && "$app" =~ smsd-.* ]]; then
+	if [[ -z ${ALT} && "$base_app" =~ (sts|smsd|pvsd|dasmon)-.* ]]; then
 		nHostAltLogs[$host]=$(( nHostAltLogs[$host] + 1 ))
+		app="$base_app"
 		known=1
-	elif [[ "$app" == "smsd-${ALT}" ]]; then
-		app="smsd"
-	elif [[ -n ${ALT} && "$app" == "smsd" ]]; then
+	elif [[ -n ${ALT} && "$base_app" =~ ${ALT}$ ]]; then
+		app="${base_app/${ALT}}"
+	elif [[ -n ${ALT} && "$base_app" =~ (sts|smsd|pvsd|dasmon) ]]; then
 		nHostAltLogs[$host]=$(( nHostAltLogs[$host] + 1 ))
+		app="${base_app}-not-alt"
 		known=1
+	else
+		app="$base_app"
 	fi
+	#echo "app=[$app]"
 
 	if [[ "$app" == "sts" ]]; then
 
@@ -411,7 +416,7 @@ PARSE_LOG()
 		known=1
 
 		# Strip Off STS PID and Error Prefix...
-		if [[ "$log" =~ sts:${S}STS${S}Error: ]]; then
+		if [[ "$log" =~ ${base_app}:${S}STS${S}Error: ]]; then
 			log=`echo "$log" | \
 			awk '{for(i=6;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
@@ -651,13 +656,14 @@ PARSE_LOG()
 		known=1
 
 		# Strip Off SMS Error Prefix...
-		if [[ "$log" =~ smsd:${S}ERROR ]]; then
+		if [[ "$log" =~ ${base_app}:${S}ERROR ]]; then
 			log=`echo "$log" | \
 			awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
 			log=`echo "$log" | \
 			awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		fi
+		#echo "log=[$log]"
 
 		# "Run-Away Data Source" Log
 		if [[ "$log" =~ Run-Away${S}Data${S}Source ]]; then
@@ -1013,7 +1019,7 @@ PARSE_LOG()
 		known=1
 
 		# Strip Off PVSD ERROR Prefix...
-		if [[ "$log" =~ pvsd:${S}PVSD${S}ERROR ]]; then
+		if [[ "$log" =~ ${base_app}:${S}PVSD${S}ERROR ]]; then
 			log=`echo "$log" | \
 			awk '{for(i=5;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
