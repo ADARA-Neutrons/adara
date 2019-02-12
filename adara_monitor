@@ -259,10 +259,8 @@ DO_CMD()
 	elif [[ "${_cmd}" == "H" || "${_cmd}" == "h" \
 			|| "${_cmd}" == "?" ]]; then
 		CMD_USAGE
-	elif [[ "${_cmd}" == "" ]]; then
-		# Pass Thru Carriage Returns... ;-D
-		echo
-	else
+	# Ignore Carriage Returns... ;-D
+	elif [[ "${_cmd}" != "" ]]; then
 		CMD_USAGE
 		echo "Error: Unknown Interactive Command [${_cmd}]...!"
 		if [[ ${_ignore} == "IGNORE" ]]; then echo ; fi
