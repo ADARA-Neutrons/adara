@@ -89,59 +89,73 @@ if [[ ! -x ${ADARA_SUMMARY} ]]; then
 fi
 
 #
-# Set Up ADARA Monitor Summary Log...
+# Set Up ADARA Monitor Summary Log & Previous Summary Marker File...
 #
 
 SUMMARY="AdaraMonitorSummary.$$.log"
 
-#
-# Generate Initial ADARA Summary...
-#
+PREVIOUS="AdaraMonitorPreviousMarker.$$.marker"
 
-LAST_CACHE_STATE=""
-LAST_TIME=0
+##
+## Functions:
+##
+
+#
+# Generate an ADARA Summary File...
+#
 
 DO_SUMMARY()
 {
 	echo
 
+	echo -n "Starting Summary: "
 	date
 
-	/bin/rm ${CACHE_DIR}/${SUMMARY} > /dev/null 2>&1
+	/bin/rm "${CACHE_DIR}/${SUMMARY}" > /dev/null 2>&1
 
 	# Remove Globbed File List If None Found...
 	shopt -s nullglob
 
-	${ADARA_SUMMARY} --terse --nostdin ${ALTOPT} ${CACHE_DIR}/*.txt \
-		> ${CACHE_DIR}/${SUMMARY}
+	${ADARA_SUMMARY} --terse --nostdin ${ALTOPT} "${CACHE_DIR}"/*.txt \
+		> "${CACHE_DIR}/${SUMMARY}"
 
 	# Restore Normal Shell Globbing...
 	shopt -u nullglob
 
-	LAST_CACHE_STATE=`/bin/ls -ld ${CACHE_DIR}`
+	LAST_CACHE_STATE=`/bin/ls -ld "${CACHE_DIR}"`
 
-	/bin/cat ${CACHE_DIR}/${SUMMARY}
+	/bin/cat "${CACHE_DIR}/${SUMMARY}"
 
 	LAST_TIME=`date +"%s"`
 
 	# Check for Intervening User Input, Which Should Probably Be Ignored
 	# (Especially a "Clear Cache" Command, which probably referred to
 	# the Results of the _Previous_ ADARA Summary Output...! ;-D)
+	# (Now there's a new "Clear Previous" Command for that! ;-D)
 
-	# Check for Input Already Waiting (Timeout = 0.1, as 0 works weirdly...)
-	IFS= read -t 0.1 -s cmd
+	local _cmd=""
 
-	# Got a Command, Ignore It...!
-	if [[ $? == 0 && "$cmd" != "" ]]; then
-		echo -n "Warning: User Input Received During ADARA Summary Update! "
-		echo "Ignoring User Command(s) [$cmd]..."
-		echo
-	fi
+	while [[ true ]]; do
 
+		# Check for Input Already Waiting
+		# (Timeout = 0.1, as 0 works weirdly...)
+		IFS= read -t 0.1 -n 1 -s _cmd
+
+		# Got a Command, Optionally Ignore It...!
+		if [[ $? == 0 ]]; then
+			DO_CMD "${_cmd}" IGNORE
+		else
+			break
+		fi
+	
+	done
+
+	# Leave "Previous" Breadcrumb for Next ADARA Summary... ;-D
+	touch "${CACHE_DIR}/${PREVIOUS}"
+
+	echo -n "Summary Done: "
 	date
 }
-
-DO_SUMMARY
 
 #
 # Clear Local Cache Directory...
@@ -153,16 +167,44 @@ CLEAR_CACHE()
 	echo -e "or Leftover Summaries:\n"
 
 	# Remove Any Older Files than the Current ADARA Summary File...
-	find ${CACHE_DIR}/ -mindepth 1 -not -cnewer ${CACHE_DIR}/${SUMMARY} \
-		-and -not -path ${CACHE_DIR}/${SUMMARY} \
+	find "${CACHE_DIR}/" \
+		-mindepth 1 -not -cnewer "${CACHE_DIR}/${SUMMARY}" \
+		-and -not -path "${CACHE_DIR}/${SUMMARY}" \
 		-print -exec /bin/rm -f {} \;
 
 	# Generate a New ADARA Summary Now...
+	echo -e "\nRefreshing ADARA Summary..."
 	DO_SUMMARY
 }
 
 #
-# Main Interactive Loop
+# Clear Previous Local Cache Directory...
+#
+
+CLEAR_PREVIOUS_CACHE()
+{
+	if [[ ! -f "${CACHE_DIR}/${PREVIOUS}" ]]; then
+		echo -e "\nNo Previous ADARA Summary Marker File Found..."
+		echo "Ignoring Command."
+		return
+	fi
+
+	echo -e -n "\nRemoving Any Previously Processed Local Cache Files "
+	echo -e "or Leftover Summaries:\n"
+
+	# Remove Any Older Files than the Previous ADARA Summary Marker File...
+	find "${CACHE_DIR}/" \
+		-mindepth 1 -not -cnewer "${CACHE_DIR}/${PREVIOUS}" \
+		-and -not -path "${CACHE_DIR}/${PREVIOUS}" \
+		-print -exec /bin/rm -f {} \;
+
+	# Generate a New ADARA Summary Now...
+	echo -e "\nRefreshing ADARA Summary..."
+	DO_SUMMARY
+}
+
+#
+# Dump Interactive Command Usage...
 #
 
 CMD_USAGE()
@@ -171,44 +213,102 @@ CMD_USAGE()
 
 	echo -e "<space> or <tab>  = Refresh the Latest ADARA Summary\n"
 	echo -e "     C or c       = Clear Current Local Syslog Error Cache\n"
+	echo -e "     P or p       = Clear Previous Local Syslog Error Cache\n"
 	echo -e "     Q or q       = Quit ADARA Monitor\n"
 	echo -e "   H or h or ?    = Display this Interactive Command Usage\n"
-	echo
 }
 
-while [ true ]; do
+#
+# Interpret and Execute Interactive Commands...
+#
+
+DO_CMD()
+{
+	local _cmd="$1"
+	shift
+
+	local _ignore="$1"
+	shift
+
+	local _ignored=0
+
+	local _nl="\n"
+	if [[ ${_ignore} == "IGNORE" ]]; then _nl="" ; fi
+
+	if [[ "${_cmd}" == "Q" || "${_cmd}" == "q" ]]; then
+		echo -e "${_nl}Exiting ADARA Monitor at User's Request.\n"
+		exit 0
+	elif [[ "${_cmd}" == " " || "${_cmd}" == "	" ]]; then
+		if [[ ${_ignore} == "IGNORE" ]]; then
+			_ignored=1
+		else
+			echo -e "${_nl}Refreshing ADARA Summary..."
+			DO_SUMMARY
+		fi
+	elif [[ "${_cmd}" == "C" || "${_cmd}" == "c" ]]; then
+		if [[ ${_ignore} == "IGNORE" ]]; then
+			_ignored=1
+		else
+			echo -e "${_nl}Clearing ADARA Summary Statistics..."
+			CLEAR_CACHE
+		fi
+	elif [[ "${_cmd}" == "P" || "${_cmd}" == "p" ]]; then
+		echo -e "${_nl}Clearing Previous ADARA Summary Statistics..."
+		CLEAR_PREVIOUS_CACHE
+		if [[ ${_ignore} == "IGNORE" ]]; then echo ; fi
+	elif [[ "${_cmd}" == "H" || "${_cmd}" == "h" \
+			|| "${_cmd}" == "?" ]]; then
+		CMD_USAGE
+	elif [[ "${_cmd}" == "" ]]; then
+		# Pass Thru Carriage Returns... ;-D
+		echo
+	else
+		CMD_USAGE
+		echo "Error: Unknown Interactive Command [${_cmd}]...!"
+		if [[ ${_ignore} == "IGNORE" ]]; then echo ; fi
+	fi
+
+	# Log Any Ignored Commands...
+	if [[ ${_ignored} == 1 ]]; then
+		echo -e -n "${_nl}Warning: User Input Received "
+		echo "During ADARA Summary Update!"
+		echo "Ignoring User Command(s) [${_cmd}]..."
+		echo
+	fi
+}
+
+##
+## End of Functions.
+##
+
+#
+# Generate Initial ADARA Summary...
+#
+
+LAST_CACHE_STATE=""
+LAST_TIME=0
+
+DO_SUMMARY
+
+#
+# Main Interactive Loop
+#
+
+while [[ true ]]; do
 
 	# Check for Interactive Command Input...
 	IFS= read -t 10 -n 1 -s cmd
 
 	# Got a Command, Execute It...
 	if [[ $? == 0 ]]; then
-
-		if [[ "$cmd" == "Q" || "$cmd" == "q" ]]; then
-			echo -e "\nExiting ADARA Monitor at User's Request.\n"
-			exit 0
-		elif [[ "$cmd" == " " || "$cmd" == "\t" ]]; then
-			echo -e "\nRefreshing ADARA Summary..."
-			DO_SUMMARY
-		elif [[ "$cmd" == "C" || "$cmd" == "c" ]]; then
-			echo -e "\nClearing ADARA Summary Statistics..."
-			CLEAR_CACHE
-		elif [[ "$cmd" == "H" || "$cmd" == "h" || "$cmd" == "?" ]]; then
-			CMD_USAGE
-		elif [[ "$cmd" == "" ]]; then
-			# Pass Thru Carriage Returns... ;-D
-			echo
-		else
-			CMD_USAGE
-			echo -e "\nError: Unknown Interactive Command [$cmd]...!"
-		fi
+		DO_CMD "$cmd"
 	fi
 
 	#
 	# Check for Changes to Local Cache Directory...
 	#
 
-	cache_state=`/bin/ls -ld ${CACHE_DIR}`
+	cache_state=`/bin/ls -ld "${CACHE_DIR}"`
 
 	if [[ "${cache_state}" != "${LAST_CACHE_STATE}" ]]; then
 		echo -e "\nLocal Cache Directory Changed, Refreshing ADARA Summary."
