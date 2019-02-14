@@ -21,7 +21,8 @@ USAGE()
 	echo
 	echo "usage:  adara_monitor [--alt=\"-mon\"] \\"
 	echo "                      [--adara_summary=<path>] \\"
-	echo "                      [--cache_dir=<CACHE_DIR>] [--help|-h]"
+	echo "                      [--cache_dir=<CACHE_DIR>] \\"
+	echo "                      [--connect] [--help|-h]"
 	echo
 
 	echo "where:"
@@ -35,9 +36,13 @@ USAGE()
 	echo " --cache_dir=<CACHE_DIR>  = location of local error cache files"
 	echo "                            [${CACHE_DIR}]"
 	echo
+	echo "      --connect           = \"connect\" to running ADARA Monitor"
+	echo
 	echo "     --help | -h          = display this usage information"
 	echo
 }
+
+do_connect=0
 
 for arg in "$@" ; do
 	# echo "arg=$arg"
@@ -72,6 +77,9 @@ for arg in "$@" ; do
 			USAGE
 			exit -2
 		fi
+	elif [[ "#$key#" == '#--connect#' ]]; then
+		echo -e "\nConnecting to Existing ADARA Monitor..."
+		do_connect=1
 	else
 		echo -e "\nError: Unknown Option/Unrecognized File:\n [${key}]"
 		USAGE
@@ -204,6 +212,58 @@ CLEAR_PREVIOUS_CACHE()
 }
 
 #
+# "Connect" to an Existing ADARA Monitor/Local Cache Directory...
+#
+
+DO_CONNECT()
+{
+	local _summaryCk=`/bin/ls -t "${CACHE_DIR}"/AdaraMonitorSummary.*.log`
+
+	if [[ $? != 0 || -z "${_summaryCk}" ]]; then
+		echo -e "\nError Connecting to Existing ADARA Monitor...!\n"
+		/bin/ls -lt "${CACHE_DIR}"
+		echo
+		exit -10
+	fi
+
+	SUMMARY=`basename ${_summaryCk}`
+
+	if [[ $? != 0 || -z "${SUMMARY}" ]]; then
+		echo -e "\nError Extracting ADARA Monitor Log Basename...!"
+		echo -e "\n   _summaryCk=[${_summaryCk}]\n"
+		/bin/ls -lt "${CACHE_DIR}"
+		echo
+		exit -11
+	fi
+
+	local _connPid=`echo "${SUMMARY}" | awk -F "." '{print $2}'`
+
+	if [[ ${_connPid} == 0 || ${_connPid} == "" ]]; then
+		echo -e "\nError Extracting PID for Existing ADARA Monitor...!"
+		echo -e "\n   SUMMARY=[${SUMMARY}]"
+		echo -e "\n   _connPid=[${_connPid}]"
+		echo
+		exit -12
+	fi
+
+	PREVIOUS="AdaraMonitorPreviousMarker.${_connPid}.marker"
+
+	echo -e "\nConnected to ADARA Monitor PID=[${_connPid}]:"
+	echo -e "\n   SUMMARY=[${SUMMARY}]"
+	echo -e "\n   PREVIOUS=[${PREVIOUS}]"
+	echo
+
+	echo -n "Displaying Connected Summary: "
+	date
+
+	echo
+
+	/bin/ls -l "${CACHE_DIR}/${SUMMARY}" | /usr/bin/sed -e "s@ /@\n    /@"
+
+	/bin/cat "${CACHE_DIR}/${SUMMARY}"
+}
+
+#
 # Dump Interactive Command Usage...
 #
 
@@ -241,6 +301,13 @@ DO_CMD()
 	elif [[ "${_cmd}" == " " || "${_cmd}" == "	" ]]; then
 		if [[ ${_ignore} == "IGNORE" ]]; then
 			_ignored=1
+		elif [[ $do_connect == 1 ]]; then
+			echo -e -n "${_nl}Re-Displaying Connected ADARA Summary: "
+			date
+			echo
+			/bin/ls -l "${CACHE_DIR}/${SUMMARY}" \
+				| /usr/bin/sed -e "s@ /@\n    /@"
+			/bin/cat "${CACHE_DIR}/${SUMMARY}"
 		else
 			echo -e "${_nl}Refreshing ADARA Summary..."
 			DO_SUMMARY
@@ -280,13 +347,25 @@ DO_CMD()
 ##
 
 #
-# Generate Initial ADARA Summary...
+# Handle Any "Connection" to Existing ADARA Monitor...
 #
 
-LAST_CACHE_STATE=""
-LAST_TIME=0
+if [[ $do_connect == 1 ]]; then
 
-DO_SUMMARY
+	DO_CONNECT
+
+#
+# Else Generate Initial ADARA Summary...
+#
+
+else
+
+	LAST_CACHE_STATE=""
+	LAST_TIME=0
+
+	DO_SUMMARY
+
+fi
 
 #
 # Main Interactive Loop
@@ -300,6 +379,14 @@ while [[ true ]]; do
 	# Got a Command, Execute It...
 	if [[ $? == 0 ]]; then
 		DO_CMD "$cmd"
+	fi
+
+	#
+	# Skip Periodic Refresh Checks in "Connected" Mode...
+	#
+
+	if [[ $do_connect == 1 ]]; then
+		continue
 	fi
 
 	#
