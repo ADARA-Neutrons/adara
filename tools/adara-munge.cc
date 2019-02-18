@@ -11,6 +11,8 @@
 /// This sets the size of the ADARA parser stream buffer in bytes
 #define ADARA_IN_BUF_SIZE   0x3000000  // For PixelMap!
 
+#define MAX_DEVICE_ID   100
+
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
 
@@ -138,9 +140,14 @@ class MungeParser : public ADARA::POSIXParser {
 public:
 	MungeParser() :
 		ADARA::POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
+		m_lastpkttime_sec(0), m_lastpkttime_nsec(0),
 		m_starttime_sec(0), m_starttime_nsec(0),
 		m_endtime_sec(0), m_endtime_nsec(0),
-		m_case(0), m_posixRead(false), m_showDDP(false), m_lowRate(false),
+		m_run_start_epoch(0), m_run_file_number(0), m_run_number(0),
+		m_case(0),
+		m_skip_pkt(false),
+		m_addRunEnd(false), m_hysterical(false),
+		m_posixRead(false), m_showDDP(false), m_lowRate(false),
 		m_terse(false), m_catch(false),
 		m_out(std::cout)
 	{ }
@@ -179,15 +186,28 @@ public:
 	bool rxPacket(const ADARA::VariableU32ArrayPkt &pkt);
 	bool rxPacket(const ADARA::VariableDoubleArrayPkt &pkt);
 
+	void addRunStatus( uint32_t m_run_number, uint32_t m_run_start_epoch,
+		uint32_t m_run_file_number, ADARA::RunStatus::Enum status );
+
 	using ADARA::POSIXParser::rxPacket;
 
 private:
-	uint32_t m_descriptor_count[100];
+
+	uint32_t m_descriptor_count[MAX_DEVICE_ID];
+	uint32_t m_lastpkttime_sec;
+	uint32_t m_lastpkttime_nsec;
 	uint32_t m_starttime_sec;
 	uint32_t m_starttime_nsec;
 	uint32_t m_endtime_sec;
 	uint32_t m_endtime_nsec;
+	uint32_t m_run_start_epoch;
+	uint32_t m_run_file_number;
+	uint32_t m_run_number;
 	uint32_t m_case;
+
+	bool m_skip_pkt;
+	bool m_addRunEnd;
+	bool m_hysterical;
 	bool m_posixRead;
 	bool m_showDDP;
 	bool m_lowRate;
@@ -230,7 +250,19 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 	}
 
 	// Pass Packet Through to Output Stream...
-	m_out.write( (const char *)pkt.packet(), pkt.packet_length() );
+	if ( !m_skip_pkt )
+	{
+		m_out.write( (const char *)pkt.packet(), pkt.packet_length() );
+	}
+	else
+	{
+		m_skip_pkt = false;
+	}
+
+	// Capture "Last Packet's" Pulse Id (Timestamp)...
+	// - for Adding Run Status End Packet...
+	m_lastpkttime_sec = (uint32_t) (pkt.pulseId() >> 32);
+	m_lastpkttime_nsec = (uint32_t) pkt.pulseId();
 
 	return ret;
 }
@@ -238,11 +270,11 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 bool MungeParser::rxUnknownPkt(const ADARA::Packet &pkt)
 {
 	if ( !m_terse ) {
-		fprintf(stderr,"%u.%09u Unknown Packet\n",
+		fprintf( stderr, "%u.%09u Unknown Packet\n",
 			(uint32_t) (pkt.pulseId() >> 32),
-			(uint32_t) pkt.pulseId());
-		fprintf(stderr,"    type %08x len %u\n",
-			pkt.type(), pkt.packet_length());
+			(uint32_t) pkt.pulseId() );
+		fprintf( stderr, "    type %08x len %u\n",
+			pkt.type(), pkt.packet_length() );
 	}
 
 	return false;
@@ -256,16 +288,16 @@ bool MungeParser::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	if ( !m_terse ) {
 		// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 		if (hdr) {
-			fprintf(stderr,"%u.%09u Oversize Packet\n",
+			fprintf( stderr, "%u.%09u Oversize Packet\n",
 				(uint32_t) (hdr->pulseId() >> 32),
-				(uint32_t) hdr->pulseId());
-			fprintf(stderr,"    type %08x len %u\n",
-				hdr->type(), hdr->packet_length());
+				(uint32_t) hdr->pulseId() );
+			fprintf( stderr, "    type %08x len %u\n",
+				hdr->type(), hdr->packet_length() );
 		}
 		else {
-			fprintf(stderr,
-				"[No Header, Continuation...] Oversize Packet\n");
-			fprintf(stderr,"    chunk_len %u\n", chunk_len);
+			fprintf( stderr,
+				"[No Header, Continuation...] Oversize Packet\n" );
+			fprintf( stderr,"    chunk_len %u\n", chunk_len );
 		}
 	}
 
@@ -287,7 +319,7 @@ bool MungeParser::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		bool is_mapped)
 {
 	if ( !m_terse ) {
-		printf("%u.%09u %s EVENT DATA (0x%x,v%u)\n"
+		fprintf( stderr, "%u.%09u %s EVENT DATA (0x%x,v%u)\n"
 			"    srcId 0x%08x pktSeq 0x%x dspSeq 0x%x%s\n"
 			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x\n"
 			"    dataFlags=%s 0x%x (%s)\n"
@@ -308,7 +340,7 @@ bool MungeParser::handleDataPkt(const ADARA::RawDataPkt *pkt,
 			(uint64_t) pkt->intraPulseTime() * 100,
 			(uint64_t) pkt->tofOffset() * 100,
 			pkt->tofCorrected() ? "" : " (raw)",
-			(uint64_t) pkt->pulseCharge() * 10, pkt->num_events());
+			(uint64_t) pkt->pulseCharge() * 10, pkt->num_events() );
 	}
 
 	// Save Last Packet Time as Potential "End of Run" Timestamp...
@@ -321,7 +353,7 @@ bool MungeParser::handleDataPkt(const ADARA::RawDataPkt *pkt,
 bool MungeParser::rxPacket(const ADARA::RTDLPkt &pkt)
 {
 	if ( !m_terse ) {
-		printf("%u.%09u RTDL (0x%x,v%u) [%u bytes]\n"
+		fprintf( stderr, "%u.%09u RTDL (0x%x,v%u) [%u bytes]\n"
 			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x\n"
 			"    dataFlags=%s 0x%x (%s)\n"
 			"    flavor %d (%s)\n"
@@ -338,7 +370,7 @@ bool MungeParser::rxPacket(const ADARA::RTDLPkt &pkt)
 			(uint64_t) pkt.intraPulseTime() * 100,
 			(uint64_t) pkt.tofOffset() * 100,
 			pkt.tofCorrected() ? "" : " (raw)",
-			(uint64_t) pkt.pulseCharge() * 10, pkt.ringPeriod());
+			(uint64_t) pkt.pulseCharge() * 10, pkt.ringPeriod() );
 	}
 
 	// Save Last Packet Time as Potential "End of Run" Timestamp...
@@ -351,35 +383,36 @@ bool MungeParser::rxPacket(const ADARA::RTDLPkt &pkt)
 bool MungeParser::rxPacket(const ADARA::BankedEventPkt &pkt)
 {
 	if ( !m_terse ) {
-		printf("%u.%09u BANKED EVENT DATA (0x%x,v%u) [%u bytes]\n"
+		fprintf( stderr,
+			"%u.%09u BANKED EVENT DATA (0x%x,v%u) [%u bytes]\n"
 			"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
-			pkt.pulseEnergy(), pkt.vetoFlags());
+			pkt.pulseEnergy(), pkt.vetoFlags() );
 		if (pkt.flags()) {
-			printf("    flags");
+			fprintf( stderr, "    flags" );
 			if (pkt.flags() & ADARA::ERROR_PIXELS)
-				printf(" ERROR");
+				fprintf( stderr, " ERROR" );
 			if (pkt.flags() & ADARA::PARTIAL_DATA)
-				printf(" PARTIAL");
+				fprintf( stderr, " PARTIAL" );
 			if (pkt.flags() & ADARA::PULSE_VETO)
-				printf(" VETO");
+				fprintf( stderr, " VETO" );
 			if (pkt.flags() & ADARA::MISSING_RTDL)
-				printf(" NO_RTDL");
+				fprintf( stderr, " NO_RTDL" );
 			if (pkt.flags() & ADARA::MAPPING_ERROR)
-				printf(" MAPPING");
+				fprintf( stderr, " MAPPING" );
 			if (pkt.flags() & ADARA::DUPLICATE_PULSE)
-				printf(" DUP_PULSE");
+				fprintf( stderr, " DUP_PULSE" );
 			if (pkt.flags() & ADARA::PCHARGE_UNCORRECTED)
-				printf(" PCHG_UNCOR");
+				fprintf( stderr, " PCHG_UNCOR" );
 			if (pkt.flags() & ADARA::VETO_UNCORRECTED)
-				printf(" VETO_UNCOR");
+				fprintf( stderr, " VETO_UNCOR" );
 			if (pkt.flags() & ADARA::GOT_METADATA)
-				printf(" GOT_METADATA");
+				fprintf( stderr, " GOT_METADATA" );
 			if (pkt.flags() & ADARA::GOT_NEUTRONS)
-				printf(" GOT_NEUTRONS");
-			printf("\n");
+				fprintf( stderr, " GOT_NEUTRONS" );
+			fprintf( stderr, "\n" );
 		}
 	}
 
@@ -393,37 +426,38 @@ bool MungeParser::rxPacket(const ADARA::BankedEventPkt &pkt)
 bool MungeParser::rxPacket(const ADARA::BankedEventStatePkt &pkt)
 {
 	if ( !m_terse ) {
-		printf("%u.%09u BANKED EVENT STATE DATA (0x%x,v%u) [%u bytes]\n"
+		fprintf( stderr,
+			"%u.%09u BANKED EVENT STATE DATA (0x%x,v%u) [%u bytes]\n"
 			"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
-			pkt.pulseEnergy(), pkt.vetoFlags());
+			pkt.pulseEnergy(), pkt.vetoFlags() );
 		if (pkt.flags()) {
-			printf("    flags");
+			fprintf( stderr, "    flags" );
 			if (pkt.flags() & ADARA::ERROR_PIXELS)
-				printf(" ERROR");
+				fprintf( stderr, " ERROR" );
 			if (pkt.flags() & ADARA::PARTIAL_DATA)
-				printf(" PARTIAL");
+				fprintf( stderr, " PARTIAL" );
 			if (pkt.flags() & ADARA::PULSE_VETO)
-				printf(" VETO");
+				fprintf( stderr, " VETO" );
 			if (pkt.flags() & ADARA::MISSING_RTDL)
-				printf(" NO_RTDL");
+				fprintf( stderr, " NO_RTDL" );
 			if (pkt.flags() & ADARA::MAPPING_ERROR)
-				printf(" MAPPING");
+				fprintf( stderr, " MAPPING" );
 			if (pkt.flags() & ADARA::DUPLICATE_PULSE)
-				printf(" DUP_PULSE");
+				fprintf( stderr, " DUP_PULSE" );
 			if (pkt.flags() & ADARA::PCHARGE_UNCORRECTED)
-				printf(" PCHG_UNCOR");
+				fprintf( stderr, " PCHG_UNCOR" );
 			if (pkt.flags() & ADARA::VETO_UNCORRECTED)
-				printf(" VETO_UNCOR");
+				fprintf( stderr, " VETO_UNCOR" );
 			if (pkt.flags() & ADARA::GOT_METADATA)
-				printf(" GOT_METADATA");
+				fprintf( stderr, " GOT_METADATA" );
 			if (pkt.flags() & ADARA::GOT_NEUTRONS)
-				printf(" GOT_NEUTRONS");
+				fprintf( stderr, " GOT_NEUTRONS" );
 			if (pkt.flags() & ADARA::HAS_STATES)
-				printf(" HAS_STATES");
-			printf("\n");
+				fprintf( stderr, " HAS_STATES" );
+			fprintf( stderr, "\n" );
 		}
 	}
 
@@ -437,35 +471,36 @@ bool MungeParser::rxPacket(const ADARA::BankedEventStatePkt &pkt)
 bool MungeParser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 {
 	if ( !m_terse ) {
-		printf("%u.%09u BEAM MONITOR DATA (0x%x,v%u) [%u bytes]\n"
+		fprintf( stderr,
+			"%u.%09u BEAM MONITOR DATA (0x%x,v%u) [%u bytes]\n"
 			"    cycle %u charge %lupC energy %ueV vetoFlags 0x%x\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.cycle(), (uint64_t) pkt.pulseCharge() * 10,
-			pkt.pulseEnergy(), pkt.vetoFlags());
+			pkt.pulseEnergy(), pkt.vetoFlags() );
 		if (pkt.flags()) {
-			printf("    flags");
+			fprintf( stderr, "    flags" );
 			if (pkt.flags() & ADARA::ERROR_PIXELS)
-				printf(" ERROR");
+				fprintf( stderr, " ERROR" );
 			if (pkt.flags() & ADARA::PARTIAL_DATA)
-				printf(" PARTIAL");
+				fprintf( stderr, " PARTIAL" );
 			if (pkt.flags() & ADARA::PULSE_VETO)
-				printf(" VETO");
+				fprintf( stderr, " VETO" );
 			if (pkt.flags() & ADARA::MISSING_RTDL)
-				printf(" NO_RTDL");
+				fprintf( stderr, " NO_RTDL" );
 			if (pkt.flags() & ADARA::MAPPING_ERROR)
-				printf(" MAPPING");
+				fprintf( stderr, " MAPPING" );
 			if (pkt.flags() & ADARA::DUPLICATE_PULSE)
-				printf(" DUP_PULSE");
+				fprintf( stderr, " DUP_PULSE" );
 			if (pkt.flags() & ADARA::PCHARGE_UNCORRECTED)
-				printf(" PCHG_UNCOR");
+				fprintf( stderr, " PCHG_UNCOR" );
 			if (pkt.flags() & ADARA::VETO_UNCORRECTED)
-				printf(" VETO_UNCOR");
+				fprintf( stderr, " VETO_UNCOR" );
 			if (pkt.flags() & ADARA::GOT_METADATA)
-				printf(" GOT_METADATA");
+				fprintf( stderr, " GOT_METADATA" );
 			if (pkt.flags() & ADARA::GOT_NEUTRONS)
-				printf(" GOT_NEUTRONS");
-			printf("\n");
+				fprintf( stderr, " GOT_NEUTRONS" );
+			fprintf( stderr, "\n" );
 		}
 	}
 
@@ -479,102 +514,222 @@ bool MungeParser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 {
 	if ( !m_terse ) {
-		fprintf(stderr,"%u.%09u RUN STATUS (0x%x,v%u) [%u bytes]\n",
+		fprintf( stderr, "%u.%09u RUN STATUS (0x%x,v%u) [%u bytes]\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
-			pkt.base_type(), pkt.version(), pkt.packet_length());
+			pkt.base_type(), pkt.version(), pkt.packet_length() );
 
 		switch (pkt.status()) {
 		case ADARA::RunStatus::NO_RUN:
-			fprintf(stderr,"    No current run\n");
+			fprintf( stderr, "    No current run\n" );
 			break;
 		case ADARA::RunStatus::STATE:
-			fprintf(stderr,"    State snapshot\n");
+			fprintf( stderr, "    State snapshot\n" );
 			break;
 		case ADARA::RunStatus::NEW_RUN:
-			fprintf(stderr,"    New run\n");
+			fprintf( stderr, "    New run\n" );
 			break;
 		case ADARA::RunStatus::RUN_EOF:
-			fprintf(stderr,"    End of file (run continues)\n");
+			fprintf( stderr, "    End of file (run continues)\n" );
 			break;
 		case ADARA::RunStatus::RUN_BOF:
-			fprintf(stderr,"    Beginning of file (continuing run)\n");
+			fprintf( stderr, "    Beginning of file (continuing run)\n" );
 			break;
 		case ADARA::RunStatus::END_RUN:
-			fprintf(stderr,"    End of run\n");
+			fprintf( stderr, "    End of run\n" );
 			break;
 		}
 
 		if (pkt.runNumber()) {
-			fprintf(stderr,"    Run %u started at epoch %u\n",
-				pkt.runNumber(), pkt.runStart());
+			fprintf( stderr, "    Run %u started at epoch %u\n",
+				pkt.runNumber(), pkt.runStart() );
 			if (pkt.status() != ADARA::RunStatus::STATE)
-				fprintf(stderr,"    File index %u\n", pkt.fileNumber());
+				fprintf( stderr, "    File index %u\n", pkt.fileNumber() );
 #if 0
 			if (pkt.version() == 0x01) {
-				printf("    Paused 0x%x Pause File index %u\n",
-					pkt.paused(), pkt.pauseFileNumber());
-				printf("    Addendum 0x%x Addendum File index %u\n",
-					pkt.addendum(), pkt.addendumFileNumber());
+				fprintf( stderr,
+					"    Paused 0x%x Pause File index %u\n",
+					pkt.paused(), pkt.pauseFileNumber() );
+				fprintf( stderr,
+					"    Addendum 0x%x Addendum File index %u\n",
+					pkt.addendum(), pkt.addendumFileNumber() );
 			}
 #endif
 		}
 	}
 
-#ifdef REF_M_HYSTERICAL
-	// REF_M "Hysterical" Replay Tweaks to Run Status
-	// - Run Start Time and Run End Time Must Match Historical Data...!
-	if ( m_starttime_sec > 0 && m_starttime_nsec > 0 )
+	// Capture Run Start Epoch/File Information for
+	// Adding Omitted RunStatusPkt for End of Run...!
+	if ( m_addRunEnd )
 	{
-		if ( pkt.status() == ADARA::RunStatus::NEW_RUN )
+		std::cerr << "[Add Run End Mode]" << std::endl;
+
+		// RunStatusPkt from Start of Run/File...
+		// - Capture Run Number, Run Start Epoch Time & File Number...
+		if ( pkt.status() == ADARA::RunStatus::NEW_RUN
+				|| pkt.status() == ADARA::RunStatus::RUN_BOF )
 		{
-			std::cerr << "*** Found Run Status - New Run...!"
+			m_run_number = pkt.runNumber();
+			m_run_start_epoch = pkt.runStart();
+			m_run_file_number = pkt.fileNumber();
+
+			std::cerr << "Captured Run Status Meta-Data:"
+				<< std::endl
+				<< "- Run Number = " << m_run_number << std::endl
+				<< "- Run Start Epoch = " << m_run_start_epoch << std::endl
+				<< "- Run File Number = " << m_run_file_number
 				<< std::endl;
-			uint64_t newPulseId;
-			newPulseId = ((uint64_t) m_starttime_sec) << 32;
-			newPulseId |= m_starttime_nsec;
-			ADARA::RunStatusPkt *PKT =
-				const_cast<ADARA::RunStatusPkt*>(&pkt);
-			PKT->setPulseId( newPulseId );
-			PKT->setRunStart( m_starttime_sec );
 		}
+
+		// Hmmm... This Run File _Already Has_ a RunStatusPkt
+		// for End of File...
+		else if ( pkt.status() == ADARA::RunStatus::RUN_EOF )
+		{
+			std::cerr
+				<< "*** Warning: Run File Already Has Run Status Packet"
+				<< " - End of File (Run Continues)..."
+				<< " Skipping This Run Status Packet...!"
+				<< std::endl;
+
+			m_skip_pkt = true;
+		}
+
+		// Hmmm... This Run Already _Has_ a RunStatusPkt for End of Run...!
 		else if ( pkt.status() == ADARA::RunStatus::END_RUN )
 		{
-			std::cerr << "*** Found Run Status - End of Run...!"
+			std::cerr
+				<< "*** Error: Run File Already Has Run Status"
+				<< " - End of Run...!"
+				<< " Deactivating \"Add End of Run\" Option..."
 				<< std::endl;
-			uint64_t newPulseId;
-			newPulseId = ((uint64_t) m_endtime_sec) << 32;
-			newPulseId |= m_endtime_nsec;
-			ADARA::RunStatusPkt *PKT =
-				const_cast<ADARA::RunStatusPkt*>(&pkt);
-			PKT->setPulseId( newPulseId );
-			// *Always* Set to Run Start Time! ;-D
-			PKT->setRunStart( m_starttime_sec );
+
+			m_addRunEnd = false;
 		}
 	}
-#endif
+
+	// "Hysterical" Replay Tweaks to Run Status (for REF_M originally)
+	// - Run Start Time and Run End Time Must Match Historical Data...!
+	else if ( m_hysterical )
+	{
+		if ( m_starttime_sec > 0 && m_starttime_nsec > 0 )
+		{
+			if ( pkt.status() == ADARA::RunStatus::NEW_RUN )
+			{
+				std::cerr << "*** Found Run Status - New Run...!"
+					<< std::endl;
+				uint64_t newPulseId;
+				newPulseId = ((uint64_t) m_starttime_sec) << 32;
+				newPulseId |= m_starttime_nsec;
+				ADARA::RunStatusPkt *PKT =
+					const_cast<ADARA::RunStatusPkt*>(&pkt);
+				PKT->setPulseId( newPulseId );
+				PKT->setRunStart( m_starttime_sec );
+			}
+			else if ( pkt.status() == ADARA::RunStatus::END_RUN )
+			{
+				std::cerr << "*** Found Run Status - End of Run...!"
+					<< std::endl;
+				uint64_t newPulseId;
+				newPulseId = ((uint64_t) m_endtime_sec) << 32;
+				newPulseId |= m_endtime_nsec;
+				ADARA::RunStatusPkt *PKT =
+					const_cast<ADARA::RunStatusPkt*>(&pkt);
+				PKT->setPulseId( newPulseId );
+				// *Always* Set to Run Start Time! ;-D
+				PKT->setRunStart( m_starttime_sec );
+			}
+		}
+		else
+		{
+			std::cerr
+				<< "Hysterical Run Status Mode _Without_ Start Time Set!"
+				<< " Ignoring..." << std::endl;
+		}
+	}
 
 	return false;
+}
+
+struct run_status_packet {
+	ADARA::Header   hdr;
+	uint32_t    run_number;
+	uint32_t    run_start;
+	uint32_t    status_number;
+#if 0
+	uint32_t    paused_number;
+	uint32_t    addendum_number;
+#endif
+} __attribute__((packed));
+
+void MungeParser::addRunStatus( uint32_t run_number,
+		uint32_t run_start_epoch, uint32_t run_file_number,
+		ADARA::RunStatus::Enum status )
+{
+	struct run_status_packet spkt = {
+		hdr : {
+#if 0
+			payload_len : 20,
+#else
+			payload_len : 12,
+#endif
+			pkt_format : ADARA_PKT_TYPE(
+				ADARA::PacketType::RUN_STATUS_TYPE,
+				ADARA::PacketType::RUN_STATUS_VERSION ),
+		},
+	};
+
+	spkt.hdr.ts_sec = m_lastpkttime_sec;
+	spkt.hdr.ts_nsec = m_lastpkttime_nsec;
+
+	spkt.run_number = run_number;
+
+	spkt.run_start = run_start_epoch;
+
+	// Ignore Paused File Number in RunStatus Packet...
+	// (TODO Figure out how to munge this field if we ever need
+	// to _Recover_ any Paused Files into a given run...! ;-)
+	// [Solved in V1 Packet Type... Yet To Be Activated... ;-]
+	spkt.status_number = run_file_number | ((uint32_t) status << 24);
+
+#if 0
+	spkt.paused_number = m_pauseFileNumber | ((uint32_t) m_paused << 24);
+	spkt.addendum_number = m_addendumFileNumber
+		| ((uint32_t) m_addendum << 24);
+#endif
+
+	m_out.write( (const char *)&spkt, sizeof(spkt) );
 }
 
 bool MungeParser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 {
 	if ( !m_terse || m_showDDP ) {
 		// TODO display more fields (check that the contents don't change)
-		printf("%u.%09u DEVICE DESCRIPTOR (0x%x,v%u) [%u bytes]\n"
+		fprintf( stderr,
+			"%u.%09u DEVICE DESCRIPTOR (0x%x,v%u) [%u bytes]\n"
 			"    Device %u\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
-			pkt.devId());
+			pkt.devId() );
 	}
 
 	if ( m_showDDP )
 	{
-		printf( "%s\n", pkt.description().c_str() );
+		fprintf( stderr, "%s\n", pkt.description().c_str() );
 	}
 
 	//
 	// Evil Device Id Re-Numbering Issue (beamline.xml Changed Mid-Run!)
 	//
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		std::cerr << "Warning in DeviceDescriptorPkt:"
+			<< " Device Id " << pkt.devId()
+			<< " > Max Device Id " << MAX_DEVICE_ID
+			<< " - Ignoring Munge Cases for this Device...!"
+			<< std::endl;
+
+		return false;
+	}
 
 	// Another Descriptor for the Given Device Id...
 	(m_descriptor_count[ pkt.devId() ])++;
@@ -646,14 +801,25 @@ bool MungeParser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 bool MungeParser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 {
 	if ( !m_terse ) {
-		fprintf(stderr,"%u.%09u U32 VARIABLE (0x%x,v%u) [%u bytes]\n"
+		fprintf( stderr, "%u.%09u U32 VARIABLE (0x%x,v%u) [%u bytes]\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"
 			"    Value %u\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
-			severityString(pkt.severity()), pkt.value());
+			severityString(pkt.severity()), pkt.value() );
+	}
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		std::cerr << "Warning in VariableU32Pkt:"
+			<< " Device Id " << pkt.devId()
+			<< " > Max Device Id " << MAX_DEVICE_ID
+			<< " - Ignoring Munge Cases for this Device...!"
+			<< std::endl;
+
+		return false;
 	}
 
 	// CASE #1: Stream Files _Before_ and Up To Change
@@ -723,14 +889,14 @@ bool MungeParser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 {
 	if ( !m_terse ) {
-		fprintf(stderr,"%u.%09u DOUBLE VARIABLE (0x%x,v%u) [%u bytes]\n"
+		fprintf( stderr, "%u.%09u DOUBLE VARIABLE (0x%x,v%u) [%u bytes]\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"
 			"    Value %lf\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
-			severityString(pkt.severity()), pkt.value());
+			severityString(pkt.severity()), pkt.value() );
 	}
 
 	// CNCS FitSam "Off-By-11-Minutes" Bug, November 2017...
@@ -757,6 +923,17 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 		PKT->setPulseId( newPulseId );
 	}
 	*/
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		std::cerr << "Warning in VariableDoublePkt:"
+			<< " Device Id " << pkt.devId()
+			<< " > Max Device Id " << MAX_DEVICE_ID
+			<< " - Ignoring Munge Cases for this Device...!"
+			<< std::endl;
+
+		return false;
+	}
 
 	// CASE #1: Stream Files _Before_ and Up To Change
 	// -> *ALL* OLD Device Ids Need to Be Edited into New Device Ids...!
@@ -825,14 +1002,25 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 bool MungeParser::rxPacket(const ADARA::VariableStringPkt &pkt)
 {
 	if ( !m_terse ) {
-		fprintf(stderr,"%u.%09u String VARIABLE (0x%x,v%u) [%u bytes]\n"
+		fprintf( stderr, "%u.%09u String VARIABLE (0x%x,v%u) [%u bytes]\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"
 			"    Value '%s'\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
-			severityString(pkt.severity()), pkt.value().c_str());
+			severityString(pkt.severity()), pkt.value().c_str() );
+	}
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		std::cerr << "Warning in VariableStringPkt:"
+			<< " Device Id " << pkt.devId()
+			<< " > Max Device Id " << MAX_DEVICE_ID
+			<< " - Ignoring Munge Cases for this Device...!"
+			<< std::endl;
+
+		return false;
 	}
 
 	// CASE #1: Stream Files _Before_ and Up To Change
@@ -904,18 +1092,30 @@ bool MungeParser::rxPacket(const ADARA::VariableU32ArrayPkt &pkt)
 	uint32_t i;
 
 	if ( !m_terse ) {
-		fprintf(stderr,"%u.%09u U32 ARRAY VARIABLE (0x%x,v%u) [%u bytes]\n"
+		fprintf( stderr,
+			"%u.%09u U32 ARRAY VARIABLE (0x%x,v%u) [%u bytes]\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"
 			"    Count %u Values",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
-			severityString(pkt.severity()), pkt.elemCount());
+			severityString(pkt.severity()), pkt.elemCount() );
 		for (i = 0; i < pkt.elemCount(); i++) {
-			fprintf(stderr," %u", pkt.value()[i]);
+			fprintf( stderr, " %u", pkt.value()[i] );
 		}
-		fprintf(stderr,"\n");
+		fprintf( stderr, "\n" );
+	}
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		std::cerr << "Warning in VariableU32ArrayPkt:"
+			<< " Device Id " << pkt.devId()
+			<< " > Max Device Id " << MAX_DEVICE_ID
+			<< " - Ignoring Munge Cases for this Device...!"
+			<< std::endl;
+
+		return false;
 	}
 
 	// CASE #1: Stream Files _Before_ and Up To Change
@@ -987,7 +1187,7 @@ bool MungeParser::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 	uint32_t i;
 
 	if ( !m_terse ) {
-		fprintf(stderr,
+		fprintf( stderr,
 			"%u.%09u DOUBLE ARRAY VARIABLE (0x%x,v%u) [%u bytes]\n"
 			"    Device %u Variable %u\n"
 			"    Status %s Severity %s\n"
@@ -995,11 +1195,22 @@ bool MungeParser::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
-			severityString(pkt.severity()), pkt.elemCount());
+			severityString(pkt.severity()), pkt.elemCount() );
 		for (i = 0; i < pkt.elemCount(); i++) {
-			fprintf(stderr," %lf", pkt.value()[i]);
+			fprintf( stderr, " %lf", pkt.value()[i] );
 		}
-		fprintf(stderr,"\n");
+		fprintf( stderr, "\n" );
+	}
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		std::cerr << "Warning in VariableDoubleArrayPkt:"
+			<< " Device Id " << pkt.devId()
+			<< " > Max Device Id " << MAX_DEVICE_ID
+			<< " - Ignoring Munge Cases for this Device...!"
+			<< std::endl;
+
+		return false;
 	}
 
 	// CASE #1: Stream Files _Before_ and Up To Change
@@ -1141,8 +1352,11 @@ void MungeParser::parse(int argc, char **argv)
 		opts.add_options()
 		("help,h", "Show usage information")
 		("posixread,P", "Use POSIX read() to parse incoming stream")
+		("showddp,D", "Show payload of device descriptor packets")
 		("terse,T", "Terse Mode, Produce no output (except as requested)")
 		("catch,C", "Catch Exceptions, Try to parse past bad packets")
+		("addrunend,E", "Add Omitted Run Status Packet to End of Stream")
+		("hysterical,H", "Set Hysterical Run Start/End Times")
 		("starttime", po::value<std::string>(&m_starttime),
 			"Hysterical Start Time for Experiment Data")
 		("case", po::value<uint32_t>(&m_case),
@@ -1174,8 +1388,12 @@ void MungeParser::parse(int argc, char **argv)
 			exit(2);
 		}
 
+	m_addRunEnd = vm.count("addrunend");
+
+	m_hysterical = vm.count("hysterical");
+
 	if ( m_starttime.size() ) {
-		std::cerr << "Run Start Time Requested as: "
+		std::cerr << "Hysterical Run Start Time Requested as: "
 			<< m_starttime << std::endl;
 		size_t dot = m_starttime.find(".");
 		if ( dot != std::string::npos ) {
@@ -1183,7 +1401,7 @@ void MungeParser::parse(int argc, char **argv)
 				m_starttime.substr(0, dot) );
 			m_starttime_nsec = boost::lexical_cast<uint32_t>(
 				m_starttime.substr(dot + 1) );
-			std::cerr << "Run Start Time"
+			std::cerr << "Hysterical Run Start Time"
 				<< " -> sec=" << m_starttime_sec
 				<< " nsec=" << m_starttime_nsec << std::endl;
 		}
@@ -1223,6 +1441,39 @@ void MungeParser::parse(int argc, char **argv)
 		} catch (std::string m) {
 			std::cerr << argv[0] << ": " << m << std::endl;
 			exit(1);
+		}
+	}
+
+	// Add Final "RunStatusPkt" to End of Run...
+	if ( m_addRunEnd )
+	{
+		if ( m_run_number > 0
+				&& m_run_start_epoch > 0
+				&& m_run_file_number > 0 )
+		{
+			std::cerr
+				<< "[Adding Final Run Status Packet for End of Run!]"
+				<< std::endl
+				<< "- Run Number = " << m_run_number << std::endl
+				<< "- Run Start Epoch = " << m_run_start_epoch << std::endl
+				<< "- Run File Number = " << m_run_file_number
+				<< std::endl;
+
+			addRunStatus( m_run_number, m_run_start_epoch,
+				m_run_file_number, ADARA::RunStatus::END_RUN );
+		}
+
+		else
+		{
+			std::cerr
+				<< "Error: Adding Final Run Status Packet for End of Run!"
+				<< " Missing Required Meta-Data:"
+				<< std::endl
+				<< "- Run Number = " << m_run_number << std::endl
+				<< "- Run Start Epoch = " << m_run_start_epoch << std::endl
+				<< "- Run File Number = " << m_run_file_number << std::endl
+				<< "Can't Add Final Run Status Packet..."
+				<< std::endl;
 		}
 	}
 }
