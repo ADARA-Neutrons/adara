@@ -103,6 +103,7 @@ declare -A nHostAltLogs
 declare -A nHostSTSLDAPLookupUserName
 declare -A nHostSTSLDAPSearchFailed
 declare -A nHostSTSMoreThanOnePVValue
+declare -A nHostSTSMoreThanOnePVValuePIDs
 declare -A nHostSTSPVIDReNumbered
 declare -A nHostSTSNoMatchingUnitsPV
 declare -A nHostSTSPrePulseVarValue
@@ -267,6 +268,7 @@ PARSE_LOG()
 		nHostSTSLDAPLookupUserName[$host]=0
 		nHostSTSLDAPSearchFailed[$host]=0
 		nHostSTSMoreThanOnePVValue[$host]=0
+		nHostSTSMoreThanOnePVValuePIDs[$host]=""
 		nHostSTSPVIDReNumbered[$host]=0
 		nHostSTSNoMatchingUnitsPV[$host]=0
 		nHostSTSPrePulseVarValue[$host]=0
@@ -417,9 +419,11 @@ PARSE_LOG()
 
 		# Strip Off STS PID and Error Prefix...
 		if [[ "$log" =~ ${base_app}:${S}STS${S}Error: ]]; then
+			pid=`echo "$log" | awk '{print $5}'`
 			log=`echo "$log" | \
 			awk '{for(i=6;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
+			pid=`echo "$log" | awk '{print $3}'`
 			log=`echo "$log" | \
 			awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		fi
@@ -442,6 +446,8 @@ PARSE_LOG()
 			#echo "More Than 1 PV Value for..."
 			nHostSTSMoreThanOnePVValue[$host]=$(( \
 				nHostSTSMoreThanOnePVValue[$host] + 1 ))
+			nHostSTSMoreThanOnePVValuePIDs[$host]="\
+				${nHostSTSMoreThanOnePVValuePIDs[$host]}${pid}\n"
 
 		# "PV ID Re-Numbered" Log
 		elif [[ "$log" =~ PV${S}ID${S}Re-Numbered ]]; then
@@ -1484,6 +1490,9 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTSMoreThanOnePVValue[$h]} "
 		echo "STS \"More Than 1 PV Value for\" Logs"
+		pidlist=`echo -e "${nHostSTSMoreThanOnePVValuePIDs[$h]//	/}" \
+			| sed -e '/^$/d' -e 's/[][]//g' | sort -u -n`
+		echo "        PIDs: "${pidlist}
 	fi
 	if [[ ${nHostSTSUnableToInitialize[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTSUnableToInitialize[$h]} "
