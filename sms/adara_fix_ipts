@@ -457,7 +457,7 @@ INSTALL_AND_CHECK_DATAFILE()
 
 	echo -e "\nNow Verify Still a Valid Stream File with ADARA Parser..."
 	echo -e "\n\t-> Search for New ${_meta_name} Value(s):"
-	echo -e "\t[${_new_value}]"
+	echo -e "\n\t[${_new_value}]"
 	echo -e -n "\n\t-> Verify File Parses to End!"
 	if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
 		echo -n " [_Not_ End of Run]"
