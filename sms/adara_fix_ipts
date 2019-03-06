@@ -326,7 +326,7 @@ for arg in "$@" ; do
 		USAGE
 		exit 0
 	else
-		echo -e "\nError: Unknown Command Line Option [${arg}]"
+		echo -e "\nERROR: Unknown Command Line Option [${arg}]"
 		USAGE
 		exit 1
 	fi
@@ -334,13 +334,13 @@ for arg in "$@" ; do
 done
 
 if [[ -z "${RUN_NUMBERS}" ]]; then
-	echo -e "\nError: No Run Numbers Specified!"
+	echo -e "\nERROR: No Run Numbers Specified!"
 	USAGE
 	exit 2
 fi
 
 if [[ -z "${IPTS_NEW}" ]]; then
-	echo -e "\nError: No Replacement IPTS Proposal Specified!"
+	echo -e "\nERROR: No Replacement IPTS Proposal Specified!"
 	USAGE
 	exit 3
 fi
@@ -369,7 +369,7 @@ if [[ -z "${STS_PORT}" ]]; then
 	ckstsport=$?
 
 	if [[ ${ckstsport} != 0 ]]; then
-		echo -e -n "\nError Determining STS Port "
+		echo -e -n "\nERROR Determining STS Port "
 		echo "for \"${STS_SERVICE}\" Service on ${STS_HOST}...!"
 		USAGE
 		exit 4
@@ -414,7 +414,7 @@ INSTALL_AND_CHECK_DATAFILE()
 {
 	# Run Directory
 	if [[ "#$1#" == '##' ]]; then
-		echo -e "\nError: No Run Directory Specified for Install Check!"
+		echo -e "\nERROR: No Run Directory Specified for Install Check!"
 		return 11
 	fi
 	local _rundir="$1"
@@ -422,7 +422,7 @@ INSTALL_AND_CHECK_DATAFILE()
 
 	# Data File
 	if [[ "#$1#" == '##' ]]; then
-		echo -e "\nError: No Data File Specified for Install Check!"
+		echo -e "\nERROR: No Data File Specified for Install Check!"
 		return 12
 	fi
 	local _datafile="$1"
@@ -457,7 +457,7 @@ INSTALL_AND_CHECK_DATAFILE()
 
 	echo -e "\nNow Verify Still a Valid Stream File with ADARA Parser..."
 	echo -e "\n\t-> Search for New ${_meta_name} Value(s):"
-	echo -e "\t\t\"${_new_value}\""
+	echo -e "\t[${_new_value}]"
 	echo -e -n "\n\t-> Verify File Parses to End!"
 	if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
 		echo -n " [_Not_ End of Run]"
@@ -563,7 +563,7 @@ RESUBMIT_RUN()
 {
 	# Run Directory
 	if [[ "#$1#" == '##' ]]; then
-		echo -e "\nError: No Run Directory Specified for Re-Submit Run!"
+		echo -e "\nERROR: No Run Directory Specified for Re-Submit Run!"
 		echo -e "\nContinuing with Next Run Number..."
 		return 15
 	fi
@@ -572,7 +572,7 @@ RESUBMIT_RUN()
 
 	# Data File
 	if [[ "#$1#" == '##' ]]; then
-		echo -e "\nError: No Data File Specified for Re-Submit Run!"
+		echo -e "\nERROR: No Data File Specified for Re-Submit Run!"
 		echo -e "\nContinuing with Next Run Number..."
 		return 16
 	fi
@@ -848,7 +848,7 @@ MANUAL_EDIT()
 {
 	# Run Directory
 	if [[ "#$1#" == '##' ]]; then
-		echo -e "\nError: No Run Directory Specified for Manual Editing!"
+		echo -e "\nERROR: No Run Directory Specified for Manual Editing!"
 		echo -e "\nContinuing with Next Run Number..."
 		return 20
 	fi
@@ -857,7 +857,7 @@ MANUAL_EDIT()
 
 	# Data File
 	if [[ "#$1#" == '##' ]]; then
-		echo -e "\nError: No Data File Specified for Manual Editing!"
+		echo -e "\nERROR: No Data File Specified for Manual Editing!"
 		echo -e "\nContinuing with Next Run Number..."
 		return 21
 	fi
@@ -904,7 +904,8 @@ MANUAL_EDIT()
 	echo -e "\nReady to Manually Edit the Data File:"
 	echo -e "\n\t[${_datafile}.NEW-$$]"
 	echo -e "\n\tin [${_rundir}]"
-	echo -e "\nto Change ${_meta_name} to \"${_new_value}\"."
+	echo -e "\nto Change ${_meta_name} to:"
+	echo -e "\t[${_new_value}]"
 	CHECK_PROCEED "Proceed"
 	if [[ $? != 0 ]]; then
 		echo -e "\nOK, Skipping This Run Number."
@@ -994,11 +995,11 @@ LOOKUP_PROPOSAL_METADATA()
 		shift
 	fi
 
-	echo -e -n "\nLOOKUP_PROPOSAL_METADATA(): XML Tag for ${_meta_name} "
-	echo "= \"${_xml_tag}\""
+	echo -e "\nLOOKUP_PROPOSAL_METADATA():"
+	echo -e "\t-> XML Tag for ${_meta_name} = \"<${_xml_tag}>\""
 
 	if [[ "${_allow_multi}" == "AllowMulti" ]]; then
-		echo -e "\t[Allow Multiple Lookup Results!]"
+		echo -e "\t-> [Allow Multiple Lookup Results!]"
 	fi
 
 	#
@@ -1031,7 +1032,9 @@ LOOKUP_PROPOSAL_METADATA()
 			"${_xml_tag}" "${_meta_name}" "${_new_value}"
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
+			echo -e "\nGiving Up on ${_meta_name} Meta-Data Lookup"
+			echo "(<${_xml_tag}>) for Run ${run}..."
+			echo -e "\n\t[${_new_value}]"
 			return 30
 		else
 			return 255   # Pass-Thru Return...!
@@ -1090,7 +1093,9 @@ LOOKUP_PROPOSAL_METADATA()
 			"${_xml_tag}" "${_meta_name}" "${_new_value}"
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
+			echo -e "\nGiving Up on ${_meta_name} Meta-Data Lookup"
+			echo "(<${_xml_tag}>) for Run ${run}..."
+			echo -e "\n\t[${_new_value}]"
 			return 32
 		else
 			return 255   # Pass-Thru Return...!
@@ -1139,12 +1144,13 @@ UPDATE_PROPOSAL_METADATA()
 		shift
 	fi
 
-	echo -e -n "\nUPDATE_PROPOSAL_METADATA(): XML Tag for ${_meta_name} "
-	echo "= \"${_xml_tag}\""
-	echo -e "\t-> New Value: [${_new_value}]"
+	echo -e "\nUPDATE_PROPOSAL_METADATA():"
+	echo -e "\t-> XML Tag for ${_meta_name} = \"<${_xml_tag}>\""
+	echo -e "\t-> New Value:"
+	echo -e "\t[${_new_value}]"
 
 	if [[ "${_delete_value}" == "DeleteValue" ]]; then
-		echo -e "\t\t[DELETE VALUE!!!]"
+		echo -e "\t\t=> [DELETE VALUE!!!]"
 	fi
 
 	update_old_value=""
@@ -1159,6 +1165,9 @@ UPDATE_PROPOSAL_METADATA()
 		return 0
 	# Error Return...
 	elif [[ ${cklookup} != 0 ]]; then
+		echo -e "\nUnable to Update ${_meta_name} Meta-Data Value"
+		echo "(<${_xml_tag}>) for Run ${run}..."
+		echo -e "\n\t[${_new_value}]"
 		return ${cklookup}
 	fi
 
@@ -1185,7 +1194,9 @@ UPDATE_PROPOSAL_METADATA()
 			"${_xml_tag}" "${_meta_name}" "${_new_value}"
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
+			echo -e "\nUnable to Update ${_meta_name} Meta-Data Value"
+			echo "(<${_xml_tag}>) for Run ${run}..."
+			echo -e "\n\t[${_new_value}]"
 			return 33
 		else
 			return 0
@@ -1203,7 +1214,9 @@ UPDATE_PROPOSAL_METADATA()
 			"${_xml_tag}" "${_meta_name}" "${_new_value}"
 		if [[ $? != 0 ]]; then
 			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
+			echo -e "\nUnable to Update ${_meta_name} Meta-Data Value"
+			echo "(<${_xml_tag}>) for Run ${run}..."
+			echo -e "\n\t[${_new_value}]"
 			return 34
 		else
 			return 0
@@ -1212,7 +1225,7 @@ UPDATE_PROPOSAL_METADATA()
 
 	echo -e -n "\nExtracted Line Number and Content "
 	echo "from ${_meta_name} Meta-Data Line:"
-	echo -e "\n\t${ipts_old_line_wnum}\n"
+	echo -e "\n${ipts_old_line_wnum}\n"
 		# Allow Self-Indenting from XML Line(s)
 	echo -e "\t-> Line #${ipts_old_line_num}"
 	echo -e "\t-> [${ipts_old_line}]"
@@ -1236,9 +1249,9 @@ UPDATE_PROPOSAL_METADATA()
 
 		len_diff=$(( ${#ipts_new_line} ))
 
-		echo -e -n "\nDeleting This Old ${_meta_name} "
-		echo "Value [${update_old_value}]:"
-		echo -e "\t${len_diff} Spaces to Post-Pad."
+		echo -e "\nDeleting This Old ${_meta_name} Meta-Data Value:"
+		echo -e "\n\t[${update_old_value}]"
+		echo -e "\n\t-> ${len_diff} Spaces to Post-Pad."
 
 		ipts_new_line=""
 		for (( i = 0 ; i < ${len_diff} ; ++i )); do
@@ -1249,7 +1262,7 @@ UPDATE_PROPOSAL_METADATA()
 		done
 
 		echo -e "\nModified New ${_meta_name} Line is:"
-		echo -e "\t[${ipts_new_line}]"
+		echo -e "\n\t[${ipts_new_line}]"
 
 		do_subst=0
 
@@ -1259,10 +1272,12 @@ UPDATE_PROPOSAL_METADATA()
 
 		len_diff=$(( ${#update_old_value} - ${#_new_value} ))
 
-		echo -e -n "\nNew ${_meta_name} [${_new_value}] is "
-		echo "_Shorter_ than Old [${update_old_value}]:"
-		echo -e -n "\t${#update_old_value} - ${#_new_value} = ${len_diff} "
-		echo "Spaces to Pad."
+		echo -e "\nNew ${_meta_name} Meta-Data Value:"
+		echo -e "\n\t[${_new_value}]"
+		echo -e "\nis _Shorter_ than Old ${_meta_name} Meta-Data Value:"
+		echo -e "\n\t[${update_old_value}]"
+		echo -e -n "\n\t-> ${#update_old_value} - ${#_new_value} = "
+		echo "${len_diff} Spaces to Pad."
 
 		for (( i = 0 ; i < ${len_diff} ; ++i )); do
 			# Use a Placeholder for Spaces,
@@ -1271,7 +1286,8 @@ UPDATE_PROPOSAL_METADATA()
 			_new_value="${_new_value}${SPACE_MARKER}"
 		done
 
-		echo -e "\nResulting New ${_meta_name} is: [${_new_value}]"
+		echo -e "\nResulting New ${_meta_name} is:"
+		echo -e "\n\t[${_new_value}]"
 
 	# If New Meta-Data is _Longer_ than Old Meta-Data,
 	# Try to Remove Sufficient White Space...
@@ -1279,10 +1295,12 @@ UPDATE_PROPOSAL_METADATA()
 
 		len_diff=$(( ${#_new_value} - ${#update_old_value} ))
 
-		echo -e -n "\nNew ${_meta_name} [${_new_value}] is "
-		echo "_Longer_ than Old [${update_old_value}]:"
-		echo -e -n "\t${#_new_value} - ${#update_old_value} = ${len_diff} "
-		echo "Spaces to Remove from Line!"
+		echo -e "\nNew ${_meta_name} Meta-Data Value:"
+		echo -e "\n\t[${_new_value}]"
+		echo -e "\nis _Longer_ than Old ${_meta_name} Meta-Data Value:"
+		echo -e "\n\t[${update_old_value}]"
+		echo -e -n "\n\t-> ${#_new_value} - ${#update_old_value} = "
+		echo "${len_diff} Spaces to Remove from Line!"
 
 		# Try to Remove Sufficient Spaces from Old Proposal Meta-Data Line
 
@@ -1302,7 +1320,10 @@ UPDATE_PROPOSAL_METADATA()
 					"${_xml_tag}" "${_meta_name}" "${_new_value}"
 				if [[ $? != 0 ]]; then
 					CHECK_PROCEED
-					echo -e "\nContinuing with Next Run Number..."
+					echo -e -n "\nUnable to Update ${_meta_name} "
+					echo "Meta-Data Value"
+					echo "(<${_xml_tag}>) for Run ${run}..."
+					echo -e "\n\t[${_new_value}]"
 					return 35
 				else
 					return 0
@@ -1327,7 +1348,10 @@ UPDATE_PROPOSAL_METADATA()
 					"${_xml_tag}" "${_meta_name}" "${_new_value}"
 				if [[ $? != 0 ]]; then
 					CHECK_PROCEED
-					echo -e "\nContinuing with Next Run Number..."
+					echo -e -n "\nUnable to Update ${_meta_name} "
+					echo "Meta-Data Value"
+					echo "(<${_xml_tag}>) for Run ${run}..."
+					echo -e "\n\t[${_new_value}]"
 					return 36
 				else
 					return 0
@@ -1337,14 +1361,16 @@ UPDATE_PROPOSAL_METADATA()
 		done
 
 		echo -e "\nResulting New/Old ${_meta_name} Line Template is:"
-		echo -e "\t[${ipts_new_line}]"
+		echo -e "\n\t[${ipts_new_line}]"
 
 	# New Meta-Data is _Same_ Length as Old Meta-Data, Yay! ;-D
 	else
 
-		echo -e -n "\nNew ${_meta_name} [${_new_value}] is "
-		echo "_Same_ Length as Old [${update_old_value}]:"
-		echo -e "\t${#_new_value} = ${#update_old_value}"
+		echo -e "\nNew ${_meta_name} Value:"
+		echo -e "\n\t[${_new_value}]"
+		echo -e "\nis _Same_ Length as Old ${_meta_name} Value:"
+		echo -e "\n\t[${update_old_value}]"
+		echo -e "\n\t-> ${#_new_value} = ${#update_old_value}"
 
 	fi
 
@@ -1398,7 +1424,10 @@ UPDATE_PROPOSAL_METADATA()
 				"${_xml_tag}" "${_meta_name}" "${_new_value}"
 			if [[ $? != 0 ]]; then
 				CHECK_PROCEED
-				echo -e "\nContinuing with Next Run Number..."
+				echo -e -n "\nUnable to Update ${_meta_name} "
+				echo "Meta-Data Value"
+				echo "(<${_xml_tag}>) for Run ${run}..."
+				echo -e "\n\t[${_new_value}]"
 				return 37
 			else
 				return 0
@@ -1618,7 +1647,7 @@ for run in ${RUN_NUMBERS} ; do
 
 	do_propmeta=1
 	if [[ ${ckpropmeta} != 0 || -z "${prop_json}" ]]; then
-		echo -e -n "\nError Looking Up Proposal Meta-Data "
+		echo -e -n "\nERROR Looking Up Proposal Meta-Data "
 		echo "for \"${IPTS_NEW}\"...!"
 		echo -e "\nSkipping Title and User Substitution..."
 		do_propmeta=0
@@ -1679,8 +1708,8 @@ for run in ${RUN_NUMBERS} ; do
 			ckupdate=$?
 
 			if [[ ${ckupdate} != 0 ]]; then
-				echo -e "\nWARNING: Unable to Update Proposal Title...!"
-				echo -e "\nContinuing..."
+				echo -e "\nWARNING: Unable to Update Proposal Title..."
+				echo -e "\nOptional Update, Ignore and Continue..."
 			fi
 
 		fi
@@ -1706,9 +1735,9 @@ for run in ${RUN_NUMBERS} ; do
 
 				# [Not] Pass-Thru Return... (Already Manually Edited)
 				if [[ ${cklookup} != 255 ]]; then
-					# Error Return...
-					echo -e "\nWARNING: Unable to Update Proposal User...!"
-					echo -e "\nContinuing..."
+					echo -e -n "\nWARNING: Unable to Update "
+					echo "Proposal Users..."
+					echo -e "\nOptional Update, Ignore and Continue..."
 				fi
 
 			# Lookup Succeeded, Reconcile New vs. Old User Lists...! ;-D
@@ -1760,8 +1789,8 @@ for run in ${RUN_NUMBERS} ; do
 					if [[ $found == 1 ]]; then
 						continue
 					else
-						echo -e -n "\n*** User [${new_user}] Not Found... "
-						echo "[Needs Adding]"
+						echo -e -n "\n\t*** User [${new_user}] "
+						echo "Not Found... [Needs Adding]"
 					fi
 
 				done
@@ -1811,7 +1840,8 @@ for run in ${RUN_NUMBERS} ; do
 							echo "for Old User [${old_user}]...!"
 							echo -e -n "\n\tUSER_OLD = [${USER_OLD}] "
 							echo "vs. [${old_user}]"
-							echo -e "\nContinuing..."
+							echo -e -n "\nOptional Update, "
+							echo "Ignore and Continue..."
 						fi
 
 					else
@@ -1821,6 +1851,8 @@ for run in ${RUN_NUMBERS} ; do
 						echo "for Any Old Users - List Depleted...!"
 						echo -e "\nGiving Up on Remaining New User List:"
 						echo -e "\n\t[${new_user_list}]"
+						echo -e -n "\nOptional Update, "
+						echo "Ignore and Continue..."
 
 						break
 
@@ -1853,7 +1885,8 @@ for run in ${RUN_NUMBERS} ; do
 						echo "Old Proposal User [${old_user}]...!"
 						echo -e -n "\n\tUSER_OLD = [${USER_OLD}] "
 						echo "vs. [${old_user}]"
-						echo -e "\nContinuing..."
+						echo -e -n "\nOptional Update, "
+						echo "Ignore and Continue..."
 					fi
 
 				done
@@ -1874,7 +1907,7 @@ for run in ${RUN_NUMBERS} ; do
 		echo -e -n "\n${SPACES_NEEDED} Spaces are Needed "
 		echo "for Meta-Data Changes."
 
-		echo -e "\nToo Bad, Not Yet Implemented... ;-D"
+		echo -e "\n\t-> Too Bad, Not Yet Implemented... ;-D"
 
 	fi
 
@@ -1898,7 +1931,7 @@ for run in ${RUN_NUMBERS} ; do
 	echo -e -n "\nSubstituting New Proposal Meta-Data for [${IPTS_NEW}] "
 	echo "into New Data File:"
 	echo -e "\t[${datafile}]"
-	echo -e "\t-> ${datafile}.NEW-$$"
+	echo -e "\t-> [${datafile}.NEW-$$]"
 
 	echo -e "\nSubstitution Expressions:"
 	echo -e "\t${SUBST_EXPRS}"
