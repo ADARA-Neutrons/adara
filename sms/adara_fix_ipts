@@ -500,7 +500,7 @@ INSTALL_AND_CHECK_DATAFILE()
 		echo -e -n "\nBacking Up ${SMS_WHICH_DATA_FILE} ADARA Output "
 		echo "Stream File for Run ${run}:"
 		echo -e "\t[${_datafile}]"
-		echo -e "\t->[${_datafile}.BACKUP-$$]"
+		echo -e "\t-> [${_datafile}.BACKUP-$$]"
 
 		${CP} -i \
 			"${_rundir}/${_datafile}" "${_rundir}/${_datafile}.BACKUP-$$"
@@ -787,7 +787,7 @@ RESUBMIT_RUN()
 		_subject="${_subject} to ${IPTS_NEW}"
 
 		echo -e "\n${MAILER} -s \\"
-		echo -e "   \"${_subject}\" \\"
+		echo -e "\"${_subject}\" \\"
 		echo -e "\t${NOTIFY_EMAIL_LIST}"
 
 		${MAILER} -s "${_subject}" \
@@ -889,7 +889,7 @@ MANUAL_EDIT()
 	echo -e "\nCopying ${SMS_WHICH_DATA_FILE} ADARA Output Stream File "
 	echo "for Editing Run ${run}:"
 	echo -e "\t[${_datafile}]"
-	echo -e "\t->[${_datafile}.NEW-$$]"
+	echo -e "\t-> [${_datafile}.NEW-$$]"
 
 	${CP} -i "${_rundir}/${_datafile}" "${_rundir}/${_datafile}.NEW-$$"
 	ckcp=$?
