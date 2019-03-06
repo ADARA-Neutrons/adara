@@ -116,6 +116,7 @@ USAGE()
 	echo "    [--first_data_file|--last_data_file] \\"
 	echo "    [--send-paused-data] [--no-send-paused-data] \\"
 	echo "    [--archive_path=<${ARCHIVE_PATH}>] \\"
+	echo "    [--space_marker=<${SPACE_MARKER}>] \\"
 	echo "    [--run=<RunNumber1>] \\"
 	echo "    [--run=<RunNumber2,RunNumber3,...>] \\"
 	echo "    [--run=<RunNumber4-RunNumber5>] \\"
@@ -235,6 +236,9 @@ SMS_WHICH_DATA_FILE="LAST"
 
 SEND_PAUSED_DATA=""
 
+SPACES_NEEDED=0
+SPACE_MARKER="#"
+
 FACILITY=""
 
 INST=""
@@ -305,6 +309,9 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--archive_path#' ]]; then
 		ARCHIVE_PATH="${value%/}"
 		echo -e "\nSetting Archive Path Directory to:\n\t[${ARCHIVE_PATH}]"
+	elif [[ "#$key#" == '#--space_marker#' ]]; then
+		SPACE_MARKER="${value}"
+		echo -e "\nSetting White Space Marker to:\n\t[${SPACE_MARKER}]"
 	elif [[ "#$key#" == '#--run#' ]]; then
 		PARSE_RUN_NUMBERS "${value}"
 	elif [[ "#$key#" == '#--ipts#' ]]; then
@@ -1221,6 +1228,9 @@ UPDATE_PROPOSAL_METADATA()
 	# Starting Point for New Proposal Meta-Data Substitution Line...
 	ipts_new_line="${ipts_old_line}"
 
+	# Flag Whether Actual Value Substitution is Required...
+	do_subst=1
+
 	# If DELETING This Value, Perform Alternate Space-Preserving Substitute
 	if [[ "${_delete_value}" == "DeleteValue" ]]; then
 
@@ -1232,11 +1242,16 @@ UPDATE_PROPOSAL_METADATA()
 
 		ipts_new_line=""
 		for (( i = 0 ; i < ${len_diff} ; ++i )); do
-			ipts_new_line="${ipts_new_line} "
+			# Use a Placeholder for Spaces,
+			# To Be Converted to Real Spaces Later
+			# Or Else Absorbed As Needed...! ;-D
+			ipts_new_line="${ipts_new_line}${SPACE_MARKER}"
 		done
 
 		echo -e "\nModified New ${_meta_name} Line is:"
 		echo -e "\t[${ipts_new_line}]"
+
+		do_subst=0
 
 	# If New Meta-Data is _Shorter_ than Old Meta-Data,
 	# Just Pad with White Space...
@@ -1250,7 +1265,10 @@ UPDATE_PROPOSAL_METADATA()
 		echo "Spaces to Pad."
 
 		for (( i = 0 ; i < ${len_diff} ; ++i )); do
-			_new_value="${_new_value} "
+			# Use a Placeholder for Spaces,
+			# To Be Converted to Real Spaces Later
+			# Or Else Absorbed As Needed...! ;-D
+			_new_value="${_new_value}${SPACE_MARKER}"
 		done
 
 		echo -e "\nResulting New ${_meta_name} is: [${_new_value}]"
@@ -1278,6 +1296,8 @@ UPDATE_PROPOSAL_METADATA()
 				echo "in Old ${_meta_name} Line!"
 				echo -e -n "\n\tNeed ${len_diff} Spaces, "
 				echo "Only Found $i..."
+				SPACES_NEEDED=$(( ${SPACES_NEEDED} + ${len_diff} - ${i} ))
+				echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
 				MANUAL_EDIT "${rundir}" "${datafile}" \
 					"${_xml_tag}" "${_meta_name}" "${_new_value}"
 				if [[ $? != 0 ]]; then
@@ -1298,8 +1318,10 @@ UPDATE_PROPOSAL_METADATA()
 			if [[ ${cksedspc} != 0 ]]; then
 				echo -e -n "\nERROR Stripping White Space "
 				echo "from Proposal Meta-Data Line...!"
-				echo -e -n "\nOnly Stripped Off $i Spaces, "
-				echo "Leaving ${_meta_name} Line Template as:"
+				echo -e -n "\nOnly Stripped Off $i Spaces..."
+				SPACES_NEEDED=$(( ${SPACES_NEEDED} + ${len_diff} - ${i} ))
+				echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
+				echo -e "\nLeaving ${_meta_name} Line Template as:"
 				echo -e "\n\t[${ipts_new_line}]"
 				MANUAL_EDIT "${rundir}" "${datafile}" \
 					"${_xml_tag}" "${_meta_name}" "${_new_value}"
@@ -1331,27 +1353,67 @@ UPDATE_PROPOSAL_METADATA()
 	# in New Proposal Meta-Data Line...
 	#
 
-	ipts_new_line=`echo "${ipts_new_line}" \
-		| ${SED} "s/${update_old_value}/${_new_value}/"`
-	cksedprop=$?
+	if [[ $do_subst == 1 ]]; then
 
-	if [[ ${cksedprop} != 0 ]]; then
-		echo -e "\nERROR Substituting ${_meta_name} in Meta-Data Line...!"
-		MANUAL_EDIT "${rundir}" "${datafile}" \
-			"${_xml_tag}" "${_meta_name}" "${_new_value}"
-		if [[ $? != 0 ]]; then
-			CHECK_PROCEED
-			echo -e "\nContinuing with Next Run Number..."
-			return 37
+		echo -e "\nReplacing Preceding White Space with Markers in Line:"
+		echo -e "\tNew Line: [${ipts_new_line}]"
+			# Allow Self-Indenting from XML Line(s)
+
+		# Note: Funky Sed Incantation Courtesy of SiegeX on StackOverflow!
+		# 1. Mark Label "a"
+		# 2. Replace the Last Space After the Preceding White Space
+		#    Regex Sub-Expression with the "Space Marker"
+		# 3. If Successful, Keep Branching Back to Label "a"...
+		white_sub_new_line=`echo "${ipts_new_line}" \
+			| ${SED} \
+				":a;s/^\([[:space:]]*\)[[:space:]]/\1${SPACE_MARKER}/;ta"`
+		cksedwhite=$?
+
+		if [[ ${cksedwhite} != 0 ]]; then
+			echo -e -n "\nWarning: Unable to Substitute "
+			echo "Preceding White Space for Marker Character..."
+			echo "in Meta-Data Line...!"
+			echo -e "\nNot Required, Proceeding Anyway."
 		else
-			return 0
+			# "It Worked", So Use the Result... ;-D
+			ipts_new_line="${white_sub_new_line}"
+			echo -e "->\tNew Line: [${ipts_new_line}]"
+				# Allow Self-Indenting from XML Line(s)
 		fi
+
+		echo -e "\nSubstituting Old Value for New Value in Line:"
+		echo -e "\tNew Line: [${ipts_new_line}]"
+			# Allow Self-Indenting from XML Line(s)
+		echo -e "\t   Old Value: [${update_old_value}]"
+		echo -e "\t-> New Value: [${_new_value}]"
+
+		ipts_new_line=`echo "${ipts_new_line}" \
+			| ${SED} "s/${update_old_value}/${_new_value}/"`
+		cksedvalue=$?
+
+		if [[ ${cksedvalue} != 0 ]]; then
+			echo -e -n "\nERROR Substituting ${_meta_name} "
+			echo "in Meta-Data Line...!"
+			MANUAL_EDIT "${rundir}" "${datafile}" \
+				"${_xml_tag}" "${_meta_name}" "${_new_value}"
+			if [[ $? != 0 ]]; then
+				CHECK_PROCEED
+				echo -e "\nContinuing with Next Run Number..."
+				return 37
+			else
+				return 0
+			fi
+		fi
+
+		echo -e "->\tNew Line: [${ipts_new_line}]"
+			# Allow Self-Indenting from XML Line(s)
+
 	fi
 
 	echo -e "\nFinal ${_meta_name} Line Substitution:"
-	echo -e "\told: [${ipts_old_line}]"
+	echo -e "\tOld Line: [${ipts_old_line}]"
 		# Allow Self-Indenting from XML Line(s)
-	echo -e "\tnew: [${ipts_new_line}]"
+	echo -e "\tNew Line: [${ipts_new_line}]"
 		# Allow Self-Indenting from XML Line(s)
 
 	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
@@ -1525,6 +1587,9 @@ for run in ${RUN_NUMBERS} ; do
 	ckupdate=$?
 
 	if [[ ${ckupdate} != 0 ]]; then
+		echo -e "\nERROR: Unable to Update Proposal Id...!"
+		echo -e "\nCannot Continue with This Run Number."
+		echo -e "\nContinuing with Next Run Number..."
 		continue
 	fi
 
@@ -1798,6 +1863,31 @@ for run in ${RUN_NUMBERS} ; do
 		fi
 
 	fi
+
+	#
+	# Handle Any Excess or Insufficient White Space in Meta-Data...
+	# - Start with the "Easy Ones" Already in the Substitution Strings
+	#
+
+	if [[ ${SPACES_NEEDED} -gt 0 ]]; then
+
+		echo -e -n "\n${SPACES_NEEDED} Spaces are Needed "
+		echo "for Meta-Data Changes."
+
+		echo -e "\nToo Bad, Not Yet Implemented... ;-D"
+
+	fi
+
+	#
+	# Convert Any Remaining "White Space Markers" Back to Actual Spaces...
+	#
+
+	echo -e "\nConvert Any Remaining White Space Markers Back to Spaces:"
+	echo -e "\n   [${SUBST_EXPRS}]"
+
+	SUBST_EXPRS=`echo "${SUBST_EXPRS}" | ${SED} "s@${SPACE_MARKER}@ @g"`
+
+	echo -e "\n-> [${SUBST_EXPRS}]"
 
 	#
 	# Actually Make the Data File Substitution(s)...! ;-D
