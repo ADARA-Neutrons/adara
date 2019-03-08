@@ -1426,7 +1426,8 @@ NxGen::processRunInfo
 
             std::string user_name = u->name;
 
-            if ( !u->name.compare( "XXX_UNRESOLVED_NAME_XXX" )
+            if ( ( !u->name.compare( "XXX_UNRESOLVED_NAME_XXX" )
+                        || u->name.empty() )
                     && !u->id.empty()
                     && u->id.compare( "XXX_UNRESOLVED_UID_XXX" ) )
             {
