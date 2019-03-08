@@ -1317,8 +1317,6 @@ UPDATE_PROPOSAL_METADATA()
 				echo "in Old ${_meta_name} Line!"
 				echo -e -n "\n\tNeed ${_len_diff} Spaces, "
 				echo "Only Found $i..."
-				SPACES_NEEDED=$(( ${SPACES_NEEDED} + ${_len_diff} - ${i} ))
-				echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
 				if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
 					CHECK_PROCEED \
 					"Do You Want to Proceed with Auto-Substitution Anyway"
@@ -1326,6 +1324,9 @@ UPDATE_PROPOSAL_METADATA()
 					if [[ ${_ckanyway} == 0 ]]; then
 						echo -e -n "\nProceeding with Over-Length "
 						echo "Auto-Substitution..."
+						SPACES_NEEDED=$(( ${SPACES_NEEDED} \
+							+ ${_len_diff} - ${i} ))
+						echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
 						break
 					else
 						MANUAL_EDIT "${rundir}" "${datafile}" \
@@ -1338,12 +1339,17 @@ UPDATE_PROPOSAL_METADATA()
 							echo -e "\n\t[${_new_value}]"
 							return 35
 						else
+							# Assume Manual Editing Worked...
+							# Leave SPACES_NEEDED unchanged.
 							return 0
 						fi
 					fi
 				else
 					echo -e -n "\nAuto-Proceeding with Over-Length "
 					echo "Auto-Substitution..."
+					SPACES_NEEDED=$(( ${SPACES_NEEDED} \
+						+ ${_len_diff} - ${i} ))
+					echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
 					break
 				fi
 			fi
@@ -1358,8 +1364,6 @@ UPDATE_PROPOSAL_METADATA()
 				echo -e -n "\nERROR Stripping White Space "
 				echo "from Proposal Meta-Data Line...!"
 				echo -e "\nOnly Stripped Off $i Spaces..."
-				SPACES_NEEDED=$(( ${SPACES_NEEDED} + ${_len_diff} - ${i} ))
-				echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
 				echo -e "\nLeaving ${_meta_name} Line Template as:"
 				echo -e "\n\t[${_ipts_new_line}]"
 				if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
@@ -1369,6 +1373,9 @@ UPDATE_PROPOSAL_METADATA()
 					if [[ ${_ckanyway} == 0 ]]; then
 						echo -e -n "\nProceeding with Over-Length "
 						echo "Auto-Substitution..."
+						SPACES_NEEDED=$(( ${SPACES_NEEDED} \
+							+ ${_len_diff} - ${i} ))
+						echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
 						break
 					else
 						MANUAL_EDIT "${rundir}" "${datafile}" \
@@ -1381,12 +1388,17 @@ UPDATE_PROPOSAL_METADATA()
 							echo -e "\n\t[${_new_value}]"
 							return 36
 						else
+							# Assume Manual Editing Worked...
+							# Leave SPACES_NEEDED unchanged.
 							return 0
 						fi
 					fi
 				else
 					echo -e -n "\nAuto-Proceeding with Over-Length "
 					echo "Auto-Substitution..."
+					SPACES_NEEDED=$(( ${SPACES_NEEDED} \
+						+ ${_len_diff} - ${i} ))
+					echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
 					break
 				fi
 			fi
@@ -2342,6 +2354,9 @@ for run in ${RUN_NUMBERS} ; do
 			echo "for Run ${run}..."
 			echo -e "\nContinuing with Next Run Number..."
 			continue
+		else
+			# Assume Manual Editing Worked...
+			SPACES_NEEDED=0
 		fi
 	fi
 
