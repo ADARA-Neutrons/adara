@@ -1153,22 +1153,23 @@ UPDATE_PROPOSAL_METADATA()
 		echo -e "\t\t=> [DELETE VALUE!!!]"
 	fi
 
+	ipts_old_line_wnum=""
 	update_old_value=""
 
 	LOOKUP_PROPOSAL_METADATA \
 		"${_xml_tag}" "${_meta_name}" "${_new_value}" \
 		"ipts_old_line_wnum" "update_old_value"
-	cklookup=$?
+	local _cklookup=$?
 
 	# Pass-Thru Return...
-	if [[ ${cklookup} == 255 ]]; then
+	if [[ ${_cklookup} == 255 ]]; then
 		return 0
 	# Error Return...
-	elif [[ ${cklookup} != 0 ]]; then
+	elif [[ ${_cklookup} != 0 ]]; then
 		echo -e "\nUnable to Update ${_meta_name} Meta-Data Value"
 		echo "(<${_xml_tag}>) for Run ${run}..."
 		echo -e "\n\t[${_new_value}]"
-		return ${cklookup}
+		return ${_cklookup}
 	fi
 
 	#
@@ -1183,11 +1184,11 @@ UPDATE_PROPOSAL_METADATA()
 	# Separate Old Meta-Data Line into Line Number and Content...
 	#
 
-	ipts_old_line_num=`echo "${ipts_old_line_wnum}" \
+	local _ipts_old_line_num=`echo "${ipts_old_line_wnum}" \
 		| ${AWK} -F ":" '{print $1}'`
-	ckawkoldlinenum=$?
+	local _ckawkoldlinenum=$?
 
-	if [[ ${ckawkoldlinenum} != 0 ]]; then
+	if [[ ${_ckawkoldlinenum} != 0 ]]; then
 		echo -e -n "\nERROR Extracting Line Number from "
 		echo "${_meta_name} Meta-Data Line...!"
 		MANUAL_EDIT "${rundir}" "${datafile}" \
@@ -1203,11 +1204,11 @@ UPDATE_PROPOSAL_METADATA()
 		fi
 	fi
 
-	ipts_old_line=`echo "${ipts_old_line_wnum}" \
+	local _ipts_old_line=`echo "${ipts_old_line_wnum}" \
 		| ${AWK} -F ":" '{print $2}'`
-	ckawkoldline=$?
+	local _ckawkoldline=$?
 
-	if [[ ${ckawkoldline} != 0 ]]; then
+	if [[ ${_ckawkoldline} != 0 ]]; then
 		echo -e -n "\nERROR Extracting Content from "
 		echo "${_meta_name} Meta-Data Line...!"
 		MANUAL_EDIT "${rundir}" "${datafile}" \
@@ -1227,8 +1228,8 @@ UPDATE_PROPOSAL_METADATA()
 	echo "from ${_meta_name} Meta-Data Line:"
 	echo -e "\n${ipts_old_line_wnum}\n"
 		# Allow Self-Indenting from XML Line(s)
-	echo -e "\t-> Line #${ipts_old_line_num}"
-	echo -e "\t-> [${ipts_old_line}]"
+	echo -e "\t-> Line #${_ipts_old_line_num}"
+	echo -e "\t-> [${_ipts_old_line}]"
 		# Allow Self-Indenting from XML Line(s)
 
 	#
@@ -1239,47 +1240,49 @@ UPDATE_PROPOSAL_METADATA()
 	#
 
 	# Starting Point for New Proposal Meta-Data Substitution Line...
-	ipts_new_line="${ipts_old_line}"
+	local _ipts_new_line="${_ipts_old_line}"
 
 	# Flag Whether Actual Value Substitution is Required...
-	do_subst=1
+	local _do_subst=1
+
+	local _len_diff=""
 
 	# If DELETING This Value, Perform Alternate Space-Preserving Substitute
 	if [[ "${_delete_value}" == "DeleteValue" ]]; then
 
-		len_diff=$(( ${#ipts_new_line} ))
+		_len_diff=$(( ${#_ipts_new_line} ))
 
 		echo -e "\nDeleting This Old ${_meta_name} Meta-Data Value:"
 		echo -e "\n\t[${update_old_value}]"
-		echo -e "\n\t-> ${len_diff} Spaces to Post-Pad."
+		echo -e "\n\t-> ${_len_diff} Spaces to Post-Pad."
 
-		ipts_new_line=""
-		for (( i = 0 ; i < ${len_diff} ; ++i )); do
+		_ipts_new_line=""
+		for (( i = 0 ; i < ${_len_diff} ; ++i )); do
 			# Use a Placeholder for Spaces,
 			# To Be Converted to Real Spaces Later
 			# Or Else Absorbed As Needed...! ;-D
-			ipts_new_line="${ipts_new_line}${SPACE_MARKER}"
+			_ipts_new_line="${_ipts_new_line}${SPACE_MARKER}"
 		done
 
 		echo -e "\nModified New ${_meta_name} Line is:"
-		echo -e "\n\t[${ipts_new_line}]"
+		echo -e "\n\t[${_ipts_new_line}]"
 
-		do_subst=0
+		_do_subst=0
 
 	# If New Meta-Data is _Shorter_ than Old Meta-Data,
 	# Just Pad with White Space...
 	elif [[ ${#_new_value} -lt ${#update_old_value} ]]; then
 
-		len_diff=$(( ${#update_old_value} - ${#_new_value} ))
+		_len_diff=$(( ${#update_old_value} - ${#_new_value} ))
 
 		echo -e "\nNew ${_meta_name} Meta-Data Value:"
 		echo -e "\n\t[${_new_value}]"
 		echo -e "\nis _Shorter_ than Old ${_meta_name} Meta-Data Value:"
 		echo -e "\n\t[${update_old_value}]"
 		echo -e -n "\n\t-> ${#update_old_value} - ${#_new_value} = "
-		echo "${len_diff} Spaces to Pad."
+		echo "${_len_diff} Spaces to Pad."
 
-		for (( i = 0 ; i < ${len_diff} ; ++i )); do
+		for (( i = 0 ; i < ${_len_diff} ; ++i )); do
 			# Use a Placeholder for Spaces,
 			# To Be Converted to Real Spaces Later
 			# Or Else Absorbed As Needed...! ;-D
@@ -1293,45 +1296,60 @@ UPDATE_PROPOSAL_METADATA()
 	# Try to Remove Sufficient White Space...
 	elif [[ ${#_new_value} -gt ${#update_old_value} ]]; then
 
-		len_diff=$(( ${#_new_value} - ${#update_old_value} ))
+		_len_diff=$(( ${#_new_value} - ${#update_old_value} ))
 
 		echo -e "\nNew ${_meta_name} Meta-Data Value:"
 		echo -e "\n\t[${_new_value}]"
 		echo -e "\nis _Longer_ than Old ${_meta_name} Meta-Data Value:"
 		echo -e "\n\t[${update_old_value}]"
 		echo -e -n "\n\t-> ${#_new_value} - ${#update_old_value} = "
-		echo "${len_diff} Spaces to Remove from Line!"
+		echo "${_len_diff} Spaces to Remove from Line!"
 
 		# Try to Remove Sufficient Spaces from Old Proposal Meta-Data Line
 
-		for (( i = 0 ; i < ${len_diff} ; ++i )); do
+		for (( i = 0 ; i < ${_len_diff} ; ++i )); do
 
 			# *Only* Steal Spaces from _Before_ This Current Tag!
 			# I.e. Not from Subsequent Data Content, e.g. Proposal Title...
-			ckspc=`echo "${ipts_new_line}" | ${GREP} -c " <${_xml_tag}>"`
+			ckspc=`echo "${_ipts_new_line}" | ${GREP} -c " <${_xml_tag}>"`
 			if [[ "${ckspc}" != "1" ]]; then   # Not 1 Line Found...
-				echo -e -n "\nERROR: Insufficient White Space to Remove "
+				echo -e -n "\nWarning: Insufficient White Space to Remove "
 				echo "in Old ${_meta_name} Line!"
-				echo -e -n "\n\tNeed ${len_diff} Spaces, "
+				echo -e -n "\n\tNeed ${_len_diff} Spaces, "
 				echo "Only Found $i..."
-				SPACES_NEEDED=$(( ${SPACES_NEEDED} + ${len_diff} - ${i} ))
+				SPACES_NEEDED=$(( ${SPACES_NEEDED} + ${_len_diff} - ${i} ))
 				echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
-				MANUAL_EDIT "${rundir}" "${datafile}" \
-					"${_xml_tag}" "${_meta_name}" "${_new_value}"
-				if [[ $? != 0 ]]; then
-					CHECK_PROCEED
-					echo -e -n "\nUnable to Update ${_meta_name} "
-					echo "Meta-Data Value"
-					echo "(<${_xml_tag}>) for Run ${run}..."
-					echo -e "\n\t[${_new_value}]"
-					return 35
+				if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+					CHECK_PROCEED \
+					"Do You Want to Proceed with Auto-Substitution Anyway"
+					local _ckanyway=$?
+					if [[ ${_ckanyway} == 0 ]]; then
+						echo -e -n "\nProceeding with Over-Length "
+						echo "Auto-Substitution..."
+						break
+					else
+						MANUAL_EDIT "${rundir}" "${datafile}" \
+							"${_xml_tag}" "${_meta_name}" "${_new_value}"
+						if [[ $? != 0 ]]; then
+							CHECK_PROCEED
+							echo -e -n "\nUnable to Update ${_meta_name} "
+							echo "Meta-Data Value"
+							echo "(<${_xml_tag}>) for Run ${run}..."
+							echo -e "\n\t[${_new_value}]"
+							return 35
+						else
+							return 0
+						fi
+					fi
 				else
-					return 0
+					echo -e -n "\nAuto-Proceeding with Over-Length "
+					echo "Auto-Substitution..."
+					break
 				fi
 			fi
 
 			# Take Any Space We Can Get (_Before_ This Tag)...! ;-D
-			ipts_new_line=`echo "${ipts_new_line}" \
+			_ipts_new_line=`echo "${_ipts_new_line}" \
 				| ${SED} "s@ <${_xml_tag}>@<${_xml_tag}>@"`
 					# Note: XML Tag Could Contain "/" for Embedded Tag!
 			cksedspc=$?
@@ -1339,29 +1357,44 @@ UPDATE_PROPOSAL_METADATA()
 			if [[ ${cksedspc} != 0 ]]; then
 				echo -e -n "\nERROR Stripping White Space "
 				echo "from Proposal Meta-Data Line...!"
-				echo -e -n "\nOnly Stripped Off $i Spaces..."
-				SPACES_NEEDED=$(( ${SPACES_NEEDED} + ${len_diff} - ${i} ))
+				echo -e "\nOnly Stripped Off $i Spaces..."
+				SPACES_NEEDED=$(( ${SPACES_NEEDED} + ${_len_diff} - ${i} ))
 				echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
 				echo -e "\nLeaving ${_meta_name} Line Template as:"
-				echo -e "\n\t[${ipts_new_line}]"
-				MANUAL_EDIT "${rundir}" "${datafile}" \
-					"${_xml_tag}" "${_meta_name}" "${_new_value}"
-				if [[ $? != 0 ]]; then
-					CHECK_PROCEED
-					echo -e -n "\nUnable to Update ${_meta_name} "
-					echo "Meta-Data Value"
-					echo "(<${_xml_tag}>) for Run ${run}..."
-					echo -e "\n\t[${_new_value}]"
-					return 36
+				echo -e "\n\t[${_ipts_new_line}]"
+				if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+					CHECK_PROCEED \
+					"Do You Want to Proceed with Auto-Substitution Anyway"
+					local _ckanyway=$?
+					if [[ ${_ckanyway} == 0 ]]; then
+						echo -e -n "\nProceeding with Over-Length "
+						echo "Auto-Substitution..."
+						break
+					else
+						MANUAL_EDIT "${rundir}" "${datafile}" \
+							"${_xml_tag}" "${_meta_name}" "${_new_value}"
+						if [[ $? != 0 ]]; then
+							CHECK_PROCEED
+							echo -e -n "\nUnable to Update ${_meta_name} "
+							echo "Meta-Data Value"
+							echo "(<${_xml_tag}>) for Run ${run}..."
+							echo -e "\n\t[${_new_value}]"
+							return 36
+						else
+							return 0
+						fi
+					fi
 				else
-					return 0
+					echo -e -n "\nAuto-Proceeding with Over-Length "
+					echo "Auto-Substitution..."
+					break
 				fi
 			fi
 
 		done
 
 		echo -e "\nResulting New/Old ${_meta_name} Line Template is:"
-		echo -e "\n\t[${ipts_new_line}]"
+		echo -e "\n\t[${_ipts_new_line}]"
 
 	# New Meta-Data is _Same_ Length as Old Meta-Data, Yay! ;-D
 	else
@@ -1379,18 +1412,20 @@ UPDATE_PROPOSAL_METADATA()
 	# in New Proposal Meta-Data Line...
 	#
 
-	if [[ $do_subst == 1 ]]; then
+	if [[ ${_do_subst} == 1 ]]; then
 
 		echo -e "\nReplacing Preceding White Space with Markers in Line:"
-		echo -e "\tNew Line: [${ipts_new_line}]"
+		echo -e "\tNew Line: [${_ipts_new_line}]"
 			# Allow Self-Indenting from XML Line(s)
 
 		# Note: Funky Sed Incantation Courtesy of SiegeX on StackOverflow!
+		# From https://stackoverflow.com/questions/9222281/
+		#    replace-leading-whitespace-with-sed-or-similar
 		# 1. Mark Label "a"
 		# 2. Replace the Last Space After the Preceding White Space
 		#    Regex Sub-Expression with the "Space Marker"
 		# 3. If Successful, Keep Branching Back to Label "a"...
-		white_sub_new_line=`echo "${ipts_new_line}" \
+		white_sub_new_line=`echo "${_ipts_new_line}" \
 			| ${SED} \
 				":a;s/^\([[:space:]]*\)[[:space:]]/\1${SPACE_MARKER}/;ta"`
 		cksedwhite=$?
@@ -1402,18 +1437,18 @@ UPDATE_PROPOSAL_METADATA()
 			echo -e "\nNot Required, Proceeding Anyway."
 		else
 			# "It Worked", So Use the Result... ;-D
-			ipts_new_line="${white_sub_new_line}"
-			echo -e "->\tNew Line: [${ipts_new_line}]"
+			_ipts_new_line="${white_sub_new_line}"
+			echo -e "->\tNew Line: [${_ipts_new_line}]"
 				# Allow Self-Indenting from XML Line(s)
 		fi
 
 		echo -e "\nSubstituting Old Value for New Value in Line:"
-		echo -e "\tNew Line: [${ipts_new_line}]"
+		echo -e "\tNew Line: [${_ipts_new_line}]"
 			# Allow Self-Indenting from XML Line(s)
 		echo -e "\t   Old Value: [${update_old_value}]"
 		echo -e "\t-> New Value: [${_new_value}]"
 
-		ipts_new_line=`echo "${ipts_new_line}" \
+		_ipts_new_line=`echo "${_ipts_new_line}" \
 			| ${SED} "s/${update_old_value}/${_new_value}/"`
 		cksedvalue=$?
 
@@ -1434,15 +1469,15 @@ UPDATE_PROPOSAL_METADATA()
 			fi
 		fi
 
-		echo -e "->\tNew Line: [${ipts_new_line}]"
+		echo -e "->\tNew Line: [${_ipts_new_line}]"
 			# Allow Self-Indenting from XML Line(s)
 
 	fi
 
 	echo -e "\nFinal ${_meta_name} Line Substitution:"
-	echo -e "\tOld Line: [${ipts_old_line}]"
+	echo -e "\tOld Line: [${_ipts_old_line}]"
 		# Allow Self-Indenting from XML Line(s)
-	echo -e "\tNew Line: [${ipts_new_line}]"
+	echo -e "\tNew Line: [${_ipts_new_line}]"
 		# Allow Self-Indenting from XML Line(s)
 
 	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
@@ -1454,7 +1489,7 @@ UPDATE_PROPOSAL_METADATA()
 	# (Using Specific Line Number from Selected Old Meta-Data Line!)
 	#
 
-	subst="${ipts_old_line_num}s@${ipts_old_line}@${ipts_new_line}@"
+	subst="${_ipts_old_line_num}s@${_ipts_old_line}@${_ipts_new_line}@"
 
 	SUBST_EXPRS="$SUBST_EXPRS -e \"${subst}\""
 
@@ -1907,7 +1942,71 @@ for run in ${RUN_NUMBERS} ; do
 		echo -e -n "\n${SPACES_NEEDED} Spaces are Needed "
 		echo "for Meta-Data Changes."
 
-		echo -e "\n\t-> Too Bad, Not Yet Implemented... ;-D"
+		spaces_avail=`echo "${SUBST_EXPRS}" \
+			| ${GREP} -o "${SPACE_MARKER}" | wc | awk '{print $1}'`
+
+		num_spaces=0
+
+		if [[ ${SPACES_NEEDED} -gt ${spaces_avail} ]]; then
+			echo -e -n "\nWarning: Insufficient White Space Available "
+			echo "in Substitution Strings...!"
+			echo -e -n "\nNeed ${SPACES_NEEDED} Spaces, "
+			echo "But Only Have ${spaces_avail} Spaces Available."
+			num_spaces="${spaces_avail}"
+		else
+			echo -e -n "\nTrying to Absorb ${SPACES_NEEDED} Spaces "
+			echo "from the ${spaces_avail} Spaces Available."
+			num_spaces="${SPACES_NEEDED}"
+		fi
+
+		# Try to Remove Sufficient Spaces from Substitution Strings
+
+		echo
+
+		for (( i = 0 ; i < ${num_spaces} ; ++i )); do
+
+			# Make Sure There are Still Some Spaces Left...
+			ckspc=`echo "${SUBST_EXPRS}" \
+				| ${GREP} -o "${SPACE_MARKER}" | wc | awk '{print $1}'`
+			if [[ ${ckspc} -lt 1 ]]; then   # No Space Markers Found...
+				if [[ ${i} -gt 0 ]]; then echo ; fi
+				echo -e -n "\nERROR: Insufficient White Space Markers "
+				echo "to Absorb in Substitution Strings!"
+				echo -e -n "\n\tExpected ${num_spaces} Markers "
+				echo "But Only Found $i..."
+				break
+			fi
+
+			# Take Any Space We Can Get (_Before_ This Tag)...! ;-D
+			SUBST_EXPRS=`echo "${SUBST_EXPRS}" \
+				| ${SED} "s@${SPACE_MARKER}@@"`
+			cksedmrk=$?
+
+			if [[ ${cksedmrk} != 0 ]]; then
+				if [[ ${i} -gt 0 ]]; then echo ; fi
+				echo -e -n "\nERROR Abosrbing White Space Markers "
+				echo "from Substitution Strings!"
+				echo -e "\nOnly Absorbed $i Markers..."
+				SPACES_NEEDED=$(( ${SPACES_NEEDED} - ${i} ))
+				echo -e "\nSPACES_NEEDED Remaining -> [${SPACES_NEEDED}]"
+				break
+			fi
+
+			echo -n "${SPACE_MARKER}"
+
+		done
+
+		if [[ ${i} -gt 0 ]]; then echo ; fi
+		echo -e -n "\nAbsorbed ${i} of ${num_spaces} White Space Markers "
+		echo "from Substitution Strings."
+		SPACES_NEEDED=$(( ${SPACES_NEEDED} - ${i} ))
+		echo -e "\nSPACES_NEEDED Remaining -> [${SPACES_NEEDED}]"
+		echo -e "\nResulting Substitution Strings are:"
+		echo -e "\n\t[${SUBST_EXPRS}]"
+
+		if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+			CHECK_PROCEED
+		fi
 
 	fi
 
@@ -1950,6 +2049,29 @@ for run in ${RUN_NUMBERS} ; do
 			echo -e "\nContinuing with Next Run Number..."
 		fi
 		continue
+	fi
+
+	#
+	# Now That We're Done Substituting,
+	# See If We Still Need to Absorb Yet More White Space... ;-o
+	#
+
+	if [[ ${SPACES_NEEDED} -gt 0 ]]; then
+
+		echo -e -n "\n${SPACES_NEEDED} Spaces are *Still* Needed "
+		echo "for Meta-Data Changes."
+
+		# Nested Manual Edit of Newly Substituted Data File...! ;-D
+		MANUAL_EDIT "${rundir}" "${datafile}.NEW-$$" \
+			"run_number" "White Space Absorption" \
+			"SPACES_NEEDED=${SPACES_NEEDED}"
+		if [[ $? != 0 ]]; then
+			CHECK_PROCEED
+			echo -e -n "\nUnable to Absorb Additional White Space "
+			echo "for Run ${run}..."
+			echo -e "\nContinuing with Next Run Number..."
+			continue
+		fi
 	fi
 
 	# Install and Check Modified Data File...
