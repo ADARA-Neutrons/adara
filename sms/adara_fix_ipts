@@ -23,6 +23,10 @@
 #    --sts_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
 #    --archive_path=/TESTING --run=98446-98448 --ipts=IPTS-21608
 #
+# ./sms/adara_fix_ipts --inst=ARCS --facility=SNS --sts_host=localhost \
+#    --sts_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --archive_path=/TESTING --run=125356-125363 --ipts=IPTS-20849
+
 # With "Fix IPTS" Test Data in:
 #
 #    /SNS/users/y8y/20170830/20170830-013325.796536119-run-38523/
@@ -40,6 +44,16 @@
 #    /SNS/users/y8y/20180920/20180920-154457.198797185-run-98447/
 #    /SNS/users/y8y/20180920/20180920-154729.955497035-run-98448/
 #    (/SNS/users/y8y/20180920/cleanup)
+#
+#    /SNS/users/y8y/20190311/20190311-000350.433146816-run-125356/
+#    /SNS/users/y8y/20190311/20190311-032720.588704159-run-125357/
+#    /SNS/users/y8y/20190311/20190311-061229.415149226-run-125358/
+#    /SNS/users/y8y/20190311/20190311-070418.791527987-run-125359/
+#    /SNS/users/y8y/20190311/20190311-090706.409446369-run-125360/
+#    /SNS/users/y8y/20190311/20190311-094042.223450763-run-125361/
+#    /SNS/users/y8y/20190311/20190311-112034.429064109-run-125362/
+#    /SNS/users/y8y/20190311/20190311-114014.684490977-run-125363/
+#    (/SNS/users/y8y/20190311/cleanup)
 #
 
 #
@@ -1023,7 +1037,7 @@ LOOKUP_PROPOSAL_METADATA()
 		| ${GREP} --text "<${_xml_tag}>"`
 	ckoldiptsline=$?
 
-	if [[ ${ckoldiptsline} != 0 ]]; then
+	if [[ ${ckoldiptsline} != 0 || -z "${_old_line_wnum}" ]]; then
 		echo -e -n "\nERROR Extracting Old ${_meta_name} Line "
 		echo "from Stream File for Run ${run}!"
 		echo -e "\n\t[${_old_line_wnum}]"
@@ -1517,8 +1531,15 @@ ABSORB_WHITE_SPACE()
 	echo -e -n "\nABSORB_WHITE_SPACE(): ${SPACES_NEEDED} Spaces "
 	echo "Still Needed for Meta-Data Changes."
 
-	# Potential XML Tag Targets for Extra White Space Absorption...
-	local _xml_tags="user /user users /users"
+	# List Potential XML Tag Targets for Extra White Space Absorption...
+
+	local _xml_tags="user /user users"
+
+	# Add Closing "</users>" Tag _Only_ If We Didn't Already Utilize It!
+	if [[ $ADDED_USERS == 0 ]]; then
+		_xml_tags="${_xml_tags} /users"
+	fi
+
 	_xml_tags="${_xml_tags} facility_name instrument_name run_number"
 	_xml_tags="${_xml_tags} no_sample_info/ name role"
 
@@ -2022,6 +2043,8 @@ for run in ${RUN_NUMBERS} ; do
 		# Substitute Proposal Members (Users)...
 		#
 
+		ADDED_USERS=0
+
 		if [[ -n "${USERS_NEW}" ]]; then
 
 			# Extract New User List...
@@ -2153,8 +2176,10 @@ for run in ${RUN_NUMBERS} ; do
 						echo -e -n "\nWARNING: Unable to Substitute "
 						echo "New Proposal User [${new_user}]"
 						echo "for Any Old Users - List Depleted...!"
-						echo -e "\nGiving Up on Remaining New User List:"
-						echo -e "\n\t[${new_user_list}]"
+						echo -e "\nRemaining New User List:"
+						echo -e -n "\n\t["
+						echo ${new_user_list}"]"
+							# Collapse Extraneous White Space
 						echo -e -n "\nOptional Update, "
 						echo "Ignore and Continue..."
 
@@ -2165,7 +2190,168 @@ for run in ${RUN_NUMBERS} ; do
 				done
 
 				#
-				# Now Clear Out Any Unnecessary Old User Slots...
+				# Are There Still Any New Users Left to Add...?
+				#
+
+				echo -e "\nRemaining New Users Yet-to-Be-Added List:"
+				echo -e -n "\n\t["
+				echo ${new_user_list}"]" # Collapse Extraneous White Space
+
+				first=1
+
+				for new_user in ${new_user_list} ; do
+
+					# Do Closing Users Tag Initialization Here...
+					# (Easier to do Inside Loop, Just Break on Error... :-)
+					if [[ ${first} == 1 ]]; then
+
+						echo -e -n "\nStill Some Remaining "
+						echo "New Users to Add...!"
+
+						# Find the Closing "</users>" Tag Line
+
+						echo -e -n "\nLocate Closing Users (</users>) "
+						echo "Tag Line..."
+
+						closing_users_line_wnum=""
+
+						LOOKUP_PROPOSAL_METADATA \
+							"/users" "Closing Users Tag" \
+							"NO-MANUAL-EDIT" \
+							"closing_users_line_wnum" ""
+						cklookupusers=$?
+
+						# Something Happened During Lookup...
+						if [[ ${cklookupusers} != 0 ]]; then
+							echo -e -n "\nERROR: Unable to Lookup "
+							echo -n " Closing Users (</users>) Tag Line "
+							echo "for Adding New Users...!"
+							echo -e -n "\nOptional Update, "
+							echo "Ignore and Continue..."
+							break
+						fi
+
+						echo -e "\nGot Closing Users </users> Tag Line:"
+						echo -e "\n\t[${closing_users_line_wnum}]"
+
+						# Separate Old Closing Users Tag Line into
+						# Line Number and Content
+
+						culine_num=`echo "${closing_users_line_wnum}" \
+							| ${AWK} -F ":" '{print $1}'`
+						ckawkculinenum=$?
+
+						if [[ ${ckawkculinenum} != 0 ]]; then
+							echo -e -n "\nERROR Extracting Line Number "
+							echo -n "from Closing Users (</users>) "
+							echo "Tag Line...!"
+							echo -e -n "\nOptional Update, "
+							echo "Ignore and Continue..."
+							break
+						fi
+
+						culine=`echo "${closing_users_line_wnum}" \
+							| ${AWK} -F ":" '{print $2}'`
+						ckawkculine=$?
+
+						if [[ ${ckawkculine} != 0 ]]; then
+							echo -e -n "\nERROR Extracting Content "
+							echo -n "from Closing Users (</users>) "
+							echo "Tag Line...!"
+							echo -e -n "\nOptional Update, "
+							echo "Ignore and Continue..."
+							break
+						fi
+
+						echo -e -n "\nExtracted Line Number and Content "
+						echo "from Closing Users (</users>) Tag Line:"
+						echo -e "\n${closing_users_line_wnum}\n"
+							# Allow Self-Indenting from XML Line(s)
+						echo -e "\t-> Line #${culine_num}"
+						echo -e "\t-> [${culine}]"
+							# Allow Self-Indenting from XML Line(s)
+
+						# Starting Point for Closing Users (</users>) Tag
+						# Substitution Line...
+						new_culine="${culine}"
+
+						# Just Replace Any/All White Space with Marker...
+						# (Will Probably All Be Preceding White Space...)
+						new_culine=`echo "${new_culine}" \
+							| ${SED} "s@ @${SPACE_MARKER}@g"`
+						cksedwhite=$?
+
+						if [[ ${cksedwhite} != 0 ]]; then
+							echo -e -n "\nWarning: Unable to Substitute "
+							echo "White Space for Marker Character"
+							echo "in Closing Users (</users>) Tag Line...!"
+							echo -e -n "\nOptional Update, "
+							echo "Ignore and Continue..."
+							break
+						fi
+
+						echo -e -n "\nClosing Users (</users>) Tag "
+						echo "Line Substitution:"
+						echo -e "\tOld Line: [${culine}]"
+							# Allow Self-Indenting from XML Line(s)
+						echo -e "\tNew Line: [${new_culine}]"
+							# Allow Self-Indenting from XML Line(s)
+
+						if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+							CHECK_PROCEED
+						fi
+
+						#
+						# Append Substitution to List
+						# (Using Specific Line Number
+						#    from Selected Old Meta-Data Line!)
+						#
+
+						subst="${culine_num}s@${culine}@${new_culine}@"
+
+						SUBST_EXPRS="$SUBST_EXPRS -e \"${subst}\""
+
+						# Set Flag to Skip Closing Users "</users>" Tag
+						# When Absorbing White Space...
+						# (We'll Catch The White Space Markers Anyway...)
+						ADDED_USERS=1
+
+						# Done with Closing Users Tag Initialization...
+						first=0
+
+					fi
+
+					echo -e "\nAdding New User Declaration Tags for:"
+					echo -e "\n\t[${new_user}]"
+
+					# Construct Minimalist New User Declaration Tags
+					# - Let Implicit (Empty) "XXX_UNRESOLVED_NAME_XXX"
+					# User Name Resolve... (i.e. No "<name>" Tags...)
+					# (Role/"XXX_UNRESOLVED_ROLE_XXX" is Deprecated.)
+
+					new_decl="<user><id>${new_user}</id></user>"
+
+					echo -e "\n\t[${new_decl}]"
+
+					if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+						CHECK_PROCEED
+					fi
+
+					# Prepend Next New User Declaration
+					# Before Closing Users (</users>) Tag...
+
+					subst="${culine_num}s@</users>@${new_decl}</users>@"
+
+					SUBST_EXPRS="$SUBST_EXPRS -e \"${subst}\""
+
+					# We'll Need to Absorb More Spaces for This New User!
+					SPACES_NEEDED=$(( ${SPACES_NEEDED} + ${#new_decl} ))
+					echo -e "\nSPACES_NEEDED -> [${SPACES_NEEDED}]..."
+
+				done
+
+				#
+				# Now Clear Out Any Remaining/Unnecessary Old User Slots...
 				#
 
 				echo -e "\nRemaining Unused Old User List:"
