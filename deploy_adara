@@ -806,6 +806,30 @@ if [ $need_build == 1 ]; then
 
 	fi
 
+	# SMS ADARA Add Run End Script (if present, added in v1.6.26...)
+
+	if [[ -e sms/adara_add_run_end && -x sms/adara_add_run_end ]]; then
+
+		echo -e -n "\nCopying SMS ADARA Add Run End Script " | tee -a $LOG
+		echo -e "into Archive Release Tag:\n" | tee -a $LOG
+
+		cp -i -p sms/adara_add_run_end "$tag_archive" |& tee -a $LOG
+
+		copy_ok=$?
+
+		if [ $copy_ok != 0 ]; then
+			echo -e -n "\nError Copying ADARA Add Run End Script " \
+				| tee -a $LOG
+			echo -e "into Release Tag Directory! ($copy_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -21
+		fi
+
+		/bin/ls -l "$tag_archive/adara_add_run_end" |& tee -a $LOG
+
+	fi
+
 	# STS Client
 
 	echo -e "\nCopying STS Client Executable into Archive Release Tag:\n" \
