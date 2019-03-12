@@ -1957,7 +1957,7 @@ for run in ${RUN_NUMBERS} ; do
 	#
 
 	# Parse Proposal Number from Proposal Id...
-	prop_num=`echo "${IPTS_NEW}" | sed -e "s/^IPTS-//"`
+	prop_num=`echo "${IPTS_NEW}" | ${SED} -e "s/^IPTS-//"`
 
 	# Set Bash Pipefail Option as Needed...
 	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
@@ -2400,7 +2400,7 @@ for run in ${RUN_NUMBERS} ; do
 		echo "for Meta-Data Changes."
 
 		spaces_avail=`echo "${SUBST_EXPRS}" \
-			| ${GREP} -o "${SPACE_MARKER}" | wc | awk '{print $1}'`
+			| ${GREP} -o "${SPACE_MARKER}" | ${WC} | awk '{print $1}'`
 
 		num_spaces=0
 
@@ -2426,7 +2426,7 @@ for run in ${RUN_NUMBERS} ; do
 
 			# Make Sure There are Still Some Spaces Left...
 			ckspc=`echo "${SUBST_EXPRS}" \
-				| ${GREP} -o "${SPACE_MARKER}" | wc | awk '{print $1}'`
+				| ${GREP} -o "${SPACE_MARKER}" | ${WC} | awk '{print $1}'`
 			if [[ ${ckspc} -lt 1 ]]; then   # No Space Markers Found...
 				if [[ ${i} -gt 0 ]]; then echo ; x="-n" ; fi
 				echo -e -n "\nERROR: Insufficient White Space Markers "
