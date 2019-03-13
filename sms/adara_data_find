@@ -43,6 +43,10 @@ USAGE()
 	echo "    [--epics=<EPICSTimeInSeconds>] \\"
 	echo "    [--secs=<TimeInSeconds>] \\"
 	echo "    [--human=\"<DateString>\"] \\"
+	echo "    [--SMS|--sms] \\"
+	echo "    [--nED|--ned|--ds=1] \\"
+	echo "    [--PVSD|--pvsd|--ds=3] \\"
+	echo "    [--ds=<N>] [--pkt=\"RTDL|VARIABLE\"] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
 	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
 	echo "    [--sms_data=<${SMS_DATA}>] \\"
@@ -160,7 +164,7 @@ SET_HUMAN_TIME()
 }
 
 #
-# Get Starting Timestamp of Local SMS Raw Data File
+# Get Starting Timestamp of Local Raw Data File
 #
 
 GET_DATA_START_TIME()
@@ -191,7 +195,7 @@ GET_DATA_START_TIME()
 	fi
 
 	local _first_rtdl_line=`${ADARA_PARSER} "${_datadir}/${_datafile}" \
-		| ${GREP} " RTDL " | ${HEAD} -1`
+		| ${GREP} " ${FILE_PACKET} " | ${HEAD} -1`
 	local _ckrtdl=$?
 
 	# Reset Bash Pipefail Option as Needed...
@@ -208,7 +212,7 @@ GET_DATA_START_TIME()
 		return
 	fi
 
-	# Just Return If No RTDL Lines Found...
+	# Just Return If No Desired File Packets Lines Found...
 	if [[ -z "${_first_rtdl_line}" ]]; then
 		echo ""
 		return
@@ -218,7 +222,8 @@ GET_DATA_START_TIME()
 		| ${AWK} '{print $1}'`
 
 	if [[ $? != 0 || -z "${_data_start_time}" ]]; then
-		echo -e "\nError Parsing First RTDL Line Output for Data File:" >&2
+		echo -e -n "\nError Parsing First ${FILE_PACKET} Line Output " >&2
+		echo "for Data File:" >&2
 		echo -e "\t[${_first_rtdl_line}]" >&2
 		echo ""
 		return
@@ -230,6 +235,10 @@ GET_DATA_START_TIME()
 #
 # Parse Command Line Arguments
 #
+
+FILE_TYPE="SMS"
+FILE_PREFIX="f"
+FILE_PACKET="RTDL"
 
 NextValue=""
 
@@ -271,6 +280,47 @@ for arg in "$@" ; do
 		else
 			NextValue="human"
 		fi
+	elif [[ "#$key#" == '#--SMS#' || "#$key#" == '#--sms#' ]]; then
+		FILE_TYPE="SMS"
+		FILE_PREFIX="f"
+		FILE_PACKET="RTDL"
+		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+		echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+	elif [[ "#$key#" == '#--nED#' || "#$key#" == '#--ned#' ]]; then
+		FILE_TYPE="nED"
+		FILE_PREFIX="ds00000001-s"
+		FILE_PACKET="RTDL"
+		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+		echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+	elif [[ "#$key#" == '#--PVSD#' || "#$key#" == '#--pvsd#' ]]; then
+		FILE_TYPE="PVSD"
+		FILE_PREFIX="ds00000003-s"
+		FILE_PACKET="VARIABLE"
+		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+		echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+	elif [[ "#$key#" == '#--ds#' ]]; then
+		# Single-Digit Data Source Numbers...
+		if [[ ${value} -lt 10 ]]; then
+			FILE_TYPE="DataSource#${value}"
+			FILE_PREFIX="ds0000000${value}-s"
+		# Double-Digit Data Source Numbers...
+		elif [[ ${value} -lt 100 ]]; then
+			FILE_TYPE="DataSource#${value}"
+			FILE_PREFIX="ds000000${value}-s"
+		else
+			echo -n "\nReally...?! More than 100 Data Sources...?? ;-D"
+			exit -99
+		fi
+		FILE_PACKET="RTDL"   # Can be overridden by "--pkt=FOO"...
+		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+		echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+	elif [[ "#$key#" == '#--pkt#' ]]; then
+		FILE_PACKET="${value}"
+		echo -e "\nFile Packet Type Set to: \"${FILE_PACKET}\""
 	elif [[ "#$key#" == '#--adara_parser#' ]]; then
 		ADARA_PARSER="${value}"
 		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
@@ -307,11 +357,11 @@ EPICSNsecs=`echo "${EPICSTimeInSeconds}" | ${SED} "s/${EPICSSecs}\.//"`
 # Ready to Begin...! :-D
 #
 
-echo -e "\n*** Searching for Local SMS Raw Data File Containing:"
+echo -e "\n*** Searching for Local ${FILE_TYPE} Raw Data Files Containing:"
 
 echo -e "\n\tEPICS Search Time in Seconds:  ${EPICSTimeInSeconds}"
 
-echo -e "\n\tUsing Local SMS Raw Data in:  [${SMS_DATA}]"
+echo -e "\n\tUsing Local ${FILE_TYPE} Raw Data in:  [${SMS_DATA}]"
 
 CHECK_PROCEED
 
@@ -369,7 +419,8 @@ for data_dir in ${data_dirs} ; do
 	echo -e "\nSearching for Data Files in Local SMS Data Subdirectory:"
 	echo -e "\n[${data_dir}]"
 
-	data_files=`${LS} -t "${data_dir}" | ${GREP} -e "^f.*\.adara$"`
+	data_files=`${LS} -t "${data_dir}" \
+		| ${GREP} -e "^${FILE_PREFIX}.*\.adara$"`
 
 	if [[ $? != 0 || -z "${data_files}" ]]; then
 		echo -e "\nNo Data Files Found... Skip to Next Data Subdirectory..."
@@ -384,7 +435,7 @@ for data_dir in ${data_dirs} ; do
 
 		if [[ -n "${first_time}" ]]; then
 
-			echo -e "\tFirst RTDL Time:  ${first_time}"
+			echo -e "\tFirst ${FILE_PACKET} Time:  ${first_time}"
 
 			# Strip Off Nanoseconds...
 			first_secs=`echo "${first_time}" | ${SED} 's/\.[0-9]*//'`
@@ -511,14 +562,14 @@ if [[ $display_file == 1 ]]; then
 	if [[ $? == 0 ]]; then
 		lsout=`echo "${lsout}" \
 			| ${SED} -e "s@ ${SMS_DATA}/@\n\t\t${SMS_DATA}/\n\t\t\t@" \
-				-e "s@f[0-9][0-9][0-9]@\n\t\t\t\t&@"`
+				-e "s@${FILE_PREFIX}[0-9][0-9][0-9]@\n\t\t\t\t&@"`
 		echo -e "\n\t${lsout}"
 	else
 		echo -e "\nError Listing Data File Path...!"
 		echo "${lsout}"
 	fi
 
-	CHECK_PROCEED "Display SMS Output ADARA Data Stream"
+	CHECK_PROCEED "Display ${FILE_TYPE} ADARA Data Stream File"
 	if [[ $? != 0 ]]; then
 		echo
 		exit
