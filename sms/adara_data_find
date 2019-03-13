@@ -201,7 +201,7 @@ GET_DATA_START_TIME()
 
 	if [[ ${_ckrtdl} != 0 ]]; then
 		echo -e "\nError Searching ADARA Parser Output for Data File:" >&2
-		echo -e "\t${_datadir}/${_datafile}" >&2
+		echo -e "\t[${_datadir}/${_datafile}]" >&2
 		echo >&2
 		${LS} -l "${_datadir}/${_datafile}" >&2
 		echo ""
@@ -332,7 +332,7 @@ target_secs_60=$(( target_secs - 60 ))
 # Convert Target Time to String Format for "Find" Utility...
 target_str=`date --date="1970-01-01 UTC ${target_secs_60} seconds"`
 
-echo -e "\nTarget Date String:   [${target_str}]"
+echo -e "\n\"One-Minute-Earlier\" Target Date String:   [${target_str}]"
 
 data_dirs=`${FIND} ${SMS_DATA} \
 	-mindepth 2 -maxdepth 2 -newermt "${target_str}" \
@@ -347,6 +347,8 @@ if [[ -z "${data_dirs}" ]]; then
 fi
 
 echo -e "\nFound Potential Local SMS Data Subdirectories:\n\n$data_dirs"
+
+echo -e "\n(Going Back 1 Minute Prior to Desired Target Time...)"
 
 CHECK_PROCEED
 
@@ -394,7 +396,8 @@ for data_dir in ${data_dirs} ; do
 			if [[ ${first_secs} -lt ${EPICSSecs} ]]; then
 
 				echo -e -n "\t\tBEFORE TARGET TIME "
-				echo "${first_secs} < ${EPICSSecs}"
+				echo -n "${first_secs} < ${EPICSSecs} "
+				echo "[$(( EPICSSecs - first_secs )) Diff]"
 
 				last_before_data_dir="${data_dir}"
 				last_before_data_file="${data_file}"
@@ -402,10 +405,11 @@ for data_dir in ${data_dirs} ; do
 			elif [[ ${first_secs} -gt ${EPICSSecs} ]]; then
 
 				echo -e -n "\t\tAFTER TARGET TIME "
-				echo "${first_secs} > ${EPICSSecs}"
+				echo -n "${first_secs} > ${EPICSSecs} "
+				echo "[$(( first_secs - EPICSSecs )) Diff]"
 
 				# It was the Last Guy...! ;-D
-				echo -e "\n\t\tLAST GUY!"
+				echo -e "\n\t\tLAST GUY! ;-)"
 				found_data_dir="${last_before_data_dir}"
 				found_data_file="${last_before_data_file}"
 
@@ -422,7 +426,7 @@ for data_dir in ${data_dirs} ; do
 					echo "${first_nsecs} <= ${EPICSNsecs}"
 
 					# It's Me...! ;-D
-					echo -e "\n\t\tIT'S ME!"
+					echo -e "\n\t\tIT'S ME! :-D"
 					found_data_dir="${data_dir}"
 					found_data_file="${data_file}"
 
@@ -434,7 +438,7 @@ for data_dir in ${data_dirs} ; do
 					echo "${first_nsecs} > ${EPICSNsecs}"
 
 					# It was the Last Guy...! ;-D
-					echo -e "\n\t\tLAST GUY!"
+					echo -e "\n\t\tLAST GUY! :-)"
 					found_data_dir="${last_before_data_dir}"
 					found_data_file="${last_before_data_file}"
 
@@ -450,6 +454,8 @@ for data_dir in ${data_dirs} ; do
 
 done
 
+display_file=0
+
 #
 # Found It...! ;-D
 #
@@ -461,6 +467,8 @@ if [[ -n "${found_data_dir}" && -n "${found_data_file}" ]]; then
 	echo -e "\n\t[${found_data_dir}]"
 
 	echo -e "\n\t[${found_data_file}]"
+
+	display_file=1
 
 #
 # Didn't Find It... ;-b
@@ -477,6 +485,11 @@ elif [[ -n "${last_before_data_dir}" \
 
 	echo -e "\n\t[${last_before_data_file}]"
 
+	found_data_dir="${last_before_data_dir}"
+	found_data_file="${last_before_data_file}"
+
+	display_file=1
+
 #
 # Didn't Find Anything... :-Q
 #
@@ -484,6 +497,36 @@ elif [[ -n "${last_before_data_dir}" \
 else
 
 	echo -e "\nBUMMER! Failed to Find ANY Time Preceding Target Time...!"
+
+fi
+
+#
+# Display Found Data File/Next Best Guess... ;-D
+#
+
+if [[ $display_file == 1 ]]; then
+
+	lsout=`${LS} -l "${found_data_dir}/${found_data_file}"`
+
+	if [[ $? == 0 ]]; then
+		lsout=`echo "${lsout}" \
+			| ${SED} -e "s@ ${SMS_DATA}/@\n\t\t${SMS_DATA}/\n\t\t\t@" \
+				-e "s@f[0-9][0-9][0-9]@\n\t\t\t\t&@"`
+		echo -e "\n\t${lsout}"
+	else
+		echo -e "\nError Listing Data File Path...!"
+		echo "${lsout}"
+	fi
+
+	CHECK_PROCEED "Display SMS Output ADARA Data Stream"
+	if [[ $? != 0 ]]; then
+		echo
+		exit
+	fi
+
+	${ADARA_PARSER} "${found_data_dir}/${found_data_file}" \
+		| ${Less} "+/^${EPICSTimeInSeconds}"
+	ckparse=$?
 
 fi
 
