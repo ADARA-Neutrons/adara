@@ -12,6 +12,8 @@ CACHE_DIR="/SNSlocal/rsyslog.cache"
 
 ALTOPT="" # for Alternate/Secondary SMS Deployments... ;-D
 
+HEAD="/usr/bin/head"
+
 #
 # Dump Usage
 #
@@ -217,7 +219,8 @@ CLEAR_PREVIOUS_CACHE()
 
 DO_CONNECT()
 {
-	local _summaryCk=`/bin/ls -t "${CACHE_DIR}"/AdaraMonitorSummary.*.log`
+	local _summaryCk=`/bin/ls -t "${CACHE_DIR}"/AdaraMonitorSummary.*.log \
+		| ${HEAD} -1`
 
 	if [[ $? != 0 || -z "${_summaryCk}" ]]; then
 		echo -e "\nError Connecting to Existing ADARA Monitor...!\n"
