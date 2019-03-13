@@ -47,6 +47,7 @@ USAGE()
 	echo "    [--nED|--ned|--ds=1] \\"
 	echo "    [--PVSD|--pvsd|--ds=3] \\"
 	echo "    [--ds=<N>] [--pkt=\"RTDL|VARIABLE\"] \\"
+	echo "    [--delay=<Hours>] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
 	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
 	echo "    [--sms_data=<${SMS_DATA}>] \\"
@@ -240,6 +241,8 @@ FILE_TYPE="SMS"
 FILE_PREFIX="f"
 FILE_PACKET="RTDL"
 
+DIR_DELAY=1
+
 NextValue=""
 
 for arg in "$@" ; do
@@ -321,6 +324,10 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--pkt#' ]]; then
 		FILE_PACKET="${value}"
 		echo -e "\nFile Packet Type Set to: \"${FILE_PACKET}\""
+	elif [[ "#$key#" == '#--delay#' ]]; then
+		DIR_DELAY="${value}"
+		echo -e -n "\nSetting Data Directory Find Delay to: "
+		echo "[${DIR_DELAY} Hours]"
 	elif [[ "#$key#" == '#--adara_parser#' ]]; then
 		ADARA_PARSER="${value}"
 		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
@@ -376,17 +383,18 @@ target_time=`EPICS_TO_SECS "${EPICSTimeInSeconds}"`
 # Strip Off Nanoseconds...
 target_secs=`echo "${target_time}" | ${SED} 's/\.[0-9]*//'`
 
-# Subtract 1 Minute from Target Seconds...
-target_secs_60=$(( target_secs - 60 ))
+# Subtract Directory Delay (Hours) from Target Seconds...
+target_secs_delay=$(( $target_secs - ( 3600 * $DIR_DELAY ) ))
 
 # Convert Target Time to String Format for "Find" Utility...
-target_str=`date --date="1970-01-01 UTC ${target_secs_60} seconds"`
+target_str=`date --date="1970-01-01 UTC ${target_secs_delay} seconds"`
 
-echo -e "\n\"One-Minute-Earlier\" Target Date String:   [${target_str}]"
+echo -e "\n\"${DIR_DELAY} Hour(s) Earlier\" Target Date String:"
+echo -e "\n\t[${target_str}]"
 
 data_dirs=`${FIND} ${SMS_DATA} \
 	-mindepth 2 -maxdepth 2 -newermt "${target_str}" \
-	| ${SORT}` 
+	| ${GREP} -v "state-storage" | ${SORT}` 
 
 if [[ -z "${data_dirs}" ]]; then
 	echo -e "\nError: No Candidate Data Subdirectories Found...!"
@@ -398,7 +406,8 @@ fi
 
 echo -e "\nFound Potential Local SMS Data Subdirectories:\n\n$data_dirs"
 
-echo -e "\n(Going Back 1 Minute Prior to Desired Target Time...)"
+echo -e \
+	"\n(Going Back ${DIR_DELAY} Hour(s) Prior to Desired Target Time...)"
 
 CHECK_PROCEED
 
@@ -419,7 +428,7 @@ for data_dir in ${data_dirs} ; do
 	echo -e "\nSearching for Data Files in Local SMS Data Subdirectory:"
 	echo -e "\n[${data_dir}]"
 
-	data_files=`${LS} -t "${data_dir}" \
+	data_files=`${LS} -t -r "${data_dir}" \
 		| ${GREP} -e "^${FILE_PREFIX}.*\.adara$"`
 
 	if [[ $? != 0 || -z "${data_files}" ]]; then
@@ -528,7 +537,7 @@ if [[ -n "${found_data_dir}" && -n "${found_data_file}" ]]; then
 elif [[ -n "${last_before_data_dir}" \
 		&& -n "${last_before_data_file}" ]]; then
 
-	echo -e "\nBummer! Failed to Find Target Time..."
+	echo -e "\n*** Bummer! Failed to Find Target Time..."
 
 	echo -e "\nLast Time Before Target Time was:"
 
@@ -547,7 +556,7 @@ elif [[ -n "${last_before_data_dir}" \
 
 else
 
-	echo -e "\nBUMMER! Failed to Find ANY Time Preceding Target Time...!"
+	echo -e "\n*** BUMMER! Failed to Find ANY Time Preceding Target Time!!"
 
 fi
 
@@ -575,8 +584,9 @@ if [[ $display_file == 1 ]]; then
 		exit
 	fi
 
-	${ADARA_PARSER} "${found_data_dir}/${found_data_file}" \
-		| ${Less} "+/^${EPICSTimeInSeconds}"
+	${ADARA_PARSER} --showrun --showddp --events \
+		"${found_data_dir}/${found_data_file}" \
+			| ${Less} "+/^${EPICSTimeInSeconds}"
 	ckparse=$?
 
 fi
