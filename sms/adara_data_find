@@ -49,7 +49,7 @@ USAGE()
 	echo "    [--ds=<N>] [--pkt=\"RTDL|VARIABLE\"] \\"
 	echo "    [--delay=<Hours>] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
-	echo "    [--extra_parser_args=\"--showfoo\"  \\"
+	echo "    [--extra_parser_args=\"--showfoo\"]  \\"
 	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
 	echo "    [--sms_data=<${SMS_DATA}>] \\"
 	echo "    [--help|-h]"
