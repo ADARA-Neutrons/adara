@@ -49,6 +49,7 @@ USAGE()
 	echo "    [--ds=<N>] [--pkt=\"RTDL|VARIABLE\"] \\"
 	echo "    [--delay=<Hours>] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
+	echo "    [--extra_parser_args=\"--showfoo\"  \\"
 	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
 	echo "    [--sms_data=<${SMS_DATA}>] \\"
 	echo "    [--help|-h]"
@@ -243,6 +244,8 @@ FILE_PACKET="RTDL"
 
 DIR_DELAY=1
 
+EXTRA_PARSER_ARGS=""
+
 NextValue=""
 
 for arg in "$@" ; do
@@ -331,6 +334,10 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--adara_parser#' ]]; then
 		ADARA_PARSER="${value}"
 		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
+	elif [[ "#$key#" == '#--extra_parser_args#' ]]; then
+		EXTRA_PARSER_ARGS="${value}"
+		echo -e "\nSetting Extra ADARA Parser Args to:"
+		echo -e "\n\t[${EXTRA_PARSER_ARGS}]"
 	elif [[ "#$key#" == '#--sms_config#' ]]; then
 		SMS_CONFIG="${value%/}"
 		echo -e "\nSetting SMS Config Directory to:\n\t[${SMS_CONF}]"
@@ -584,7 +591,7 @@ if [[ $display_file == 1 ]]; then
 		exit
 	fi
 
-	${ADARA_PARSER} --showrun --showddp --events \
+	${ADARA_PARSER} --showrun --showddp --events ${EXTRA_PARSER_ARGS} \
 		"${found_data_dir}/${found_data_file}" \
 			| ${Less} "+/^${EPICSTimeInSeconds}"
 	ckparse=$?
