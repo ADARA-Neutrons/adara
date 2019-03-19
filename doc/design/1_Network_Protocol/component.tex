@@ -260,8 +260,8 @@ developers will fill them in at a later date.}
     \bitheader{31,30,29,24,23,22,21,16,15,10,9,0} \\
     \wordbox{1}{Source ID} \\
     \bitbox{1}{\tiny E \\ O \\ P} &
-    \bitbox{15}{Pkt Seq} &
-    \bitbox{16}{DSP Seq} \\
+    \bitbox{15}{Pulse Seq} &
+    \bitbox{16}{Source Seq} \\
     \bitbox{8}{Flavor} &
     \bitbox{24}{Pulse Charge (units of 10 pC)} \\
     \bitbox{1}{\tiny B \\ V \\ T } &
@@ -295,9 +295,10 @@ in this packet due to frame skew.
 processed these events.
 \item{\bf EOP} (End of Packet) indicates that this is the last event packet
 to be sent for the current pulse.
-\item{\bf Pkt Seq} is a monotonically increasing event packet number for the
-current pulse.
-\item{\bf DSP Seq} is a monotonically increasing packet number for this source.
+\item{\bf Pulse Seq} is a monotonically increasing event packet number
+for the current pulse.
+\item{\bf Source Seq} is a monotonically increasing packet number
+for this source.
 This field is incremented for every packet sent by the source and does not
 reset for each pulse.
 \item{\bf Flavor} contains the accelerator pulse flavor as defined by
@@ -382,7 +383,7 @@ Pixel ID is the physical pixel associated with this neutron event.
 \end{figure}
 
 When run over a network transport that does not provide reliable service, such
-as UDP, the protocol uses the {\bf Pulse ID}, {\bf Source ID}, {\bf Pkt Seq},
+as UDP, the protocol uses the {\bf Pulse ID}, {\bf Source ID}, {\bf Pulse Seq},
 and {\bf EOP} field to detect the loss of packets describing the events for a
 pulse. Each packet source ({\bf Source ID}) sequentially numbers the raw event
 packets it sends for a pulse, starting at zero. The source must set {\bf EOP}
@@ -551,8 +552,8 @@ fast metadata pixel ID formats.}
     \bitheader{31,30,29,27,24,23,22,21,16,15,10,9,0} \\
     \wordbox{1}{Source ID} \\
     \bitbox{1}{\tiny E \\ O \\ P} &
-    \bitbox{15}{Pkt Seq} &
-    \bitbox{16}{DSP Seq} \\
+    \bitbox{15}{Pulse Seq} &
+    \bitbox{16}{Source Seq} \\
     \bitbox{5}{Data Flags} &
     \bitbox{3}{Flavor} &
     \bitbox{24}{Pulse Charge (units of 10 pC)} \\
@@ -593,9 +594,10 @@ in this packet due to frame skew.
 processed these events.
 \item{\bf EOP} (End of Packet) indicates that this is the last event packet
 to be sent for the current pulse.
-\item{\bf Pkt Seq} is a monotonically increasing event packet number for the
-current pulse.
-\item{\bf DSP Seq} is a monotonically increasing packet number for this source.
+\item{\bf Pulse Seq} is a monotonically increasing event packet number
+for the current pulse.
+\item{\bf Source Seq} is a monotonically increasing packet number
+for this source.
 This field is incremented for every packet sent by the source and does not
 reset for each pulse.
 \item{\bf Data Flags} contains ``Data Flags'' (5 bits) for the given pulse,
@@ -649,7 +651,7 @@ Pixel ID is the physical pixel associated with this neutron event.
 \end{itemize}
 
 When run over a network transport that does not provide reliable service, such
-as UDP, the protocol uses the {\bf Pulse ID}, {\bf Source ID}, {\bf Pkt Seq},
+as UDP, the protocol uses the {\bf Pulse ID}, {\bf Source ID}, {\bf Pulse Seq},
 and {\bf EOP} field to detect the loss of packets describing the events for a
 pulse. Each packet source ({\bf Source ID}) sequentially numbers the raw event
 packets it sends for a pulse, starting at zero. The source must set {\bf EOP}
@@ -678,8 +680,8 @@ to deal with reordering should it be necessary.
     \bitheader{31,30,29,24,23,22,21,16,15,10,9,0} \\
     \wordbox{1}{Source ID} \\
     \bitbox{1}{\tiny E \\ O \\ P} &
-    \bitbox{15}{Pkt Seq} &
-    \bitbox{16}{DSP Seq} \\
+    \bitbox{15}{Pulse Seq} &
+    \bitbox{16}{Source Seq} \\
     \bitbox{8}{Flavor} &
     \bitbox{24}{Pulse Charge (units of 10 pC)} \\
     \bitbox{1}{\tiny B \\ V \\ T } &
@@ -764,9 +766,10 @@ in this packet due to frame skew.
 processed these events.
 \item{\bf EOP} (End of Packet) indicates that this is the last event packet
 to be sent for the current pulse.
-\item{\bf Pkt Seq} is a monotonically increasing event packet number for the
-current pulse.
-\item{\bf DSP Seq} is a monotonically increasing packet number for this source.
+\item{\bf Pulse Seq} is a monotonically increasing event packet number
+for the current pulse.
+\item{\bf Source Seq} is a monotonically increasing packet number
+for this source.
 This field is incremented for every packet sent by the source and does not
 reset for each pulse.
 \item{\bf Flavor} contains the accelerator pulse flavor as defined by
@@ -815,7 +818,7 @@ Pixel ID is the physical pixel associated with this neutron event.
 \end{itemize}
 
 When run over a network transport that does not provide reliable service, such
-as UDP, the protocol uses the {\bf Pulse ID}, {\bf Source ID}, {\bf Pkt Seq},
+as UDP, the protocol uses the {\bf Pulse ID}, {\bf Source ID}, {\bf Pulse Seq},
 and {\bf EOP} field to detect the loss of packets describing the events for a
 pulse. Each packet source ({\bf Source ID}) sequentially numbers the raw event
 packets it sends for a pulse, starting at zero. The source must set {\bf EOP}
@@ -844,8 +847,8 @@ to deal with reordering should it be necessary.
     \bitheader{31,30,29,27,24,23,22,21,16,15,10,9,0} \\
     \wordbox{1}{Source ID} \\
     \bitbox{1}{\tiny E \\ O \\ P} &
-    \bitbox{15}{Pkt Seq} &
-    \bitbox{16}{DSP Seq} \\
+    \bitbox{15}{Pulse Seq} &
+    \bitbox{16}{Source Seq} \\
     \bitbox{5}{Data Flags} &
     \bitbox{3}{Flavor} &
     \bitbox{24}{Pulse Charge (units of 10 pC)} \\
@@ -936,9 +939,10 @@ in this packet due to frame skew.
 processed these events.
 \item{\bf EOP} (End of Packet) indicates that this is the last event packet
 to be sent for the current pulse.
-\item{\bf Pkt Seq} is a monotonically increasing event packet number for the
-current pulse.
-\item{\bf DSP Seq} is a monotonically increasing packet number for this source.
+\item{\bf Pulse Seq} is a monotonically increasing event packet number
+for the current pulse.
+\item{\bf Source Seq} is a monotonically increasing packet number
+for this source.
 This field is incremented for every packet sent by the source and does not
 reset for each pulse.
 \item{\bf Data Flags} contains ``Data Flags'' (5 bits) for the given pulse,
@@ -992,7 +996,7 @@ Pixel ID is the physical pixel associated with this neutron event.
 \end{itemize}
 
 When run over a network transport that does not provide reliable service, such
-as UDP, the protocol uses the {\bf Pulse ID}, {\bf Source ID}, {\bf Pkt Seq},
+as UDP, the protocol uses the {\bf Pulse ID}, {\bf Source ID}, {\bf Pulse Seq},
 and {\bf EOP} field to detect the loss of packets describing the events for a
 pulse. Each packet source ({\bf Source ID}) sequentially numbers the raw event
 packets it sends for a pulse, starting at zero. The source must set {\bf EOP}
