@@ -51,7 +51,7 @@
 
 namespace ADARA {
 
-const std::string VERSION = "1.9.2";
+const std::string VERSION = "1.9.3";
 const std::string TAG_NAME = "XXX_TAG_NAME_XXX";
 
 const std::string ATTRIB = "ADARA Data Acquisition System, Neutron Sciences Directorate, Oak Ridge National Laboratory (ORNL), UT-Battelle LLC";
