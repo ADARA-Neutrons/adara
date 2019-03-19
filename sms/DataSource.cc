@@ -142,7 +142,6 @@ public:
 		m_name(name), m_hwId(hwId), m_smsId(smsId),
 		m_intermittent(false), m_recoverPktCount(0),
 		m_activePulse(0), m_lastPulse(0), m_dupCount(0),
-		m_sourceSeq(0), // Increases Per Source Packet
 		m_pulseGood(true), m_trueNew(true)
 	{
 		// Snag an SMSControl Instance Handle _Exactly Once_...! ;-o
@@ -161,6 +160,12 @@ public:
 		m_err_count_second = 0;
 		m_err_count_minute = 0;
 		m_err_count_tenmin = 0;
+
+		// Source Sequence: Increases Per Source Packet, No "Reset"...
+		// - Initialize to 0xffffffff, a Value the 16-bit Source Sequence
+		// will Never Take, so we can _Ignore_ the First Sequence Value
+		// Until we "Prime the Pump"... ;-D
+		m_sourceSeq = (uint32_t) -1;
 
 		// Initialize HWSource Bandwidth PVs...
 		if ( m_hwIndex >= 0 ) {
@@ -434,21 +439,34 @@ public:
 	bool checkSourceSeq(const ADARA::RawDataPkt &pkt) {
 		bool ok = (pkt.sourceSeq() == m_sourceSeq);
 		if ( !ok ) {
-			// Rate-limited logging of Source sequence out-of-order?
-			std::string log_info;
-			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-					RLL_LOCAL_SOURCE_SEQUENCE, m_name,
-					2, 10, 100, log_info ) ) {
-				ERROR(log_info
-					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-					<< "checkSourceSeq() "
-					<< "Local Source Sequence Out-of-Order: "
-					<< pkt.sourceSeq() << " != " << m_sourceSeq
+			// Don't Count/Log the _First_ Source Sequence as an Error
+			// - We Don't Yet Know Where the Data Source Sequence is At...!
+			if ( m_sourceSeq == ((uint32_t) -1) ) {
+				DEBUG("checkSourceSeq() Priming the Pump:"
+					<< " m_sourceSeq=" << m_sourceSeq
+					<< " -> pkt.sourceSeq()=" << pkt.sourceSeq()
 					<< std::hex << " src=0x" << m_hwId
 					<< " m_activePulse=0x" << m_activePulse
 					<< " hwId=0x" << m_hwId << std::dec);
+				ok = true;
 			}
-			// Try to Ride the Wave... ;-Q
+			else {
+				// Rate-limited logging of Source sequence out-of-order?
+				std::string log_info;
+				if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+						RLL_LOCAL_SOURCE_SEQUENCE, m_name,
+						2, 10, 100, log_info ) ) {
+					ERROR(log_info
+						<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+						<< "checkSourceSeq() "
+						<< "Local Source Sequence Out-of-Order: "
+						<< pkt.sourceSeq() << " != " << m_sourceSeq
+						<< std::hex << " src=0x" << m_hwId
+						<< " m_activePulse=0x" << m_activePulse
+						<< " hwId=0x" << m_hwId << std::dec);
+				}
+			}
+			// Try to Ride the Wave... (or "Prime the Pump" on Connect...!)
 			m_sourceSeq = ( pkt.sourceSeq() + 1 ) % pkt.maxSourceSeq();
 		}
 		else {
