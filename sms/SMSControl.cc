@@ -354,6 +354,8 @@ void SMSControl::addSource(const std::string &name,
 	bool ignore_eop;
 	bool ignore_local_sawtooth;
 	bool mixed_data_packets;
+	bool check_source_sequence;
+	bool check_pulse_sequence;
 	uint32_t rtdlNoDataThresh;
 	bool save_input_stream;
 
@@ -384,6 +386,8 @@ void SMSControl::addSource(const std::string &name,
 	ignore_eop = info.get<bool>("ignore_eop", false);
 	ignore_local_sawtooth = info.get<bool>("ignore_local_sawtooth", false);
 	mixed_data_packets = info.get<bool>("mixed_data_packets", false);
+	check_source_sequence = info.get<bool>("check_source_sequence", true);
+	check_pulse_sequence = info.get<bool>("check_pulse_sequence", true);
 	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
 	save_input_stream = info.get<bool>("save_input_stream", false);
 
@@ -415,6 +419,20 @@ void SMSControl::addSource(const std::string &name,
 			<< " - No Auto-Deduce Sub-60Hz Pulse for Proton Charge Zero!");
 	}
 
+	// Should probably let someone know if we're _Not_ gonna
+	// Check Data Packet Source Sequence Numbers...! ;-D
+	if (!check_source_sequence) {
+		DEBUG("Data Packet Source Sequence Checking Set to False for "
+			<< name << " - Per Source Packet, No Reset...");
+	}
+
+	// Should probably let someone know if we're _Not_ gonna
+	// Check Data Packet Source Sequence Numbers...! ;-D
+	if (!check_pulse_sequence) {
+		DEBUG("Data Packet Pulse Sequence Checking Set to False for "
+			<< name << " - Per Event Packet, Resets Per Pulse...");
+	}
+
 	// Probably should also log if we're Saving All the Input Stream
 	// from this particular Data Source... (not something you'd really
 	// wanna do all the time in production... :-)
@@ -435,6 +453,8 @@ void SMSControl::addSource(const std::string &name,
 							 ignore_eop,
 							 ignore_local_sawtooth,
 							 mixed_data_packets,
+							 check_source_sequence,
+							 check_pulse_sequence,
 							 chunk_size,
 							 rtdlNoDataThresh,
 							 save_input_stream));
