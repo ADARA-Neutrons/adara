@@ -155,6 +155,22 @@ option_label[$num_options]="[Mixed Data Packets (Neutron and Meta-Data)]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
+option_name[$num_options]="check_source_sequence"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:CheckSourceSequence"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Check Pkt Source Sequence Numbers (No Reset)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="check_pulse_sequence"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:CheckPulseSequence"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Check Pkt Pulse Sequence Numbers (Resets)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
 option_name[$num_options]="readsize"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MaxReadChunk"
 option_pv_opt[$num_options]="-S"
@@ -1482,6 +1498,8 @@ if [[ "$command" == "status" \
 					caget $WAIT ${dsprefix}:IgnoreEoP
 					caget $WAIT ${dsprefix}:IgnoreLocalSAWTOOTH
 					caget $WAIT ${dsprefix}:MixedDataPackets
+					caget $WAIT ${dsprefix}:CheckSourceSequence
+					caget $WAIT ${dsprefix}:CheckPulseSequence
 					caget $WAIT -S ${dsprefix}:MaxReadChunk
 					caget $WAIT ${dsprefix}:RTDLNoDataThresh
 					caget $WAIT ${dsprefix}:SaveInputStream
