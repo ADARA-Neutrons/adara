@@ -34,7 +34,9 @@ public:
 		double connect_retry, double connect_timeout,
 		double data_timeout, uint32_t data_timeout_retry,
 		bool ignore_eop, bool ignore_local_sawtooth,
-		bool mixed_data_packets, unsigned int read_chunk,
+		bool mixed_data_packets,
+		bool check_source_sequence, bool check_pulse_sequence,
+		unsigned int read_chunk,
 		uint32_t rtdlNoDataThresh, bool save_input_stream);
 	~DataSource();
 
@@ -84,6 +86,8 @@ private:
 	bool m_ignore_eop;
 	bool m_ignore_local_sawtooth;
 	bool m_mixed_data_packets;
+	bool m_check_source_sequence;
+	bool m_check_pulse_sequence;
 	unsigned int m_max_read_chunk;
 	uint32_t m_rtdlNoDataThresh;
 	bool m_save_input_stream;
@@ -101,6 +105,8 @@ private:
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreLocalSAWTOOTH;
 	boost::shared_ptr<smsBooleanPV> m_pvMixedDataPackets;
+	boost::shared_ptr<smsBooleanPV> m_pvCheckSourceSequence;
+	boost::shared_ptr<smsBooleanPV> m_pvCheckPulseSequence;
 	boost::shared_ptr<smsStringPV> m_pvMaxReadChunk;
 	boost::shared_ptr<smsUint32PV> m_pvRTDLNoDataThresh;
 	boost::shared_ptr<smsBooleanPV> m_pvSaveInputStream;

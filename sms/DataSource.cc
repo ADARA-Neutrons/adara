@@ -550,7 +550,9 @@ DataSource::DataSource( const std::string &name,
 			double connect_retry, double connect_timeout,
 			double data_timeout, uint32_t data_timeout_retry,
 			bool ignore_eop, bool ignore_local_sawtooth,
-			bool mixed_data_packets, unsigned int read_chunk,
+			bool mixed_data_packets,
+			bool check_source_sequence, bool check_pulse_sequence,
+			unsigned int read_chunk,
 			uint32_t rtdlNoDataThresh, bool save_input_stream ) :
 	m_name(uri), m_basename(name), m_uri(uri),
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
@@ -561,6 +563,8 @@ DataSource::DataSource( const std::string &name,
 	m_ignore_eop(ignore_eop),
 	m_ignore_local_sawtooth(ignore_local_sawtooth),
 	m_mixed_data_packets(mixed_data_packets),
+	m_check_source_sequence(check_source_sequence),
+	m_check_pulse_sequence(check_pulse_sequence),
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
 	m_save_input_stream(save_input_stream)
 {
@@ -679,6 +683,14 @@ DataSource::DataSource( const std::string &name,
 	m_pvMixedDataPackets = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":MixedDataPackets", /* AutoSave */ true));
 
+	m_pvCheckSourceSequence = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":CheckSourceSequence",
+		/* AutoSave */ true));
+
+	m_pvCheckPulseSequence = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":CheckPulseSequence",
+		/* AutoSave */ true));
+
 	m_pvMaxReadChunk = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":MaxReadChunk", /* AutoSave */ true));
 
@@ -741,6 +753,8 @@ DataSource::DataSource( const std::string &name,
 	m_ctrl->addPV(m_pvIgnoreEoP);
 	m_ctrl->addPV(m_pvIgnoreLocalSAWTOOTH);
 	m_ctrl->addPV(m_pvMixedDataPackets);
+	m_ctrl->addPV(m_pvCheckSourceSequence);
+	m_ctrl->addPV(m_pvCheckPulseSequence);
 	m_ctrl->addPV(m_pvMaxReadChunk);
 	m_ctrl->addPV(m_pvRTDLNoDataThresh);
 	m_ctrl->addPV(m_pvSaveInputStream);
@@ -775,6 +789,8 @@ DataSource::DataSource( const std::string &name,
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
 	m_pvIgnoreLocalSAWTOOTH->update(m_ignore_local_sawtooth, &now);
 	m_pvMixedDataPackets->update(m_mixed_data_packets, &now);
+	m_pvCheckSourceSequence->update(m_check_source_sequence, &now);
+	m_pvCheckPulseSequence->update(m_check_pulse_sequence, &now);
 	m_pvRTDLNoDataThresh->update(m_rtdlNoDataThresh, &now);
 	m_pvSaveInputStream->update(m_save_input_stream, &now);
 
@@ -879,6 +895,18 @@ DataSource::DataSource( const std::string &name,
 			bvalue, ts ) ) {
 		m_mixed_data_packets = bvalue;
 		m_pvMixedDataPackets->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvCheckSourceSequence->getName(),
+			bvalue, ts ) ) {
+		m_check_source_sequence = bvalue;
+		m_pvCheckSourceSequence->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvCheckPulseSequence->getName(),
+			bvalue, ts ) ) {
+		m_check_pulse_sequence = bvalue;
+		m_pvCheckPulseSequence->update(bvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV( m_pvRTDLNoDataThresh->getName(),
@@ -2183,9 +2211,22 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 
 	boost::shared_ptr<HWSource> hw_src = getHWSource(pkt->sourceID());
 
+	// [INFREQUENTLY] Update "Check Packet Source/Pulse Sequence" Options
+	// for This Data Source, from Live Config PV Value...
+	// - We don't expect this to change very often, if ever,
+	// so only check rarely, like every 3 minutes... ;-D
+	// (Note: count already incremented above for overall method...!)
+	if ( !(cnt % 33333) ) {
+		m_check_source_sequence = m_pvCheckSourceSequence->value();
+		m_check_pulse_sequence = m_pvCheckPulseSequence->value();
+	}
+
 	// Check for Valid Source Sequence from This Source...
 	// (Increases Per Source Packet)
-	bool sourceSeqOk = hw_src->checkSourceSeq(*pkt);
+	bool sourceSeqOk = true;
+	if ( m_check_source_sequence ) {
+		sourceSeqOk = hw_src->checkSourceSeq(*pkt);
+	}
 
 	// Check for Intermittent HWSource...
 	if ( hw_src->intermittent() ) {
@@ -2262,7 +2303,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// - We don't expect this to change very often, if ever,
 		// so only check very rarely, like every 10 minutes... ;-D
 		// (Note: count already incremented above for overall method...!)
-		if ( !(cnt % 999999) ) {
+		if ( !(cnt % 99999) ) {
 			m_mixed_data_packets = m_pvMixedDataPackets->value();
 		}
 
@@ -2270,8 +2311,10 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 			is_mapped, m_mixed_data_packets,
 			event_count, meta_count, err_count );
 
-		if ( !(hw_src->checkPulseSeq(*pkt)) || !sourceSeqOk )
+		if ( ( m_check_pulse_sequence && !(hw_src->checkPulseSeq(*pkt)) )
+				|| !sourceSeqOk ) {
 			m_ctrl->markPartial( pkt->pulseId(), hw_src->dupCount() );
+		}
 	}
 
 	// Pulse is "Bad", Count All Events as Errors...
