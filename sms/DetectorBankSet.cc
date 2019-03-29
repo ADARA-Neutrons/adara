@@ -28,12 +28,22 @@ public:
 	class DetBankSetNamePV : public smsStringPV {
 	public:
 		DetBankSetNamePV(const std::string &name,
-				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsStringPV(name), m_config(config), m_info(info) {}
+				DetectorBankSet *config, DetectorBankSetInfo *info,
+				bool auto_save = false) :
+			smsStringPV(name, auto_save), m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
 			std::string name = value();
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				StorageManager::autoSavePV( m_pv_name, name, &ts );
+			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
 			if ( name.compare( m_info->getName() ) )
@@ -53,17 +63,29 @@ public:
 	private:
 		DetectorBankSet *m_config;
 		DetectorBankSetInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	class DetBankSetBanklistPV : public smsStringPV {
 	public:
 		DetBankSetBanklistPV(const std::string &name,
-				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsStringPV(name), m_config(config), m_info(info) {}
+				DetectorBankSet *config, DetectorBankSetInfo *info,
+				bool auto_save = false) :
+			smsStringPV(name, auto_save), m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
 			std::string rawBanklist = value();
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				StorageManager::autoSavePV( m_pv_name, rawBanklist, &ts );
+			}
 
 			std::vector<uint32_t> banklist;
 			Utils::parseArrayString( rawBanklist, banklist );
@@ -92,6 +114,8 @@ public:
 	private:
 		DetectorBankSet *m_config;
 		DetectorBankSetInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	static gddAppFuncTableStatus getFormatEnums(gdd &in)
@@ -142,8 +166,12 @@ public:
 	class DetBankSetFormatPV : public smsUint32PV {
 	public:
 		DetBankSetFormatPV(const std::string &name,
-				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsUint32PV(name), m_config(config), m_info(info) {}
+				DetectorBankSet *config, DetectorBankSetInfo *info,
+				uint32_t min = 0, uint32_t max = INT32_MAX,
+				bool auto_save = false) :
+			smsUint32PV(name, min, max, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		gddAppFuncTableStatus getEnums(gdd &in)
 		{
@@ -187,6 +215,16 @@ public:
 				newFormat = "both";
 			}
 
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				std::stringstream ss;
+				ss << newFlags;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+			}
+
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
 			if ( newFormat.compare( oldFormat ) )
 			{
@@ -205,17 +243,33 @@ public:
 	private:
 		DetectorBankSet *m_config;
 		DetectorBankSetInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	class DetBankSetOffsetPV : public smsUint32PV {
 	public:
 		DetBankSetOffsetPV(const std::string &name,
-				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsUint32PV(name), m_config(config), m_info(info) {}
+				DetectorBankSet *config, DetectorBankSetInfo *info,
+				uint32_t min = 0, uint32_t max = INT32_MAX,
+				bool auto_save = false) :
+			smsUint32PV(name, min, max, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
 			uint32_t tofOffset = value();
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				std::stringstream ss;
+				ss << tofOffset;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
 			if ( tofOffset != m_info->getTofOffset() )
@@ -235,17 +289,33 @@ public:
 	private:
 		DetectorBankSet *m_config;
 		DetectorBankSetInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	class DetBankSetMaxPV : public smsUint32PV {
 	public:
 		DetBankSetMaxPV(const std::string &name,
-				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsUint32PV(name), m_config(config), m_info(info) {}
+				DetectorBankSet *config, DetectorBankSetInfo *info,
+				uint32_t min = 0, uint32_t max = INT32_MAX,
+				bool auto_save = false) :
+			smsUint32PV(name, min, max, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
 			uint32_t tofMax = value();
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				std::stringstream ss;
+				ss << tofMax;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
 			if ( tofMax != m_info->getTofMax() )
@@ -265,13 +335,19 @@ public:
 	private:
 		DetectorBankSet *m_config;
 		DetectorBankSetInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	class DetBankSetBinPV : public smsUint32PV {
 	public:
 		DetBankSetBinPV(const std::string &name,
-				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsUint32PV(name), m_config(config), m_info(info) {}
+				DetectorBankSet *config, DetectorBankSetInfo *info,
+				uint32_t min = 0, uint32_t max = INT32_MAX,
+				bool auto_save = false) :
+			smsUint32PV(name, min, max, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
@@ -282,6 +358,16 @@ public:
 				ERROR("DetBankSetBinPV: TOF Histogram Bin Size < 1!"
 					<< " Setting to 1.");
 				tofBin = 1;
+			}
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				std::stringstream ss;
+				ss << tofBin;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
 			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
@@ -302,17 +388,33 @@ public:
 	private:
 		DetectorBankSet *m_config;
 		DetectorBankSetInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	class DetBankSetThrottlePV : public smsFloat64PV {
 	public:
 		DetBankSetThrottlePV(const std::string &name,
-				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsFloat64PV(name, 0.0), m_config(config), m_info(info) {}
+				DetectorBankSet *config, DetectorBankSetInfo *info,
+				double min = 0.0, double max = FLOAT64_MAX,
+				bool auto_save = false) :
+			smsFloat64PV(name, min, max, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
 			double throttle = value();
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				std::stringstream ss;
+				ss << std::setprecision(17) << throttle;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
 			// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
@@ -320,7 +422,8 @@ public:
 			{
 				INFO("DetBankSetThrottlePV: Changing Detector Bank Set "
 					<< m_info->getName() << " Throttle Frequency for "
-					<< m_pv_name << " from " << m_info->getThrottle()
+					<< m_pv_name << std::setprecision(17)
+					<< " from " << m_info->getThrottle()
 					<< " to " << throttle);
 
 				m_info->setThrottle(throttle);
@@ -333,17 +436,29 @@ public:
 	private:
 		DetectorBankSet *m_config;
 		DetectorBankSetInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	class DetBankSetSuffixPV : public smsStringPV {
 	public:
 		DetBankSetSuffixPV(const std::string &name,
-				DetectorBankSet *config, DetectorBankSetInfo *info) :
-			smsStringPV(name), m_config(config), m_info(info) {}
+				DetectorBankSet *config, DetectorBankSetInfo *info,
+				bool auto_save = false) :
+			smsStringPV(name, auto_save), m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
 			std::string suffix = value();
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				StorageManager::autoSavePV( m_pv_name, suffix, &ts );
+			}
 
 			bool changed = false;
 
@@ -391,6 +506,8 @@ public:
 	private:
 		DetectorBankSet *m_config;
 		DetectorBankSetInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	DetectorBankSetInfo(DetectorBankSet *config,
@@ -416,28 +533,36 @@ public:
 		prefix += ss.str();
 
 		m_pvName = boost::shared_ptr<DetBankSetNamePV>( new
-			DetBankSetNamePV(prefix + ":Name", m_config, this) );
+			DetBankSetNamePV(prefix + ":Name", m_config, this,
+				/* AutoSave */ true) );
 
 		m_pvBanks = boost::shared_ptr<DetBankSetBanklistPV>( new
-			DetBankSetBanklistPV(prefix + ":Banklist", m_config, this) );
+			DetBankSetBanklistPV(prefix + ":Banklist", m_config, this,
+				/* AutoSave */ true) );
 
 		m_pvFormat = boost::shared_ptr<DetBankSetFormatPV>( new
-			DetBankSetFormatPV(prefix + ":Format", m_config, this) );
+			DetBankSetFormatPV(prefix + ":Format", m_config, this,
+				0, INT32_MAX, /* AutoSave */ true) );
 
 		m_pvOffset = boost::shared_ptr<DetBankSetOffsetPV>( new
-			DetBankSetOffsetPV(prefix + ":TofOffset", m_config, this) );
+			DetBankSetOffsetPV(prefix + ":TofOffset", m_config, this,
+				0, INT32_MAX, /* AutoSave */ true) );
 
 		m_pvMax = boost::shared_ptr<DetBankSetMaxPV>( new
-			DetBankSetMaxPV(prefix + ":MaxTof", m_config, this) );
+			DetBankSetMaxPV(prefix + ":MaxTof", m_config, this,
+				0, INT32_MAX, /* AutoSave */ true) );
 
 		m_pvBin = boost::shared_ptr<DetBankSetBinPV>( new
-			DetBankSetBinPV(prefix + ":TofBin", m_config, this) );
+			DetBankSetBinPV(prefix + ":TofBin", m_config, this,
+				0, INT32_MAX, /* AutoSave */ true) );
 
 		m_pvThrottle = boost::shared_ptr<DetBankSetThrottlePV>( new
-			DetBankSetThrottlePV(prefix + ":Throttle", m_config, this) );
+			DetBankSetThrottlePV(prefix + ":Throttle", m_config, this,
+				0.0, FLOAT64_MAX, /* AutoSave */ true) );
 
 		m_pvSuffix = boost::shared_ptr<DetBankSetSuffixPV>( new
-			DetBankSetSuffixPV(prefix + ":Suffix", m_config, this) );
+			DetBankSetSuffixPV(prefix + ":Suffix", m_config, this,
+				/* AutoSave */ true) );
 
 		ctrl->addPV(m_pvName);
 		ctrl->addPV(m_pvBanks);
@@ -450,24 +575,87 @@ public:
 
 		// Initialize Detector Bank Set Config PVs...
 
-		struct timespec ts;
-		clock_gettime(CLOCK_REALTIME, &ts);
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
 
-		m_pvName->update(m_name, &ts);
+		m_pvName->update(m_name, &now);
 
 		std::string banklistStr;
 		Utils::printArrayString( m_banklist, banklistStr );
-		m_pvBanks->update(banklistStr, &ts);
+		m_pvBanks->update(banklistStr, &now);
 
-		m_pvFormat->update(m_flags, &ts);
+		m_pvFormat->update(m_flags, &now);
 
-		m_pvOffset->update(m_tofOffset, &ts);
-		m_pvMax->update(m_tofMax, &ts);
-		m_pvBin->update(m_tofBin, &ts);
+		m_pvOffset->update(m_tofOffset, &now);
+		m_pvMax->update(m_tofMax, &now);
+		m_pvBin->update(m_tofBin, &now);
 
-		m_pvThrottle->update(m_throttle, &ts);
+		m_pvThrottle->update(m_throttle, &now);
 
-		m_pvSuffix->update(m_suffix, &ts);
+		m_pvSuffix->update(m_suffix, &now);
+
+		/* Restore Any PVs to AutoSaved Config Values... */
+
+		struct timespec ts;
+		std::string value;
+		uint32_t uvalue;
+		double dvalue;
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvName->getName(), value, ts ) ) {
+			// Don't Manually Set "m_name" String Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvName->update(value, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvBanks->getName(), value, ts ) ) {
+			// Don't Manually Set "m_banklist" String (Array) Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvBanks->update(value, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvFormat->getName(), uvalue, ts ) ) {
+			// Don't Manually Set "m_flags" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvFormat->update(uvalue, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvOffset->getName(), uvalue, ts ) ) {
+			// Don't Manually Set "m_tofOffset" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvOffset->update(uvalue, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvMax->getName(), uvalue, ts ) ) {
+			// Don't Manually Set "m_tofMax" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvMax->update(uvalue, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvBin->getName(), uvalue, ts ) ) {
+			// Don't Manually Set "m_tofBin" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvBin->update(uvalue, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvThrottle->getName(), dvalue, ts ) ) {
+			// Don't Manually Set "m_throttle" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvThrottle->update(dvalue, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvSuffix->getName(), value, ts ) ) {
+			// Don't Manually Set "m_suffix" String Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvSuffix->update(value, &ts);
+		}
 
 		// Initialize Changed Flag...
 		m_changed = true;
