@@ -121,9 +121,10 @@ public:
 				// AutoSave PV Value Change...
 				struct timespec ts;
 				m_value->getTimeStamp(&ts);
-				std::stringstream ss;
-				ss << do_histo;
-				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+				// Use String Representation of Boolean for AutoSave File...
+				// (No Special Enum String Support in AutoSave...!)
+				std::string bvalstr = ( do_histo ) ? "true" : "false";
+				StorageManager::autoSavePV( m_pv_name, bvalstr, &ts );
 			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
@@ -316,7 +317,7 @@ public:
 				struct timespec ts;
 				m_value->getTimeStamp(&ts);
 				std::stringstream ss;
-				ss << distance;
+				ss << std::setprecision(17) << distance;
 				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
 			}
 
@@ -326,7 +327,8 @@ public:
 			{
 				INFO("BeamMonDistancePV: Changing Beam Monitor "
 					<< m_info->getId() << " Distance for "
-					<< m_pv_name << " from " << m_info->getDistance()
+					<< m_pv_name << std::setprecision(17)
+					<< " from " << m_info->getDistance()
 					<< " to " << distance);
 
 				m_info->setDistance(distance);
@@ -421,38 +423,43 @@ public:
 
 		if ( StorageManager::getAutoSavePV(
 				m_pvId->getName(), uvalue, ts ) ) {
-			m_id = uvalue;
+			// Don't Manually Set "m_id" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
 			m_pvId->update(uvalue, &ts);
 		}
 
 		if ( StorageManager::getAutoSavePV(
 				m_pvFormat->getName(), bvalue, ts ) ) {
-			// Don't Manually Set "m_format" String Here...
+			// Don't Manually Set "m_format" Value Here...
 			// Let "changed()" Do *All* It's Stuff... ;-D
 			m_pvFormat->update(bvalue, &ts);
 		}
 
 		if ( StorageManager::getAutoSavePV(
 				m_pvOffset->getName(), uvalue, ts ) ) {
-			m_tofOffset = uvalue;
+			// Don't Manually Set "m_tofOffset" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
 			m_pvOffset->update(uvalue, &ts);
 		}
 
 		if ( StorageManager::getAutoSavePV(
 				m_pvMax->getName(), uvalue, ts ) ) {
-			m_tofMax = uvalue;
+			// Don't Manually Set "m_tofMax" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
 			m_pvMax->update(uvalue, &ts);
 		}
 
 		if ( StorageManager::getAutoSavePV(
 				m_pvBin->getName(), uvalue, ts ) ) {
-			m_tofBin = uvalue;
+			// Don't Manually Set "m_tofBin" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
 			m_pvBin->update(uvalue, &ts);
 		}
 
 		if ( StorageManager::getAutoSavePV(
 				m_pvDistance->getName(), dvalue, ts ) ) {
-			m_distance = dvalue;
+			// Don't Manually Set "m_distance" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
 			m_pvDistance->update(dvalue, &ts);
 		}
 
