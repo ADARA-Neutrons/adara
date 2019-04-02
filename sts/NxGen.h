@@ -8,7 +8,7 @@
 #include <time.h>
 #include <unistd.h>
 #include "h5nx.hpp"
-#include "stsdefs.h"
+#include "stcdefs.h"
 #include "StreamParser.h"
 #include "ADARAUtils.h"
 #include <boost/lexical_cast.hpp>
@@ -26,12 +26,12 @@
  * The NxGen class is a stream adapter subclass that specializes the
  * ADARA StreamParser class for creating NeXus output files.
  */
-class NxGen : public STS::StreamParser
+class NxGen : public STC::StreamParser
 {
 private:
 
     /// BankInfo subclass that adds Nexus-required attributes
-    class NxBankInfo : public STS::BankInfo
+    class NxBankInfo : public STC::BankInfo
     {
     public:
         /// NxBankInfo constructor
@@ -120,7 +120,7 @@ private:
     };
 
     /// MonitorInfo subclass that adds Nexus-required attributes
-    class NxMonitorInfo : public STS::MonitorInfo
+    class NxMonitorInfo : public STC::MonitorInfo
     {
     public:
         /// NxMonitorInfo constructor
@@ -129,7 +129,7 @@ private:
             uint16_t a_id,                    ///< [in] ID of detector bank
             uint32_t a_buf_reserve,           ///< [in] Event buffer initial capacity
             uint32_t a_idx_buf_reserve,       ///< [in] Index buffer initial capacity
-            STS::BeamMonitorConfig *a_config, ///< [in] Beam Mon Histo Config (opt)
+            STC::BeamMonitorConfig *a_config, ///< [in] Beam Mon Histo Config (opt)
             bool a_known_monitor,             ///< [in] Valid Beam Mon Config?
             NxGen &a_nxgen                    ///< [in] Parent NxGen instance
         )
@@ -189,7 +189,7 @@ private:
         NxGen                  &m_nxgen;            ///< NxGen parent class
     };
 
-    // (STS Config) Element Structure to store information about
+    // (STC Config) Element Structure to store information about
     // Linked Entities in a Group Container...
     struct ElementInfo
     {
@@ -220,7 +220,7 @@ private:
         return( (struct ElementInfo *) NULL );
     }
 
-    // (STS Config) Conditional Structure to store information about
+    // (STC Config) Conditional Structure to store information about
     // Conditionally-Included Elements in a Group Container...
     // (Contains a Vector of ElementInfo structures to be included...)
     struct ConditionInfo
@@ -235,10 +235,10 @@ private:
         bool                            is_set;
     };
 
-    // (STS Config) Group Name Embedded Index Specifier...
+    // (STC Config) Group Name Embedded Index Specifier...
     static std::string GroupNameIndex;
 
-    // (STS Config) Group Container Structure to store information about
+    // (STC Config) Group Container Structure to store information about
     // collections of NeXus/DASlogs data elements to be collected together
     // and Linked into a Group, at a specific location in the NeXus File.
     struct GroupInfo
@@ -255,7 +255,7 @@ private:
 
     /// PVInfo subclass that adds Nexus-required attributes and virtual method implementations.
     template<class T>
-    class NxPVInfo : public STS::PVInfo<T>
+    class NxPVInfo : public STC::PVInfo<T>
     {
     public:
         /// NxPVInfo constructor
@@ -266,10 +266,10 @@ private:
             const std::string   &a_internal_name, ///< [in] Internal (Nexus) name of PV
             const std::string   &a_connection,  ///< [in] PV Connection String
             const std::string   &a_internal_connection, ///< [in] Internal (Nexus) PV Connection String
-            STS::Identifier      a_device_id,   ///< [in] ID of device that owns the PV
-            STS::Identifier      a_pv_id,       ///< [in] ID of the PV
-            STS::PVType          a_type,        ///< [in] Type of PV
-            std::vector<STS::PVEnumeratedType>
+            STC::Identifier      a_device_id,   ///< [in] ID of device that owns the PV
+            STC::Identifier      a_pv_id,       ///< [in] ID of the PV
+            STC::PVType          a_type,        ///< [in] Type of PV
+            std::vector<STC::PVEnumeratedType>
                                 *a_enum_vector, ///< [in] Enumerated Type Vector
             uint32_t             a_enum_index,  ///< [in] Enumerated Type Index
             const std::string   &a_units,       ///< [in] Units of PV (empty if not needed)
@@ -278,7 +278,7 @@ private:
             NxGen               &a_nxgen        ///< [in] NxGen instance needed for Nexus output
         )
         :
-            STS::PVInfo<T>( a_device_name, a_name, a_connection,
+            STC::PVInfo<T>( a_device_name, a_name, a_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
                 a_units, a_ignore, a_duplicate ),
             m_nxgen(a_nxgen),
@@ -388,7 +388,7 @@ private:
             m_nxgen.writeSlab( m_log_path + "/value",
                 value_buffer, m_cur_size );
 
-            // Save Last Value for Conditional STS Config Groups
+            // Save Last Value for Conditional STC Config Groups
             this->m_last_value = value_buffer.back();
             this->m_last_value_set = true;
 
@@ -398,11 +398,11 @@ private:
 
             // Capture Value Strings for Enumerated Type PVs...
             // (IFF Everything Works...! ;-D)
-            if ( this->m_type == STS::PVT_ENUM
+            if ( this->m_type == STC::PVT_ENUM
                     && this->m_enum_vector != NULL
                     && this->m_enum_index != (uint32_t) -1 )
             {
-                STS::PVEnumeratedType *pv_enum =
+                STC::PVEnumeratedType *pv_enum =
                     &((*(this->m_enum_vector))[ this->m_enum_index ]);
 
                 // Do We Have a Matching (Usable) Value and Name Vectors?
@@ -464,7 +464,7 @@ private:
                     }
 
                     // Save Last Value Enum String
-                    // for Conditional STS Config Groups...
+                    // for Conditional STC Config Groups...
                     this->m_last_enum_string = m_value_enum_strings.back();
                 }
             }
@@ -481,7 +481,7 @@ private:
             m_nxgen.writeSlab( m_log_path + "/value",
                 value_buffer, m_cur_size );
 
-            // Save Last Value for Conditional STS Config Groups
+            // Save Last Value for Conditional STC Config Groups
             this->m_last_value = value_buffer.back();
             this->m_last_value_set = true;
 
@@ -535,7 +535,7 @@ private:
                 m_nxgen.writeMultidimDataset( m_log_path,
                     "value", value_vec, dims, this->m_units );
 
-                // Save Last Value for Conditional STS Config Groups
+                // Save Last Value for Conditional STC Config Groups
                 this->m_last_value = value_buffer.back();
                 this->m_last_value_set = true;
 
@@ -604,7 +604,7 @@ private:
                 m_nxgen.writeMultidimDataset( m_log_path,
                     "value", value_vec, dims, this->m_units );
 
-                // Save Last Value for Conditional STS Config Groups
+                // Save Last Value for Conditional STC Config Groups
                 this->m_last_value = value_buffer.back();
                 this->m_last_value_set = true;
 
@@ -673,7 +673,7 @@ private:
                 m_nxgen.writeMultidimDataset( m_log_path,
                     "value", value_vec, dims, this->m_units );
 
-                // Save Last Value for Conditional STS Config Groups
+                // Save Last Value for Conditional STC Config Groups
                 this->m_last_value = value_buffer.back();
                 this->m_last_value_set = true;
 
@@ -697,7 +697,7 @@ private:
         int32_t flushBuffers
         (
             uint64_t start_time,    ///< 1st Pulse Time (nanosecs), if set
-            struct STS::RunMetrics *a_run_metrics   ///< If non-zero, indicates finalization code should be executed for this PV
+            struct STC::RunMetrics *a_run_metrics   ///< If non-zero, indicates finalization code should be executed for this PV
         )
         {
             int32_t num_values = -1;
@@ -713,7 +713,7 @@ private:
                     {
                         syslog( LOG_ERR,
                             "[%i] %s: %s %s %s %s, %s: %s",
-                            g_pid, "STS Error", "NxPVInfo::flushBuffers()",
+                            g_pid, "STC Error", "NxPVInfo::flushBuffers()",
                             this->m_device_str.c_str(),
                             "Normalizing PV Value Times",
                             "with First Pulse Time",
@@ -732,7 +732,7 @@ private:
                         // TODO Add Rate-Limiting...?
                         syslog( LOG_ERR,
                             "[%i] %s: %s %s %s %s, %s: %s",
-                            g_pid, "STS Error", "NxPVInfo::flushBuffers()",
+                            g_pid, "STC Error", "NxPVInfo::flushBuffers()",
                             this->m_device_str.c_str(),
                             "Non-Normalized PV Buffer Full",
                             "With No First Pulse Time Yet",
@@ -752,7 +752,7 @@ private:
                             "NxPVInfo::flushBuffers()" )) )
                 {
                     syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
-                        g_pid, "STS Error:", "NxPVInfo::flushBuffers()",
+                        g_pid, "STC Error:", "NxPVInfo::flushBuffers()",
                         "Failed to Force Initialize NeXus File",
                         "Losing PV Value Data!!",
                         this->m_device_str.c_str(),
@@ -786,16 +786,16 @@ private:
                     // Wait for End of Run to Dump String/Array PV Types...
                     // (Need to Determine Max String Length for 2D Array)
                     if ( !a_run_metrics &&
-                            ( this->m_type == STS::PVT_STRING
-                                || this->m_type == STS::PVT_UINT_ARRAY
-                                || this->m_type == STS::PVT_DOUBLE_ARRAY )
+                            ( this->m_type == STC::PVT_STRING
+                                || this->m_type == STC::PVT_UINT_ARRAY
+                                || this->m_type == STC::PVT_DOUBLE_ARRAY )
                     )
                     {
                         if ( !(this->m_full_buffer_count++ % 1000) )
                         {
                             syslog( LOG_ERR,
                                 "[%i] %s: %s %s: %s, %s: %s",
-                                g_pid, "STS Error",
+                                g_pid, "STC Error",
                                 "NxPVInfo::flushBuffers()",
                                 this->m_device_str.c_str(),
                                 "String/Array PV Buffer Full",
@@ -821,9 +821,9 @@ private:
 
                         // Let String/Array PVs Create Their Own Values
                         // (e.g. 2D String/Numerical Arrays)
-                        if ( this->m_type != STS::PVT_STRING
-                                && this->m_type != STS::PVT_UINT_ARRAY
-                                && this->m_type != STS::PVT_DOUBLE_ARRAY )
+                        if ( this->m_type != STC::PVT_STRING
+                                && this->m_type != STC::PVT_UINT_ARRAY
+                                && this->m_type != STC::PVT_DOUBLE_ARRAY )
                         {
                             m_nxgen.makeDataset( m_log_path, "value",
                                 m_nxgen.toNxType( this->m_type ),
@@ -878,7 +878,7 @@ private:
 
                         if ( m_cur_size
                                 // No Statistics for Strings!
-                                && this->m_type != STS::PVT_STRING )
+                                && this->m_type != STC::PVT_STRING )
                         {
                             // Data has been written,
                             // so also write statistics
@@ -900,7 +900,7 @@ private:
                         if ( this->m_enum_vector != NULL
                                 && this->m_enum_index != (uint32_t) -1 )
                         {
-                            STS::PVEnumeratedType *pv_enum =
+                            STC::PVEnumeratedType *pv_enum =
                                 &((*(this->m_enum_vector))[
                                     this->m_enum_index ]);
 
@@ -933,7 +933,7 @@ private:
                                 {
                                     syslog( LOG_ERR,
                                         "[%i] %s: %s %s: %d %s %s %s!",
-                                        g_pid, "STS Error",
+                                        g_pid, "STC Error",
                                         "NxPVInfo::flushBuffers()",
                                         this->m_device_str.c_str(),
                                         m_value_enum_strings_not_found,
@@ -996,7 +996,7 @@ private:
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s: %s %s: %s for %s - %s",
-                                    g_pid, "STS Error",
+                                    g_pid, "STC Error",
                                     "NxPVInfo::flushBuffers()",
                                     this->m_device_str.c_str(),
                                     "Empty Enumerated Type Value Strings",
@@ -1051,9 +1051,9 @@ private:
                                 m_log_path, m_link_path );
                         }
 
-                        // Search STS Config for Associated Groups
+                        // Search STC Config for Associated Groups
                         if ( m_nxgen.m_config_groups.size() )
-                            createSTSConfigGroups();
+                            createSTCConfigGroups();
 
                         // Done, We've Finalized This PV Log.
                         this->m_finalized = true;
@@ -1132,7 +1132,7 @@ private:
                         m_nxgen.makeGroupLink(
                             m_log_path, m_link_path );
 
-                        // Search STS Config for Associated Groups
+                        // Search STC Config for Associated Groups
                         // NOTE: All of This will "Still Work" for
                         // Any Subsumed Duplicate PVs "By Alias",
                         // _Except_ for Any Links to the "Last PV Value",
@@ -1141,7 +1141,7 @@ private:
                         // Value for the Combined PV Log... ;-b
                         // (This could be fixed, but probably unnecessary.)
                         if ( m_nxgen.m_config_groups.size() )
-                            createSTSConfigGroups();
+                            createSTCConfigGroups();
 
                         // Done, We've Finalized This PV Log.
                         this->m_finalized = true;
@@ -1161,7 +1161,7 @@ private:
             return( num_values );
         }
 
-        /// Compare Uint32 PV Value to Conditional STS Config Group Strings
+        /// Compare Uint32 PV Value to Conditional STC Config Group Strings
         bool matchValues
         (
             uint32_t value,                 ///< Uint32 Value to Match
@@ -1172,7 +1172,7 @@ private:
             if ( !(this->m_last_value_set) )
                 return( false );
 
-            // Compare PV Value to Conditional STS Config Group Values
+            // Compare PV Value to Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 uint32_t val = boost::lexical_cast<uint32_t>( values[i] );
@@ -1187,7 +1187,7 @@ private:
             return( false );
         }
 
-        /// Compare Double PV Value to Conditional STS Config Group Strings
+        /// Compare Double PV Value to Conditional STC Config Group Strings
         bool matchValues
         (
             double value,                   ///< Double Value to Match
@@ -1198,11 +1198,11 @@ private:
             if ( !(this->m_last_value_set) )
                 return( false );
 
-            // Compare PV Value to Conditional STS Config Group Values
+            // Compare PV Value to Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 double val = boost::lexical_cast<double>( values[i] );
-                if ( approximatelyEqual( val, value, STS_DOUBLE_EPSILON ) )
+                if ( approximatelyEqual( val, value, STC_DOUBLE_EPSILON ) )
                 {
                     syslog( LOG_INFO, "[%i] Value Match (%lf)",
                         g_pid, value );
@@ -1213,7 +1213,7 @@ private:
             return( false );
         }
 
-        /// Compare String PV Value to Conditional STS Config Group Strings
+        /// Compare String PV Value to Conditional STC Config Group Strings
         bool matchValues
         (
             std::string value,              ///< String Value to Match
@@ -1224,7 +1224,7 @@ private:
             if ( !(this->m_last_value_set) )
                 return( false );
 
-            // Compare PV Value to Conditional STS Config Group Values
+            // Compare PV Value to Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 if ( !(value.compare( values[i] )) )
@@ -1238,7 +1238,7 @@ private:
             return( false );
         }
 
-        /// Compare Uint32 PV Array to Conditional STS Config Group Strings
+        /// Compare Uint32 PV Array to Conditional STC Config Group Strings
         bool matchValues
         (
             std::vector<uint32_t> value,    ///< Uint32 Array to Match
@@ -1249,13 +1249,13 @@ private:
             if ( !(this->m_last_value_set) )
                 return( false );
 
-            // Compare PV Value to Conditional STS Config Group Values
+            // Compare PV Value to Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 uint32_t val = boost::lexical_cast<uint32_t>( values[i] );
 
                 // Compare _Each_ PV Array Value to the
-                // Conditional STS Config Group Values...
+                // Conditional STC Config Group Values...
                 // (Meh, it's something... ;-b)
                 for ( uint32_t j=0 ; j < value.size() ; j++ )
                 {
@@ -1271,7 +1271,7 @@ private:
             return( false );
         }
 
-        /// Compare Double PV Array to Conditional STS Config Group Strings
+        /// Compare Double PV Array to Conditional STC Config Group Strings
         bool matchValues
         (
             std::vector<double> value,      ///< Double Array to Match
@@ -1282,18 +1282,18 @@ private:
             if ( !(this->m_last_value_set) )
                 return( false );
 
-            // Compare PV Value to Conditional STS Config Group Values
+            // Compare PV Value to Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 double val = boost::lexical_cast<double>( values[i] );
 
                 // Compare _Each_ PV Array Value to the
-                // Conditional STS Config Group Values...
+                // Conditional STC Config Group Values...
                 // (Meh, it's something... ;-b)
                 for ( uint32_t j=0 ; j < value.size() ; j++ )
                 {
                     if ( approximatelyEqual( val, value[j],
-                            STS_DOUBLE_EPSILON ) )
+                            STC_DOUBLE_EPSILON ) )
                     {
                         syslog( LOG_INFO, "[%i] Value[%d] Match (%lf)",
                             g_pid, j, value[j] );
@@ -1316,7 +1316,7 @@ private:
             if ( !(this->m_last_value_set) )
                 return( false );
 
-            // Not-Compare PV Value to Conditional STS Config Group Values
+            // Not-Compare PV Value to Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 uint32_t val = boost::lexical_cast<uint32_t>( values[i] );
@@ -1342,12 +1342,12 @@ private:
             if ( !(this->m_last_value_set) )
                 return( false );
 
-            // Not-Compare PV Value to Conditional STS Config Group Values
+            // Not-Compare PV Value to Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 double val = boost::lexical_cast<double>( values[i] );
                 if ( !approximatelyEqual( val, value,
-                        STS_DOUBLE_EPSILON ) )
+                        STC_DOUBLE_EPSILON ) )
                 {
                     syslog( LOG_INFO, "[%i] Value Not-Match (%lf)",
                         g_pid, value );
@@ -1369,7 +1369,7 @@ private:
             if ( !(this->m_last_value_set) )
                 return( false );
 
-            // Not-Compare PV Value to Conditional STS Config Group Values
+            // Not-Compare PV Value to Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 if ( value.compare( values[i] ) )
@@ -1394,13 +1394,13 @@ private:
             if ( !(this->m_last_value_set) )
                 return( false );
 
-            // Not-Compare PV Value to Conditional STS Config Group Values
+            // Not-Compare PV Value to Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 uint32_t val = boost::lexical_cast<uint32_t>( values[i] );
 
                 // Not-Compare _Each_ PV Array Value to the
-                // Conditional STS Config Group Values...
+                // Conditional STC Config Group Values...
                 // (Meh, this is really terrible... ;-b)
                 for ( uint32_t j=0 ; j < value.size() ; j++ )
                 {
@@ -1427,18 +1427,18 @@ private:
             if ( !(this->m_last_value_set) )
                 return( false );
 
-            // Not-Compare PV Value to Conditional STS Config Group Values
+            // Not-Compare PV Value to Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 double val = boost::lexical_cast<double>( values[i] );
 
                 // Not-Compare _Each_ PV Array Value to the
-                // Conditional STS Config Group Values...
+                // Conditional STC Config Group Values...
                 // (Meh, this is really terrible... ;-b)
                 for ( uint32_t j=0 ; j < value.size() ; j++ )
                 {
                     if ( !approximatelyEqual( val, value[j],
-                            STS_DOUBLE_EPSILON ) )
+                            STC_DOUBLE_EPSILON ) )
                     {
                         syslog( LOG_INFO, "[%i] Value[%d] Not-Match (%lf)",
                             g_pid, j, value[j] );
@@ -1450,7 +1450,7 @@ private:
             return( false );
         }
 
-        /// Compare PV Enum String to Conditional STS Config Group Strings
+        /// Compare PV Enum String to Conditional STC Config Group Strings
         bool matchValueStrings
         (
             std::string enum_string,        ///< Enum String to Match
@@ -1462,7 +1462,7 @@ private:
                 return( false );
 
             // Compare PV Enum String to
-            // Conditional STS Config Group Values
+            // Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 if ( !(enum_string.compare( values[i] )) )
@@ -1488,7 +1488,7 @@ private:
                 return( false );
 
             // Not-Compare PV Enum String to
-            // Conditional STS Config Group Values
+            // Conditional STC Config Group Values
             for ( uint32_t i=0 ; i < values.size() ; i++ )
             {
                 if ( enum_string.compare( values[i] ) )
@@ -1572,8 +1572,8 @@ private:
             m_nxgen.writeMultidimDataset( path, name, value, dims, units );
         }
 
-        /// Search STS Config for Associated Groups & Create...
-        void createSTSConfigGroupMatchingElements
+        /// Search STC Config for Associated Groups & Create...
+        void createSTCConfigGroupMatchingElements
         (
             struct GroupInfo *G,                        ///< Config Group
             std::vector<struct ElementInfo> &elements,  ///< Elements
@@ -1677,7 +1677,7 @@ private:
                                 {
                                     syslog( LOG_ERR,
                                         "[%i] %s %s \"%s\" for %s (%s)",
-                                        g_pid, "STS Error:",
+                                        g_pid, "STC Error:",
                                         "Index Not Found in Group Name",
                                         G->name.c_str(),
                                         this->m_device_pv_str.c_str(),
@@ -1718,7 +1718,7 @@ private:
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s %s in %s \"%s\" %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "No Index Found for",
                                     this->m_device_pv_str.c_str(),
                                     "Group", G->name.c_str(),
@@ -1749,7 +1749,7 @@ private:
                                         << this->m_device_pv_str;
                                     syslog( LOG_ERR,
                                         "[%i] %s %s, %s=[%s] %s=[%s]",
-                                        g_pid, "STS Error:",
+                                        g_pid, "STC Error:",
                                         ss.str().c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
@@ -1824,7 +1824,7 @@ private:
                                         << this->m_device_pv_str;
                                     syslog( LOG_ERR,
                                         "[%i] %s %s, %s=[%s] %s=[%s]",
-                                        g_pid, "STS Error:",
+                                        g_pid, "STC Error:",
                                         ss.str().c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
@@ -1931,7 +1931,7 @@ private:
                                     {
                                         syslog( LOG_ERR,
                                             "[%i] %s %s %s %s - %s %s",
-                                            g_pid, "STS Error:",
+                                            g_pid, "STC Error:",
                                             "More Than 1 PV Value for",
                                             elem_link_path.c_str(),
                                             "to Link to Element Path",
@@ -1945,7 +1945,7 @@ private:
                                 {
                                     syslog( LOG_ERR,
                                         "[%i] %s %s %s - %s - %s %s",
-                                        g_pid, "STS Error:",
+                                        g_pid, "STC Error:",
                                         "*** NO LAST PV VALUE for",
                                         elem_link_path.c_str(),
                                         "Nothing to Link to Element Path",
@@ -2042,7 +2042,7 @@ private:
                         {
                             syslog( LOG_ERR,
                                 "[%i] %s %s %s - %s %s %s - %s %s",
-                                g_pid, "STS Error:",
+                                g_pid, "STC Error:",
                                 "*** DUPLICATE Element Link Attempt for",
                                 elem_link_path.c_str(),
                                 "PV/Log Path", it->second.c_str(),
@@ -2110,7 +2110,7 @@ private:
                         {
                             syslog( LOG_ERR,
                                 "[%i] %s %s %s - %s %s...",
-                                g_pid, "STS Error:",
+                                g_pid, "STC Error:",
                                 "*** DUPLICATE Element Units Value for",
                                 units_patt_str.c_str(),
                                 "Ignoring",
@@ -2123,8 +2123,8 @@ private:
             }
         }
 
-        /// Search STS Config for Associated Groups & Create...
-        void createSTSConfigGroups()
+        /// Search STC Config for Associated Groups & Create...
+        void createSTCConfigGroups()
         {
             // REMOVE ME...
             //syslog( LOG_INFO, "[%i] Checking %s for %s",
@@ -2134,18 +2134,18 @@ private:
 
             // Do We Have a Valid Initialized NeXus Data File...?
             // (We shouldn't get called if not, so if we do, better
-            // force it, lest we actually lose STS Config meta-data...!!)
+            // force it, lest we actually lose STC Config meta-data...!!)
             // Note: This is Just for Paranoia's Sake to Check Initialize
             // here, because we only get called by NxPVInfo::flushBuffers()
             // which _Also_ checks the NeXus Initialization... ;-D
             if ( !(m_nxgen.initialize( true,
-                    "NxPVInfo::createSTSConfigGroups()" )) )
+                    "NxPVInfo::createSTCConfigGroups()" )) )
             {
                 syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
-                    g_pid, "STS Error:",
-                    "NxPVInfo::createSTSConfigGroups()",
+                    g_pid, "STC Error:",
+                    "NxPVInfo::createSTCConfigGroups()",
                     "Failed to Force Initialize NeXus File",
-                    "Losing STS Config Meta-Data!!",
+                    "Losing STC Config Meta-Data!!",
                     this->m_device_str.c_str(),
                     this->m_pv_str.c_str() );
                 usleep(30000); // give syslog a chance...
@@ -2159,7 +2159,7 @@ private:
                 struct GroupInfo *G = &(m_nxgen.m_config_groups[g]);
 
                 // Check for Element Pattern Matches...
-                createSTSConfigGroupMatchingElements(
+                createSTCConfigGroupMatchingElements(
                     G, G->elements, "" );
 
                 // Skip Conditional Value Checks if No PV Values Set...
@@ -2241,12 +2241,12 @@ private:
             }
         }
 
-        /// Search STS Config for Conditional Groups & Create...
-        void createSTSConfigConditionalGroups(void)
+        /// Search STC Config for Conditional Groups & Create...
+        void createSTCConfigConditionalGroups(void)
         {
             // Skip This If We're Not Writing to NeXus
             // or If We Don't Care About This PV (Ignored),
-            // or We Don't Have Any STS Config Groups...! ;-D
+            // or We Don't Have Any STC Config Groups...! ;-D
             if ( !(m_nxgen.m_gen_nexus) || this->m_ignore
                     || !(m_nxgen.m_config_groups.size()) )
             {
@@ -2260,13 +2260,13 @@ private:
             // in StreamParser::finalizeStreamProcessing(), then
             // Now's a Chance to Finally Create a NeXus Data File...! ;-D
             if ( !(m_nxgen.initialize( true,
-                    "NxPVInfo::createSTSConfigConditionalGroups()" )) )
+                    "NxPVInfo::createSTCConfigConditionalGroups()" )) )
             {
                 syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
-                    g_pid, "STS Error:",
-                    "NxPVInfo::createSTSConfigConditionalGroups()",
+                    g_pid, "STC Error:",
+                    "NxPVInfo::createSTCConfigConditionalGroups()",
                     "Failed to Force Initialize NeXus File",
-                    "Losing STS Conditional Config Groups!!",
+                    "Losing STC Conditional Config Groups!!",
                     this->m_device_str.c_str(),
                     this->m_pv_str.c_str() );
                 usleep(30000); // give syslog a chance...
@@ -2275,12 +2275,12 @@ private:
 
             try
             {
-                // Search for Activated STS Config Conditional Groups
+                // Search for Activated STC Config Conditional Groups
 
                 // REMOVE ME...
                 //syslog( LOG_INFO, "[%i] Checking %s for %s",
                     //g_pid, this->m_device_pv_str.c_str(),
-                    //"STS Config Conditional Group Membership..." );
+                    //"STC Config Conditional Group Membership..." );
                 //usleep(30000); // give syslog a chance...
 
                 // Check Each Config Group in Turn for a
@@ -2308,7 +2308,7 @@ private:
                         {
                             std::string label = "Condition ";
                             label += "\"" + C->name + "\" ";
-                            createSTSConfigGroupMatchingElements(
+                            createSTCConfigGroupMatchingElements(
                                 G, C->elements, label );
                         }
                     }
@@ -2317,7 +2317,7 @@ private:
             catch( TraceException &e )
             {
                 RETHROW_TRACE( e,
-                    "NxPVInfo::createSTSConfigConditionalGroups (pv: "
+                    "NxPVInfo::createSTCConfigConditionalGroups (pv: "
                     << this->m_device_id << "." << this->m_pv_id
                     << ") failed." )
             }
@@ -2375,52 +2375,52 @@ protected:
 
     bool                initialize( bool a_force_init = false,
                             std::string caller = "" );
-    void                finalize( const STS::RunMetrics &a_run_metrics,
-                            const STS::RunInfo &a_run_info );
-    STS::PVInfoBase*    makePVInfo( const std::string &a_device_name,
+    void                finalize( const STC::RunMetrics &a_run_metrics,
+                            const STC::RunInfo &a_run_info );
+    STC::PVInfoBase*    makePVInfo( const std::string &a_device_name,
                             const std::string &a_name,
                             const std::string &a_connection,
-                            STS::Identifier a_device_id,
-                            STS::Identifier a_pv_id,
-                            STS::PVType a_type,
-                            std::vector<STS::PVEnumeratedType>
+                            STC::Identifier a_device_id,
+                            STC::Identifier a_pv_id,
+                            STC::PVType a_type,
+                            std::vector<STC::PVEnumeratedType>
                                 *a_enum_vector,
                             uint32_t a_enum_index,
                             const std::string &a_units,
                             bool a_ignore );
-    STS::BankInfo*      makeBankInfo( uint16_t a_id, uint32_t a_state,
+    STC::BankInfo*      makeBankInfo( uint16_t a_id, uint32_t a_state,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve );
     void                initializeNxBank( NxBankInfo *a_bi,
                             bool a_end_of_run );
-    STS::MonitorInfo*   makeMonitorInfo( uint16_t a_id,
+    STC::MonitorInfo*   makeMonitorInfo( uint16_t a_id,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve,
-                            STS::BeamMonitorConfig *a_config,
+                            STC::BeamMonitorConfig *a_config,
                             bool a_known_monitor );
     void                initializeNxMonitor( NxMonitorInfo *a_mi );
     void                processBeamlineInfo(
-                            const STS::BeamlineInfo &a_beamline_info,
+                            const STC::BeamlineInfo &a_beamline_info,
                             bool a_force_init = false );
-    void                processRunInfo( const STS::RunInfo &a_run_info,
+    void                processRunInfo( const STC::RunInfo &a_run_info,
                             const bool a_strict );
     void                processGeometry( const std::string &a_xml,
                             bool a_force_init = false );
-    void                pulseBuffersReady( STS::PulseInfo &a_pulse_info );
-    void                bankPidTOFBuffersReady( STS::BankInfo &a_bank );
-    void                bankIndexBuffersReady( STS::BankInfo &a_bank,
+    void                pulseBuffersReady( STC::PulseInfo &a_pulse_info );
+    void                bankPidTOFBuffersReady( STC::BankInfo &a_bank );
+    void                bankIndexBuffersReady( STC::BankInfo &a_bank,
                             bool use_default_chunk_size );
-    void                bankPulseGap( STS::BankInfo &a_bank,
+    void                bankPulseGap( STC::BankInfo &a_bank,
                             uint64_t a_count );
-    void                bankFinalize( STS::BankInfo &a_bank );
+    void                bankFinalize( STC::BankInfo &a_bank );
     void                monitorTOFBuffersReady(
-                            STS::MonitorInfo &a_monitor_info );
+                            STC::MonitorInfo &a_monitor_info );
     void                monitorIndexBuffersReady(
-                            STS::MonitorInfo &a_monitor_info,
+                            STC::MonitorInfo &a_monitor_info,
                             bool use_default_chunk_size );
-    void                monitorPulseGap( STS::MonitorInfo &a_monitor,
+    void                monitorPulseGap( STC::MonitorInfo &a_monitor,
                             uint64_t a_count );
-    void                monitorFinalize( STS::MonitorInfo &a_monitor );
+    void                monitorFinalize( STC::MonitorInfo &a_monitor );
     void                runComment( const std::string &a_comment,
                             bool a_force_init = false );
     void                markerPause( double a_time, uint64_t tOrig,
@@ -2435,11 +2435,11 @@ protected:
                             const std::string &a_comment  );
     void                markerComment( double a_time, uint64_t tOrig,
                             const std::string &a_comment );
-    void                writeDeviceEnums( STS::Identifier a_devId,
-                            std::vector<STS::PVEnumeratedType>
+    void                writeDeviceEnums( STC::Identifier a_devId,
+                            std::vector<STC::PVEnumeratedType>
                                 &a_enumVec );
-    void                checkSTSConfigElementUnitsPaths(void);
-    void                writeSTSConfigUnitsAttributes(
+    void                checkSTCConfigElementUnitsPaths(void);
+    void                writeSTCConfigUnitsAttributes(
                             struct GroupInfo *G,
                             std::vector<struct ElementInfo> &elements );
 
@@ -2447,7 +2447,7 @@ private:
     void                flushPauseData(void);
     void                flushScanData(void);
     void                flushCommentData(void);
-    NeXus::NXnumtype    toNxType( STS::PVType a_type ) const;
+    NeXus::NXnumtype    toNxType( STC::PVType a_type ) const;
     void                makeGroup( const std::string &a_path,
                             const std::string &a_type );
     void                makeDataset( const std::string &a_path,
@@ -2462,7 +2462,7 @@ private:
                             std::vector<TypeT> &a_data,
                             std::vector<hsize_t> &a_dims,
                             const std::string a_units = "" );
-    void                parseSTSConfigFile(
+    void                parseSTCConfigFile(
                             const std::string &a_config_file );
     void                makeLink( const std::string &source_path,
                             const std::string &dest_name );
@@ -2509,7 +2509,7 @@ private:
                                         a_buffer, a_buffer_size,
                                         a_cur_size ) != SUCCEED )
                                 {
-                                    THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+                                    THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
                                         "H5NXwrite_slab FAILED for path: "
                                             << a_path
                                             << " a_buffer_size="
@@ -2571,9 +2571,9 @@ private:
     bool                m_nexus_init;           ///< Has the Nexus file been Initialized yet or not?
     bool                m_nexus_beamline_init;  ///< Has the Nexus BeamlineInfo been Initialized yet or not?
     std::string         m_nexus_filename;       ///< Name of Nexus file
-    std::string         m_config_file;          ///< Name of STS Config file
+    std::string         m_config_file;          ///< Name of STC Config file
     std::vector<struct GroupInfo>
-                        m_config_groups;        ///< Vector of STS Config Group Containers
+                        m_config_groups;        ///< Vector of STC Config Group Containers
     std::string         m_entry_path;           ///< Path to Nexus NXentry
     std::string         m_instrument_path;      ///< Path to Nexus NXinstrument
     std::string         m_daslogs_path;         ///< Path to Nexus DAS Logs
@@ -2612,7 +2612,7 @@ private:
     uint64_t                    m_total_counts;         /// Total Run Event Counts
     uint64_t                    m_total_uncounts;       /// Total Run Event Uncounts
     uint64_t                    m_total_non_counts;     /// Total Run Event Non-Counts (Monitor)
-    struct timespec             m_sts_run_start_time;   /// STS Start of Processing Time
+    struct timespec             m_stc_run_start_time;   /// STC Start of Processing Time
 };
 
 #endif // NXGEN_H

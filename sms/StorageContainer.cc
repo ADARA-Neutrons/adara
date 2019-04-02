@@ -321,7 +321,7 @@ bool StorageContainer::createMarker(const char *file)
 void StorageContainer::markTranslated(void)
 {
 	/* Mark this container as completed so that we don't resend it to
-	 * STS if we restart before it is purged.
+	 * STC if we restart before it is purged.
 	 */
 	INFO("Marking Run " << m_runNumber << " as Successfully Translated");
 	if (createMarker(m_completed_marker))

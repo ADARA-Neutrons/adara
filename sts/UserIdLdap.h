@@ -5,9 +5,9 @@
 #include <string>
 #include <stdint.h>
 
-int stsLdapConnect();
+int stcLdapConnect();
 
-int stsLdapLookupUserName( std::string uid, std::string &user_name );
+int stcLdapLookupUserName( std::string uid, std::string &user_name );
 
-int stsLdapDisconnect(void);
+int stcLdapDisconnect(void);
 

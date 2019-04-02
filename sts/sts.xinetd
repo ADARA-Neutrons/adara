@@ -1,23 +1,23 @@
 
 #
-# STS XInetD Init Script
-#    - to be installed in /etc/xinetd.d/sts
+# STC XInetD Init Script
+#    - to be installed in /etc/xinetd.d/stc
 #
-# Also Requires STS Port 31417 to be added to /etc/services:
-#    sts   31417/udp   #sts service
-#    sts   31417/tcp   #sts service
+# Also Requires STC Port 31417 to be added to /etc/services:
+#    stc   31417/udp   #stc service
+#    stc   31417/tcp   #stc service
 #
 # Note: "server_args" is currently ignored!
 #
 
-service sts
+service stc
 {
-        id              = sts-stream
+        id              = stc-stream
         wait            = no
         socket_type     = stream
         user            = snsdata
         group           = adara
-        server          = /usr/local/bin/sts
+        server          = /usr/local/bin/stc
         server_args     = -m inetd -o /tmp
         port            = 31417
 }

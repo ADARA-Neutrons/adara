@@ -34,7 +34,7 @@ NxGen::NxGen
     string         &a_work_base,                ///< [in] Work Directory Base
     string         &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
     string         &a_nexus_out_file,           ///< [in] Filename of output Nexus file (disabled if empty)
-    string         &a_config_file,              ///< [in] Filename of STS Config file (disabled if empty)
+    string         &a_config_file,              ///< [in] Filename of STC Config file (disabled if empty)
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
     unsigned long   a_chunk_size,               ///< [in] HDF5 chunk size (in Dataset Elements!)
@@ -42,7 +42,7 @@ NxGen::NxGen
     unsigned short  a_anc_buf_chunk_count,      ///< [in] ADARA ancillary buffer size in chunks
     unsigned long   a_cache_size,               ///< [in] HDF5 cache size
     unsigned short  a_compression_level,        ///< [in] HDF5 compression level (0 = off to 9 = max)
-    bool            a_verbose                   ///< [in] STS Verbosity
+    bool            a_verbose                   ///< [in] STC Verbosity
 )
 :
     StreamParser( a_fd_in,
@@ -77,8 +77,8 @@ NxGen::NxGen
     m_nexus_run_comment_init(false),
     m_nexus_geometry_init(false)
 {
-    // Capture STS "Start of Processing Time"...
-    clock_gettime( CLOCK_REALTIME, &m_sts_run_start_time );
+    // Capture STC "Start of Processing Time"...
+    clock_gettime( CLOCK_REALTIME, &m_stc_run_start_time );
 
     if ( !a_nexus_out_file.empty() )
     {
@@ -86,9 +86,9 @@ NxGen::NxGen
         m_h5nx.H5NXset_cache_size( a_cache_size );
     }
 
-    // Parse STS Config File
+    // Parse STC Config File
     if ( !m_config_file.empty() )
-        parseSTSConfigFile( m_config_file );
+        parseSTCConfigFile( m_config_file );
 
     // Reserve internal buffer for veto pulse times (in Dataset Elements!)
     m_pulse_vetoes.reserve( a_chunk_size );
@@ -111,16 +111,16 @@ NxGen::~NxGen()
  * scalar types are supported (others are mapped to these), in addition
  * to the new uint32 and double array PVs.
  */
-STS::PVInfoBase*
+STC::PVInfoBase*
 NxGen::makePVInfo
 (
     const string           &a_device_name,  ///< [in] Name of device that owns the PV
     const string           &a_name,         ///< [in] Name of PV
     const string           &a_connection,   ///< [in] PV Connection String
-    STS::Identifier         a_device_id,    ///< [in] ID of device that owns the PV
-    STS::Identifier         a_pv_id,        ///< [in] ID of the PV
-    STS::PVType             a_type,         ///< [in] Type of PV
-    std::vector<STS::PVEnumeratedType>
+    STC::Identifier         a_device_id,    ///< [in] ID of device that owns the PV
+    STC::Identifier         a_pv_id,        ///< [in] ID of the PV
+    STC::PVType             a_type,         ///< [in] Type of PV
+    std::vector<STC::PVEnumeratedType>
                            *a_enum_vector,  ///< [in] Enumerated Type Vector for PV
     uint32_t                a_enum_index,   ///< [in] Enumerated Type Index for PV
     const string           &a_units,        ///< [in] Units of PV (empty if not needed)
@@ -166,7 +166,7 @@ NxGen::makePVInfo
                 {
                     syslog( LOG_ERR,
                         "[%i] %s %s: %s: Device %s: %s -> %s",
-                        g_pid, "STS Error:", "makePVInfo()",
+                        g_pid, "STC Error:", "makePVInfo()",
                         "PV Name Clash",
                         a_device_name.c_str(),
                         a_name.c_str(),
@@ -193,7 +193,7 @@ NxGen::makePVInfo
     // Verify a Complete Match, and/or Stitch Together _All_ the Values
     // from All Copies, as needed.
 
-    vector<STS::PVInfoBase*>::iterator ipv = m_pvs_list.begin();
+    vector<STC::PVInfoBase*>::iterator ipv = m_pvs_list.begin();
 
     bool isDuplicate = false;
 
@@ -210,7 +210,7 @@ NxGen::makePVInfo
 
             syslog( LOG_ERR,
                 "[%i] %s %s: %s: Device %s %s == Device %s %s",
-                g_pid, "STS Error:", "makePVInfo()",
+                g_pid, "STC Error:", "makePVInfo()",
                 "Duplicate PV Connection",
                 a_device_name.c_str(),
                 internal_connection.c_str(),
@@ -242,7 +242,7 @@ NxGen::makePVInfo
         {
             syslog( LOG_ERR,
                 "[%i] %s %s: %s: Device %s %s == Device %s %s",
-                g_pid, "STS Error:", "makePVInfo()",
+                g_pid, "STC Error:", "makePVInfo()",
                 "Duplicate PV Connection for Different PV Definition",
                 a_device_name.c_str(),
                 internal_connection.c_str(),
@@ -268,7 +268,7 @@ NxGen::makePVInfo
                     {
                         syslog( LOG_ERR,
                             "[%i] %s %s: %s: Device %s: %s -> %s",
-                            g_pid, "STS Error:", "makePVInfo()",
+                            g_pid, "STC Error:", "makePVInfo()",
                             "PV Connection Clash",
                             a_device_name.c_str(),
                             a_connection.c_str(),
@@ -283,7 +283,7 @@ NxGen::makePVInfo
                         internal_name = internal_connection;
                         syslog( LOG_ERR,
                             "[%i] %s %s: %s: Device %s: %s -> %s",
-                            g_pid, "STS Error:", "makePVInfo()",
+                            g_pid, "STC Error:", "makePVInfo()",
                             "Associated PV Name (Alias) Clash",
                             a_device_name.c_str(),
                             a_name.c_str(),
@@ -311,37 +311,37 @@ NxGen::makePVInfo
 
     switch ( a_type )
     {
-        case STS::PVT_INT:  // ADARA only supports uint32_t currently
-        case STS::PVT_ENUM:
-        case STS::PVT_UINT:
+        case STC::PVT_INT:  // ADARA only supports uint32_t currently
+        case STC::PVT_ENUM:
+        case STC::PVT_UINT:
             return new NxPVInfo<uint32_t>( a_device_name,
                 a_name, internal_name, a_connection, internal_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
                 a_units, a_ignore, isDuplicate, *this );
-        case STS::PVT_FLOAT: // ADARA only supports double currently
-        case STS::PVT_DOUBLE:
+        case STC::PVT_FLOAT: // ADARA only supports double currently
+        case STC::PVT_DOUBLE:
             return new NxPVInfo<double>( a_device_name,
                 a_name, internal_name, a_connection, internal_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
                 a_units, a_ignore, isDuplicate, *this );
-        case STS::PVT_STRING:
+        case STC::PVT_STRING:
             return new NxPVInfo<string>( a_device_name,
                 a_name, internal_name, a_connection, internal_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
                 a_units, a_ignore, isDuplicate, *this );
-        case STS::PVT_UINT_ARRAY:
+        case STC::PVT_UINT_ARRAY:
             return new NxPVInfo< vector<uint32_t> >( a_device_name,
                 a_name, internal_name, a_connection, internal_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
                 a_units, a_ignore, isDuplicate, *this );
-        case STS::PVT_DOUBLE_ARRAY:
+        case STC::PVT_DOUBLE_ARRAY:
             return new NxPVInfo< vector<double> >( a_device_name,
                 a_name, internal_name, a_connection, internal_connection,
                 a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
                 a_units, a_ignore, isDuplicate, *this );
     }
 
-    THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
+    THROW_TRACE( STC::ERR_UNEXPECTED_INPUT,
         "makePVInfo() failed - invalid PV type: " << a_type );
 }
 
@@ -352,7 +352,7 @@ NxGen::makePVInfo
  * This method constructs Nexus-specific BankInfo objects. The Nexus-specific NxBankInfo extends the BankInfo class to
  * include a number of attributes needed for writing banked event data efficiently to a Nexus file.
  */
-STS::BankInfo*
+STC::BankInfo*
 NxGen::makeBankInfo
 (
     uint16_t a_id,              ///< [in] ID of detector bank
@@ -411,7 +411,7 @@ NxGen::initializeNxBank
     if ( !initialize( true, "NxGen::initializeNxBank()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u",
-            g_pid, "STS Error:", "NxGen::initializeNxBank()",
+            g_pid, "STC Error:", "NxGen::initializeNxBank()",
             "Failed to Force Initialize NeXus File",
             "Losing Bank Group/Data!!",
             "bank_id", a_bi->m_id );
@@ -475,13 +475,13 @@ NxGen::initializeNxBank
  * MonitorInfo class to include a number of attributes needed
  * for writing monitor event data efficiently to a Nexus file.
  */
-STS::MonitorInfo*
+STC::MonitorInfo*
 NxGen::makeMonitorInfo
 (
     uint16_t a_id,                    ///< [in] ID of detector bank
     uint32_t a_buf_reserve,           ///< [in] Event buffer initial capacity
     uint32_t a_idx_buf_reserve,       ///< [in] Index buffer initial capacity
-    STS::BeamMonitorConfig *a_config, ///< [in] Beam Monitor Histo Config (opt)
+    STC::BeamMonitorConfig *a_config, ///< [in] Beam Monitor Histo Config (opt)
     bool a_known_monitor              ///< [in] Is this a "Known" Monitor?
 )
 {
@@ -530,7 +530,7 @@ NxGen::initializeNxMonitor
     if ( !initialize( true, "NxGen::initializeNxMonitor()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u",
-            g_pid, "STS Error:", "NxGen::initializeNxMonitor()",
+            g_pid, "STC Error:", "NxGen::initializeNxMonitor()",
             "Failed to Force Initialize NeXus File",
             "Losing Monitor Group/Meta-Data!!",
             "bank_id", a_mi->m_id );
@@ -611,7 +611,7 @@ NxGen::initialize( bool a_force_init, string caller )
             else
             {
                 syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-                    g_pid, "STS Error:", "NxGen::initialize()",
+                    g_pid, "STC Error:", "NxGen::initialize()",
                     "Failed to Force Construction of Working Directory",
                     "Bailing... (Probably...)" );
                 usleep(30000); // give syslog a chance...
@@ -674,26 +674,26 @@ NxGen::initialize( bool a_force_init, string caller )
         // Create Software Provenance Collection
         makeGroup( m_software_path, "NXcollection" );
 
-        // Create ADARA STS Software Provenance Note
+        // Create ADARA STC Software Provenance Note
         makeGroup( m_software_path + "/Translation", "NXprocess" );
         writeString( m_software_path + "/Translation", "program",
-            "ADARA STS" );
+            "ADARA STC" );
         writeString( m_software_path + "/Translation", "note",
             ADARA::ATTRIB );
 
-        // ADARA STS Version String
-        string sts_version = "ADARA STS ";
-        sts_version += STS_VERSION;
-        sts_version += ", Common ";
-        sts_version += ADARA::VERSION;
-        sts_version += ", ComBus ";
-        sts_version += ADARA::ComBus::VERSION;
-        sts_version += ", Tag ";
-        sts_version += ADARA::TAG_NAME;
+        // ADARA STC Version String
+        string stc_version = "ADARA STC ";
+        stc_version += STC_VERSION;
+        stc_version += ", Common ";
+        stc_version += ADARA::VERSION;
+        stc_version += ", ComBus ";
+        stc_version += ADARA::ComBus::VERSION;
+        stc_version += ", Tag ";
+        stc_version += ADARA::TAG_NAME;
         writeString( m_software_path + "/Translation", "version",
-            sts_version );
+            stc_version );
 
-        // ADARA STS Processing Start Time
+        // ADARA STC Processing Start Time
         struct timespec now;
         clock_gettime( CLOCK_REALTIME_COARSE, &now );
         string time = timeToISO8601( now );
@@ -732,8 +732,8 @@ NxGen::initialize( bool a_force_init, string caller )
 void
 NxGen::finalize
 (
-    const STS::RunMetrics &a_run_metrics,   ///< [in] Run metrics object
-    const STS::RunInfo &a_run_info          ///< [in] Run information object
+    const STC::RunMetrics &a_run_metrics,   ///< [in] Run metrics object
+    const STC::RunInfo &a_run_info          ///< [in] Run information object
 )
 {
     if ( !m_gen_nexus )
@@ -745,7 +745,7 @@ NxGen::finalize
     if ( !initialize( true, "NxGen::finalize()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-            g_pid, "STS Error:", "NxGen::finalize()",
+            g_pid, "STC Error:", "NxGen::finalize()",
             "Failed to Force Initialize NeXus File",
             "Losing Final Run Meta-Data!" );
         usleep(30000); // give syslog a chance...
@@ -989,7 +989,7 @@ NxGen::finalize
  * now that All PV Values have been processed...
  */
 void
-NxGen::checkSTSConfigElementUnitsPaths(void)
+NxGen::checkSTCConfigElementUnitsPaths(void)
 {
     if ( !m_gen_nexus )
         return;
@@ -1000,13 +1000,13 @@ NxGen::checkSTSConfigElementUnitsPaths(void)
     // Although if we just Forced Working Directory construction
     // in StreamParser::finalizeStreamProcessing(), then
     // Now May Be Our Chance to Finally Create a NeXus Data File...! ;-D
-    if ( !initialize( true, "NxGen::checkSTSConfigElementUnitsPaths()" ) )
+    if ( !initialize( true, "NxGen::checkSTCConfigElementUnitsPaths()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-            g_pid, "STS Error:",
-            "NxGen::checkSTSConfigElementUnitsPaths()",
+            g_pid, "STC Error:",
+            "NxGen::checkSTCConfigElementUnitsPaths()",
             "Failed to Force Initialize NeXus File",
-            "Losing STS Config Element Units Meta-Data!" );
+            "Losing STC Config Element Units Meta-Data!" );
         usleep(30000); // give syslog a chance...
         return;
     }
@@ -1017,7 +1017,7 @@ NxGen::checkSTSConfigElementUnitsPaths(void)
     {
         struct GroupInfo *G = &(m_config_groups[g]);
 
-        writeSTSConfigUnitsAttributes( G, G->elements );
+        writeSTCConfigUnitsAttributes( G, G->elements );
 
         // Check for Conditional Elements as Well...
         for ( uint32_t c=0 ; c < G->conditions.size() ; c++ )
@@ -1026,7 +1026,7 @@ NxGen::checkSTSConfigElementUnitsPaths(void)
 
             if ( C->is_set )
             {
-                writeSTSConfigUnitsAttributes( G, C->elements );
+                writeSTCConfigUnitsAttributes( G, C->elements );
             }
         }
     }
@@ -1040,7 +1040,7 @@ NxGen::checkSTSConfigElementUnitsPaths(void)
  * now that All PV Values have been processed...
  */
 void
-NxGen::writeSTSConfigUnitsAttributes(
+NxGen::writeSTCConfigUnitsAttributes(
         struct GroupInfo *G, std::vector<struct ElementInfo> &elements )
 {
     std::map<std::string, std::string>::iterator it;
@@ -1116,7 +1116,7 @@ NxGen::writeSTSConfigUnitsAttributes(
             }
             ss << "]";
             syslog( LOG_ERR, "[%i] %s Group %s: %s - %s %s",
-                g_pid, "STS Error:",
+                g_pid, "STC Error:",
                 G->name.c_str(), "No Matching Units PV Found",
                 "Missing PV Value or Config...?", ss.str().c_str() );
             usleep(30000); // give syslog a chance...
@@ -1125,11 +1125,11 @@ NxGen::writeSTSConfigUnitsAttributes(
 }
 
 
-/*! \brief Dump Overall STS Processing Statistics
+/*! \brief Dump Overall STC Processing Statistics
  *
  * This method dump the overall processing time/event bandwidth
  * for Nexus-specific output generation, including statistics
- * for the _Run Itself_ and how long the STS took to process it.
+ * for the _Run Itself_ and how long the STC took to process it.
  */
 void
 NxGen::dumpProcessingStatistics(void)
@@ -1167,31 +1167,31 @@ NxGen::dumpProcessingStatistics(void)
         (double) m_total_non_counts / (double) m_duration );
     usleep(30000); // give syslog a chance...
 
-    // STS Processing Statistics
+    // STC Processing Statistics
 
-    struct timespec sts_run_end_time;
+    struct timespec stc_run_end_time;
 
-    clock_gettime( CLOCK_REALTIME, &sts_run_end_time );
+    clock_gettime( CLOCK_REALTIME, &stc_run_end_time );
 
-    float sts_duration = calcDiffSeconds(
-        sts_run_end_time, m_sts_run_start_time );
+    float stc_duration = calcDiffSeconds(
+        stc_run_end_time, m_stc_run_start_time );
 
     syslog( LOG_INFO, "[%i] %s = %f seconds",
-        g_pid, "Total STS Processing Time", sts_duration );
+        g_pid, "Total STC Processing Time", stc_duration );
     usleep(30000); // give syslog a chance...
 
-    double sts_bandwidth = (double) total_counts
-        / (double) sts_duration;
+    double stc_bandwidth = (double) total_counts
+        / (double) stc_duration;
 
     syslog( LOG_INFO, "[%i] %s = %lf events/sec",
-        g_pid, "Overall STS Bandwidth", sts_bandwidth );
+        g_pid, "Overall STC Bandwidth", stc_bandwidth );
     usleep(30000); // give syslog a chance...
 
-    double overhead_ratio = ( sts_bandwidth > 0.0 ) ?
-        ( run_bandwidth / sts_bandwidth ) : 0.0;
+    double overhead_ratio = ( stc_bandwidth > 0.0 ) ?
+        ( run_bandwidth / stc_bandwidth ) : 0.0;
 
     syslog( LOG_INFO, "[%i] %s = %lf",
-        g_pid, "STS Overhead Ratio", overhead_ratio );
+        g_pid, "STC Overhead Ratio", overhead_ratio );
     usleep(30000); // give syslog a chance...
 }
 
@@ -1203,7 +1203,7 @@ NxGen::dumpProcessingStatistics(void)
 void
 NxGen::processBeamlineInfo
 (
-    const STS::BeamlineInfo & a_beamline_info,  ///< [in] Beamline information object
+    const STC::BeamlineInfo & a_beamline_info,  ///< [in] Beamline information object
     bool a_force_init                           ///< [in] Force Initialize?
 )
 {
@@ -1220,7 +1220,7 @@ NxGen::processBeamlineInfo
         if ( a_force_init )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-                g_pid, "STS Error:", "NxGen::processBeamlineInfo()",
+                g_pid, "STC Error:", "NxGen::processBeamlineInfo()",
                 "Failed to Force Initialize NeXus File",
                 "Losing Beamline Meta-Data!" );
             usleep(30000); // give syslog a chance...
@@ -1229,7 +1229,7 @@ NxGen::processBeamlineInfo
         {
             syslog( LOG_ERR,
                 "[%i] %s %s: %s - %s",
-                g_pid, "STS Error:", "NxGen::processBeamlineInfo()",
+                g_pid, "STC Error:", "NxGen::processBeamlineInfo()",
                 "Unable to Initialize NeXus File", "Retry Later..." );
             usleep(30000); // give syslog a chance...
         }
@@ -1272,7 +1272,7 @@ NxGen::processBeamlineInfo
 void
 NxGen::processRunInfo
 (
-    const STS::RunInfo & a_run_info,    ///< [in] Run information object
+    const STC::RunInfo & a_run_info,    ///< [in] Run information object
     const bool a_strict                 ///< [in] Strict Protocol Parsing
 )
 {
@@ -1288,7 +1288,7 @@ NxGen::processRunInfo
             msg = "Required run_number missing from RunInfo.";
 
         if ( msg.size() )
-            THROW_TRACE( STS::ERR_UNEXPECTED_INPUT, msg )
+            THROW_TRACE( STC::ERR_UNEXPECTED_INPUT, msg )
     }
 
     if ( !m_gen_nexus )
@@ -1303,7 +1303,7 @@ NxGen::processRunInfo
     if ( !initialize( true, "NxGen::processRunInfo()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-            g_pid, "STS Error:", "NxGen::processRunInfo()",
+            g_pid, "STC Error:", "NxGen::processRunInfo()",
             "Failed to Force Initialize NeXus File",
             "Losing Final Run Meta-Data!" );
         usleep(30000); // give syslog a chance...
@@ -1411,7 +1411,7 @@ NxGen::processRunInfo
         bool ldap_lookup = false;
         size_t user_count = 0;
         string path;
-        for ( vector<STS::UserInfo>::const_iterator u =
+        for ( vector<STC::UserInfo>::const_iterator u =
                 a_run_info.users.begin();
                 u != a_run_info.users.end(); ++u )
         {
@@ -1434,12 +1434,12 @@ NxGen::processRunInfo
                 // Create LDAP Connection Only as Needed...
                 if ( !ldap_lookup )
                 {
-                    if ( stsLdapConnect() == 0 )
+                    if ( stcLdapConnect() == 0 )
                         ldap_lookup = true;
                 }
 
                 if ( ldap_lookup )
-                    stsLdapLookupUserName( u->id, user_name );
+                    stcLdapLookupUserName( u->id, user_name );
             }
 
             writeString( path, "name", user_name );
@@ -1454,7 +1454,7 @@ NxGen::processRunInfo
 
         // Close Any Open LDAP Connections...
         if ( ldap_lookup )
-            stsLdapDisconnect();
+            stcLdapDisconnect();
     }
     catch( TraceException &e )
     {
@@ -1477,7 +1477,7 @@ NxGen::processGeometry
     // Check for Duplicate Geometry...
     if ( m_geometryXml.size() > 0 && m_geometryXml.compare( a_xml ) ) {
         syslog( LOG_ERR, "[%i] %s %s: New [%s] != Orig [%s] - %s",
-            g_pid, "STS Error:", "Duplicate Geometry/IDF Specified",
+            g_pid, "STC Error:", "Duplicate Geometry/IDF Specified",
             a_xml.c_str(), m_geometryXml.c_str(),
             "Ignoring..." );
         usleep(30000); // give syslog a chance...
@@ -1501,7 +1501,7 @@ NxGen::processGeometry
         if ( a_force_init )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-                g_pid, "STS Error:", "NxGen::processGeometry()",
+                g_pid, "STC Error:", "NxGen::processGeometry()",
                 "Failed to Force Initialize NeXus File",
                 "Losing Geometry/IDF XML Data!" );
             usleep(30000); // give syslog a chance...
@@ -1510,7 +1510,7 @@ NxGen::processGeometry
         {
             syslog( LOG_ERR,
                 "[%i] %s %s: %s - %s",
-                g_pid, "STS Error:", "NxGen::processGeometry()",
+                g_pid, "STC Error:", "NxGen::processGeometry()",
                 "Unable to Initialize NeXus File", "Retry Later..." );
             usleep(30000); // give syslog a chance...
         }
@@ -1543,7 +1543,7 @@ NxGen::processGeometry
 void
 NxGen::pulseBuffersReady
 (
-    STS::PulseInfo &a_pulse_info    ///< [in] Pulse data object
+    STC::PulseInfo &a_pulse_info    ///< [in] Pulse data object
 )
 {
     if ( !m_gen_nexus )
@@ -1557,7 +1557,7 @@ NxGen::pulseBuffersReady
         vector<double>::iterator tstart = a_pulse_info.times.begin();
         vector<double>::iterator tend = a_pulse_info.times.end(); tend--;
         syslog( LOG_ERR, "[%i] %s %s: %s - %s For Pulses from %lf to %lf.",
-            g_pid, "STS Error:", "NxGen::pulseBuffersReady()",
+            g_pid, "STC Error:", "NxGen::pulseBuffersReady()",
             "Failed to Force Initialize NeXus File",
             "Losing Pulse Info Data!!", *tstart, *tend );
         usleep(30000); // give syslog a chance...
@@ -1585,7 +1585,7 @@ NxGen::pulseBuffersReady
                 // This is the Final Dump and There aren't any Pulses?!
                 // Create Some Dummy Datasets for Linking, etc...
                 syslog( LOG_ERR, "[%i] %s! %s for %s and %s", g_pid,
-                    "STS Error: Empty Final Pulse Info Buffer(s)",
+                    "STC Error: Empty Final Pulse Info Buffer(s)",
                     "Creating Dummy Datasets",
                     m_daslogs_freq_path.c_str(),
                     m_daslogs_pchg_path.c_str() );
@@ -1704,7 +1704,7 @@ NxGen::pulseBuffersReady
 void
 NxGen::bankPidTOFBuffersReady
 (
-    STS::BankInfo &a_bank   ///< [in] Detector bank to write
+    STC::BankInfo &a_bank   ///< [in] Detector bank to write
 )
 {
     if ( !m_gen_nexus )
@@ -1715,7 +1715,7 @@ NxGen::bankPidTOFBuffersReady
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
         if ( !bi )
         {
-            THROW_TRACE( STS::ERR_CAST_FAILED,
+            THROW_TRACE( STC::ERR_CAST_FAILED,
                 "Invalid bank object passed to bankPidTOFBuffersReady()" )
         }
 
@@ -1729,7 +1729,7 @@ NxGen::bankPidTOFBuffersReady
         if ( !initialize( true, "NxGen::bankPidTOFBuffersReady()" ) )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
-                g_pid, "STS Error:", "NxGen::bankPidTOFBuffersReady()",
+                g_pid, "STC Error:", "NxGen::bankPidTOFBuffersReady()",
                 "Failed to Force Initialize NeXus File",
                 "Losing Bank PID/TOF Data!!",
                 "bank_id", a_bank.m_id,
@@ -1796,7 +1796,7 @@ NxGen::bankPidTOFBuffersReady
 void
 NxGen::bankIndexBuffersReady
 (
-    STS::BankInfo &a_bank,          ///< [in] Detector bank to write
+    STC::BankInfo &a_bank,          ///< [in] Detector bank to write
     bool use_default_chunk_size     ///< [in] Use Default Chunk Size...?
 )
 {
@@ -1808,7 +1808,7 @@ NxGen::bankIndexBuffersReady
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
         if ( !bi )
         {
-            THROW_TRACE( STS::ERR_CAST_FAILED,
+            THROW_TRACE( STC::ERR_CAST_FAILED,
                 "Invalid bank object passed to bankIndexBuffersReady()" )
         }
 
@@ -1822,7 +1822,7 @@ NxGen::bankIndexBuffersReady
         if ( !initialize( true, "NxGen::bankIndexBuffersReady()" ) )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
-                g_pid, "STS Error:", "NxGen::bankIndexBuffersReady()",
+                g_pid, "STC Error:", "NxGen::bankIndexBuffersReady()",
                 "Failed to Force Initialize NeXus File",
                 "Losing Bank Index Data!!",
                 "bank_id", a_bank.m_id,
@@ -1893,7 +1893,7 @@ NxGen::bankIndexBuffersReady
 void
 NxGen::bankPulseGap
 (
-    STS::BankInfo  &a_bank,     ///< [in] Detector bank with pulse gap
+    STC::BankInfo  &a_bank,     ///< [in] Detector bank with pulse gap
     uint64_t        a_count     ///< [in] Number of missing pulses
 )
 {
@@ -1906,7 +1906,7 @@ NxGen::bankPulseGap
     if ( !initialize( true, "NxGen::bankPulseGap()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s count=%lu",
-            g_pid, "STS Error:", "NxGen::bankPulseGap()",
+            g_pid, "STC Error:", "NxGen::bankPulseGap()",
             "Failed to Force Initialize NeXus File",
             "Losing Bank Pulse Gap Data!", a_count );
         usleep(30000); // give syslog a chance...
@@ -1918,7 +1918,7 @@ NxGen::bankPulseGap
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
         if ( !bi )
         {
-            THROW_TRACE( STS::ERR_CAST_FAILED,
+            THROW_TRACE( STC::ERR_CAST_FAILED,
                 "Invalid bank object passed to bankPulseGap()" )
         }
 
@@ -1958,7 +1958,7 @@ NxGen::bankPulseGap
 void
 NxGen::bankFinalize
 (
-    STS::BankInfo &a_bank   ///< [in] Detector bank to finalize
+    STC::BankInfo &a_bank   ///< [in] Detector bank to finalize
 )
 {
     if ( !m_gen_nexus )
@@ -1970,7 +1970,7 @@ NxGen::bankFinalize
     if ( !initialize( true, "NxGen::bankFinalize()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s bank_id=%u",
-            g_pid, "STS Error:", "NxGen::bankFinalize()",
+            g_pid, "STC Error:", "NxGen::bankFinalize()",
             "Failed to Force Initialize NeXus File",
             "Losing Bank Histogram/Meta-Data!!", a_bank.m_id );
         usleep(30000); // give syslog a chance...
@@ -1982,7 +1982,7 @@ NxGen::bankFinalize
         NxBankInfo *bi = dynamic_cast<NxBankInfo*>(&a_bank);
         if ( !bi )
         {
-            THROW_TRACE( STS::ERR_CAST_FAILED,
+            THROW_TRACE( STC::ERR_CAST_FAILED,
                 "Invalid bank object passed to bankFinalize()" )
         }
 
@@ -2109,7 +2109,7 @@ NxGen::bankFinalize
 void
 NxGen::monitorTOFBuffersReady
 (
-    STS::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
+    STC::MonitorInfo &a_monitor     ///< [in] Monitor with events to write
 )
 {
     if ( !m_gen_nexus )
@@ -2120,7 +2120,7 @@ NxGen::monitorTOFBuffersReady
         NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
         if ( !mi )
         {
-            THROW_TRACE( STS::ERR_CAST_FAILED,
+            THROW_TRACE( STC::ERR_CAST_FAILED,
               "Invalid monitor object passed to monitorTOFBuffersReady()" )
         }
 
@@ -2130,7 +2130,7 @@ NxGen::monitorTOFBuffersReady
         if ( !initialize( true, "NxGen::monitorTOFBuffersReady()" ) )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
-                g_pid, "STS Error:", "NxGen::monitorTOFBuffersReady()",
+                g_pid, "STC Error:", "NxGen::monitorTOFBuffersReady()",
                 "Failed to Force Initialize NeXus File",
                 "Losing Monitor TOF Data!!",
                 "monitor_id", a_monitor.m_id,
@@ -2183,7 +2183,7 @@ NxGen::monitorTOFBuffersReady
 void
 NxGen::monitorIndexBuffersReady
 (
-    STS::MonitorInfo &a_monitor,    ///< [in] Monitor with events to write
+    STC::MonitorInfo &a_monitor,    ///< [in] Monitor with events to write
     bool use_default_chunk_size     ///< [in] Use Default Chunk Size...?
 )
 {
@@ -2195,7 +2195,7 @@ NxGen::monitorIndexBuffersReady
         NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
         if ( !mi )
         {
-            THROW_TRACE( STS::ERR_CAST_FAILED,
+            THROW_TRACE( STC::ERR_CAST_FAILED,
             "Invalid monitor object passed to monitorIndexBuffersReady()" )
         }
 
@@ -2205,7 +2205,7 @@ NxGen::monitorIndexBuffersReady
         if ( !initialize( true, "NxGen::monitorIndexBuffersReady()" ) )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s %s=%u %s=%lu %s=%lu",
-                g_pid, "STS Error:", "NxGen::monitorIndexBuffersReady()",
+                g_pid, "STC Error:", "NxGen::monitorIndexBuffersReady()",
                 "Failed to Force Initialize NeXus File",
                 "Losing Monitor Index Data!!",
                 "monitor_id", a_monitor.m_id,
@@ -2267,7 +2267,7 @@ NxGen::monitorIndexBuffersReady
 void
 NxGen::monitorPulseGap
 (
-    STS::MonitorInfo   &a_monitor,  ///< [in] Monitor with a pulse gap
+    STC::MonitorInfo   &a_monitor,  ///< [in] Monitor with a pulse gap
     uint64_t            a_count     ///< [in] Number of missing pulses
 )
 {
@@ -2280,7 +2280,7 @@ NxGen::monitorPulseGap
     if ( !initialize( true, "NxGen::monitorPulseGap()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s count=%lu",
-            g_pid, "STS Error:", "NxGen::monitorPulseGap()",
+            g_pid, "STC Error:", "NxGen::monitorPulseGap()",
             "Failed to Force Initialize NeXus File",
             "Losing Monitor Pulse Gap Data!", a_count );
         usleep(30000); // give syslog a chance...
@@ -2292,7 +2292,7 @@ NxGen::monitorPulseGap
         NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
         if ( !mi )
         {
-            THROW_TRACE( STS::ERR_CAST_FAILED,
+            THROW_TRACE( STC::ERR_CAST_FAILED,
                 "Invalid monitor object passed to monitorPulseGap()" )
         }
 
@@ -2328,7 +2328,7 @@ NxGen::monitorPulseGap
 void
 NxGen::monitorFinalize
 (
-    STS::MonitorInfo &a_monitor     ///< [in] Monitor to finalize
+    STC::MonitorInfo &a_monitor     ///< [in] Monitor to finalize
 )
 {
     if ( !m_gen_nexus )
@@ -2340,7 +2340,7 @@ NxGen::monitorFinalize
     if ( !initialize( true, "NxGen::monitorFinalize()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s monitor_id=%u",
-            g_pid, "STS Error:", "NxGen::monitorFinalize()",
+            g_pid, "STC Error:", "NxGen::monitorFinalize()",
             "Failed to Force Initialize NeXus File",
             "Losing Monitor Histogram/Meta-Data!!", a_monitor.m_id );
         usleep(30000); // give syslog a chance...
@@ -2352,7 +2352,7 @@ NxGen::monitorFinalize
         NxMonitorInfo *mi = dynamic_cast<NxMonitorInfo*>(&a_monitor);
         if ( !mi )
         {
-            THROW_TRACE( STS::ERR_CAST_FAILED,
+            THROW_TRACE( STC::ERR_CAST_FAILED,
                 "Invalid monitor object passed to monitorFinalize()" )
         }
 
@@ -2419,7 +2419,7 @@ NxGen::runComment
     // Always Handle Duplicate Run Comment, Even if Not Writing to NeXus.
     if ( m_runComment.size() > 0 && m_runComment.compare( a_comment ) ) {
         syslog( LOG_ERR, "[%i] %s %s: New [%s] != Orig [%s] - %s",
-            g_pid, "STS Error:", "Duplicate Run Comment Specified",
+            g_pid, "STC Error:", "Duplicate Run Comment Specified",
             a_comment.c_str(), m_runComment.c_str(),
             "Discarding..." );
         usleep(30000); // give syslog a chance...
@@ -2448,7 +2448,7 @@ NxGen::runComment
         if ( a_force_init )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-                g_pid, "STS Error:", "NxGen::runComment()",
+                g_pid, "STC Error:", "NxGen::runComment()",
                 "Failed to Force Initialize NeXus File",
                 "Losing Run Comment Data!" );
             usleep(30000); // give syslog a chance...
@@ -2457,7 +2457,7 @@ NxGen::runComment
         {
             syslog( LOG_ERR,
                 "[%i] %s %s: %s - %s",
-                g_pid, "STS Error:", "NxGen::runComment()",
+                g_pid, "STC Error:", "NxGen::runComment()",
                 "Unable to Initialize NeXus File", "Retry Later..." );
             usleep(30000); // give syslog a chance...
         }
@@ -2791,8 +2791,8 @@ NxGen::flushCommentData()
 void
 NxGen::writeDeviceEnums
 (
-    STS::Identifier a_devId,                 ///< [in] DeviceId
-    vector<STS::PVEnumeratedType> &a_enumVec ///< [in/out] Vector of Enumerated Type Structs
+    STC::Identifier a_devId,                 ///< [in] DeviceId
+    vector<STC::PVEnumeratedType> &a_enumVec ///< [in/out] Vector of Enumerated Type Structs
 )
 {
     if ( !m_gen_nexus )
@@ -2807,14 +2807,14 @@ NxGen::writeDeviceEnums
     if ( !initialize( true, "NxGen::writeDeviceEnums()" ) )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-            g_pid, "STS Error:", "NxGen::writeDeviceEnums()",
+            g_pid, "STC Error:", "NxGen::writeDeviceEnums()",
             "Failed to Force Initialize NeXus File",
             "Losing Device Enumeration Meta-Data!" );
         usleep(30000); // give syslog a chance...
         return;
     }
 
-    for ( vector<STS::PVEnumeratedType>::iterator ienum =
+    for ( vector<STC::PVEnumeratedType>::iterator ienum =
                 a_enumVec.begin();
             ienum != a_enumVec.end(); ++ienum )
     {
@@ -2829,7 +2829,7 @@ NxGen::writeDeviceEnums
             done = true;
 
             // Search Preceding Enums...
-            for ( vector<STS::PVEnumeratedType>::iterator idup =
+            for ( vector<STC::PVEnumeratedType>::iterator idup =
                         a_enumVec.begin();
                     idup != ienum; ++idup )
             {
@@ -2845,7 +2845,7 @@ NxGen::writeDeviceEnums
                         << " - Next Enum Name to Try: "
                         << ienum->name << "_" << count;
                     syslog( LOG_ERR, "[%i] %s %s",
-                        g_pid, "STS Error:", ss.str().c_str() );
+                        g_pid, "STC Error:", ss.str().c_str() );
                     usleep(30000); // give syslog a chance...
 
                     stringstream ss_new;
@@ -2889,7 +2889,7 @@ NxGen::writeDeviceEnums
             {
                 // Dang, No Easy Solution... (I.e. Element Array Mismatch!)
                 stringstream sss;
-                sss << "STS Error:"
+                sss << "STC Error:"
                     << " writeDeviceEnums() Element Array Mismatch"
                     << " for Device " << a_devId
                     << " Enum " << enum_name
@@ -2952,7 +2952,7 @@ NxGen::writeDeviceEnums
             else
             {
                 syslog( LOG_ERR, "[%i] %s! %s for %s", g_pid,
-                    "STS Error: Empty Enum Names",
+                    "STC Error: Empty Enum Names",
                     "Creating Dummy Names", ss.str().c_str() );
                 usleep(30000); // give syslog a chance...
                 makeDataset( ss.str(), "names", NeXus::CHAR, "", 1 );
@@ -2971,7 +2971,7 @@ NxGen::writeDeviceEnums
             // Don't Propagate TraceException, Just Log Failure...
             // (Enumerated Types are _Not_ Mission Critical (Hopefully!).
             stringstream sse;
-            sse << "STS Error:"
+            sse << "STC Error:"
                 << " writeDeviceEnums() failed"
                 << " for Device " << a_devId
                 << " Enum " << enum_name
@@ -2992,30 +2992,30 @@ NxGen::writeDeviceEnums
 NeXus::NXnumtype
 NxGen::toNxType
 (
-    STS::PVType a_type  ///< [in] PVType to be converted
+    STC::PVType a_type  ///< [in] PVType to be converted
 ) const
 {
     switch( a_type )
     {
-    case STS::PVT_INT:
+    case STC::PVT_INT:
         return NeXus::INT32;
-    case STS::PVT_UINT:
-    case STS::PVT_ENUM:
+    case STC::PVT_UINT:
+    case STC::PVT_ENUM:
         return NeXus::UINT32;
-    case STS::PVT_FLOAT:
+    case STC::PVT_FLOAT:
         return NeXus::FLOAT32;
-    case STS::PVT_DOUBLE:
+    case STC::PVT_DOUBLE:
         return NeXus::FLOAT64;
-    case STS::PVT_STRING:
+    case STC::PVT_STRING:
         return NeXus::CHAR;
-    case STS::PVT_UINT_ARRAY:
+    case STC::PVT_UINT_ARRAY:
         return NeXus::UINT32;
-    case STS::PVT_DOUBLE_ARRAY:
+    case STC::PVT_DOUBLE_ARRAY:
         return NeXus::FLOAT64;
         break;
     }
 
-    THROW_TRACE( STS::ERR_UNEXPECTED_INPUT,
+    THROW_TRACE( STC::ERR_UNEXPECTED_INPUT,
         "toNxType() failed - invalid PV type: " << a_type )
 }
 
@@ -3033,7 +3033,7 @@ NxGen::makeGroup
 {
     if ( m_h5nx.H5NXmake_group( a_path, a_type ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_group() failed for path: " << a_path )
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE, "H5NXmake_group() failed for path: " << a_path )
     }
 }
 
@@ -3062,7 +3062,7 @@ NxGen::makeDataset
     if ( m_h5nx.H5NXcreate_dataset_extend( a_path, a_name, a_type,
             chunk_size ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
             "H5NXcreate_dataset_extend() failed for path: " << a_path
                 << ", name: " << a_name )
     }
@@ -3072,7 +3072,7 @@ NxGen::makeDataset
         if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name,
                 "units", a_units ) != SUCCEED )
         {
-            THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
                 "H5NXmake_attribute_string() failed for path: " << a_path
                      << ", name: " << a_name )
         }
@@ -3100,7 +3100,7 @@ NxGen::writeMultidimDataset
     if ( (cc = m_h5nx.H5NXmake_dataset_vector( a_path, a_name, a_data,
             a_dims.size(), a_dims )) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
             "H5NXmake_dataset_vector() failed for path: " << a_path
                 << ", name: " << a_name )
     }
@@ -3110,7 +3110,7 @@ NxGen::writeMultidimDataset
         if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name,
                 "units", a_units ) != SUCCEED )
         {
-            THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+            THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
                 "H5NXmake_attribute_string() failed for path: " << a_path
                      << ", name: " << a_name )
         }
@@ -3118,15 +3118,15 @@ NxGen::writeMultidimDataset
 }
 
 
-/*! \brief Parses External STS Config File
+/*! \brief Parses External STC Config File
  *
- * This method parses an External STS Config File
+ * This method parses an External STC Config File
  * to generate a Custom NeXus File Group/Mapping Set.
  */
 void
-NxGen::parseSTSConfigFile
+NxGen::parseSTCConfigFile
 (
-    const string &a_config_file     ///< [in] STS Config File Path
+    const string &a_config_file     ///< [in] STC Config File Path
 )
 {
     xmlDocPtr doc = xmlReadFile( a_config_file.c_str(), 0, 0 );
@@ -3149,16 +3149,16 @@ NxGen::parseSTSConfigFile
 
             // REMOVE ME...
             //syslog( LOG_INFO, "[%i] %s Root <%s>=[%s]",
-                //g_pid, "Parsing STS Config File",
+                //g_pid, "Parsing STC Config File",
                 //tag.c_str(), value.c_str() );
             //usleep(30000); // give syslog a chance...
 
             if ( xmlStrcmp( root->name,
-                    (const xmlChar*)"sts_config" ) != 0 )
+                    (const xmlChar*)"stc_config" ) != 0 )
             {
                 syslog( LOG_ERR,
-                    "[%i] %s %s <%s>=[%s] in STS Config File - %s",
-                    g_pid, "STS Error:", "Unrecognized Root Tag",
+                    "[%i] %s %s <%s>=[%s] in STC Config File - %s",
+                    g_pid, "STC Error:", "Unrecognized Root Tag",
                     tag.c_str(), value.c_str(), "Bailing on Config..." );
                 usleep(30000); // give syslog a chance...
                 return;
@@ -3174,16 +3174,16 @@ NxGen::parseSTSConfigFile
 
                 // REMOVE ME...
                 //syslog( LOG_INFO, "[%i] %s Level 1 <%s>=[%s]",
-                    //g_pid, "Parsing STS Config File",
+                    //g_pid, "Parsing STC Config File",
                     //tag.c_str(), value.c_str() );
                 //usleep(30000); // give syslog a chance...
 
-                // Log STS Config File Version...
+                // Log STC Config File Version...
                 if ( xmlStrcmp( lev1->name,
                         (const xmlChar*)"version" ) == 0 )
                 {
                     syslog( LOG_INFO, "[%i] %s Version: %s",
-                        g_pid, "Parsing STS Config File", value.c_str() );
+                        g_pid, "Parsing STC Config File", value.c_str() );
                     usleep(30000); // give syslog a chance...
                 }
 
@@ -3200,7 +3200,7 @@ NxGen::parseSTSConfigFile
 
                     // REMOVE ME...
                     //syslog( LOG_INFO, "[%i] %s Found Group [%s]",
-                        //g_pid, "STS Config", value.c_str() );
+                        //g_pid, "STC Config", value.c_str() );
                     //usleep(30000); // give syslog a chance...
 
                     for ( xmlNode *lev2 = lev1->children;
@@ -3211,7 +3211,7 @@ NxGen::parseSTSConfigFile
 
                         // REMOVE ME...
                         //syslog( LOG_INFO, "[%i] %s Level 2 <%s>=[%s]",
-                            //g_pid, "Parsing STS Config File",
+                            //g_pid, "Parsing STC Config File",
                             //tag.c_str(), value.c_str() );
                         //usleep(30000); // give syslog a chance...
 
@@ -3223,8 +3223,8 @@ NxGen::parseSTSConfigFile
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s [%s] -> [%s] - %s",
-                                    g_pid, "STS Error:",
-                                    "STS Config DUPLICATE Group Name",
+                                    g_pid, "STC Error:",
+                                    "STC Config DUPLICATE Group Name",
                                     group.name.c_str(), value.c_str(),
                                     "Using New Group Name..." );
                                 usleep(30000); // give syslog a chance...
@@ -3234,7 +3234,7 @@ NxGen::parseSTSConfigFile
                                 // REMOVE ME...
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Name [%s]",
-                                    g_pid, "STS Config", value.c_str() );
+                                    g_pid, "STC Config", value.c_str() );
                                 usleep(30000); // give syslog a chance...
                             }
 
@@ -3245,7 +3245,7 @@ NxGen::parseSTSConfigFile
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s Group is Indexed! [%s]",
-                                    g_pid, "STS Config", value.c_str() );
+                                    g_pid, "STC Config", value.c_str() );
                                 usleep(30000); // give syslog a chance...
 
                                 group.hasIndex = true;
@@ -3260,8 +3260,8 @@ NxGen::parseSTSConfigFile
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s [%s] -> [%s] - %s",
-                                    g_pid, "STS Error:",
-                                    "STS Config DUPLICATE Group Path",
+                                    g_pid, "STC Error:",
+                                    "STC Config DUPLICATE Group Path",
                                     group.path.c_str(), value.c_str(),
                                     "Using New Group Path..." );
                                 usleep(30000); // give syslog a chance...
@@ -3271,7 +3271,7 @@ NxGen::parseSTSConfigFile
                                 // REMOVE ME...
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Path [%s]",
-                                    g_pid, "STS Config", value.c_str() );
+                                    g_pid, "STC Config", value.c_str() );
                                 usleep(30000); // give syslog a chance...
                             }
 
@@ -3286,8 +3286,8 @@ NxGen::parseSTSConfigFile
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s [%s] -> [%s] - %s",
-                                    g_pid, "STS Error:",
-                                    "STS Config DUPLICATE Group Type",
+                                    g_pid, "STC Error:",
+                                    "STC Config DUPLICATE Group Type",
                                     group.type.c_str(), value.c_str(),
                                     "Using New Group Type..." );
                                 usleep(30000); // give syslog a chance...
@@ -3297,7 +3297,7 @@ NxGen::parseSTSConfigFile
                                 // REMOVE ME...
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Type [%s]",
-                                    g_pid, "STS Config", value.c_str() );
+                                    g_pid, "STC Config", value.c_str() );
                                 usleep(30000); // give syslog a chance...
                             }
 
@@ -3341,7 +3341,7 @@ NxGen::parseSTSConfigFile
                             // REMOVE ME...
                             //syslog( LOG_INFO,
                                 //"[%i] %s Group Element [%s]",
-                                //g_pid, "STS Config", value.c_str() );
+                                //g_pid, "STC Config", value.c_str() );
                             //usleep(30000); // give syslog a chance...
 
                             for ( xmlNode *lev3 = lev2->children;
@@ -3353,7 +3353,7 @@ NxGen::parseSTSConfigFile
                                 // REMOVE ME...
                                 //syslog( LOG_INFO,
                                     //"[%i] %s Element Level 3 <%s>=[%s]",
-                                    //g_pid, "Parsing STS Config File",
+                                    //g_pid, "Parsing STC Config File",
                                     //tag.c_str(), value.c_str() );
                                 //usleep(30000); // give syslog a chance...
 
@@ -3363,7 +3363,7 @@ NxGen::parseSTSConfigFile
                                     // REMOVE ME...
                                     //syslog( LOG_INFO,
                                     //"[%i] %s Element Pattern #%ld [%s]",
-                                        //g_pid, "STS Config",
+                                        //g_pid, "STC Config",
                                         //element.patterns.size() + 1,
                                         //value.c_str() );
                                     // give syslog a chance
@@ -3378,7 +3378,7 @@ NxGen::parseSTSConfigFile
                                     // REMOVE ME...
                                     //syslog( LOG_INFO,
                                     //"[%i] %s Element Index #%ld [%s]",
-                                        //g_pid, "STS Config",
+                                        //g_pid, "STC Config",
                                         //element.indices.size() + 1,
                                         //value.c_str() );
                                     // give syslog a chance
@@ -3395,8 +3395,8 @@ NxGen::parseSTSConfigFile
                                     {
                                         syslog( LOG_ERR,
                                         "[%i] %s %s %s [%s] -> [%s] - %s",
-                                            g_pid, "STS Error:",
-                                            "STS Config DUPLICATE",
+                                            g_pid, "STC Error:",
+                                            "STC Config DUPLICATE",
                                             "Element Name",
                                             element.name.c_str(),
                                             value.c_str(),
@@ -3409,7 +3409,7 @@ NxGen::parseSTSConfigFile
                                         // REMOVE ME...
                                         //syslog( LOG_INFO,
                                             //"[%i] %s Element Name [%s]",
-                                            //g_pid, "STS Config",
+                                            //g_pid, "STC Config",
                                             //value.c_str() );
                                         // give syslog a chance
                                         //usleep(30000);
@@ -3425,7 +3425,7 @@ NxGen::parseSTSConfigFile
                                     // REMOVE ME...
                                     //syslog( LOG_INFO,
                                         //"[%i] %s %s #%ld [%s]",
-                                        //g_pid, "STS Config",
+                                        //g_pid, "STC Config",
                                         //"Element Units Value Pattern",
                                         //element.unitsPatterns.size() + 1,
                                         //value.c_str() );
@@ -3444,8 +3444,8 @@ NxGen::parseSTSConfigFile
                                     {
                                         syslog( LOG_ERR,
                                         "[%i] %s %s %s [%s] -> [%s] - %s",
-                                            g_pid, "STS Error:",
-                                            "STS Config DUPLICATE",
+                                            g_pid, "STC Error:",
+                                            "STC Config DUPLICATE",
                                             "Element Units",
                                             element.units.c_str(),
                                             value.c_str(),
@@ -3458,7 +3458,7 @@ NxGen::parseSTSConfigFile
                                         // REMOVE ME...
                                         //syslog( LOG_INFO,
                                             //"[%i] %s Element Units [%s]",
-                                            //g_pid, "STS Config",
+                                            //g_pid, "STC Config",
                                             //value.c_str() );
                                         // give syslog a chance
                                         //usleep(30000);
@@ -3474,8 +3474,8 @@ NxGen::parseSTSConfigFile
                                 {
                                     syslog( LOG_ERR,
                                         "[%i] %s %s at %s <%s>=[%s]",
-                                        g_pid, "STS Error:",
-                                        "Unknown Tag in STS Config",
+                                        g_pid, "STC Error:",
+                                        "Unknown Tag in STC Config",
                                         "Element Level 3",
                                         tag.c_str(), value.c_str() );
                                     usleep(30000); // give syslog a chance
@@ -3532,10 +3532,10 @@ NxGen::parseSTSConfigFile
                                     std::string err =
                                         "Duplicate Element Name ";
                                     err += "\"" + element.name + "\"";
-                                    err += " in STS Config Group \""
+                                    err += " in STC Config Group \""
                                         + group.name + "\"";
                                     syslog( LOG_ERR, "[%i] %s %s - %s %s",
-                                        g_pid, "STS Error:", err.c_str(),
+                                        g_pid, "STC Error:", err.c_str(),
                                         "Ignoring", ss.str().c_str() );
                                     usleep(30000); // give syslog a chance
                                 }
@@ -3544,7 +3544,7 @@ NxGen::parseSTSConfigFile
                                     // REMOVE ME...
                                     syslog( LOG_INFO,
                                         "[%i] %s %s \"%s\" - %s",
-                                        g_pid, "STS Config",
+                                        g_pid, "STC Config",
                                         "Adding Element to Group",
                                         group.name.c_str(),
                                         ss.str().c_str() );
@@ -3556,10 +3556,10 @@ NxGen::parseSTSConfigFile
                             else
                             {
                                 std::string err = "Incomplete Element";
-                                err += " in STS Config Group \""
+                                err += " in STC Config Group \""
                                     + group.name + "\"";
                                 syslog( LOG_ERR, "[%i] %s %s - %s %s",
-                                    g_pid, "STS Error:", err.c_str(),
+                                    g_pid, "STC Error:", err.c_str(),
                                     "Ignoring", ss.str().c_str() );
                                 usleep(30000); // give syslog a chance
                             }
@@ -3575,7 +3575,7 @@ NxGen::parseSTSConfigFile
                             // REMOVE ME...
                             syslog( LOG_INFO,
                                 "[%i] %s Group Condition [%s]",
-                                g_pid, "STS Config", value.c_str() );
+                                g_pid, "STC Config", value.c_str() );
                             usleep(30000); // give syslog a chance...
 
                             for ( xmlNode *lev3 = lev2->children;
@@ -3587,7 +3587,7 @@ NxGen::parseSTSConfigFile
                                 // REMOVE ME...
                                 //syslog( LOG_INFO,
                                     //"[%i] %s %s Level 3 <%s>=[%s]",
-                                    //g_pid, "Parsing STS Config File",
+                                    //g_pid, "Parsing STC Config File",
                                     //"Condition",
                                     //tag.c_str(), value.c_str() );
                                 //usleep(30000); // give syslog a chance...
@@ -3600,8 +3600,8 @@ NxGen::parseSTSConfigFile
                                     {
                                         syslog( LOG_ERR,
                                         "[%i] %s %s %s [%s] -> [%s] - %s",
-                                            g_pid, "STS Error:",
-                                            "STS Config DUPLICATE",
+                                            g_pid, "STC Error:",
+                                            "STC Config DUPLICATE",
                                             "Condition Name",
                                             condition.name.c_str(),
                                             value.c_str(),
@@ -3615,7 +3615,7 @@ NxGen::parseSTSConfigFile
                                         // REMOVE ME...
                                         //syslog( LOG_INFO,
                                            //"[%i] %s Condition Name [%s]",
-                                            //g_pid, "STS Config",
+                                            //g_pid, "STC Config",
                                             //value.c_str() );
                                         // give syslog a chance
                                         //usleep(30000);
@@ -3630,7 +3630,7 @@ NxGen::parseSTSConfigFile
                                     // REMOVE ME...
                                     //syslog( LOG_INFO,
                                         //"[%i] %s Condition %s #%ld [%s]",
-                                        //g_pid, "STS Config", "Pattern",
+                                        //g_pid, "STC Config", "Pattern",
                                         //condition.patterns.size() + 1,
                                         //value.c_str() );
                                     // give syslog a chance
@@ -3646,7 +3646,7 @@ NxGen::parseSTSConfigFile
                                     // REMOVE ME...
                                     //syslog( LOG_INFO,
                                         //"[%i] %s Condition %s #%ld [%s]",
-                                        //g_pid, "STS Config",
+                                        //g_pid, "STC Config",
                                         //"Value String",
                                       //condition.value_strings.size() + 1,
                                         //value.c_str() );
@@ -3663,7 +3663,7 @@ NxGen::parseSTSConfigFile
                                     // REMOVE ME...
                                     //syslog( LOG_INFO,
                                         //"[%i] %s Condition %s #%ld [%s]",
-                                        //g_pid, "STS Config", "Value",
+                                        //g_pid, "STC Config", "Value",
                                         //condition.values.size() + 1,
                                         //value.c_str() );
                                     // give syslog a chance
@@ -3679,7 +3679,7 @@ NxGen::parseSTSConfigFile
                                     // REMOVE ME...
                                     //syslog( LOG_INFO,
                                         //"[%i] %s Condition %s #%ld [%s]",
-                                        //g_pid, "STS Config",
+                                        //g_pid, "STC Config",
                                         //"NOT Value String",
                                        //condition.not_value_strings.size()
                                             //+ 1,
@@ -3698,7 +3698,7 @@ NxGen::parseSTSConfigFile
                                     // REMOVE ME...
                                     //syslog( LOG_INFO,
                                         //"[%i] %s Condition %s #%ld [%s]",
-                                        //g_pid, "STS Config", "NOT Value",
+                                        //g_pid, "STC Config", "NOT Value",
                                         //condition.not_values.size() + 1,
                                         //value.c_str() );
                                     // give syslog a chance
@@ -3744,7 +3744,7 @@ NxGen::parseSTSConfigFile
 
                                     // REMOVE ME...
                                     //syslog( LOG_INFO, "[%i] %s %s [%s]",
-                                        //g_pid, "STS Config",
+                                        //g_pid, "STC Config",
                                         //"Group Condition Element",
                                         //value.c_str() );
                                     // give syslog a chance...
@@ -3760,7 +3760,7 @@ NxGen::parseSTSConfigFile
                                         //syslog( LOG_INFO,
                                             //"[%i] %s %s <%s>=[%s]",
                                             //g_pid,
-                                            //"Parsing STS Config File",
+                                            //"Parsing STC Config File",
                                             //"Condition Element Level 3",
                                             //tag.c_str(), value.c_str() );
                                         // give syslog a chance...
@@ -3773,7 +3773,7 @@ NxGen::parseSTSConfigFile
                                             // REMOVE ME...
                                             //syslog( LOG_INFO,
                                                //"[%i] %s %s %s #%ld [%s]",
-                                                //g_pid, "STS Config",
+                                                //g_pid, "STC Config",
                                                 //"Condition Element",
                                                 //"Pattern",
                                                 //element.patterns.size()
@@ -3793,7 +3793,7 @@ NxGen::parseSTSConfigFile
                                             // REMOVE ME...
                                             //syslog( LOG_INFO,
                                                //"[%i] %s %s %s #%ld [%s]",
-                                                //g_pid, "STS Config",
+                                                //g_pid, "STC Config",
                                                 //"Condition Element",
                                                 //"Index",
                                               //element.indices.size() + 1,
@@ -3814,8 +3814,8 @@ NxGen::parseSTSConfigFile
                                             {
                                                 syslog( LOG_ERR,
                                         "[%i] %s %s %s [%s] -> [%s] - %s",
-                                                    g_pid, "STS Error:",
-                                                    "STS Config DUPLICATE",
+                                                    g_pid, "STC Error:",
+                                                    "STC Config DUPLICATE",
                                                 "Condition Element Name",
                                                     element.name.c_str(),
                                                     value.c_str(),
@@ -3829,7 +3829,7 @@ NxGen::parseSTSConfigFile
                                                 // REMOVE ME...
                                                 //syslog( LOG_INFO,
                                                     //"[%i] %s %s [%s]",
-                                                    //g_pid, "STS Config",
+                                                    //g_pid, "STC Config",
                                                 //"Condition Element Name",
                                                     //value.c_str() );
                                                 // give syslog a chance
@@ -3846,7 +3846,7 @@ NxGen::parseSTSConfigFile
                                             // REMOVE ME...
                                             //syslog( LOG_INFO,
                                                 //"[%i] %s %s #%ld [%s]",
-                                                //g_pid, "STS Config",
+                                                //g_pid, "STC Config",
                                            //"Element Units Value Pattern",
                                                 //element.unitsPatterns
                                                     //.size() + 1,
@@ -3868,8 +3868,8 @@ NxGen::parseSTSConfigFile
                                             {
                                                 syslog( LOG_ERR,
                                         "[%i] %s %s %s [%s] -> [%s] - %s",
-                                                    g_pid, "STS Error:",
-                                                    "STS Config DUPLICATE",
+                                                    g_pid, "STC Error:",
+                                                    "STC Config DUPLICATE",
                                                     "Element Units",
                                                     element.units.c_str(),
                                                     value.c_str(),
@@ -3883,7 +3883,7 @@ NxGen::parseSTSConfigFile
                                                 // REMOVE ME...
                                                 //syslog( LOG_INFO,
                                             //"[%i] %s Element Units [%s]",
-                                                    //g_pid, "STS Config",
+                                                    //g_pid, "STC Config",
                                                     //value.c_str() );
                                                 // give syslog a chance
                                                 //usleep(30000);
@@ -3901,8 +3901,8 @@ NxGen::parseSTSConfigFile
                                         {
                                             syslog( LOG_ERR,
                                             "[%i] %s %s at %s <%s>=[%s]",
-                                                g_pid, "STS Error:",
-                                            "Unknown Tag in STS Config",
+                                                g_pid, "STC Error:",
+                                            "Unknown Tag in STC Config",
                                             "Condition Element Level 4",
                                                 tag.c_str(), value.c_str()
                                             );
@@ -3970,11 +3970,11 @@ NxGen::parseSTSConfigFile
                                             err += "\"" + element.name
                                                 + "\"";
                                             err +=
-                                                " in STS Config Group \""
+                                                " in STC Config Group \""
                                                 + group.name + "\"";
                                             syslog( LOG_ERR,
                                                 "[%i] %s %s - %s %s",
-                                                g_pid, "STS Error:",
+                                                g_pid, "STC Error:",
                                                 err.c_str(), "Ignoring",
                                                 ss.str().c_str() );
                                             // give syslog a chance
@@ -3991,13 +3991,13 @@ NxGen::parseSTSConfigFile
                                             err += "\"" + element.name
                                                 + "\"";
                                             err +=
-                                                " in STS Config Group \""
+                                                " in STC Config Group \""
                                                 + group.name + "\"";
                                             err += " Condition \""
                                                 + condition.name + "\"";
                                             syslog( LOG_ERR,
                                                 "[%i] %s %s - %s %s",
-                                                g_pid, "STS Error:",
+                                                g_pid, "STC Error:",
                                                 err.c_str(), "Ignoring",
                                                 ss.str().c_str() );
                                             // give syslog a chance
@@ -4007,7 +4007,7 @@ NxGen::parseSTSConfigFile
                                         {
                                             // REMOVE ME...
                                             std::string info =
-                                                "STS Config Adding";
+                                                "STC Config Adding";
                                             info += " Element";
                                             info += " to Condition \""
                                                 + condition.name + "\"";
@@ -4029,12 +4029,12 @@ NxGen::parseSTSConfigFile
                                         std::string err = "Incomplete";
                                         err += " Condition \""
                                             + condition.name + "\"";
-                                        err += " Element in STS Config";
+                                        err += " Element in STC Config";
                                         err += " Group \""
                                             + group.name + "\"";
                                         syslog( LOG_ERR,
                                             "[%i] %s %s - %s %s",
-                                            g_pid, "STS Error:",
+                                            g_pid, "STC Error:",
                                             err.c_str(), "Ignoring",
                                             ss.str().c_str() );
                                         // give syslog a chance
@@ -4049,8 +4049,8 @@ NxGen::parseSTSConfigFile
                                 {
                                     syslog( LOG_ERR,
                                         "[%i] %s %s at %s <%s>=[%s]",
-                                        g_pid, "STS Error:",
-                                        "Unknown Tag in STS Config",
+                                        g_pid, "STC Error:",
+                                        "Unknown Tag in STC Config",
                                         "Condition Level 3",
                                         tag.c_str(), value.c_str() );
                                     usleep(30000); // give syslog a chance
@@ -4126,7 +4126,7 @@ NxGen::parseSTSConfigFile
                                 syslog( LOG_INFO,
                                     "[%i] %s \"%s\" %s \"%s\" - %s",
                                     g_pid,
-                                    "STS Config Adding Condition",
+                                    "STC Config Adding Condition",
                                     condition.name.c_str(),
                                     "to Group", group.name.c_str(),
                                     ss.str().c_str() );
@@ -4138,10 +4138,10 @@ NxGen::parseSTSConfigFile
                             {
                                 std::string err = "Incomplete Condition";
                                 err += " \"" + condition.name + "\"";
-                                err += " in STS Config Group \""
+                                err += " in STC Config Group \""
                                     + group.name + "\"";
                                 syslog( LOG_ERR, "[%i] %s %s - %s %s",
-                                    g_pid, "STS Error:", err.c_str(),
+                                    g_pid, "STC Error:", err.c_str(),
                                     "Ignoring", ss.str().c_str() );
                                 usleep(30000); // give syslog a chance
                             }
@@ -4154,14 +4154,14 @@ NxGen::parseSTSConfigFile
                         {
                             syslog( LOG_ERR,
                                 "[%i] %s %s at Level 2 <%s>=[%s]",
-                                g_pid, "STS Error:",
-                                "Unknown Tag in STS Config",
+                                g_pid, "STC Error:",
+                                "Unknown Tag in STC Config",
                                 tag.c_str(), value.c_str() );
                             usleep(30000); // give syslog a chance
                         }
                     }
 
-                    // Add Group Container to STS Config...
+                    // Add Group Container to STC Config...
                     // (If Required Fields are Present, Else Error)
                     // Note: It's Ok to have No Elements, Only Conditions!
                     if ( group.name.size()
@@ -4174,7 +4174,7 @@ NxGen::parseSTSConfigFile
                         syslog( LOG_INFO,
                     "[%i] %s \"%s\" %s - %s=[%s] %s=[%s] (%lu %s, %lu %s)",
                             g_pid, "Adding Group Container",
-                            group.name.c_str(), "to STS Config",
+                            group.name.c_str(), "to STC Config",
                             "path", group.path.c_str(),
                             "type", group.type.c_str(),
                             group.elements.size(), "elements",
@@ -4187,10 +4187,10 @@ NxGen::parseSTSConfigFile
                     {
                         std::string err = "Incomplete Group Container \""
                             + group.name
-                            + "\" in STS Config";
+                            + "\" in STC Config";
                         syslog( LOG_ERR,
                         "[%i] %s %s - %s %s=[%s] %s=[%s] (%lu %s, %lu %s)",
-                            g_pid, "STS Error:", err.c_str(),
+                            g_pid, "STC Error:", err.c_str(),
                             "Ignoring",
                             "path", group.path.c_str(),
                             "type", group.type.c_str(),
@@ -4206,7 +4206,7 @@ NxGen::parseSTSConfigFile
                         (const xmlChar*)"comment" ) != 0 )
                 {
                     syslog( LOG_ERR, "[%i] %s %s at Level 1 <%s>=[%s]",
-                        g_pid, "STS Error:", "Unknown Tag in STS Config",
+                        g_pid, "STC Error:", "Unknown Tag in STC Config",
                         tag.c_str(), value.c_str() );
                     usleep(30000); // give syslog a chance
                 }
@@ -4215,27 +4215,27 @@ NxGen::parseSTSConfigFile
         catch( std::exception &e )
         {
             syslog( LOG_ERR,
-                "[%i] %s Exception Parsing STS Config File: %s - %s",
-                g_pid, "STS Error:", a_config_file.c_str(), e.what() );
+                "[%i] %s Exception Parsing STC Config File: %s - %s",
+                g_pid, "STC Error:", a_config_file.c_str(), e.what() );
             usleep(30000); // give syslog a chance...
         }
         catch( ... )
         {
             syslog( LOG_ERR,
-                "[%i] %s Unknown Exception Parsing STS Config File: %s",
-                g_pid, "STS Error:", a_config_file.c_str() );
+                "[%i] %s Unknown Exception Parsing STC Config File: %s",
+                g_pid, "STC Error:", a_config_file.c_str() );
             usleep(30000); // give syslog a chance...
         }
 
         if ( !parsed )
         {
-            syslog( LOG_ERR, "[%i] %s Parsing STS Config File: %s - %s",
-                g_pid, "STS Error:", a_config_file.c_str(),
+            syslog( LOG_ERR, "[%i] %s Parsing STC Config File: %s - %s",
+                g_pid, "STC Error:", a_config_file.c_str(),
                 "No Valid XML Tags Parsed!" );
             usleep(30000); // give syslog a chance...
         }
 
-        syslog( LOG_INFO, "[%i] Parsed STS Config File: %s - %lu %s",
+        syslog( LOG_INFO, "[%i] Parsed STC Config File: %s - %lu %s",
             g_pid, a_config_file.c_str(),
             m_config_groups.size(), "Valid Groups Found" );
         usleep(30000); // give syslog a chance...
@@ -4245,8 +4245,8 @@ NxGen::parseSTSConfigFile
 
     else
     {
-        syslog( LOG_ERR, "[%i] %s Reading STS Config File: %s - %s",
-            g_pid, "STS Error:", a_config_file.c_str(),
+        syslog( LOG_ERR, "[%i] %s Reading STC Config File: %s - %s",
+            g_pid, "STC Error:", a_config_file.c_str(),
             "Empty or Invalid XML Document?" );
         usleep(30000); // give syslog a chance...
     }
@@ -4267,7 +4267,7 @@ NxGen::makeLink
 {
     if ( m_h5nx.H5NXmake_link( a_source_path, a_dest_name ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
             "H5NXmake_link() failed for source: "
                 << a_source_path << ", dest: " << a_dest_name )
     }
@@ -4292,7 +4292,7 @@ NxGen::makeGroupLink
     if ( m_h5nx.H5NXmake_group_link( a_source_path, a_dest_name )
             != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
             "H5NXmake_group_link() failed for source: "
                 << a_source_path << ", dest: " << a_dest_name )
     }
@@ -4315,7 +4315,7 @@ NxGen::writeString
     {
         if ( m_h5nx.H5NXmake_dataset_string( a_path, a_dataset, a_value ) != SUCCEED )
         {
-            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_string() failed for path: " << a_path << ", value: "
+            THROW_TRACE( STC::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_string() failed for path: " << a_path << ", value: "
                          << a_value )
         }
     }
@@ -4337,7 +4337,7 @@ NxGen::checkDataset
     if ( m_h5nx.H5NXcheck_dataset_path( a_path, a_dataset, a_exists )
             != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
             "H5NXcheck_dataset_path() failed for path: " << a_path )
     }
 }
@@ -4358,7 +4358,7 @@ NxGen::writeStringAttribute
 {
     if ( m_h5nx.H5NXmake_attribute_string( a_path, a_attrib, a_value ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", attrib: "
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path << ", attrib: "
                      << a_attrib << ", value: " << a_value )
     }
 }
@@ -4384,7 +4384,7 @@ NxGen::checkStringAttribute
     if ( m_h5nx.H5NXcheck_attribute_string( a_path, a_attrib, a_value,
             a_attr_value, wasSet ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXcheck_attribute_string() failed for path: " << a_path << ", attrib: "
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE, "H5NXcheck_attribute_string() failed for path: " << a_path << ", attrib: "
                      << a_attrib << ", value: " << a_value )
     }
     return( !wasSet );
@@ -4408,7 +4408,7 @@ NxGen::writeScalar
 {
     if ( m_h5nx.H5NXmake_dataset_scalar( a_path, a_name, a_value ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_scalar() failed for path: " << a_path << ", name: "
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE, "H5NXmake_dataset_scalar() failed for path: " << a_path << ", name: "
                      << a_name << ", value: " << a_value )
     }
 
@@ -4416,7 +4416,7 @@ NxGen::writeScalar
     {
         if ( m_h5nx.H5NXmake_attribute_string( a_path + "/" + a_name, "units", a_units ) != SUCCEED )
         {
-            THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path
+            THROW_TRACE( STC::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_string() failed for path: " << a_path
                          << ", name: " << a_name )
         }
     }
@@ -4438,7 +4438,7 @@ NxGen::writeScalarAttribute
 {
     if ( m_h5nx.H5NXmake_attribute_scalar( a_path, a_attrib, a_value ) != SUCCEED )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_scalar() failed for path: " << a_path << ", attrib: "
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE, "H5NXmake_attribute_scalar() failed for path: " << a_path << ", attrib: "
                      << a_attrib << ", value: " << a_value )
     }
 }

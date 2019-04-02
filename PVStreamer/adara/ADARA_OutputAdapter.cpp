@@ -482,7 +482,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
 
     case PV_INT:
         // Send All Integers as "Unsigned" in the ADARA Protocol
-        // - it all gets resolved in the STS/NeXus using the "pv_type"! :-D
+        // - it all gets resolved in the STC/NeXus using the "pv_type"! :-D
         a_adara_pkt.format          =
             ADARA_PKT_TYPE(
                 ::ADARA::PacketType::VAR_VALUE_U32_TYPE,
@@ -542,7 +542,7 @@ OutputAdapter::buildVVP( OutPacket &a_adara_pkt,
 
     case PV_INT_ARRAY:
         // Send All Integers as "Unsigned" in the ADARA Protocol
-        // - it all gets resolved in the STS/NeXus using the "pv_type"! :-D
+        // - it all gets resolved in the STC/NeXus using the "pv_type"! :-D
         elemCount = a_state.m_elem_count;
         a_adara_pkt.format          =
             ADARA_PKT_TYPE(

@@ -15,7 +15,7 @@
 #include "RuleConfigDialog.h"
 #include "ComBusMessages.h"
 #include "DASMonMessages.h"
-#include "STSMessages.h"
+#include "STCMessages.h"
 #include "style.h"
 
 using namespace std;
@@ -24,14 +24,14 @@ using namespace std;
 #define TIMEOUT_PROC_UNRESPONSIVE   10
 #define TIMEOUT_PROC_DEAD           30
 #define TIMEOUT_PROC_DEAD_CLEANUP   30
-#define TIMEOUT_STS_INACTIVE        30
-#define TIMEOUT_STS_UNRESPONSIVE    10
+#define TIMEOUT_STC_INACTIVE        30
+#define TIMEOUT_STC_UNRESPONSIVE    10
 #define MONITOR_ID_INACTIVE_TIMEOUT 60
 #define MONITOR_ID_DATA_TIMEOUT     10
 #define TOPIC_STATUS                "STATUS.>"
 #define TOPIC_SIGNALS               "SIGNAL.>"
 #define TOPIC_DASMON                "APP.DASMON"
-#define TOPIC_STS                   "APP.STS"
+#define TOPIC_STC                   "APP.STC"
 
 
 MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user,
@@ -133,7 +133,7 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     m_combus->attach( *this, TOPIC_STATUS ); // Listen to ADARA process health status (display only)
     m_combus->attach( *this, TOPIC_SIGNALS ); // Listen to ADARA signals
     m_combus->attach( *this, TOPIC_DASMON ); // Listen to dasmon service
-    m_combus->attach( *this, TOPIC_STS ); // Listen to (local) STS translation messages
+    m_combus->attach( *this, TOPIC_STC ); // Listen to (local) STC translation messages
 
     m_start_time = QDateTime::currentDateTime();
 
@@ -609,14 +609,14 @@ MainWindow::onTableTimer()
             ts != m_trans_status.end();  )
     {
         // Maybe leave finished info up for a diff time than unresponsive?
-        if ( ts->second.last_updated + TIMEOUT_STS_INACTIVE < now )
+        if ( ts->second.last_updated + TIMEOUT_STC_INACTIVE < now )
         {
             m_trans_status.erase( ts++ );
             m_refresh_trans_table = true;
         }
         else
         {
-            if ( ts->second.last_updated + TIMEOUT_STS_UNRESPONSIVE < now )
+            if ( ts->second.last_updated + TIMEOUT_STC_UNRESPONSIVE < now )
                 m_refresh_trans_table = true;
 
             ++ts;
@@ -639,12 +639,12 @@ MainWindow::onTableTimer()
                 new QTableWidgetItem( QString("%1").arg( ts->first ) ) );
             ui->transTable->setItem( row, 1,
                 new QTableWidgetItem( QString("%1 (%2)").arg(
-                    ts->second.sts_pid.c_str() ).arg(
-                        ts->second.sts_host.c_str() ) ) );
+                    ts->second.stc_pid.c_str() ).arg(
+                        ts->second.stc_host.c_str() ) ) );
 
             if ( ts->second.running )
             {
-                if ( ts->second.last_updated + TIMEOUT_STS_UNRESPONSIVE
+                if ( ts->second.last_updated + TIMEOUT_STC_UNRESPONSIVE
                         < now )
                 {
                     ui->transTable->setItem( row, 2,
@@ -733,7 +733,7 @@ MainWindow::configActiveMQ()
         m_combus->attach( *this, TOPIC_STATUS );
         m_combus->attach( *this, TOPIC_SIGNALS );
         m_combus->attach( *this, TOPIC_DASMON );
-        m_combus->attach( *this, TOPIC_STS ); // Listen to (local) STS translation messages
+        m_combus->attach( *this, TOPIC_STC ); // Listen to (local) STC translation messages
 
         updateMainWindowTitle();
     }
@@ -1289,12 +1289,12 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
                 m_refresh_proc_table = true;
             }
 
-            if ( a_msg.getSourceID().compare( 0, 3, "STS" ) == 0 )
+            if ( a_msg.getSourceID().compare( 0, 3, "STC" ) == 0 )
             {
                 map<unsigned long,TransStatus>::iterator ts;
                 for ( ts = m_trans_status.begin(); ts != m_trans_status.end(); ++ts )
                 {
-                    if ( ts->second.sts_pid == a_msg.getSourceID() )
+                    if ( ts->second.stc_pid == a_msg.getSourceID() )
                     {
                         if ( ts->second.run_status != ((ADARA::ComBus::StatusMessage&)a_msg).m_status )
                         {
@@ -1311,8 +1311,8 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
                     TransStatus status;
                     status.running = true;
                     status.run_num = 0;
-                    status.sts_pid = a_msg.getSourceID();
-                    status.sts_host = "?";
+                    status.stc_pid = a_msg.getSourceID();
+                    status.stc_host = "?";
                     status.run_status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
                     status.last_updated = time(0);
                     m_trans_status[status.run_num] = status;
@@ -1460,15 +1460,15 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         }
         break;
 
-    case ADARA::ComBus::MSG_STS_TRANS_STARTED:
+    case ADARA::ComBus::MSG_STC_TRANS_STARTED:
         {
-            const ADARA::ComBus::STS::TranslationStartedMsg &msg = (const ADARA::ComBus::STS::TranslationStartedMsg&)a_msg;
+            const ADARA::ComBus::STC::TranslationStartedMsg &msg = (const ADARA::ComBus::STC::TranslationStartedMsg&)a_msg;
 
             TransStatus status;
             status.running = true;
             status.run_num = msg.m_run_num;
-            status.sts_pid = msg.getSourceID();
-            status.sts_host = msg.m_host;
+            status.stc_pid = msg.getSourceID();
+            status.stc_host = msg.m_host;
             status.run_status = ADARA::ComBus::STATUS_OK;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
@@ -1476,31 +1476,31 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         }
         break;
 
-    case ADARA::ComBus::MSG_STS_TRANS_FINISHED:
+    case ADARA::ComBus::MSG_STC_TRANS_FINISHED:
         {
-            const ADARA::ComBus::STS::TranslationFinishedMsg &msg = (const ADARA::ComBus::STS::TranslationFinishedMsg&)a_msg;
+            const ADARA::ComBus::STC::TranslationFinishedMsg &msg = (const ADARA::ComBus::STC::TranslationFinishedMsg&)a_msg;
 
             TransStatus status;
             status.running = false;
             status.run_num = msg.m_run_num;
-            status.sts_pid = msg.getSourceID();
-            status.sts_host = msg.m_host;
-            status.trans_status = STS::TS_SUCCESS;
+            status.stc_pid = msg.getSourceID();
+            status.stc_host = msg.m_host;
+            status.trans_status = STC::TS_SUCCESS;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
             m_refresh_trans_table = true;
         }
         break;
 
-    case ADARA::ComBus::MSG_STS_TRANS_FAILED:
+    case ADARA::ComBus::MSG_STC_TRANS_FAILED:
         {
-            const ADARA::ComBus::STS::TranslationFailedMsg &msg = (const ADARA::ComBus::STS::TranslationFailedMsg&)a_msg;
+            const ADARA::ComBus::STC::TranslationFailedMsg &msg = (const ADARA::ComBus::STC::TranslationFailedMsg&)a_msg;
 
             TransStatus status;
             status.running = false;
             status.run_num = msg.m_run_num;
-            status.sts_pid = msg.getSourceID();
-            status.sts_host = msg.m_host;
+            status.stc_pid = msg.getSourceID();
+            status.stc_host = msg.m_host;
             status.trans_status = msg.m_code;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
@@ -1645,13 +1645,13 @@ MainWindow::getStatusText( int a_status )
 
 
 const char *
-MainWindow::getTransStatusText( STS::TranslationStatusCode &a_status )
+MainWindow::getTransStatusText( STC::TranslationStatusCode &a_status )
 {
     switch( a_status )
     {
-    case STS::TS_SUCCESS: return "Completed Successfully";
-    case STS::TS_PERM_ERROR: return "Critical Error";
-    case STS::TS_TRANSIENT_ERROR: return "Transient Error";
+    case STC::TS_SUCCESS: return "Completed Successfully";
+    case STC::TS_PERM_ERROR: return "Critical Error";
+    case STC::TS_TRANSIENT_ERROR: return "Transient Error";
     default: return "ERROR";
     }
 }

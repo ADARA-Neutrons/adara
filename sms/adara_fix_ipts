@@ -3,7 +3,7 @@
 # ADARA "Fix IPTS" Script...! ;-D
 #
 # Script to Automate Changing the IPTS Proposal Number for Run(s)
-# and Resubmitting Them Through the STS to Re-Catalog...! ;-D
+# and Resubmitting Them Through the STC to Re-Catalog...! ;-D
 #
 # (Because it can happen that often... ;-)
 #
@@ -11,20 +11,20 @@
 #
 # "Fix IPTS" Test Commands:
 #
-# ./sms/adara_fix_ipts --inst=PG3 --sts_host=localhost --sts_port=31420 \
+# ./sms/adara_fix_ipts --inst=PG3 --stc_host=localhost --stc_port=31420 \
 #    --sms_data=/SNS/users/y8y --no-send-paused-data \
 #    --archive_path=/TESTING --run=38524-38527 --ipts=IPTS-2767
 #
-# ./sms/adara_fix_ipts --inst=VULCAN --sts_host=localhost \
-#    --sts_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+# ./sms/adara_fix_ipts --inst=VULCAN --stc_host=localhost \
+#    --stc_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
 #    --archive_path=/TESTING --run=156458 --ipts=IPTS-18677
 #
-# ./sms/adara_fix_ipts --inst=EQSANS --sts_host=localhost \
-#    --sts_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+# ./sms/adara_fix_ipts --inst=EQSANS --stc_host=localhost \
+#    --stc_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
 #    --archive_path=/TESTING --run=98446-98448 --ipts=IPTS-21608
 #
-# ./sms/adara_fix_ipts --inst=ARCS --facility=SNS --sts_host=localhost \
-#    --sts_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+# ./sms/adara_fix_ipts --inst=ARCS --facility=SNS --stc_host=localhost \
+#    --stc_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
 #    --archive_path=/TESTING --run=125356-125363 --ipts=IPTS-20849
 
 # With "Fix IPTS" Test Data in:
@@ -85,8 +85,8 @@ XINETD_DIR="/etc/xinetd.d"
 
 ARCHIVE_PATH="/"
 
-STS1="sns-sts1.sns.gov"
-STS2="sns-sts2.sns.gov"
+STC1="sns-stc1.sns.gov"
+STC2="sns-stc2.sns.gov"
 
 TRUNCATE="/usr/bin/truncate"
 Editor="/usr/bin/vim"
@@ -121,9 +121,9 @@ USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
 	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
-	echo "    [--sts1|--sts2|--sts_host=<STS_HOST>] \\"
-	echo "    [--sts|--sts_test|--sts_dummy|--sts_hfir|--sts_hfir_test] \\"
-	echo "    [--sts_port=<STSPort>] \\"
+	echo "    [--stc1|--stc2|--stc_host=<STC_HOST>] \\"
+	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
+	echo "    [--stc_port=<STCPort>] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
 	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
 	echo "    [--sms_data=<${SMS_DATA}>] \\"
@@ -237,10 +237,10 @@ CHECK_PROCEED()
 # Parse Command Line Arguments
 #
 
-STS_HOST="${STS1}"
+STC_HOST="${STC1}"
 
-STS_SERVICE="sts_dummy"
-STS_PORT=""
+STC_SERVICE="stc_dummy"
+STC_PORT=""
 
 RUN_NUMBERS=""
 
@@ -270,33 +270,33 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--facility#' ]]; then
 		FACILITY="$value"
 		echo -e "\nSetting Facility Name to: ${FACILITY}"
-	elif [[ "#$key#" == '#--sts1#' ]]; then
-		STS_HOST="${STS1}"
-		echo -e "\nSetting STS Host to: ${STS_HOST}"
-	elif [[ "#$key#" == '#--sts2#' ]]; then
-		STS_HOST="${STS2}"
-		echo -e "\nSetting STS Host to: ${STS_HOST}"
-	elif [[ "#$key#" == '#--sts_host#' ]]; then
-		STS_HOST="${value}"
-		echo -e "\nSetting STS Host to: ${STS_HOST}"
-	elif [[ "#$key#" == '#--sts#' ]]; then
-		STS_SERVICE="sts"
-		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
-	elif [[ "#$key#" == '#--sts_test#' ]]; then
-		STS_SERVICE="sts_test"
-		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
-	elif [[ "#$key#" == '#--sts_dummy#' ]]; then
-		STS_SERVICE="sts_dummy"
-		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
-	elif [[ "#$key#" == '#--sts_hfir#' ]]; then
-		STS_SERVICE="sts_hfir"
-		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
-	elif [[ "#$key#" == '#--sts_hfir_test#' ]]; then
-		STS_SERVICE="sts_hfir_test"
-		echo -e "\nSetting STS Service to: ${STS_SERVICE}"
-	elif [[ "#$key#" == '#--sts_port#' ]]; then
-		STS_PORT="$value"
-		echo -e "\nSetting STS Port to: ${STS_PORT}"
+	elif [[ "#$key#" == '#--stc1#' ]]; then
+		STC_HOST="${STC1}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc2#' ]]; then
+		STC_HOST="${STC2}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc_host#' ]]; then
+		STC_HOST="${value}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc#' ]]; then
+		STC_SERVICE="stc"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_test#' ]]; then
+		STC_SERVICE="stc_test"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_dummy#' ]]; then
+		STC_SERVICE="stc_dummy"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_hfir#' ]]; then
+		STC_SERVICE="stc_hfir"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_hfir_test#' ]]; then
+		STC_SERVICE="stc_hfir_test"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_port#' ]]; then
+		STC_PORT="$value"
+		echo -e "\nSetting STC Port to: ${STC_PORT}"
 	elif [[ "#$key#" == '#--adara_parser#' ]]; then
 		ADARA_PARSER="${value}"
 		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
@@ -362,16 +362,16 @@ if [[ -z "${IPTS_NEW}" ]]; then
 fi
 
 #
-# Determine Proper STS Service Port...! ;-D
+# Determine Proper STC Service Port...! ;-D
 #
 
-if [[ -z "${STS_PORT}" ]]; then
+if [[ -z "${STC_PORT}" ]]; then
 
-	echo -e "\nContacting STS Host \"${STS_HOST}\" via SSH"
-	echo "to Determine Port for STS \"${STS_SERVICE}\" Service..."
+	echo -e "\nContacting STC Host \"${STC_HOST}\" via SSH"
+	echo "to Determine Port for STC \"${STC_SERVICE}\" Service..."
 
 	echo -e \
-		"\n${SSH} ${STS_HOST} ${GREP} port ${XINETD_DIR}/${STS_SERVICE}"
+		"\n${SSH} ${STC_HOST} ${GREP} port ${XINETD_DIR}/${STC_SERVICE}"
 
 	# Set Bash Pipefail Option as Needed...
 	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
@@ -379,14 +379,14 @@ if [[ -z "${STS_PORT}" ]]; then
 		set -o pipefail
 	fi
 
-	STS_PORT=`${SSH} ${STS_HOST} \
-		${GREP} "port" ${XINETD_DIR}/${STS_SERVICE} \
+	STC_PORT=`${SSH} ${STC_HOST} \
+		${GREP} "port" ${XINETD_DIR}/${STC_SERVICE} \
 		| ${AWK} '{print $3}'`
-	ckstsport=$?
+	ckstcport=$?
 
-	if [[ ${ckstsport} != 0 ]]; then
-		echo -e -n "\nERROR Determining STS Port "
-		echo "for \"${STS_SERVICE}\" Service on ${STS_HOST}...!"
+	if [[ ${ckstcport} != 0 ]]; then
+		echo -e -n "\nERROR Determining STC Port "
+		echo "for \"${STC_SERVICE}\" Service on ${STC_HOST}...!"
 		USAGE
 		exit 4
 	fi
@@ -397,7 +397,7 @@ if [[ -z "${STS_PORT}" ]]; then
 	fi
 
 	echo -e \
-		"\nGot STS Port ${STS_PORT} for STS \"${STS_SERVICE}\" Service."
+		"\nGot STC Port ${STC_PORT} for STC \"${STC_SERVICE}\" Service."
 fi
 
 #
@@ -409,8 +409,8 @@ echo "to New Proposal [${IPTS_NEW}],"
 
 echo -e "\nby Editing ${SMS_WHICH_DATA_FILE} Data File,"
 
-echo -e -n "\nUsing STS \"${STS_SERVICE}\" Service "
-echo "on \"${STS_HOST}:${STS_PORT}\"."
+echo -e -n "\nUsing STC \"${STC_SERVICE}\" Service "
+echo "on \"${STC_HOST}:${STC_PORT}\"."
 
 CHECK_PROCEED
 
@@ -573,7 +573,7 @@ INSTALL_AND_CHECK_DATAFILE()
 # usage: RESUBMIT_RUN "${rundir}" "${datafile}"
 #
 # - Re-Name the "proposal-*" Placeholder File in the Run Directory...!
-# - Re-Submit SMS Raw Data Files to STS for Re-Translation...!
+# - Re-Submit SMS Raw Data Files to STC for Re-Translation...!
 #
 RESUBMIT_RUN()
 {
@@ -617,13 +617,13 @@ RESUBMIT_RUN()
 	fi
 
 	#
-	# Re-Submit SMS Raw Data Files to STS for Re-Translation...!
+	# Re-Submit SMS Raw Data Files to STC for Re-Translation...!
 	#
 	# Use "ADARACat" to Account for Any Intervening/Sent Paused Data...
 	#
 
 	echo -e -n "\nReady to Re-Submit SMS Raw Data Files "
-	echo -e "for Run ${run} to STS for Re-Translation:"
+	echo -e "for Run ${run} to STC for Re-Translation:"
 
 	echo -e -n "\n\t-> Moving Run ${run} from Proposal \"${IPTS_OLD}\" "
 	echo -e "to \"${IPTS_NEW}\"..."
@@ -633,21 +633,21 @@ RESUBMIT_RUN()
 		echo "[${SEND_PAUSED_DATA}]"
 	fi
 
-	echo -e -n "\nUsing STS \"${STS_SERVICE}\" Service "
-	echo "on \"${STS_HOST}:${STS_PORT}\"."
+	echo -e -n "\nUsing STC \"${STC_SERVICE}\" Service "
+	echo "on \"${STC_HOST}:${STC_PORT}\"."
 
 	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
 		CHECK_PROCEED
 	fi
 
 	${ADARA_CAT} ${SEND_PAUSED_DATA} --run="${run}" --dir="${rundir}" \
-		| ${NC} ${STS_HOST} ${STS_PORT}
-	cksts=$?
+		| ${NC} ${STC_HOST} ${STC_PORT}
+	ckstc=$?
 
 	echo
 
-	if [[ ${cksts} != 0 ]]; then
-		echo -e -n "\nERROR Re-Submitting SMS Raw Data Files to STS "
+	if [[ ${ckstc} != 0 ]]; then
+		echo -e -n "\nERROR Re-Submitting SMS Raw Data Files to STC "
 		echo "for Run ${run}!"
 		CHECK_PROCEED
 		echo -e "\nContinuing with Next Run Number..."

@@ -155,7 +155,7 @@ public:
 		 *    Uid1; Uid2; Uid3; . . .
 		 *
 		 * We will handle Either One, and since we're postponing the
-		 * resolution of Uid-to-Name until "Later" (either STS or AutoRedux)
+		 * resolution of Uid-to-Name until "Later" (either STC or AutoRedux)
 		 * We will Now Accept "Empty" strings for the Name and Role, as in:
 		 *    :Uid1:; Name2:Uid2:; :Uid3:Role3; . . .
 		 */

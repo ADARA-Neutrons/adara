@@ -3,7 +3,7 @@
 
 #include <string>
 
-namespace STS {
+namespace STC {
 
 /**
  * @brief The TransCompletePkt class wraps the translation status message sent back to the SMS.

@@ -32,7 +32,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 #include "SMSControl.h"
 #include "SMSControlPV.h"
 #include "ADARAUtils.h"
-#include "STSClientMgr.h"
+#include "STCClientMgr.h"
 #include "EventFd.h"
 #include "utils.h"
 
@@ -273,15 +273,15 @@ public:
 						<< " Please Check Run Directory for Errors...");
 				} else {
 					/* Queue for Re-Translation */
-					STSClientMgr *sts = STSClientMgr::getInstance();
+					STCClientMgr *stc = STCClientMgr::getInstance();
 					INFO("Rescan Queuing Run " << c->runNumber());
-					sts->queueRun(c);
-					/* Tell the STS client to start processing the runs we
+					stc->queueRun(c);
+					/* Tell the STC client to start processing the runs we
 					 * just queued. */
-					sts->startConnect();
+					stc->startConnect();
 					/* Send Run Queued Message */
 					combus->sendOriginal(c->runNumber(), c->propId(),
-							std::string("Rescan STS Send Pending"),
+							std::string("Rescan STC Send Pending"),
 							c->startTime());
 				}
 			}
@@ -1554,7 +1554,7 @@ void StorageManager::scanDaily(const std::string &dir)
 			m_scannedBlocks += c->blocks();
 
 			if (c->runNumber()) {
-				/* DON'T Send STS Succeeded Message...!
+				/* DON'T Send STC Succeeded Message...!
 				 * - the original ComBus Message was sent
 				 * _Before_ the "Translation Completed" Marker
 				 * is written to the local Run Container Directory,
@@ -1563,7 +1563,7 @@ void StorageManager::scanDaily(const std::string &dir)
 				 * run messages... ;-b)
 				 */
 				if (c->isManual()) {
-					/* Send STS Failed Message */
+					/* Send STC Failed Message */
 					m_combus->sendOriginal(c->runNumber(), c->propId(),
 							std::string("Needs Manual Translation"),
 							c->startTime());
@@ -1572,7 +1572,7 @@ void StorageManager::scanDaily(const std::string &dir)
 					m_pendingRuns.push_back(c);
 					/* Send Run Queued Message */
 					m_combus->sendOriginal(c->runNumber(), c->propId(),
-							std::string("STS Send Pending"),
+							std::string("STC Send Pending"),
 							c->startTime());
 				}
 			}
@@ -2240,19 +2240,19 @@ void StorageManager::ioCompleted(void)
 		m_blocks_used += m_scannedBlocks;
 		m_scannedBlocks = 0;
 
-		STSClientMgr *sts = STSClientMgr::getInstance();
+		STCClientMgr *stc = STCClientMgr::getInstance();
 		std::list<StorageContainer::SharedPtr>::iterator it;
 		for (it = m_pendingRuns.begin(); it != m_pendingRuns.end();
 									++it) {
 			INFO("Queuing pending run " << (*it)->runNumber());
-			sts->queueRun(*it);
+			stc->queueRun(*it);
 		}
 
-		/* Tell the STS client to start processing the runs we
+		/* Tell the STC client to start processing the runs we
 		 * just queued.
 		 */
 		if (!m_pendingRuns.empty())
-			sts->startConnect();
+			stc->startConnect();
 	}
 	
 	// Data Directory Purge Request Completed...

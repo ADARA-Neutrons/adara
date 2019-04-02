@@ -555,7 +555,7 @@ ConfigManager::makeDeviceKey( const string &a_device_name, const string &a_sourc
  * injecting Device Descriptor packets with conflicting names. This
  * condition must be trapped by the SMS.
  *
- * Addendum: As of the end of 2018, the ADARA STS has gotten much smarter
+ * Addendum: As of the end of 2018, the ADARA STC has gotten much smarter
  * about recognizing "Duplicate PVs" and Collapsing any redundant values
  * into a single Merged PV Log. So we can be more cavalier now too,
  * and only look for PV Name/Alias Clashes that are Distinct from the

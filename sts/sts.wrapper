@@ -1,19 +1,19 @@
 #!/bin/bash
 #
-# STS Wrapper Script
-#    - to be installed in "/usr/local/bin/sts" on sns-sts[12].sns.gov
-#    - invoked by the STS XInetD Script in /etc/xinetd.d/sts
+# STC Wrapper Script
+#    - to be installed in "/usr/local/bin/stc" on sns-stc[12].sns.gov
+#    - invoked by the STC XInetD Script in /etc/xinetd.d/stc
 #
 # This wrapper calls:
-#    - "/usr/sbin/sts"
-#    - which points to "/home/controls/config/deploy/sts"
+#    - "/usr/sbin/stc"
+#    - which points to "/home/controls/config/deploy/stc"
 #    - which points to the deployed binary in
-#      "/home/controls/prod/ADARA/<tag>/sts"...
+#      "/home/controls/prod/ADARA/<tag>/stc"...
 #
 
-CONFIG_FILE="--config /SNS/snfs1/stsdata/sts_config.xml"
+CONFIG_FILE="--config /SNS/snfs1/stcdata/stc_config.xml"
 
-exec /usr/sbin/sts -s -m -w /SNS/snfs1/stsdata ${CONFIG_FILE} --no-adara \
+exec /usr/sbin/stc -s -m -w /SNS/snfs1/stcdata ${CONFIG_FILE} --no-adara \
 	--broker_uri tcp://amqbroker.sns.gov --broker_user wfclient \
 	--broker_pass w0rkfl0w
 

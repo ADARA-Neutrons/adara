@@ -13,10 +13,10 @@
 #include "POSIXParser.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
-#include "stsdefs.h"
+#include "stcdefs.h"
 #include "TraceException.h"
 
-namespace STS {
+namespace STC {
 
 
 /*! \brief Base class that provides ADARA-specific parsing and translation
@@ -177,13 +177,13 @@ private:
                     uint32_t a_event_count, const uint32_t *a_rpos );
     void        handleMonitorPulseGap( MonitorInfo &a_mi,
                     uint64_t a_count );
-    STS::BeamMonitorConfig *
+    STC::BeamMonitorConfig *
                 getBeamMonitorConfig( Identifier a_monitor_id,
                     bool & known_monitor );
-    std::vector<STS::DetectorBankSet *>
+    std::vector<STC::DetectorBankSet *>
                 getDetectorBankSets( Identifier a_bank_id );
     void        associateDetectorBankSet(
-                    STS::DetectorBankSet *a_bank_set );
+                    STC::DetectorBankSet *a_bank_set );
     template<class T>
     void        pvValueUpdate( Identifier a_device_id, Identifier a_pv_id,
                     T a_value, const timespec &a_timestamp );
@@ -207,9 +207,9 @@ private:
     uint64_t                                m_pulse_id;                 ///< ID of current pulse
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
     PulseInfo                               m_pulse_info;               ///< Neutron pulse data
-    std::vector<STS::DetectorBankSet *>     m_bank_sets;                ///< Vector of Detector Bank Sets info
+    std::vector<STC::DetectorBankSet *>     m_bank_sets;                ///< Vector of Detector Bank Sets info
     BankInfoMap                             m_banks;                    ///< Container of detector bank information
-    std::vector<STS::BeamMonitorConfig>     m_monitor_config;           ///< Vector of Beam Monitor (Histo) Config info
+    std::vector<STC::BeamMonitorConfig>     m_monitor_config;           ///< Vector of Beam Monitor (Histo) Config info
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information
     uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banks & monitors; number of elements)
     uint32_t                                m_anc_buf_write_thresh;     ///< Ancillary buffer write threshold (indexes, PVs, etc; number of elements)
@@ -222,7 +222,7 @@ private:
     std::string                             m_work_dir;                 ///< Working Directory
     bool                                    m_do_rename;                ///< Can We Do a NeXus File Rename?
     std::string                             m_adara_out_file;           ///< Filename of output ADARA stream file
-    std::string                             m_config_file;              ///< Path to STS Config file
+    std::string                             m_config_file;              ///< Path to STC Config file
     bool                                    m_strict;                   ///< Controls strict ADARA processing option
     bool                                    m_gen_adara;                ///< Controls generation of ADARA output stream file
     bool                                    m_gather_stats;             ///< Controls gathering of stream statistics
@@ -232,7 +232,7 @@ private:
     uint16_t                                m_pulse_flag;
 
     struct timespec                         m_default_run_start_time;   ///< Default Run Start Time (No Neutron Pulses)...
-    bool                                    m_verbose;                  ///< STS Verbosity
+    bool                                    m_verbose;                  ///< STC Verbosity
 
 protected:
     std::vector<PVInfoBase*>                m_pvs_list;                 ///< Collection of all process variable information
@@ -243,7 +243,7 @@ protected:
 };
 
 
-} // End namespace STS
+} // End namespace STC
 
 #endif /* STREAMPARSER_H */
 

@@ -16,7 +16,7 @@ type in these commands without context. You *cannot* learn git in these
 4. git checkout master (swiches back to the master branch)
 5. git merge mycoolbranch (merges in the changes)
 
-#### Remotes 
+#### Remotes [OBSOLETE!!]
 1. git remote add sts-devel git+ssh://trac.sns.gov/var/repos/sts-devel
    (creates a new remote called "sts-devel" which points to that repo)
 2. git pull sts-devel master 

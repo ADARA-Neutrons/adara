@@ -1,21 +1,21 @@
-.TH sts 1 "October 2012" "version 0.1.1"
+.TH stc 1 "October 2012" "version 0.1.1"
 .SH NAME
-sts - ADARA streaming translation service
+stc - ADARA streaming translation service
 .SH SYNOPSIS
-sts [OPTION]
+stc [OPTION]
 .SH DESCRIPTION
-The sts is a stream translation process used to create Nexus files within the
-SNS ADARA data acquisition and analysis system. The sts process is typically
+The stc is a stream translation process used to create Nexus files within the
+SNS ADARA data acquisition and analysis system. The stc process is typically
 installed as an xinetd service that is started in respone to a request by the
-stream management service (sms) process; however, sts can be run from the
+stream management service (sms) process; however, stc can be run from the
 command line to manually translate or inspect ADARA streams. There are two
-methods of manually translating an ADARA stream file: piping a file to sts,
+methods of manually translating an ADARA stream file: piping a file to stc,
 or using the --file (-f) option to specify an input file. For example, the
 following two commands are equivalent:
-.IP "cat streaamfile.adara | ./sts"
-.IP "./sts -f streamfile.adara"
+.IP "cat streaamfile.adara | ./stc"
+.IP "./stc -f streamfile.adara"
 .PP
-When run without options, sts generates an uncompressed Nexus output file
+When run without options, stc generates an uncompressed Nexus output file
 and an ADARA output file in the current working directory using a temporary
 file-naming scheme. If the --move option is specified, these files are moved
 to their respective cataloging locations and renamed to conform to SNS
@@ -23,16 +23,16 @@ cataloging service requirements. (Note: for the move to succeed, the working
 directory and the catalogging directories must reside in the same physical
 storage device.)
 .PP
-To use the sts as a simple stream statisics tool, enable statistics reporting
+To use the stc as a simple stream statisics tool, enable statistics reporting
 and disable both nexus file and ADARA file generation, as follows:
 
-.IP "sts -n -a -r"
+.IP "stc -n -a -r"
 
 .SH OPTIONS
 .IP "-h, --help"
 Displays usage text and exits.
 .IP "--version"
-Displays sts version number and exits.
+Displays stc version number and exits.
 .IP "-i, --interactive"
 Enables "interactive" mode (displays information to console)
 .IP "-v, --verbose"

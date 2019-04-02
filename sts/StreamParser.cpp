@@ -15,7 +15,7 @@
 
 using namespace std;
 
-namespace STS {
+namespace STC {
 
 RateLimitedLogging::History RLLHistory_StreamParserH;
 
@@ -46,12 +46,12 @@ StreamParser::StreamParser
     const string   &a_work_root,                ///< [in] Work Directory Root
     const string   &a_work_base,                ///< [in] Work Directory Base
     const string   &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
-    const string   &a_config_file,              ///< [in] Path to STS Config file
+    const string   &a_config_file,              ///< [in] Path to STC Config file
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
     uint32_t        a_event_buf_write_thresh,   ///< [in] Event buffer write threshold (number of elements)
     uint32_t        a_anc_buf_write_thresh,     ///< [in] Ancillary buffer write threshold (number of elements)
-    bool            a_verbose                   ///< [in] STS Verbosity
+    bool            a_verbose                   ///< [in] STC Verbosity
 )
 :
     POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
@@ -116,7 +116,7 @@ StreamParser::~StreamParser()
             delete ibi->second;
     }
 
-    for ( vector<STS::DetectorBankSet *>::iterator dbs =
+    for ( vector<STC::DetectorBankSet *>::iterator dbs =
             m_bank_sets.begin(); dbs != m_bank_sets.end() ; ++dbs ) {
         if ( *dbs )
             delete *dbs;
@@ -194,7 +194,7 @@ StreamParser::constructWorkingDirectory( bool a_force_init, string caller )
                 "Forcing Initialization of Nexus File", caller.c_str() );
             usleep(30000); // give syslog a chance...
 
-            // In a pinch, Steal STS Config File Directory as Scratch...!
+            // In a pinch, Steal STC Config File Directory as Scratch...!
             size_t last_slash = m_config_file.find_last_of("/");
             if ( last_slash != string::npos )
                 m_work_dir = m_config_file.substr( 0, last_slash );
@@ -207,9 +207,9 @@ StreamParser::constructWorkingDirectory( bool a_force_init, string caller )
 
             syslog( LOG_ERR,
                 "[%i] %s %s: %s %s (%s): [%s] (Set doRename=%s)",
-                g_pid, "STS Error:",
+                g_pid, "STC Error:",
                 "StreamParser::constructWorkingDirectory()", "FORCE INIT",
-                "Working Directory Constructed from STS Config File Path",
+                "Working Directory Constructed from STC Config File Path",
                 m_config_file.c_str(), m_work_dir.c_str(),
                 ( m_do_rename ? "true" : "false" ) );
             usleep(30000); // give syslog a chance...
@@ -306,7 +306,7 @@ StreamParser::processStream()
                 if ( m_processing_state != DONE_PROCESSING )
                 {
                     syslog( LOG_ERR,
-                    "[%i] STS failed %s: %s, %s (%s = %s)! [%s]",
+                    "[%i] STC failed %s: %s, %s (%s = %s)! [%s]",
                         g_pid, "processStream()", "Connection Failed",
                         "Not Done Processing", "Processing State",
                         getProcessingStateString().c_str(),
@@ -316,7 +316,7 @@ StreamParser::processStream()
                     {
                         syslog( LOG_ERR,
                             "[%i] %s %s: %s, %s (%s = %s)!",
-                            g_pid, "STS Error:", "processStream()",
+                            g_pid, "STC Error:", "processStream()",
                             "Connection Failed", "Still Processing Events",
                             "Processing State",
                             getProcessingStateString().c_str() );
@@ -572,7 +572,7 @@ StreamParser::rxPacket
         else
         {
             syslog( LOG_ERR, "[%i] %s Run Status Error: %s = %s.",
-                g_pid, "STS Error:", "Start-of-Run with Processing State",
+                g_pid, "STC Error:", "Start-of-Run with Processing State",
                 getProcessingStateString().c_str() );
             usleep(30000); // give syslog a chance...
             bad_state = true;
@@ -604,7 +604,7 @@ StreamParser::rxPacket
         else
         {
             syslog( LOG_ERR, "[%i] %s Run Status Error: %s = %s.",
-                g_pid, "STS Error:", "End-of-Run with Processing State",
+                g_pid, "STC Error:", "End-of-Run with Processing State",
                 getProcessingStateString().c_str() );
             usleep(30000); // give syslog a chance...
             bad_state = true;
@@ -1012,7 +1012,7 @@ StreamParser::rxPacket
         {
             syslog( LOG_ERR,
                 "[%i] %s %s %u.%09u with Events (%u %s) in %s - Ignoring!",
-                g_pid, "STS Error:", "Duplicate Pulse",
+                g_pid, "STC Error:", "Duplicate Pulse",
                 (uint32_t) a_pkt.timestamp().tv_sec
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (uint32_t) a_pkt.timestamp().tv_nsec,
@@ -1062,7 +1062,7 @@ StreamParser::rxPacket
         // (No need to throw out baby with the bath water...! ;-)
         syslog( LOG_ERR,
             "[%i] %s %s Received at %u.%09u, %s %s Continuing...",
-            g_pid, "STS Error:",
+            g_pid, "STC Error:",
             "Invalid Banked Event Packet Sequence",
             (uint32_t) a_pkt.timestamp().tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET,
@@ -1135,7 +1135,7 @@ StreamParser::rxPacket
         {
             syslog( LOG_ERR,
                 "[%i] %s %s %u.%09u with Events (%u %s) in %s - Ignoring!",
-                g_pid, "STS Error:", "Duplicate Pulse",
+                g_pid, "STC Error:", "Duplicate Pulse",
                 (uint32_t) a_pkt.timestamp().tv_sec
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (uint32_t) a_pkt.timestamp().tv_nsec,
@@ -1185,7 +1185,7 @@ StreamParser::rxPacket
         // (No need to throw out baby with the bath water...! ;-)
         syslog( LOG_ERR,
             "[%i] %s %s Received at %u.%09u, %s %s Continuing...",
-            g_pid, "STS Error:",
+            g_pid, "STC Error:",
             "Invalid Banked Event State Packet Sequence",
             (uint32_t) a_pkt.timestamp().tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET,
@@ -1323,7 +1323,7 @@ StreamParser::rxOversizePkt
                 // (No need to throw out baby with the bath water...! ;-)
                 syslog( LOG_ERR,
                     "[%i] %s %s Received at %u.%09u, %s %s Continuing...",
-                    g_pid, "STS Error:",
+                    g_pid, "STC Error:",
                     "Invalid (Oversized) Banked Event Packet Sequence",
                     (uint32_t) hdr->timestamp().tv_sec
                         - ADARA::EPICS_EPOCH_OFFSET,
@@ -1344,7 +1344,7 @@ StreamParser::rxOversizePkt
                 // (No need to throw out baby with the bath water...! ;-)
                 syslog( LOG_ERR,
                     "[%i] %s %s Received at %u.%09u, %s %s Continuing...",
-                    g_pid, "STS Error:",
+                    g_pid, "STC Error:",
                     "Invalid (Oversized) Beam Monitor Packet Sequence",
                     (uint32_t) hdr->timestamp().tv_sec
                         - ADARA::EPICS_EPOCH_OFFSET,
@@ -1617,7 +1617,7 @@ StreamParser::processBankEvents
 
             size_t sz = bi->m_tof_buffer_size;
 
-            // *** STS CRITICAL PATH OPTIMIZATION ***
+            // *** STC CRITICAL PATH OPTIMIZATION ***
             // *ONLY* Resize Vector if _Not_ Previously Resized...!
             // - Huge Savings for us, because resize() pre-initializes
             // the Values in the vector when resizing...! ;-D
@@ -1695,7 +1695,7 @@ StreamParser::processBankEvents
 
             // Find Detector Bank Set We're Using for Histogram
             // (Only *One* Histogram per Detector Bank (for now)...)
-            for ( std::vector<STS::DetectorBankSet *>::iterator dbs =
+            for ( std::vector<STC::DetectorBankSet *>::iterator dbs =
                         bi->m_bank_sets.begin();
                     dbs != bi->m_bank_sets.end() ; ++dbs )
             {
@@ -1737,7 +1737,7 @@ StreamParser::processBankEvents
                             {
                                 syslog( LOG_ERR,
                                 "[%i] %s %s %u %s tof=%u tofbin=%u >= %u",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "Detector Bank", bi->m_id,
                                     "Histogram Error",
                                     tof, tofbin, bi->m_num_tof_bins - 1 );
@@ -1759,7 +1759,7 @@ StreamParser::processBankEvents
                             {
                                 syslog( LOG_ERR,
                              "[%i] %s %s %u %s pid=%u tofbin=%u %u >= %lu",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "Detector Bank", bi->m_id,
                                     "Histogram Index Overflow",
                                     pid, tofbin, index,
@@ -1789,7 +1789,7 @@ StreamParser::processBankEvents
                             {
                                 syslog( LOG_ERR,
                            "[%i] %s %s %u %s pid=%u base=%u offset=%u < 0",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "Detector Bank", bi->m_id,
                                     "Histogram Offset Error",
                                     pid, bi->m_base_pid,
@@ -1905,7 +1905,7 @@ StreamParser::rxPacket
         {
             syslog( LOG_ERR,
                 "[%i] %s %s %u.%09u with %u Events in %s - Ignoring!",
-                g_pid, "STS Error:", "Duplicate Pulse",
+                g_pid, "STC Error:", "Duplicate Pulse",
                 (uint32_t) a_pkt.timestamp().tv_sec
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (uint32_t) a_pkt.timestamp().tv_nsec,
@@ -1953,7 +1953,7 @@ StreamParser::rxPacket
         // (No need to throw out baby with the bath water...! ;-)
         syslog( LOG_ERR,
             "[%i] %s %s Received at %u.%09u, %s %s Continuing...",
-            g_pid, "STS Error:",
+            g_pid, "STC Error:",
             "Invalid Beam Monitor Packet Sequence",
             (uint32_t) a_pkt.timestamp().tv_sec
                 - ADARA::EPICS_EPOCH_OFFSET,
@@ -2020,7 +2020,7 @@ StreamParser::processMonitorEvents
     if ( imi == m_monitors.end() )
     {
         bool known_monitor = true;
-        STS::BeamMonitorConfig *config =
+        STC::BeamMonitorConfig *config =
             getBeamMonitorConfig(a_monitor_id, known_monitor);
         MonitorInfo *mi = makeMonitorInfo( a_monitor_id,
             m_event_buf_write_thresh, m_anc_buf_write_thresh,
@@ -2062,7 +2062,7 @@ StreamParser::processMonitorEvents
                 {
                     syslog( LOG_ERR,
                     "[%i] %s %s %u Histogram Error tof=%u index=%u >= %u",
-                        g_pid, "STS Error:", "Beam Monitor",
+                        g_pid, "STC Error:", "Beam Monitor",
                         imi->second->m_id, tof, tofbin,
                         imi->second->m_num_tof_bins - 1 );
                     usleep(30000); // give syslog a chance...
@@ -2099,7 +2099,7 @@ StreamParser::processMonitorEvents
 
         size_t sz = imi->second->m_tof_buffer_size;
 
-        // *** STS CRITICAL PATH OPTIMIZATION ***
+        // *** STC CRITICAL PATH OPTIMIZATION ***
         // *ONLY* Resize Vector if _Not_ Previously Resized...!
         // - Huge Savings for us, because resize() pre-initializes
         // the Values in the vector when resizing...! ;-D
@@ -2642,7 +2642,7 @@ StreamParser::rxPacket
         if ( msg.size() ) {
             syslog( LOG_ERR,
                 "[%i] %s %s: Strictly Missing RunInfo - %s...",
-                g_pid, "STS Error:", "rxPacket(RunInfoPkt)", msg.c_str() );
+                g_pid, "STC Error:", "rxPacket(RunInfoPkt)", msg.c_str() );
             usleep(30000); // give syslog a chance...
         }
     }
@@ -2742,7 +2742,7 @@ StreamParser::rxPacket
 
     for (uint32_t i=0 ; i < a_pkt.beamMonCount() ; i++) {
 
-        STS::BeamMonitorConfig config;
+        STC::BeamMonitorConfig config;
 
         config.id = a_pkt.bmonId(i);
         config.tofOffset = a_pkt.tofOffset(i);
@@ -2761,11 +2761,11 @@ StreamParser::rxPacket
         {
             syslog( LOG_ERR,
                 "[%i] %s %s %u Config Error: Offset %u >= Max %u",
-                g_pid, "STS Error:", "Beam Monitor", config.id,
+                g_pid, "STC Error:", "Beam Monitor", config.id,
                 config.tofOffset, config.tofMax );
             syslog( LOG_ERR,
                 "[%i] %s Reverting to Beam Monitor Event Mode!",
-                g_pid, "STS Error:" );
+                g_pid, "STC Error:" );
             usleep(30000); // give syslog a chance...
             m_monitor_config.clear();
             break;
@@ -2776,7 +2776,7 @@ StreamParser::rxPacket
         {
             syslog( LOG_ERR,
                 "[%i] %s %s %u Histogram Config Issue: Time Bin %u < 1",
-                g_pid, "STS Error:", "Beam Monitor", config.id,
+                g_pid, "STC Error:", "Beam Monitor", config.id,
                 config.tofBin );
             usleep(30000); // give syslog a chance...
             config.tofBin = 1;
@@ -2796,14 +2796,14 @@ StreamParser::rxPacket
  * any optionally received prologue information, to define proper
  * Histogramming parameters for processing/accumulating Beam Monitor data.
  */
-STS::BeamMonitorConfig *
+STC::BeamMonitorConfig *
 StreamParser::getBeamMonitorConfig
 (
     Identifier a_monitor_id,    ///< [in] Beam Monitor Id (uint32_t)
     bool & known_monitor        ///< [in] Flag for "Unknown" Monitors...
 )
 {
-    STS::BeamMonitorConfig *config = (STS::BeamMonitorConfig *) NULL;
+    STC::BeamMonitorConfig *config = (STC::BeamMonitorConfig *) NULL;
 
     // Innocent until Presumed Guilty...
     // (or like, if there isn't any Beam Monitor Config info... :-)
@@ -2814,7 +2814,7 @@ StreamParser::getBeamMonitorConfig
         return(config); // NULL...
 
     // Look for a matching Beam Monitor Id in Any Config...
-    for ( vector<STS::BeamMonitorConfig>::iterator bmc =
+    for ( vector<STC::BeamMonitorConfig>::iterator bmc =
                 m_monitor_config.begin();
             bmc != m_monitor_config.end() && config == NULL ; ++bmc )
     {
@@ -2828,7 +2828,7 @@ StreamParser::getBeamMonitorConfig
         // "Trouble"...
         syslog( LOG_ERR,
             "[%i] %s %s %d Missing in Histogramming Config! %s",
-            g_pid, "STS Error:", "Beam Monitor", a_monitor_id,
+            g_pid, "STC Error:", "Beam Monitor", a_monitor_id,
             "[Unknown Monitor]" );
         usleep(30000); // give syslog a chance...
 
@@ -2883,7 +2883,7 @@ StreamParser::rxPacket
         }
         ss << "]";
 
-        STS::DetectorBankSet *set = new STS::DetectorBankSet;
+        STC::DetectorBankSet *set = new STC::DetectorBankSet;
 
         set->name = a_pkt.name(i);
         set->banklist = banklist;
@@ -2919,11 +2919,11 @@ StreamParser::rxPacket
         {
             syslog( LOG_ERR,
                 "[%i] %s %s %s Config Error: Offset %u >= Max %u",
-                g_pid, "STS Error:", "Detector Bank Set",
+                g_pid, "STC Error:", "Detector Bank Set",
                 set->name.c_str(), set->tofOffset, set->tofMax );
             syslog( LOG_ERR,
                 "[%i] %s Restricting Detector Bank Set to Event Mode!",
-                g_pid, "STS Error:" );
+                g_pid, "STC Error:" );
             usleep(30000); // give syslog a chance...
             set->flags &= !(ADARA::DetectorBankSetsPkt::HISTO_FORMAT);
         }
@@ -2933,7 +2933,7 @@ StreamParser::rxPacket
         {
             syslog( LOG_ERR,
                 "[%i] %s %s %s Histogram Config Issue: Time Bin %u < 1",
-                g_pid, "STS Error:", "Detector Bank Set",
+                g_pid, "STC Error:", "Detector Bank Set",
                 set->name.c_str(), set->tofBin );
             usleep(30000); // give syslog a chance...
             set->tofBin = 1;
@@ -2958,20 +2958,20 @@ StreamParser::rxPacket
  * Histogramming parameters for processing/accumulating Neutron Detector
  * data.
  */
-vector<STS::DetectorBankSet *>
+vector<STC::DetectorBankSet *>
 StreamParser::getDetectorBankSets
 (
     uint32_t a_bank_id    ///< [in] Detector Bank Id (uint32_t)
 )
 {
-    vector<STS::DetectorBankSet *> bank_sets;
+    vector<STC::DetectorBankSet *> bank_sets;
 
     // Any Detector Bank Sets...? (If not, we're done.)
     if (m_bank_sets.size() == 0)
         return(bank_sets); // empty...
 
     // Look for Detector Bank Sets with matching Detector Bank Ids...
-    for ( vector<STS::DetectorBankSet *>::iterator dbs =
+    for ( vector<STC::DetectorBankSet *>::iterator dbs =
                 m_bank_sets.begin();
             dbs != m_bank_sets.end() ; ++dbs )
     {
@@ -3006,7 +3006,7 @@ StreamParser::getDetectorBankSets
 void
 StreamParser::associateDetectorBankSet
 (
-    STS::DetectorBankSet *a_bank_set  ///< [in] Detector Bank Set (ptr)
+    STC::DetectorBankSet *a_bank_set  ///< [in] Detector Bank Set (ptr)
 )
 {
     // Look for Detector Banks that are Listed in This Set...
@@ -3047,7 +3047,7 @@ StreamParser::associateDetectorBankSet
  * This method handles the ADARA Data Done packets.
  * This is the "direct" way of the SMS telling us that
  * there is "No More Data" to stream; much better than using
- * shutdown() for the sending side of the SMS-STS socket,
+ * shutdown() for the sending side of the SMS-STC socket,
  * which seems to cause a _total_ socket disconnect here,
  * due to some aspect of the networking setup (firewall?).
  */
@@ -3070,7 +3070,7 @@ StreamParser::rxPacket
     else if ( m_processing_state != DONE_PROCESSING )
     {
         syslog( LOG_INFO,
-            "[%i] STS failed: Data Done Received, %s (%s = %s)!",
+            "[%i] STC failed: Data Done Received, %s (%s = %s)!",
             g_pid, "Not Done Processing", "Processing State",
             getProcessingStateString().c_str() );
         usleep(30000); // give syslog a chance...
@@ -3239,7 +3239,7 @@ StreamParser::rxPacket
                                                      * "Lucky Day" Log! :-D
                                                      * 11/20/2015 - Jeeem
                                                     stringstream ss;
-                                                    ss << "STS Error: "
+                                                    ss << "STC Error: "
                                                         << "Device "
                                                         << a_pkt.devId()
                                                         << " Enum "
@@ -3271,7 +3271,7 @@ StreamParser::rxPacket
                                         if ( pv_enum_vector == NULL )
                                         {
                                             stringstream ss;
-                                            ss << "STS Error: "
+                                            ss << "STC Error: "
                                                 << "Device "
                                                 << a_pkt.devId()
                                                 << " Enum "
@@ -3361,7 +3361,7 @@ StreamParser::rxPacket
                                 // SMS does not perform any checks to
                                 // prevent DataSources from publishing
                                 // duplicate PV names; thus it will
-                                // eventually happen. The STS will try
+                                // eventually happen. The STC will try
                                 // to handle name collisions without
                                 // aborting, but the above behavior that
                                 // tries to gracefully handle pvsd restarts
@@ -3369,7 +3369,7 @@ StreamParser::rxPacket
                                 // PV being replaced is actually a
                                 // duplicate PV that is still live.
                                 // On the next value update of the
-                                // replaced PV, the STS will detect that
+                                // replaced PV, the STC will detect that
                                 // there is no KEY present for that
                                 // variable. This is a ~very~ unlikely
                                 // scenario given that there is no use case
@@ -3388,7 +3388,7 @@ StreamParser::rxPacket
                                 // received definition will overwrite the
                                 // previous definition, and if value
                                 // updates are received for the former
-                                // over-written definition, the STS will
+                                // over-written definition, the STC will
                                 // throw an error.
 
                                 PVKey key(a_pkt.devId(),pv_id);
@@ -3444,7 +3444,7 @@ StreamParser::rxPacket
                                                 // a recording.
 
                                                 stringstream ss;
-                                                ss << "STS Error:"
+                                                ss << "STC Error:"
                                                     << " PV ID Re-Numbered"
                                                     << " [Device "
                                                     << ipk->second
@@ -3528,7 +3528,7 @@ StreamParser::rxPacket
                                                 // a recording.
 
                                                 stringstream ss;
-                                                ss << "STS Error:"
+                                                ss << "STC Error:"
                                                     << " PV ID Re-Defined"
                                                     << " - Former"
                                                     << " Definition"
@@ -3678,7 +3678,7 @@ StreamParser::rxPacket
                                             // PVInfo entry.
 
                                             stringstream ss;
-                                            ss << "STS Error:"
+                                            ss << "STC Error:"
                                                 << " Internal Error -"
                                                 << " Dangling PV"
                                                 << " Xref Entry"
@@ -3906,7 +3906,7 @@ StreamParser::rxPacket
                                             pv_ignore ) )
                                     {
                                         stringstream ss;
-                                        ss << "STS Error:"
+                                        ss << "STC Error:"
                                             << " PV Dev/ID Key Re-Used!"
                                             << " Former Definition"
                                             << " [Device "
@@ -3972,7 +3972,7 @@ StreamParser::rxPacket
                                                     xref );
                                             }
 
-                                            // There is nothing the STS
+                                            // There is nothing the STC
                                             // can do if there is a name
                                             // conflict here, the existing
                                             // name-to-key entry will be
@@ -4197,7 +4197,7 @@ StreamParser::rxPacket
                             else
                             {
                                 stringstream ss;
-                                ss << "STS Error:"
+                                ss << "STC Error:"
                                     << " Skipping PV - Missing Fields!"
                                     << " devId=" << a_pkt.devId()
                                     << " pvId=" << pv_id
@@ -4292,7 +4292,7 @@ StreamParser::rxPacket
                                     else
                                     {
                                         stringstream ss;
-                                        ss << "STS Error:"
+                                        ss << "STC Error:"
                                             << " Skipping Incomplete"
                                             << " Enum Element"
                                             << " devId=" << a_pkt.devId()
@@ -4350,7 +4350,7 @@ StreamParser::rxPacket
                                             // (DDP is Duplicated at
                                             // _Every_ File Boundary! ;-)
                                             // stringstream ss;
-                                            // ss << "STS Error:"
+                                            // ss << "STC Error:"
                                                 // << " Device "
                                                 // << a_pkt.devId()
                                                 // << " Duplicate Enum "
@@ -4367,7 +4367,7 @@ StreamParser::rxPacket
                                                 .compare( devEnum.name ) )
                                         {
                                             stringstream ss;
-                                            ss << "STS Error:"
+                                            ss << "STC Error:"
                                                 << " Device "
                                                 << a_pkt.devId()
                                                 << " Enum " << devEnum.name
@@ -4401,7 +4401,7 @@ StreamParser::rxPacket
                             else
                             {
                                 stringstream ss;
-                                ss << "STS Error:"
+                                ss << "STC Error:"
                                     << " Skipping Incomplete Enum "
                                     << " devId=" << a_pkt.devId()
                                     << " enumName=" << devEnum.name;
@@ -4438,7 +4438,7 @@ StreamParser::rxPacket
     }
     else
     {
-        syslog( LOG_ERR, "[%i] %s %s [%s]", g_pid, "STS Error:",
+        syslog( LOG_ERR, "[%i] %s %s [%s]", g_pid, "STC Error:",
             "Error Parsing Device Descriptor", xml.c_str() );
         // give syslog a chance...
         usleep(30000);
@@ -4545,7 +4545,7 @@ StreamParser::pvValueUpdate
             ssinfo << " = " << pvinfo->valueToString( a_value ) << " @";
             syslog( LOG_ERR,
                 "[%i] %s %s%s %s %s %lu.%09lu (%lu) < %lu.%09lu (%lu) %s",
-                g_pid, "STS Error:", log_info.c_str(),
+                g_pid, "STC Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update SAWTOOTH",
                 ssinfo.str().c_str(),
@@ -4619,7 +4619,7 @@ StreamParser::pvValueUpdate
                     int log_type = LOG_INFO;
                     if ( pvinfo->m_last_value_set ) {
                         log_type = LOG_ERR;
-                        log_hdr = "STS Error: ";
+                        log_hdr = "STC Error: ";
                     }
                     std::stringstream ss2;
                     ss2 << "Discard Previous Pre-First-Pulse Value ";
@@ -4667,7 +4667,7 @@ StreamParser::pvValueUpdate
                     int log_type = LOG_INFO;
                     if ( pvinfo->m_last_value_set ) {
                         log_type = LOG_ERR;
-                        log_hdr = "STS Error: ";
+                        log_hdr = "STC Error: ";
                     }
                     syslog( log_type,
                         "[%i] %s%s%s %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
@@ -4711,7 +4711,7 @@ StreamParser::pvValueUpdate
             ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
                 << " [" << pvinfo->m_connection << "]" << ")";
             syslog( LOG_ERR, "[%i] %s %s%s %s %s = %s @ %lu.%09lu (%lu)",
-                g_pid, "STS Error:", log_info.c_str(),
+                g_pid, "STC Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Got Pre-Pulse Variable Value Update",
                 ssinfo.str().c_str(),
@@ -4986,20 +4986,20 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( a_run_info.run_number != m_run_info.run_number ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Illegal Attempt to Update RunInfo %s! (%u != %u)",
-            g_pid, "STS Error:", "updateRunInfo()", "Run Number",
+            g_pid, "STC Error:", "updateRunInfo()", "Run Number",
             a_run_info.run_number, m_run_info.run_number );
         usleep(30000); // give syslog a chance...
     }
     if ( m_run_info.run_title.compare( a_run_info.run_title ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Run Title",
+            g_pid, "STC Error:", "updateRunInfo()", "Run Title",
             m_run_info.run_title.c_str(), a_run_info.run_title.c_str() );
         usleep(30000); // give syslog a chance...
         m_run_info.run_title = a_run_info.run_title;
     }
     if ( m_run_info.proposal_id.compare( a_run_info.proposal_id ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Proposal Id",
+            g_pid, "STC Error:", "updateRunInfo()", "Proposal Id",
             m_run_info.proposal_id.c_str(),
             a_run_info.proposal_id.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5007,7 +5007,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     }
     if ( m_run_info.proposal_title.compare( a_run_info.proposal_title ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Proposal Title",
+            g_pid, "STC Error:", "updateRunInfo()", "Proposal Title",
             m_run_info.proposal_title.c_str(),
             a_run_info.proposal_title.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5015,7 +5015,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     }
     if ( m_run_info.das_version.compare( a_run_info.das_version ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "DAS Version",
+            g_pid, "STC Error:", "updateRunInfo()", "DAS Version",
             m_run_info.das_version.c_str(),
             a_run_info.das_version.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5025,14 +5025,14 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.facility_name.compare( a_run_info.facility_name ) ) {
         syslog( LOG_ERR,
         "[%i] %s %s: Illegal Attempt to Update RunInfo %s! ([%s] != [%s])",
-            g_pid, "STS Error:", "updateRunInfo()", "Facility Name",
+            g_pid, "STC Error:", "updateRunInfo()", "Facility Name",
             m_run_info.facility_name.c_str(),
             a_run_info.facility_name.c_str() );
         usleep(30000); // give syslog a chance...
     }
     if ( a_run_info.no_sample_info != m_run_info.no_sample_info ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "No Sample Info",
+            g_pid, "STC Error:", "updateRunInfo()", "No Sample Info",
             (m_run_info.no_sample_info) ? "True" : "False",
             (a_run_info.no_sample_info) ? "True" : "False" );
         usleep(30000); // give syslog a chance...
@@ -5040,14 +5040,14 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     }
     if ( m_run_info.sample_id.compare( a_run_info.sample_id ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Id",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Id",
             m_run_info.sample_id.c_str(), a_run_info.sample_id.c_str() );
         usleep(30000); // give syslog a chance...
         m_run_info.sample_id = a_run_info.sample_id;
     }
     if ( m_run_info.sample_name.compare( a_run_info.sample_name ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Name",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Name",
             m_run_info.sample_name.c_str(),
             a_run_info.sample_name.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5055,7 +5055,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     }
     if ( m_run_info.sample_nature.compare( a_run_info.sample_nature ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Nature",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Nature",
             m_run_info.sample_nature.c_str(),
             a_run_info.sample_nature.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5063,17 +5063,17 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     }
     if ( m_run_info.sample_formula.compare( a_run_info.sample_formula ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Formula",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Formula",
             m_run_info.sample_formula.c_str(),
             a_run_info.sample_formula.c_str() );
         usleep(30000); // give syslog a chance...
         m_run_info.sample_formula = a_run_info.sample_formula;
     }
     if ( !approximatelyEqual( a_run_info.sample_mass,
-            m_run_info.sample_mass, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_mass, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Mass",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Mass",
             m_run_info.sample_mass, a_run_info.sample_mass );
         usleep(30000); // give syslog a chance...
         m_run_info.sample_mass = a_run_info.sample_mass;
@@ -5081,17 +5081,17 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_mass_units.compare(
             a_run_info.sample_mass_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Mass Units",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Mass Units",
             m_run_info.sample_mass_units.c_str(),
             a_run_info.sample_mass_units.c_str() );
         usleep(30000); // give syslog a chance...
         m_run_info.sample_mass_units = a_run_info.sample_mass_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_mass_density,
-            m_run_info.sample_mass_density, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_mass_density, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Mass Density",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Mass Density",
             m_run_info.sample_mass_density,
             a_run_info.sample_mass_density );
         usleep(30000); // give syslog a chance...
@@ -5100,7 +5100,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_mass_density_units.compare(
             a_run_info.sample_mass_density_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Mass Density Units",
             m_run_info.sample_mass_density_units.c_str(),
             a_run_info.sample_mass_density_units.c_str() );
@@ -5111,7 +5111,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_container_id.compare(
             a_run_info.sample_container_id ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Container Id",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Container Id",
             m_run_info.sample_container_id.c_str(),
             a_run_info.sample_container_id.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5120,7 +5120,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_container_name.compare(
             a_run_info.sample_container_name ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Container Name",
             m_run_info.sample_container_name.c_str(),
             a_run_info.sample_container_name.c_str() );
@@ -5131,7 +5131,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_can_indicator.compare(
             a_run_info.sample_can_indicator ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Can Indicator",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Can Indicator",
             m_run_info.sample_can_indicator.c_str(),
             a_run_info.sample_can_indicator.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5141,7 +5141,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_can_barcode.compare(
             a_run_info.sample_can_barcode ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Can Barcode",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Can Barcode",
             m_run_info.sample_can_barcode.c_str(),
             a_run_info.sample_can_barcode.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5150,7 +5150,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_can_name.compare(
             a_run_info.sample_can_name ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Can Name",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Can Name",
             m_run_info.sample_can_name.c_str(),
             a_run_info.sample_can_name.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5159,7 +5159,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_can_materials.compare(
             a_run_info.sample_can_materials ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Can Materials",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Can Materials",
             m_run_info.sample_can_materials.c_str(),
             a_run_info.sample_can_materials.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5168,7 +5168,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_description.compare(
             a_run_info.sample_description ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Description",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Description",
             m_run_info.sample_description.c_str(),
             a_run_info.sample_description.c_str() );
         usleep(30000); // give syslog a chance...
@@ -5177,17 +5177,17 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_comments.compare(
             a_run_info.sample_comments ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Comments",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Comments",
             m_run_info.sample_comments.c_str(),
             a_run_info.sample_comments.c_str() );
         usleep(30000); // give syslog a chance...
         m_run_info.sample_comments = a_run_info.sample_comments;
     }
     if ( !approximatelyEqual( a_run_info.sample_height_in_container,
-            m_run_info.sample_height_in_container, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_height_in_container, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Height In Container",
             m_run_info.sample_height_in_container,
             a_run_info.sample_height_in_container );
@@ -5198,7 +5198,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_height_in_container_units.compare(
             a_run_info.sample_height_in_container_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Height in Container Units",
             m_run_info.sample_height_in_container_units.c_str(),
             a_run_info.sample_height_in_container_units.c_str() );
@@ -5207,10 +5207,10 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_height_in_container_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_diameter,
-            m_run_info.sample_interior_diameter, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_interior_diameter, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Interior Diameter",
             m_run_info.sample_interior_diameter,
             a_run_info.sample_interior_diameter );
@@ -5221,7 +5221,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_interior_diameter_units.compare(
             a_run_info.sample_interior_diameter_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Interior Diameter Units",
             m_run_info.sample_interior_diameter_units.c_str(),
             a_run_info.sample_interior_diameter_units.c_str() );
@@ -5230,10 +5230,10 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_diameter_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_height,
-            m_run_info.sample_interior_height, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_interior_height, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Interior Height",
             m_run_info.sample_interior_height,
             a_run_info.sample_interior_height );
@@ -5244,7 +5244,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_interior_height_units.compare(
             a_run_info.sample_interior_height_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Interior Height Units",
             m_run_info.sample_interior_height_units.c_str(),
             a_run_info.sample_interior_height_units.c_str() );
@@ -5253,10 +5253,10 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_height_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_width,
-            m_run_info.sample_interior_width, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_interior_width, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Interior Width",
             m_run_info.sample_interior_width,
             a_run_info.sample_interior_width );
@@ -5267,7 +5267,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_interior_width_units.compare(
             a_run_info.sample_interior_width_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Interior Width Units",
             m_run_info.sample_interior_width_units.c_str(),
             a_run_info.sample_interior_width_units.c_str() );
@@ -5276,10 +5276,10 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_width_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_interior_depth,
-            m_run_info.sample_interior_depth, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_interior_depth, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Interior Depth",
             m_run_info.sample_interior_depth,
             a_run_info.sample_interior_depth );
@@ -5290,7 +5290,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_interior_depth_units.compare(
             a_run_info.sample_interior_depth_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Interior Depth Units",
             m_run_info.sample_interior_depth_units.c_str(),
             a_run_info.sample_interior_depth_units.c_str() );
@@ -5299,10 +5299,10 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_interior_depth_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_diameter,
-            m_run_info.sample_outer_diameter, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_outer_diameter, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Outer Diameter",
             m_run_info.sample_outer_diameter,
             a_run_info.sample_outer_diameter );
@@ -5313,7 +5313,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_outer_diameter_units.compare(
             a_run_info.sample_outer_diameter_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Outer Diameter Units",
             m_run_info.sample_outer_diameter_units.c_str(),
             a_run_info.sample_outer_diameter_units.c_str() );
@@ -5322,10 +5322,10 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_diameter_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_height,
-            m_run_info.sample_outer_height, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_outer_height, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Height",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Outer Height",
             m_run_info.sample_outer_height,
             a_run_info.sample_outer_height );
         usleep(30000); // give syslog a chance...
@@ -5334,7 +5334,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_outer_height_units.compare(
             a_run_info.sample_outer_height_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Outer Height Units",
             m_run_info.sample_outer_height_units.c_str(),
             a_run_info.sample_outer_height_units.c_str() );
@@ -5343,10 +5343,10 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_height_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_width,
-            m_run_info.sample_outer_width, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_outer_width, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Width",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Outer Width",
             m_run_info.sample_outer_width,
             a_run_info.sample_outer_width );
         usleep(30000); // give syslog a chance...
@@ -5355,7 +5355,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_outer_width_units.compare(
             a_run_info.sample_outer_width_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Outer Width Units",
             m_run_info.sample_outer_width_units.c_str(),
             a_run_info.sample_outer_width_units.c_str() );
@@ -5364,10 +5364,10 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_width_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_outer_depth,
-            m_run_info.sample_outer_depth, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_outer_depth, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Outer Depth",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Outer Depth",
             m_run_info.sample_outer_depth,
             a_run_info.sample_outer_depth );
         usleep(30000); // give syslog a chance...
@@ -5376,7 +5376,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_outer_depth_units.compare(
             a_run_info.sample_outer_depth_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Outer Depth Units",
             m_run_info.sample_outer_depth_units.c_str(),
             a_run_info.sample_outer_depth_units.c_str() );
@@ -5385,10 +5385,10 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             a_run_info.sample_outer_depth_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_volume_cubic,
-            m_run_info.sample_volume_cubic, STS_DOUBLE_EPSILON ) ) {
+            m_run_info.sample_volume_cubic, STC_DOUBLE_EPSILON ) ) {
         syslog( LOG_ERR,
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
-            g_pid, "STS Error:", "updateRunInfo()", "Sample Volume Cubic",
+            g_pid, "STC Error:", "updateRunInfo()", "Sample Volume Cubic",
             m_run_info.sample_volume_cubic,
             a_run_info.sample_volume_cubic );
         usleep(30000); // give syslog a chance...
@@ -5397,7 +5397,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     if ( m_run_info.sample_volume_cubic_units.compare(
             a_run_info.sample_volume_cubic_units ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Sample Volume Cubic Units",
             m_run_info.sample_volume_cubic_units.c_str(),
             a_run_info.sample_volume_cubic_units.c_str() );
@@ -5409,7 +5409,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
     bool update_users = false;
     if ( a_run_info.users.size() != m_run_info.users.size() ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: %lu -> %lu",
-            g_pid, "STS Error:", "updateRunInfo()",
+            g_pid, "STC Error:", "updateRunInfo()",
             "Users Vector Size Changed",
             m_run_info.users.size(),
             a_run_info.users.size() );
@@ -5422,7 +5422,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
                     a_run_info.users[i].id ) ) {
                 syslog( LOG_ERR,
                     "[%i] %s %s: Updating RunInfo %s #%u %s: [%s] -> [%s]",
-                    g_pid, "STS Error:", "updateRunInfo()",
+                    g_pid, "STC Error:", "updateRunInfo()",
                     "User", i, "Id Changed",
                     m_run_info.users[i].id.c_str(),
                     a_run_info.users[i].id.c_str() );
@@ -5433,7 +5433,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
                     a_run_info.users[i].name ) ) {
                 syslog( LOG_ERR,
                     "[%i] %s %s: Updating RunInfo %s #%u %s: [%s] -> [%s]",
-                    g_pid, "STS Error:", "updateRunInfo()",
+                    g_pid, "STC Error:", "updateRunInfo()",
                     "User", i, "Name Changed",
                     m_run_info.users[i].name.c_str(),
                     a_run_info.users[i].name.c_str() );
@@ -5444,7 +5444,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
                     a_run_info.users[i].role ) ) {
                 syslog( LOG_ERR,
                     "[%i] %s %s: Updating RunInfo %s #%u %s: [%s] -> [%s]",
-                    g_pid, "STS Error:", "updateRunInfo()",
+                    g_pid, "STC Error:", "updateRunInfo()",
                     "User", i, "Role Changed",
                     m_run_info.users[i].role.c_str(),
                     a_run_info.users[i].role.c_str() );
@@ -5475,7 +5475,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         }
         ss_new << "]";
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: %s -> %s",
-            g_pid, "STS Error:", "updateRunInfo()", "Users",
+            g_pid, "STC Error:", "updateRunInfo()", "Users",
             ss_old.str().c_str(), ss_new.str().c_str() );
         usleep(30000); // give syslog a chance...
         m_run_info.users = a_run_info.users;
@@ -5537,7 +5537,7 @@ StreamParser::finalizeStreamProcessing()
         else
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-                g_pid, "STS Error:", "NxGen::finalizeStreamProcessing()",
+                g_pid, "STC Error:", "NxGen::finalizeStreamProcessing()",
                 "Failed to Force Construction of Working Directory",
                 "EPIC FAIL, This Was Our Last Chance...!! Bailing..." );
             usleep(30000); // give syslog a chance...
@@ -5562,7 +5562,7 @@ StreamParser::finalizeStreamProcessing()
         {
             syslog( LOG_ERR,
                 "[%i] %s %s. %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
-                "STS Error:", "No Neutron Pulses Received in Stream",
+                "STC Error:", "No Neutron Pulses Received in Stream",
                 "Target Station", m_beamline_info.target_station_number,
                 "Beamline", m_run_info.facility_name.c_str(),
                 m_beamline_info.instr_shortname.c_str(),
@@ -5702,20 +5702,20 @@ StreamParser::finalizeStreamProcessing()
             &m_run_metrics );
     }
 
-    // Write Any Conditional STS Config Group Elements,
+    // Write Any Conditional STC Config Group Elements,
     // Now that All the PV Buffers have been Processed,
     // and Any Conditional Flags have been Set... :-D
 
     for ( vector<PVInfoBase*>::iterator ipv = m_pvs_list.begin();
             ipv != m_pvs_list.end(); ++ipv )
     {
-        (*ipv)->createSTSConfigConditionalGroups();
+        (*ipv)->createSTCConfigConditionalGroups();
     }
 
     // Now Globally Write Any Captured PV Units Attributes,
     // Using All Saved "Units Paths" String Sets & Units Values,
     // Now That All PV Values have been Processed...
-    checkSTSConfigElementUnitsPaths();
+    checkSTCConfigElementUnitsPaths();
 
     // Let adapter do anything else it wants to
     finalize( m_run_metrics, m_run_info );
@@ -5752,7 +5752,7 @@ StreamParser::collapseDuplicatePVs()
         if ( (*ipv)->m_duplicate && !((*ipv)->m_ignore) )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-                g_pid, "STS Error:",
+                g_pid, "STC Error:",
                 "StreamParser::collapseDuplicatePVs()",
                 "Found PV Marked as Duplicate",
                 (*ipv)->m_device_pv_str.c_str() );
@@ -5768,7 +5768,7 @@ StreamParser::collapseDuplicatePVs()
                     false /* Not "Exact" Match (Device Enum Name)... */ ) )
                 {
                     syslog( LOG_ERR, "[%i] %s %s: %s %s - %s",
-                        g_pid, "STS Error:",
+                        g_pid, "STC Error:",
                         "StreamParser::collapseDuplicatePVs()",
                         "Found Matching Duplicate PV",
                         (*ipvDup)->m_device_pv_str.c_str(),
@@ -5778,9 +5778,9 @@ StreamParser::collapseDuplicatePVs()
 
                     switch ( (*ipv)->m_type )
                     {
-                        case STS::PVT_INT:  // ADARA only supports uint32_t
-                        case STS::PVT_ENUM:
-                        case STS::PVT_UINT:
+                        case STC::PVT_INT:  // ADARA only supports uint32_t
+                        case STC::PVT_ENUM:
+                        case STC::PVT_UINT:
 
                             pvinfoU32 =
                                 dynamic_cast<PVInfo<uint32_t>*>( *ipv );
@@ -5795,7 +5795,7 @@ StreamParser::collapseDuplicatePVs()
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s - %s %s %s, %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "StreamParser::collapseDuplicatePVs()",
                                     "Main PV Duplicate Not Normalized",
                                     (*ipv)->m_device_pv_str.c_str(),
@@ -5821,7 +5821,7 @@ StreamParser::collapseDuplicatePVs()
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s - %s %s %s, %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "StreamParser::collapseDuplicatePVs()",
                                     "Matching PV Isn't Normalized",
                                     (*ipvDup)->m_device_pv_str.c_str(),
@@ -5845,8 +5845,8 @@ StreamParser::collapseDuplicatePVs()
 
                             break;
 
-                        case STS::PVT_FLOAT: // ADARA only supports double
-                        case STS::PVT_DOUBLE:
+                        case STC::PVT_FLOAT: // ADARA only supports double
+                        case STC::PVT_DOUBLE:
 
                             pvinfoDbl =
                                 dynamic_cast<PVInfo<double>*>( *ipv );
@@ -5861,7 +5861,7 @@ StreamParser::collapseDuplicatePVs()
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s - %s %s %s, %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "StreamParser::collapseDuplicatePVs()",
                                     "Main PV Duplicate Not Normalized",
                                     (*ipv)->m_device_pv_str.c_str(),
@@ -5887,7 +5887,7 @@ StreamParser::collapseDuplicatePVs()
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s - %s %s %s, %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "StreamParser::collapseDuplicatePVs()",
                                     "Matching PV Isn't Normalized",
                                     (*ipvDup)->m_device_pv_str.c_str(),
@@ -5911,7 +5911,7 @@ StreamParser::collapseDuplicatePVs()
 
                             break;
 
-                        case STS::PVT_STRING:
+                        case STC::PVT_STRING:
 
                             pvinfoStr =
                                 dynamic_cast<PVInfo<string>*>( *ipv );
@@ -5926,7 +5926,7 @@ StreamParser::collapseDuplicatePVs()
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s - %s %s %s, %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "StreamParser::collapseDuplicatePVs()",
                                     "Main PV Duplicate Not Normalized",
                                     (*ipv)->m_device_pv_str.c_str(),
@@ -5952,7 +5952,7 @@ StreamParser::collapseDuplicatePVs()
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s - %s %s %s, %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "StreamParser::collapseDuplicatePVs()",
                                     "Matching PV Isn't Normalized",
                                     (*ipvDup)->m_device_pv_str.c_str(),
@@ -5976,7 +5976,7 @@ StreamParser::collapseDuplicatePVs()
 
                             break;
 
-                        case STS::PVT_UINT_ARRAY:
+                        case STC::PVT_UINT_ARRAY:
 
                             pvinfoU32Arr =
                                 dynamic_cast<PVInfo< vector<uint32_t> >*>(
@@ -5992,7 +5992,7 @@ StreamParser::collapseDuplicatePVs()
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s - %s %s %s, %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "StreamParser::collapseDuplicatePVs()",
                                     "Main PV Duplicate Not Normalized",
                                     (*ipv)->m_device_pv_str.c_str(),
@@ -6019,7 +6019,7 @@ StreamParser::collapseDuplicatePVs()
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s - %s %s %s, %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "StreamParser::collapseDuplicatePVs()",
                                     "Matching PV Isn't Normalized",
                                     (*ipvDup)->m_device_pv_str.c_str(),
@@ -6043,7 +6043,7 @@ StreamParser::collapseDuplicatePVs()
 
                             break;
 
-                        case STS::PVT_DOUBLE_ARRAY:
+                        case STC::PVT_DOUBLE_ARRAY:
 
                             pvinfoDblArr =
                                 dynamic_cast<PVInfo< vector<double> >*>(
@@ -6059,7 +6059,7 @@ StreamParser::collapseDuplicatePVs()
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s - %s %s %s, %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "StreamParser::collapseDuplicatePVs()",
                                     "Main PV Duplicate Not Normalized",
                                     (*ipv)->m_device_pv_str.c_str(),
@@ -6086,7 +6086,7 @@ StreamParser::collapseDuplicatePVs()
                             {
                                 syslog( LOG_ERR,
                                     "[%i] %s %s: %s - %s %s %s, %s",
-                                    g_pid, "STS Error:",
+                                    g_pid, "STC Error:",
                                     "StreamParser::collapseDuplicatePVs()",
                                     "Matching PV Isn't Normalized",
                                     (*ipvDup)->m_device_pv_str.c_str(),
@@ -6121,7 +6121,7 @@ StreamParser::collapseDuplicatePVs()
             (*ipv)->m_duplicate = false;
 
             syslog( LOG_ERR, "[%i] %s %s: %s %s - %s",
-                g_pid, "STS Error:",
+                g_pid, "STC Error:",
                 "StreamParser::collapseDuplicatePVs()",
                 "PV Has Subsumed All Duplicate PV Log Values",
                 (*ipv)->m_device_pv_str.c_str(),
@@ -6134,7 +6134,7 @@ StreamParser::collapseDuplicatePVs()
         else if ( (*ipv)->m_duplicate )
         {
             syslog( LOG_ERR, "[%i] %s %s: %s - %s",
-                g_pid, "STS Error:",
+                g_pid, "STC Error:",
                 "StreamParser::collapseDuplicatePVs()",
                 "Ignoring Already Subsumed PV Duplicate",
                 (*ipv)->m_device_pv_str.c_str() );
@@ -6327,7 +6327,7 @@ StreamParser::gatherStats( const ADARA::Packet &a_pkt ) const
     stats.total_size += a_pkt.packet_length();
 }
 
-} // End namespace STS
+} // End namespace STC
 
 // vim: expandtab
 

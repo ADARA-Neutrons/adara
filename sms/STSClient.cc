@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
+static LoggerPtr logger(Logger::getLogger("SMS.STCClient"));
 
 #include <string>
 #include <sstream>
@@ -15,8 +15,8 @@ static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
-#include "STSClient.h"
-#include "STSClientMgr.h"
+#include "STCClient.h"
+#include "STCClientMgr.h"
 #include "ReadyAdapter.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
@@ -25,39 +25,39 @@ static LoggerPtr logger(Logger::getLogger("SMS.STSClient"));
 #define INITIAL_BUFFER_SIZE	4096
 #define MAX_PACKET_SIZE		(128 * 1024)
 
-double STSClient::m_heartbeat_interval = 5.0;
-unsigned int STSClient::m_max_send_chunk = 2 * 1024 * 1024;
+double STCClient::m_heartbeat_interval = 5.0;
+unsigned int STCClient::m_max_send_chunk = 2 * 1024 * 1024;
 
-void STSClient::config(const boost::property_tree::ptree &conf)
+void STCClient::config(const boost::property_tree::ptree &conf)
 {
-	m_heartbeat_interval = conf.get<double>("stsclient.heartbeat", 5.0);
-	std::string chunk = conf.get<std::string>("stsclient.maxsend", "2M");
+	m_heartbeat_interval = conf.get<double>("stcclient.heartbeat", 5.0);
+	std::string chunk = conf.get<std::string>("stcclient.maxsend", "2M");
 	try {
 		m_max_send_chunk = parse_size(chunk);
 	} catch (std::runtime_error e) {
-		std::string msg("Unable to parse STS max send: ");
+		std::string msg("Unable to parse STC max send: ");
 		msg += e.what();
 		throw std::runtime_error(msg);
 	}
 }
 
-STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
-		STSClientMgr &mgr) :
+STCClient::STCClient(int fd, StorageContainer::SharedPtr &run,
+		STCClientMgr &mgr) :
 	ADARA::POSIXParser(INITIAL_BUFFER_SIZE, MAX_PACKET_SIZE),
-	m_mgr(mgr), m_sts_fd(fd), m_file_fd(-1), m_cur_offset(0), m_run(run),
+	m_mgr(mgr), m_stc_fd(fd), m_file_fd(-1), m_cur_offset(0), m_run(run),
 	m_send_paused_data(m_mgr.m_send_paused_data),
 	m_read(NULL), m_write(NULL), m_timer(NULL),
-	m_disp(STSClientMgr::CONNECTION_LOSS), m_reason("")
+	m_disp(STCClientMgr::CONNECTION_LOSS), m_reason("")
 {
 	INFO("Initiating Translation of " << m_run->runNumber()
 		<< " SendPausedData=" << m_send_paused_data);
 
-	m_timer = new TimerAdapter<STSClient>(this, &STSClient::sendHeartbeat);
+	m_timer = new TimerAdapter<STCClient>(this, &STCClient::sendHeartbeat);
 
 	std::stringstream ss;
 	try {
-		m_read = new ReadyAdapter(m_sts_fd, fdrRead,
-			boost::bind(&STSClient::readable, this));
+		m_read = new ReadyAdapter(m_stc_fd, fdrRead,
+			boost::bind(&STCClient::readable, this));
 	} catch (std::exception &e) {
 		ss << "Exception Creating ReadyAdapter Read"
 			<< " for Run " << m_run->runNumber() << " - " << e.what();
@@ -73,8 +73,8 @@ STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 	}
 
 	try {
-		m_write = new ReadyAdapter(m_sts_fd, fdrWrite,
-			boost::bind(&STSClient::writable, this));
+		m_write = new ReadyAdapter(m_stc_fd, fdrWrite,
+			boost::bind(&STCClient::writable, this));
 	} catch (std::exception &e) {
 		ss << "Exception Creating ReadyAdapter Write"
 			<< " for Run " << m_run->runNumber() << " - " << e.what();
@@ -92,10 +92,10 @@ STSClient::STSClient(int fd, StorageContainer::SharedPtr &run,
 	run->getFiles(m_files);
 	if (run->active()) {
 		m_contConnection = run->connect(
-			boost::bind(&STSClient::fileAdded, this, _1));
+			boost::bind(&STCClient::fileAdded, this, _1));
 		if (run->file()) {
 			m_fileConnection = run->file()->connect(
-				boost::bind(&STSClient::fileUpdated, this, _1));
+				boost::bind(&STCClient::fileUpdated, this, _1));
 		}
 	}
 
@@ -121,7 +121,7 @@ exception:
 	throw std::runtime_error(ss.str());
 }
 
-STSClient::~STSClient()
+STCClient::~STCClient()
 {
 	m_contConnection.disconnect();
 	m_fileConnection.disconnect();
@@ -142,10 +142,10 @@ STSClient::~STSClient()
 		m_timer = NULL;
 	}
 
-	if (m_sts_fd >= 0) {
-		DEBUG("Close m_sts_fd=" << m_sts_fd);
-		close(m_sts_fd);
-		m_sts_fd = -1;
+	if (m_stc_fd >= 0) {
+		DEBUG("Close m_stc_fd=" << m_stc_fd);
+		close(m_stc_fd);
+		m_stc_fd = -1;
 	}
 
 	if (m_file_fd >= 0) {
@@ -157,13 +157,13 @@ STSClient::~STSClient()
 	m_mgr.clientComplete(m_run, m_disp, m_reason);
 }
 
-bool STSClient::sendHeartbeat(void)
+bool STCClient::sendHeartbeat(void)
 {
 	/* TODO send hearbeat packet */
 	return true;
 }
 
-void STSClient::writable(void)
+void STCClient::writable(void)
 {
 	// DEBUG("writable() entry");
 
@@ -199,7 +199,7 @@ void STSClient::writable(void)
 					<< " for Run " << m_run->runNumber()
 					<< ": " << re.what();
 				ERROR( ss.str() );
-				m_disp = STSClientMgr::PERMAMENT_FAIL;
+				m_disp = STCClientMgr::PERMAMENT_FAIL;
 				m_reason = ss.str();
 				delete this;
 				return;
@@ -217,13 +217,13 @@ void STSClient::writable(void)
 		}
 
 		// Check Client File Descriptor...
-		if (m_sts_fd < 0) {
+		if (m_stc_fd < 0) {
 			std::stringstream ss;
 			ss << "Invalid Client File Descriptor in writable()"
 				<< " for Run " << m_run->runNumber()
-				<< " (m_sts_fd=" << m_sts_fd << ")";
+				<< " (m_stc_fd=" << m_stc_fd << ")";
 			ERROR( ss.str() );
-			m_disp = STSClientMgr::TRANSIENT_FAIL;
+			m_disp = STCClientMgr::TRANSIENT_FAIL;
 			m_reason = ss.str();
 			delete this;
 			return;
@@ -236,13 +236,13 @@ void STSClient::writable(void)
 				<< " for Run " << m_run->runNumber()
 				<< " (m_file_fd=" << m_file_fd << ")";
 			ERROR( ss.str() );
-			m_disp = STSClientMgr::TRANSIENT_FAIL;
+			m_disp = STCClientMgr::TRANSIENT_FAIL;
 			m_reason = ss.str();
 			delete this;
 			return;
 		}
 
-		rc = sendfile(m_sts_fd, m_file_fd, &m_cur_offset, len);
+		rc = sendfile(m_stc_fd, m_file_fd, &m_cur_offset, len);
 		if (rc < 0) {
 			if (errno == EAGAIN || errno == EINTR)
 				goto more;
@@ -250,16 +250,16 @@ void STSClient::writable(void)
 			std::stringstream ss;
 
 			if (errno == EPIPE || errno == ECONNRESET) {
-				ss << "Lost Connection to STS for Run "
+				ss << "Lost Connection to STC for Run "
 					<< m_run->runNumber()
 					<< " in writable()"
-					<< " (m_sts_fd=" << m_sts_fd << ")";
+					<< " (m_stc_fd=" << m_stc_fd << ")";
 				ERROR( ss.str() );
 			} else {
 				int e = errno;
 				ss << "Run " << m_run->runNumber()
 					<< " had fatal sendfile error in writable():"
-					<< " [m_sts_fd=" << m_sts_fd
+					<< " [m_stc_fd=" << m_stc_fd
 					<< " m_file_fd=" << m_file_fd
 					<< " m_cur_offset=" << m_cur_offset
 					<< " len=" << len << "] - "
@@ -267,7 +267,7 @@ void STSClient::writable(void)
 				ERROR( ss.str() );
 			}
 
-			m_disp = STSClientMgr::TRANSIENT_FAIL;
+			m_disp = STCClientMgr::TRANSIENT_FAIL;
 			m_reason = ss.str();
 			delete this;
 			return;
@@ -302,11 +302,11 @@ void STSClient::writable(void)
 	if (!m_run->active()) {
 		/* We've sent everything from this file, so shutdown the
 		 * write side of our socket. This will signal an EOF to
-		 * STS, so we'll notice if we're trying to resend a
+		 * STC, so we'll notice if we're trying to resend a
 		 * corrupted file without a proper ending RunStatus packet.
 		 */
 #if 0
-		if (shutdown(m_sts_fd, SHUT_WR)) {
+		if (shutdown(m_stc_fd, SHUT_WR)) {
 			int e = errno;
 			WARN("shutdown() failed: " << strerror(e));
 		}
@@ -335,8 +335,8 @@ more:
 	 */
 	if (!m_write) {
 		try {
-			m_write = new ReadyAdapter(m_sts_fd, fdrWrite,
-				boost::bind(&STSClient::writable, this));
+			m_write = new ReadyAdapter(m_stc_fd, fdrWrite,
+				boost::bind(&STCClient::writable, this));
 		} catch (std::exception &e) {
 			std::stringstream ss;
 			ss << "Exception Creating ReadyAdapter in writable()"
@@ -344,7 +344,7 @@ more:
 			 	<< " - " << e.what();
 			ERROR( ss.str() );
 			m_write = NULL; // just to be sure... ;-b
-			m_disp = STSClientMgr::TRANSIENT_FAIL;
+			m_disp = STCClientMgr::TRANSIENT_FAIL;
 			m_reason = ss.str();
 			delete this;
 			return;
@@ -354,7 +354,7 @@ more:
 				<< " for Run " << m_run->runNumber();
 			ERROR( ss.str() );
 			m_write = NULL; // just to be sure... ;-b
-			m_disp = STSClientMgr::TRANSIENT_FAIL;
+			m_disp = STCClientMgr::TRANSIENT_FAIL;
 			m_reason = ss.str();
 			delete this;
 			return;
@@ -363,7 +363,7 @@ more:
 	// DEBUG("writable() more exit");
 }
 
-void STSClient::sendDataDone(void)
+void STCClient::sendDataDone(void)
 {
 	uint32_t data_done_pkt[4] =
 		{ 0, ADARA_PKT_TYPE( ADARA::PacketType::DATA_DONE_TYPE,
@@ -371,18 +371,18 @@ void STSClient::sendDataDone(void)
 
 	std::string log_info;
 
-	DEBUG("Sending Data Done to STS for Run " << m_run->runNumber());
+	DEBUG("Sending Data Done to STC for Run " << m_run->runNumber());
 
 	bool send_status = false;
 
 	// Check Client File Descriptor...
-	if ( m_sts_fd >= 0 ) {
-		send_status = Utils::sendBytes( m_sts_fd,
+	if ( m_stc_fd >= 0 ) {
+		send_status = Utils::sendBytes( m_stc_fd,
 			(char *) data_done_pkt, sizeof( data_done_pkt ), log_info );
 	}
 	else {
 		ERROR("Invalid Client File Descriptor in sendDataDone()"
-			<< " - Skipping..." << " (m_sts_fd=" << m_sts_fd << ")");
+			<< " - Skipping..." << " (m_stc_fd=" << m_stc_fd << ")");
 		return;
 	}
 
@@ -393,27 +393,27 @@ void STSClient::sendDataDone(void)
 
 		// Resort to the dreaded shutdown() system call,
 		// which doesn't appear to work through our network setup... ;-b
-		if (shutdown(m_sts_fd, SHUT_WR)) {
+		if (shutdown(m_stc_fd, SHUT_WR)) {
 			int e = errno;
 			ERROR("shutdown() failed: "
-				 << "(m_sts_fd=" << m_sts_fd << ") - "
+				 << "(m_stc_fd=" << m_stc_fd << ") - "
 				 << strerror(e));
 		}
 	}
 }
 
-void STSClient::fileAdded(StorageFile::SharedPtr &f)
+void STCClient::fileAdded(StorageFile::SharedPtr &f)
 {
         /* We don't need to try to start sending from this file just yet
 	 * (assuming it is the front of our list), as we'll get an update
 	 * notification very soon.
 	 */
 	m_files.push_back(f);
-	m_fileConnection = f->connect(boost::bind(&STSClient::fileUpdated,
+	m_fileConnection = f->connect(boost::bind(&STCClient::fileUpdated,
 						  this, _1));
 }
 
-void STSClient::fileUpdated(const StorageFile &f)
+void STCClient::fileUpdated(const StorageFile &f)
 {
 	// DEBUG("fileUpdated() entry");
 
@@ -429,7 +429,7 @@ void STSClient::fileUpdated(const StorageFile &f)
 	// DEBUG("fileUpdated() exit");
 }
 
-void STSClient::readable(void)
+void STCClient::readable(void)
 {
 	DEBUG("readable() entry");
 
@@ -438,12 +438,12 @@ void STSClient::readable(void)
 	bool ok = false;
 
 	// Check Client File Descriptor...
-	if (m_sts_fd < 0) {
+	if (m_stc_fd < 0) {
 		std::stringstream ss;
 		ss << "Invalid Client File Descriptor in readable()"
 			<< " for Run " << m_run->runNumber();
 		ERROR( ss.str() );
-		m_disp = STSClientMgr::TRANSIENT_FAIL;
+		m_disp = STCClientMgr::TRANSIENT_FAIL;
 		m_reason = ss.str();
 		delete this;
 		return;
@@ -451,32 +451,32 @@ void STSClient::readable(void)
 
 	try {
 		// NOTE: This is POSIXParser::read()... ;-o
-		ok = read(m_sts_fd, log_info, 4000, MAX_PACKET_SIZE);
-		if (!ok && m_disp == STSClientMgr::CONNECTION_LOSS) {
+		ok = read(m_stc_fd, log_info, 4000, MAX_PACKET_SIZE);
+		if (!ok && m_disp == STCClientMgr::CONNECTION_LOSS) {
 			/* We log the reason for closing the connection
 			 * elsewhere, except for the default case of an
 			 * unexpected connection loss.
 			 * Take care of that case here.
 			 */
-			ERROR("Lost connection to STS for Run " << m_run->runNumber()
-				 << " (m_sts_fd=" << m_sts_fd << ") "
+			ERROR("Lost connection to STC for Run " << m_run->runNumber()
+				 << " (m_stc_fd=" << m_stc_fd << ") "
 				 << " log_info=(" << log_info << ")");
 		}
 	}
 	catch (ADARA::invalid_packet e) {
 		std::stringstream ss;
-		ss << "Got invalid packet from STS: " << e.what();
+		ss << "Got invalid packet from STC: " << e.what();
 		ERROR( ss.str() );
-		m_disp = STSClientMgr::INVALID_PROTOCOL;
+		m_disp = STCClientMgr::INVALID_PROTOCOL;
 		m_reason = ss.str();
 		ok = false;
 	}
 	catch (std::runtime_error &r) {
 		std::stringstream ss;
-		ss << "Exception reading from STS for Run " << m_run->runNumber()
+		ss << "Exception reading from STC for Run " << m_run->runNumber()
 			 << " log_info=(" << log_info << ") - " << r.what();
 		ERROR( ss.str() );
-		m_disp = STSClientMgr::TRANSIENT_FAIL;
+		m_disp = STCClientMgr::TRANSIENT_FAIL;
 		m_reason = ss.str();
 		ok = false;
 	}
@@ -492,7 +492,7 @@ void STSClient::readable(void)
 	DEBUG("readable() exit");
 }
 
-bool STSClient::rxPacket(const ADARA::Packet &pkt)
+bool STCClient::rxPacket(const ADARA::Packet &pkt)
 {
 	/* We only care about translation complete packets; everything else
 	 * is an error and we should drop the connection.
@@ -504,12 +504,12 @@ bool STSClient::rxPacket(const ADARA::Packet &pkt)
 	ss << "Received unexpected packet type 0x"
 		<< std::hex << pkt.type() << std::dec;
 	ERROR( ss.str() );
-	m_disp = STSClientMgr::TRANSIENT_FAIL;
+	m_disp = STCClientMgr::TRANSIENT_FAIL;
 	m_reason = ss.str();
 	return true;
 }
 
-bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
+bool STCClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			       const uint8_t *UNUSED(chunk),
 			       unsigned int UNUSED(chunk_offset),
 			       unsigned int chunk_len)
@@ -532,12 +532,12 @@ bool STSClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 			<< " max=" << MAX_PACKET_SIZE;
 	}
 	ERROR( ss.str() );
-	m_disp = STSClientMgr::TRANSIENT_FAIL;
+	m_disp = STCClientMgr::TRANSIENT_FAIL;
 	m_reason = ss.str();
 	return true;
 }
 
-bool STSClient::rxPacket(const ADARA::TransCompletePkt &pkt)
+bool STCClient::rxPacket(const ADARA::TransCompletePkt &pkt)
 {
 	std::stringstream ss;
 	if ( !pkt.status() ) {
@@ -550,7 +550,7 @@ bool STSClient::rxPacket(const ADARA::TransCompletePkt &pkt)
 				"translated";
 		}
 		INFO( ss.str() );
-		m_disp = STSClientMgr::SUCCESS;
+		m_disp = STCClientMgr::SUCCESS;
 		m_reason = ss.str();
 	} else if ( pkt.status() < 0x8000 ) {
 		/* TODO remove magic numbers */
@@ -565,7 +565,7 @@ bool STSClient::rxPacket(const ADARA::TransCompletePkt &pkt)
 				<< pkt.status() << std::dec;
 		}
 		ERROR( ss.str() );
-		m_disp = STSClientMgr::TRANSIENT_FAIL;
+		m_disp = STCClientMgr::TRANSIENT_FAIL;
 		m_reason = ss.str();
 	} else {
 		if ( pkt.reason().length() ) {
@@ -579,7 +579,7 @@ bool STSClient::rxPacket(const ADARA::TransCompletePkt &pkt)
 				<< pkt.status() << std::dec;
 		}
 		ERROR( ss.str() );
-		m_disp = STSClientMgr::PERMAMENT_FAIL;
+		m_disp = STCClientMgr::PERMAMENT_FAIL;
 		m_reason = ss.str();
 	}
 	return true;
