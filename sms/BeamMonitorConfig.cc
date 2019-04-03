@@ -324,7 +324,7 @@ public:
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
 			if ( !approximatelyEqual( distance, m_info->getDistance(),
-					0.0000001 ) )
+					m_epsilon ) )
 			{
 				INFO("BeamMonDistancePV: Changing Beam Monitor "
 					<< m_info->getId() << " Distance for "
