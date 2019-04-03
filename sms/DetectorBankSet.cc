@@ -397,8 +397,9 @@ public:
 		DetBankSetThrottlePV(const std::string &name,
 				DetectorBankSet *config, DetectorBankSetInfo *info,
 				double min = 0.0, double max = FLOAT64_MAX,
+				double epsilon = FLOAT64_EPSILON,
 				bool auto_save = false) :
-			smsFloat64PV(name, min, max, auto_save),
+			smsFloat64PV(name, min, max, epsilon, auto_save),
 			m_config(config), m_info(info),
 			m_auto_save(auto_save) {}
 
@@ -417,8 +418,8 @@ public:
 			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
-			// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
-			if ( throttle != m_info->getThrottle() )
+			if ( !approximatelyEqual( throttle, m_info->getThrottle(),
+					m_epsilon ) )
 			{
 				INFO("DetBankSetThrottlePV: Changing Detector Bank Set "
 					<< m_info->getName() << " Throttle Frequency for "
@@ -558,7 +559,7 @@ public:
 
 		m_pvThrottle = boost::shared_ptr<DetBankSetThrottlePV>( new
 			DetBankSetThrottlePV(prefix + ":Throttle", m_config, this,
-				0.0, FLOAT64_MAX, /* AutoSave */ true) );
+				0.0, FLOAT64_MAX, FLOAT64_EPSILON, /* AutoSave */ true) );
 
 		m_pvSuffix = boost::shared_ptr<DetBankSetSuffixPV>( new
 			DetBankSetSuffixPV(prefix + ":Suffix", m_config, this,
