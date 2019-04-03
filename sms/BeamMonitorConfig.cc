@@ -302,8 +302,9 @@ public:
 		BeamMonDistancePV(const std::string &name,
 				BeamMonitorConfig *config, BeamMonitorInfo *info,
 				double min = FLOAT64_MIN, double max = FLOAT64_MAX,
+				double epsilon = FLOAT64_EPSILON,
 		        bool auto_save = false) :
-			smsFloat64PV(name, min, max, auto_save),
+			smsFloat64PV(name, min, max, epsilon, auto_save),
 			m_config(config), m_info(info),
 			m_auto_save(auto_save) {}
 
@@ -322,8 +323,8 @@ public:
 			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
-			// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
-			if ( distance != m_info->getDistance() )
+			if ( !approximatelyEqual( distance, m_info->getDistance(),
+					0.0000001 ) )
 			{
 				INFO("BeamMonDistancePV: Changing Beam Monitor "
 					<< m_info->getId() << " Distance for "
@@ -387,7 +388,8 @@ public:
 
 		m_pvDistance = boost::shared_ptr<BeamMonDistancePV>( new
 			BeamMonDistancePV(prefix + ":Distance", m_config, this,
-				FLOAT64_MIN, FLOAT64_MAX, /* AutoSave */ true) );
+				FLOAT64_MIN, FLOAT64_MAX, FLOAT64_EPSILON,
+				/* AutoSave */ true) );
 
 		ctrl->addPV(m_pvId);
 		ctrl->addPV(m_pvFormat);
