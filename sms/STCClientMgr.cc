@@ -133,15 +133,18 @@ STCClientMgr::STCClientMgr() :
 	prefix += ":STCClient";
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectTimeout", 0.0, FLOAT64_MAX,
+		smsFloat64PV(prefix + ":ConnectTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON,
 			/* AutoSave */ true));
 
 	m_pvConnectRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetryTimeout", 0.0, FLOAT64_MAX,
+		smsFloat64PV(prefix + ":ConnectRetryTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON,
 			/* AutoSave */ true));
 
 	m_pvTransientTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":TransientTimeout", 0.0, FLOAT64_MAX,
+		smsFloat64PV(prefix + ":TransientTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON,
 			/* AutoSave */ true));
 
 	m_pvMaxConnections = boost::shared_ptr<MaxConnectionsPV>(new
