@@ -13,6 +13,10 @@
 #define FLOAT64_MIN (-1.7976931348623157E308)
 #endif
 
+#ifndef FLOAT64_EPSILON
+#define FLOAT64_EPSILON (0.0000000000001)
+#endif
+
 #ifndef INT32_MAX
 #define INT32_MAX (2147483647)
 #endif
@@ -345,8 +349,8 @@ public:
 class smsFloat64PV : public smsPV {
 public:
 	smsFloat64PV(const std::string &name,
-		double min = FLOAT64_MIN,
-		double max = FLOAT64_MAX,
+		double min = FLOAT64_MIN, double max = FLOAT64_MAX,
+		double epsilon = FLOAT64_EPSILON,
 		bool auto_save = false);
 
 	caStatus read(const casCtx &ctx, gdd &prototype);
@@ -366,6 +370,7 @@ public:
 	virtual void changed(void);
 
 	double m_min, m_max;
+	double m_epsilon;
 
 	bool m_first_set;
 

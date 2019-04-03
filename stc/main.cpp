@@ -1,6 +1,6 @@
 
 //
-// SNS ADARA SYSTEM - Stream Translation Service (STS)
+// SNS ADARA SYSTEM - Stream Translation Client (STC)
 // 
 // This repository contains the software for the next-generation Data
 // Acquisition System (DAS) at the Spallation Neutron Source (SNS) at
@@ -38,28 +38,28 @@
 // 
 
 /**
- * \page Overview Introduction to STS capabilities, usage, and design
- * The STS is an integral component of the ADARA system that provides live
- * translation of ADARA streams into Nexus files. The STS is typically installed
+ * \page Overview Introduction to STC capabilities, usage, and design
+ * The STC is an integral component of the ADARA system that provides live
+ * translation of ADARA streams into Nexus files. The STC is typically installed
  * as an internet service that is launched (on-demand) by a request from an SMS
- * instance running on a beam line. The STS can also be run as a command-line
- * utility to manually translate ADARA files. The STS implements a number of SNS-
+ * instance running on a beam line. The STC can also be run as a command-line
+ * utility to manually translate ADARA files. The STC implements a number of SNS-
  * specific business rules including moving output files to specific locations
  * on the network files system (based on stream metadata) and notification
  * of workflow progress via AMQP messaging. These features can be disabled through
  * the CLI.
  * \subsection Usage
- * The STS can be run in either stream- or file-mode. File mode is activated by
+ * The STC can be run in either stream- or file-mode. File mode is activated by
  * specifying an input file with the -f option (see below). Without this option
- * the STS defaults to stream-mode and reads the ADARA stream from stdin. (When
+ * the STC defaults to stream-mode and reads the ADARA stream from stdin. (When
  * configured as an internet service, xinetd maps the socket connection to stdin
- * when launching a new STS instance.)
+ * when launching a new STC instance.)
  * \subsection Design
- * The STS program is a (mostly) single-threaded process that uses the NxGen class
+ * The STC program is a (mostly) single-threaded process that uses the NxGen class
  * to perform stream translation. The 'NxGen' class is a Nexus-adapter class derived
  * from the 'StreamParser' class. The StreamParser class performs ADARA-specific
  * stream parsing/buffering and 'publishes' extracted data through the IStreamAdapter
- * interface and supporting classes (see stsdefs.h). This interface is used internally
+ * interface and supporting classes (see stcdefs.h). This interface is used internally
  * by the StreamParser class to push data to derived implementation through virtual
  * methods and abstract data classes. This architecture allows the ouptut adapter to be
  * changed to support different formats without requiring changes to the ADARA input
@@ -122,7 +122,7 @@ renameFile( const string &a_source,
     }
     catch( boost::filesystem::filesystem_error &e )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
             "Move of " << a_source << " to "
                 << a_dest_path << "/" << a_dest_filename
                 << " failed. {" << e.what() << "}" )
@@ -160,7 +160,7 @@ moveFile( const string &a_source,
     }
     catch( boost::filesystem::filesystem_error &e )
     {
-        THROW_TRACE( STS::ERR_OUTPUT_FAILURE,
+        THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
             "Move of " << a_source << " to "
                 << a_dest_path << "/" << a_dest_filename
                 << " failed. {" << e.what() << "}" )
@@ -211,7 +211,7 @@ long_syslog( const string &a_label, const string &a_msg )
 }
 
 /**
- * @brief main - Entry point of STS process
+ * @brief main - Entry point of STC process
  * @param argc - Number of CLI arguments
  * @param argv - Array of CLI command/parameter strings
  * @return 0 on success, 1 on error
@@ -220,7 +220,7 @@ int main( int argc, char** argv )
 {
     int                         infd = 0;
     int                         outfd = 1;
-    STS::TranslationStatusCode  sms_code = STS::TS_SUCCESS;
+    STC::TranslationStatusCode  sms_code = STC::TS_SUCCESS;
     string                      sms_reason;
     bool                        interact;
     string                      work_root;
@@ -243,10 +243,10 @@ int main( int argc, char** argv )
     // Setup global syslog info
     g_pid = getpid();
 
-    openlog( "sts", 0, LOG_DAEMON );
+    openlog( "stc", 0, LOG_DAEMON );
     syslog( LOG_INFO,
         "[%i] %s. %s Version %s, %s Version %s, %s Version %s, Tag: %s",
-        g_pid, "Started", "STS", STS_VERSION,
+        g_pid, "Started", "STC", STC_VERSION,
         "ADARA Common", ADARA::VERSION.c_str(),
         "ComBus", ADARA::ComBus::VERSION.c_str(),
         ADARA::TAG_NAME.c_str() );
@@ -267,7 +267,7 @@ int main( int argc, char** argv )
         string domain;
 
         namespace po = boost::program_options;
-        po::options_description options( "sts program options" );
+        po::options_description options( "stc program options" );
         options.add_options()
                 ("help,h", "show help")
                 ("version", "show version number")
@@ -284,7 +284,7 @@ int main( int argc, char** argv )
                 ("work-base",po::value<string>( &work_base ),"set base path to construct working directory")
                 ("work-path,w",po::value<string>( &work_path ),"set path to working directory")
                 ("base-path,b",po::value<string>( &base_path ),"set base cataloging path (none by defualt)")
-                ("config,C",po::value<string>( &config_file ),"set STS Config File path (none by defualt)")
+                ("config,C",po::value<string>( &config_file ),"set STC Config File path (none by defualt)")
                 ("compression-level,c", po::value<unsigned short>( &compression_level )->default_value( 0 ), "set nexus compression level (0=off,9=max)")
                 ("chunk-size", po::value<unsigned long>( &chunk_size )->default_value( 49152 ),"set hdf5 chunk size (in Dataset Elements!)")
                 ("cache-size", po::value<unsigned long>( &cache_size )->default_value( 1024 ),"set hdf5 cache size (in KB)")
@@ -304,14 +304,14 @@ int main( int argc, char** argv )
         if ( opt_map.count( "help" ))
         {
             cout << options << endl;
-            return STS::TS_TRANSIENT_ERROR;
+            return STC::TS_TRANSIENT_ERROR;
         }
         else if ( opt_map.count( "version" ))
         {
-            cout << STS_VERSION
+            cout << STC_VERSION
                  << " (ADARA Common " << ADARA::VERSION
                  << ", Tag Name " << ADARA::TAG_NAME << ")" << endl;
-            return STS::TS_TRANSIENT_ERROR;
+            return STC::TS_TRANSIENT_ERROR;
         }
 
         // If user has requested cataloging, force sane options
@@ -330,7 +330,7 @@ int main( int argc, char** argv )
             gather_stats = false;
 
         //
-        // *** New STS Work Directory Specification:
+        // *** New STC Work Directory Specification:
         //    ${WORK_ROOT}/${FACILITY}/${BEAMLINE}/${WORK_BASE}
         // - if either "work_root" and/or "work_base" are specified,
         // these values _Subsume_ any "work_path" value and activate the
@@ -405,22 +405,22 @@ int main( int argc, char** argv )
             }
             else
             {
-                syslog( LOG_INFO, "[%i] STS Config File Specified: %s",
+                syslog( LOG_INFO, "[%i] STC Config File Specified: %s",
                     g_pid, config_file.c_str() );
                 usleep(30000); // give syslog a chance...
             }
         }
         else {
-            syslog( LOG_ERR, "[%i] No STS Config File Specified", g_pid );
+            syslog( LOG_ERR, "[%i] No STC Config File Specified", g_pid );
             usleep(30000); // give syslog a chance...
         }
 
-        // Only Dump Verbose STS Settings in Interactive Mode...!
-        // (else screws up the STS-to-SMS return status...! ;-D)
+        // Only Dump Verbose STC Settings in Interactive Mode...!
+        // (else screws up the STC-to-SMS return status...! ;-D)
         if ( interact && verbose )
         {
-            cout << "sts information" << endl;
-            cout << "  version       : " << STS_VERSION << endl;
+            cout << "stc information" << endl;
+            cout << "  version       : " << STC_VERSION << endl;
             cout << "  ADARA version : " << ADARA::VERSION << endl;
             cout << "  tag name      : " << ADARA::TAG_NAME << endl;
             cout << "  nexus file    : " << nexus_outfile << endl;
@@ -583,30 +583,30 @@ int main( int argc, char** argv )
     catch( TraceException &e )
     {
         // Generally, output errors are transient, others are permanent
-        if ( e.getErrorCode() == STS::ERR_OUTPUT_FAILURE )
-            sms_code = STS::TS_TRANSIENT_ERROR;
+        if ( e.getErrorCode() == STC::ERR_OUTPUT_FAILURE )
+            sms_code = STC::TS_TRANSIENT_ERROR;
         else
-            sms_code = STS::TS_PERM_ERROR;
+            sms_code = STC::TS_PERM_ERROR;
 
         sms_reason = e.toString( true, true );
 
-        long_syslog( "STS failed:", sms_reason );
+        long_syslog( "STC failed:", sms_reason );
     }
     catch( exception &e )
     {
         // Unexpected exception
-        sms_code = STS::TS_PERM_ERROR;
+        sms_code = STC::TS_PERM_ERROR;
         sms_reason = e.what();
 
-        long_syslog( "STS failed: Exception:", sms_reason );
+        long_syslog( "STC failed: Exception:", sms_reason );
     }
     catch( ... )
     {
         // Really unexpected exception
-        sms_code = STS::TS_PERM_ERROR;
+        sms_code = STC::TS_PERM_ERROR;
         sms_reason = "Unhandled exception";
 
-        syslog( LOG_INFO, "[%i] STS failed: Unknown exception.", g_pid );
+        syslog( LOG_INFO, "[%i] STC failed: Unknown exception.", g_pid );
     }
 
     string run_desc = "";
@@ -618,9 +618,9 @@ int main( int argc, char** argv )
             + " (" + nxgen->getProposalID() + ")";
     }
 
-    if ( sms_code != STS::TS_SUCCESS )
+    if ( sms_code != STC::TS_SUCCESS )
     {
-        syslog( LOG_INFO, "[%i] STS failed: Translation%s failed. code: %u",
+        syslog( LOG_INFO, "[%i] STC failed: Translation%s failed. code: %u",
             g_pid, run_desc.c_str(), (unsigned int)sms_code );
         usleep(30000); // give syslog a chance...
 
@@ -637,7 +637,7 @@ int main( int argc, char** argv )
 
     if ( !interact )
     {
-        STS::TransCompletePkt ack_pkt( sms_code, sms_reason );
+        STC::TransCompletePkt ack_pkt( sms_code, sms_reason );
         uint32_t heartbeat_pkt[4] = {0,0x00400900,0,0};
 
         // Send ACK/NACK packet to SMS - go to extra effort to ensure the message is sent and
@@ -663,7 +663,7 @@ int main( int argc, char** argv )
         if ( !send_status )
         {
             syslog( LOG_INFO,
-                "[%i] STS failed: Translation Complete Message: %s",
+                "[%i] STC failed: Translation Complete Message: %s",
                 g_pid, log_info.c_str() );
             usleep(30000); // give syslog a chance...
         }
@@ -680,7 +680,7 @@ int main( int argc, char** argv )
         else
         {
             syslog( LOG_INFO,
-                "[%i] STS failed: Translation Complete/Heartbeat Msg: %s",
+                "[%i] STC failed: Translation Complete/Heartbeat Msg: %s",
                 g_pid, log_info.c_str() );
             usleep(30000); // give syslog a chance...
         }
@@ -725,7 +725,7 @@ int main( int argc, char** argv )
             usleep(30000); // give syslog a chance...
         }
     }
-    else if ( sms_code != STS::TS_SUCCESS )
+    else if ( sms_code != STC::TS_SUCCESS )
     {
         cout << sms_reason << endl;
     }
@@ -773,7 +773,7 @@ int main( int argc, char** argv )
     syslog( LOG_INFO, "[%i] Process exiting", g_pid );
     usleep(30000); // give syslog a chance...
 
-    return sms_code != STS::TS_SUCCESS;
+    return sms_code != STC::TS_SUCCESS;
 }
 
 // vim: expandtab

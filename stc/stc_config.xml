@@ -1,16 +1,16 @@
 
 <!--
-	STS Configuration File
+	STC Configuration File
 
 	Stored in Git Repository at: git+ssh://trac.sns.gov/var/repos/config
-		- in the "sts-config" branch
+		- in the "stc-config" branch
 
-	Deployed to /SNS/snfs1/stsdata/sts_config.xml
+	Deployed to /SNS/snfs1/stcdata/stc_config.xml
 
 	Please Commit Any Changes to Git...! Thanks! :-D
 -->
 
-<sts_config>
+<stc_config>
 
 	<version>1.0.0</version>
 
@@ -600,5 +600,5 @@
 		</condition>
 	</group>
 
-</sts_config>
+</stc_config>
 

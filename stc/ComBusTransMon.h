@@ -1,13 +1,13 @@
 #ifndef COMBUSTRANSMON_H
 #define COMBUSTRANSMON_H
 
-#include "stsdefs.h"
+#include "stcdefs.h"
 #include "combus/ComBus.h"
 #include <string>
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 
-namespace STS
+namespace STC
 {
     class StreamParser;
 }
@@ -18,7 +18,7 @@ public:
     ComBusTransMon();
     ~ComBusTransMon();
 
-    void start( STS::StreamParser &a_stream_parser,
+    void start( STC::StreamParser &a_stream_parser,
         const std::string &a_broker_uri,
         const std::string &a_broker_user,
         const std::string &a_broker_pass,
@@ -26,13 +26,13 @@ public:
 
     void success( bool a_moved, const std::string &a_nexus_file );
 
-    void failure( STS::TranslationStatusCode a_code,
+    void failure( STC::TranslationStatusCode a_code,
         const std::string a_reason );
 
 private:
     void commThread();
 
-    STS::StreamParser          *m_stream_parser;
+    STC::StreamParser          *m_stream_parser;
     ADARA::ComBus::Connection  *m_combus;
     std::string                 m_domain;
     std::string                 m_broker_uri;

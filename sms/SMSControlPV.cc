@@ -1890,13 +1890,10 @@ void smsTriggerPV::changed(void)
 /* -------------------------------------------------------------------- */
 
 smsFloat64PV::smsFloat64PV(const std::string &name,
-		double min, double max, bool auto_save)
-	: smsPV(name), m_first_set(true), m_auto_save(auto_save)
+		double min, double max, double epsilon, bool auto_save)
+	: smsPV(name), m_min(min), m_max(max), m_epsilon(epsilon),
+		m_first_set(true), m_auto_save(auto_save)
 {
-	// Apply Min and Max Limits
-	m_min = min;
-	m_max = max;
-
 	initReadTable();
 
 	struct timespec ts;
@@ -2033,8 +2030,7 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	val.getTimeStamp(&ts);
 
 	m_value->get(cur);
-	// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
-	if (v == cur) {
+	if ( approximatelyEqual( v, cur, m_epsilon ) ) {
 		if ( m_first_set ) {
 			DEBUG("smsFloat64PV::write() m_pv_name=" << m_pv_name
 				<< " Value Did Not Change, But First Setting"
@@ -2062,8 +2058,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 	gdd *nval;
 
 	m_value->get(v);
-	// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
-	if (v == val) {
+	if ( approximatelyEqual( v, val, m_epsilon ) ) {
 		if ( m_first_set ) {
 			DEBUG("smsFloat64PV::update() m_pv_name=" << m_pv_name
 				<< " Value Did Not Change, But First Setting"

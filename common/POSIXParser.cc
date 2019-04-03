@@ -6,7 +6,7 @@
 #include "POSIXParser.h"
 #include "ADARAUtils.h"
 
-// Need to reconcile different Logging Libraries between SMS and STS...! ;-b
+// Need to reconcile different Logging Libraries between SMS and STC...! ;-b
 // #include "Logging.h"
 // static LoggerPtr logger(Logger::getLogger("SMS.POSIXParser"));
 

@@ -62,9 +62,9 @@ is_indexed["storage"]=0
 index_pv["storage"]=""
 idName["storage"]="Storage"
 
-is_indexed["sts"]=0
-index_pv["sts"]=""
-idName["sts"]="STS"
+is_indexed["stc"]=0
+index_pv["stc"]=""
+idName["stc"]="STC"
 
 is_indexed["livestream"]=0
 index_pv["livestream"]=""
@@ -152,6 +152,22 @@ option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MixedDataPackets"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[Mixed Data Packets (Neutron and Meta-Data)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="check_source_sequence"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:CheckSourceSequence"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Check Pkt Source Sequence Numbers (No Reset)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="check_pulse_sequence"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:CheckPulseSequence"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Check Pkt Pulse Sequence Numbers (Resets)]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
@@ -513,61 +529,61 @@ option_default[$num_options]="true"
 option_label[$num_options]="[ComBus Verbosity (for Run Pause/Resume)]"
 num_options=$(( num_options + 1 ))
 
-option_id_type[$num_options]="sts"
+option_id_type[$num_options]="stc"
 option_name[$num_options]="connect_timeout"
-option_pv[$num_options]="SMS:STSClient:ConnectTimeout"
+option_pv[$num_options]="SMS:STCClient:ConnectTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="15"
-option_label[$num_options]="[STS Client Connection Timeout]"
+option_label[$num_options]="[STC Client Connection Timeout]"
 num_options=$(( num_options + 1 ))
 
-option_id_type[$num_options]="sts"
+option_id_type[$num_options]="stc"
 option_name[$num_options]="connect_retry"
-option_pv[$num_options]="SMS:STSClient:ConnectRetryTimeout"
+option_pv[$num_options]="SMS:STCClient:ConnectRetryTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="15"
-option_label[$num_options]="[STS Client Timeout for Re-Connection Attempt]"
+option_label[$num_options]="[STC Client Timeout for Re-Connection Attempt]"
 num_options=$(( num_options + 1 ))
 
-option_id_type[$num_options]="sts"
+option_id_type[$num_options]="stc"
 option_name[$num_options]="transient_timeout"
-option_pv[$num_options]="SMS:STSClient:TransientTimeout"
+option_pv[$num_options]="SMS:STCClient:TransientTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="60"
-option_label[$num_options]="[STS Client Transient Error Retry Timeout]"
+option_label[$num_options]="[STC Client Transient Error Retry Timeout]"
 num_options=$(( num_options + 1 ))
 
-option_id_type[$num_options]="sts"
+option_id_type[$num_options]="stc"
 option_name[$num_options]="max_connections"
-option_pv[$num_options]="SMS:STSClient:MaxConnections"
+option_pv[$num_options]="SMS:STCClient:MaxConnections"
 option_value_type[$num_options]="UINT32_VALUE(connections)"
 option_default[$num_options]="3"
-option_label[$num_options]="[Max Simultaneous STS Client Connections]"
+option_label[$num_options]="[Max Simultaneous STC Client Connections]"
 num_options=$(( num_options + 1 ))
 
-option_id_type[$num_options]="sts"
+option_id_type[$num_options]="stc"
 option_name[$num_options]="max_requeue_count"
-option_pv[$num_options]="SMS:STSClient:MaxRequeueCount"
+option_pv[$num_options]="SMS:STCClient:MaxRequeueCount"
 option_value_type[$num_options]="UINT32_VALUE(requeues)"
 option_default[$num_options]="5"
-option_label[$num_options]="[Max STS Client Error Re-Queue Attempts]"
+option_label[$num_options]="[Max STC Client Error Re-Queue Attempts]"
 num_options=$(( num_options + 1 ))
 
-option_id_type[$num_options]="sts"
+option_id_type[$num_options]="stc"
 option_name[$num_options]="send_paused_data"
-option_pv[$num_options]="SMS:STSClient:SendPausedData"
+option_pv[$num_options]="SMS:STCClient:SendPausedData"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
-option_label[$num_options]="[Send STS Client Paused Mode Data (Or Not)]"
+option_label[$num_options]="[Send STC Client Paused Mode Data (Or Not)]"
 num_options=$(( num_options + 1 ))
 
-option_id_type[$num_options]="sts"
+option_id_type[$num_options]="stc"
 option_name[$num_options]="uri"
-option_pv[$num_options]="SMS:STSClient:ServiceURI"
+option_pv[$num_options]="SMS:STCClient:ServiceURI"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="IP_ADDR:IP_PORT(service)"
 option_default[$num_options]="localhost"
-option_label[$num_options]="[STS Client Service URI]"
+option_label[$num_options]="[STC Client Service URI]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="livestream"
@@ -619,7 +635,7 @@ USAGE()
 	echo "            [live_status] [bandwidth] [confck] \\"
 	echo "            [--option=\"id:name<value>\"] \\"
 	echo "            [--skiplive] [--testonly] \\"
-	echo "            [--terse] [--quiet] [--help]"
+	echo "            [--terse] [--quiet] [--help|-h]"
 	echo
 
 	echo "where:"
@@ -632,7 +648,7 @@ USAGE()
 	echo "   --testonly            = *don't* actually change anything!"
 	echo "   --terse               = display minimal output details"
 	echo "   --quiet               = display NO ConfCk output unless error"
-	echo "   --help                = display this help/usage information"
+	echo "   --help | -h           = display this help/usage information"
 	echo
 
 	echo "Available Commands:"
@@ -713,18 +729,18 @@ for arg in "$@" ; do
 	value=`echo "$arg" | awk -F = '{print $2}'`
 	# echo "key=$key"
     # echo "value=$value"
-	if [ "#$key#" == '#--beamline#' ]; then
+	if [[ "#$key#" == '#--beamline#' ]]; then
 		PRE="$value"
 		addToIntroOutput "Setting EPICS PV Prefix to: $PRE\n\n"
-	elif [ "#$key#" == '#--config#' ]; then
+	elif [[ "#$key#" == '#--config#' ]]; then
 		SMSD_CONFIG="$value"
 		addToIntroOutput "Using SMS Daemon Config File in:\n" \
 			"   $SMSD_CONFIG\n\n"
-	elif [ "#$key#" == '#--repo#' ]; then
+	elif [[ "#$key#" == '#--repo#' ]]; then
 		CONFIG_REPO="$value"
 		addToIntroOutput "Using Git Config Repository in:\n" \
 			"   $CONFIG_REPO\n\n"
-	elif [ "#$key#" == '#--alt#' ]; then
+	elif [[ "#$key#" == '#--alt#' ]]; then
 		ALT="$value"
 		addToIntroOutput "Setting Alternate SMS Suffix to:\n" \
 			"   $ALT\n\n"
@@ -732,26 +748,26 @@ for arg in "$@" ; do
 		addToIntroOutput "Using SMS Alternate Daemon Config File in:\n" \
 			"   $SMSD_CONFIG\n\n"
 		# Note: Append $ALT to $CONFIG_REPO Below...!
-	elif [ "#$key#" == '#--option#' ]; then
+	elif [[ "#$key#" == '#--option#' ]]; then
 		command="option"
 		opt_arg="$value"
 		addToIntroOutput "Setting Command to:\n" \
 			"   $command $opt_arg\n\n"
-	elif [ "#$key#" == '#--skiplive#' ]; then
+	elif [[ "#$key#" == '#--skiplive#' ]]; then
 		skiplive=1
 		addToIntroOutput \
 			"*** Skipping Live Config - Update Config File Only!\n\n"
-	elif [ "#$key#" == '#--testonly#' ]; then
+	elif [[ "#$key#" == '#--testonly#' ]]; then
 		testonly=1
 		addToIntroOutput \
 			"*** TEST RUN ONLY! ***\n\nNothing will change/commit!\n\n"
-	elif [ "#$key#" == '#--terse#' ]; then
+	elif [[ "#$key#" == '#--terse#' ]]; then
 		terse=1
 		addToIntroOutput "Setting for Terse Operation.\n\n"
-	elif [ "#$key#" == '#--quiet#' ]; then
+	elif [[ "#$key#" == '#--quiet#' ]]; then
 		quiet=1
 		addToIntroOutput "Setting for Quiet Operation.\n\n"
-	elif [ "#$key#" == '#--help#' ]; then
+	elif [[ "#$key#" == '#-h#' || "#$key#" == '#--help#' ]]; then
 		echo -e -n "$introOutput"
 		USAGE
 		exit -1
@@ -1211,11 +1227,11 @@ GET_CONFIG_SETTING()
 			elif [ "${_id_type}" == "livestream" ]; then
 				_id_num="-1"
 				# echo "Live Streaming Section."
-			elif [ "${_id_type}" == "stsclient" ]; then
-				# Abbreviate STS Client Id Type...
-				_id_type="sts"
+			elif [ "${_id_type}" == "stcclient" ]; then
+				# Abbreviate STC Client Id Type...
+				_id_type="stc"
 				_id_num="-1"
-				# echo "STS Client Section."
+				# echo "STC Client Section."
 			fi
 		fi
 
@@ -1482,6 +1498,8 @@ if [[ "$command" == "status" \
 					caget $WAIT ${dsprefix}:IgnoreEoP
 					caget $WAIT ${dsprefix}:IgnoreLocalSAWTOOTH
 					caget $WAIT ${dsprefix}:MixedDataPackets
+					caget $WAIT ${dsprefix}:CheckSourceSequence
+					caget $WAIT ${dsprefix}:CheckPulseSequence
 					caget $WAIT -S ${dsprefix}:MaxReadChunk
 					caget $WAIT ${dsprefix}:RTDLNoDataThresh
 					caget $WAIT ${dsprefix}:SaveInputStream
@@ -1594,13 +1612,13 @@ if [[ "$command" == "status" \
 
 		echo
 
-		caget $WAIT ${PRE}:SMS:STSClient:ConnectTimeout
-		caget $WAIT ${PRE}:SMS:STSClient:ConnectRetryTimeout
-		caget $WAIT ${PRE}:SMS:STSClient:TransientTimeout
-		caget $WAIT ${PRE}:SMS:STSClient:MaxConnections
-		caget $WAIT ${PRE}:SMS:STSClient:MaxRequeueCount
-		caget $WAIT ${PRE}:SMS:STSClient:SendPausedData
-		caget $WAIT -S ${PRE}:SMS:STSClient:ServiceURI
+		caget $WAIT ${PRE}:SMS:STCClient:ConnectTimeout
+		caget $WAIT ${PRE}:SMS:STCClient:ConnectRetryTimeout
+		caget $WAIT ${PRE}:SMS:STCClient:TransientTimeout
+		caget $WAIT ${PRE}:SMS:STCClient:MaxConnections
+		caget $WAIT ${PRE}:SMS:STCClient:MaxRequeueCount
+		caget $WAIT ${PRE}:SMS:STCClient:SendPausedData
+		caget $WAIT -S ${PRE}:SMS:STCClient:ServiceURI
 
 		echo
 

@@ -8,7 +8,7 @@ sms_smsd_SOURCES = sms/smsd.cc \
 		sms/StorageManager.cc sms/StorageContainer.cc \
 		sms/StorageFile.cc sms/DataSource.cc sms/LiveClient.cc \
 		sms/LiveServer.cc sms/SMSControl.cc sms/SMSControlPV.cc \
-		sms/SignalEvents.cc sms/STSClient.cc sms/STSClientMgr.cc \
+		sms/SignalEvents.cc sms/STCClient.cc sms/STCClientMgr.cc \
 		sms/RunInfo.cc sms/Geometry.cc sms/PixelMap.cc \
 		sms/BeamlineInfo.cc sms/MetaDataMgr.cc sms/FastMeta.cc \
 		sms/Markers.cc sms/BeamMonitorConfig.cc sms/DetectorBankSet.cc \
@@ -26,7 +26,7 @@ sms_smsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS) $(liblog4cxx_LIBS) \
 
 sms_test_storage_test_SOURCES = sms/test/storage-test.cc \
 		sms/StorageManager.cc sms/StorageContainer.cc \
-		sms/StorageFile.cc sms/STSClientMgr.cc sms/STSClient.cc \
+		sms/StorageFile.cc sms/STCClientMgr.cc sms/STCClient.cc \
 		sms/SMSControl.cc sms/SMSControlPV.cc sms/RunInfo.cc \
 		sms/Geometry.cc sms/Markers.cc sms/MetaDataMgr.cc sms/FastMeta.cc \
 		sms/BeamlineInfo.cc sms/DataSource.cc sms/PixelMap.cc \

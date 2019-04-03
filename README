@@ -3,7 +3,7 @@ ADARA:
 	Requires autoconf, automake, and boost-devel
 
 	SMS requires log4cxx-devel and EPICS
-	STS requires hdf5-devel, libxml2-devel, activemq-cpp-devel, apr-devel,
+	STC requires hdf5-devel, libxml2-devel, activemq-cpp-devel, apr-devel,
 		and nexus-devel (third-party)
 	DASMON server requires libxml2-devel, activemq-cpp-devel, apr-devel
 

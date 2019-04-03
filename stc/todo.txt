@@ -1,7 +1,7 @@
-STS code issues
+STC code issues
 ----------------
 
-All issues have been moved to Jira under the STS project at itrack.sns.gov
+All issues have been moved to Jira under the STC project at itrack.sns.gov
 
 
 Design Notes / Ideas

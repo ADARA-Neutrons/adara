@@ -15,7 +15,10 @@ S="[[:space:]]"
 
 USAGE()
 {
-	echo "usage:  adara_summary [FILE1 [FILE2 . . . ]] [-h|--help]"
+	echo
+	echo "usage:  adara_summary [FILE1 [FILE2 . . . ]] \\"
+	echo "                      [--terse] [--nostdin] \\"
+	echo "                      [--alt=\"-mon\"] [--help|-h]"
 	echo
 
 	echo "where:"
@@ -23,11 +26,23 @@ USAGE()
 
 	echo "   FILE1, FILE2...   = list of captured email files to summarize"
 	echo "                       (else reads from stdin...)"
-	echo "   -h|--help         = display this usage information"
+	echo
+	echo "    --terse          = only display essential/non-zero values"
+	echo
+	echo "   --nostdin         = require file list, do not read from stdin"
+	echo
+	echo "   --alt=\"-mon\"      = summarize for Alternate SMS Suffix"
+	echo
+	echo "   --help | -h       = display this usage information"
 	echo
 }
 
 FileList=""
+
+NoStdIn=0
+Terse=0
+
+ALT="" # for Alternate/Secondary SMS Deployments... ;-D
 
 for arg in "$@" ; do
 	# echo "arg=$arg"
@@ -35,7 +50,14 @@ for arg in "$@" ; do
 	value=`echo "$arg" | awk -F = '{print $2}'`
 	# echo "key=$key"
 	# echo "value=$value"
-	if [ "#$key#" == '#--help#' ]; then
+	if [[ "#$key#" == '#--terse#' ]]; then
+		Terse=1
+	elif [[ "#$key#" == '#--nostdin#' ]]; then
+		NoStdIn=1
+	elif [[ "#$key#" == '#--alt#' ]]; then
+		ALT="$value"
+		echo -e "\nUsing Alternate SMS Suffix: --alt=\"${ALT}\""
+	elif [[ "#$key#" == '#-h#' || "#$key#" == '#--help#' ]]; then
 		USAGE
 		exit 0
 	else
@@ -55,8 +77,13 @@ done
 #
 
 if [[ -z "${FileList}" ]]; then
-	echo "No Input Files Specified: Reading from /dev/stdin..."
-	FileList="/dev/stdin"
+	if [[ ${NoStdIn} == 1 ]]; then
+		echo -e "\nNO ERRORS/FILES. Done.\n"
+		exit 0
+	else
+		echo "No Input Files Specified: Reading from /dev/stdin..."
+		FileList="/dev/stdin"
+	fi
 fi
 
 #
@@ -73,38 +100,39 @@ declare -A nHostUnknownLogs
 
 declare -A nHostAltLogs
 
-declare -A nHostSTSLDAPLookupUserName
-declare -A nHostSTSLDAPSearchFailed
-declare -A nHostSTSMoreThanOnePVValue
-declare -A nHostSTSPVIDReNumbered
-declare -A nHostSTSNoMatchingUnitsPV
-declare -A nHostSTSPrePulseVarValue
-declare -A nHostSTSVarValueSawtooth
-declare -A nHostSTSVarValueTruncateNegTime
-declare -A nHostSTSNormalizeVarValueTimes
-declare -A nHostSTSFoundDupVar
-declare -A nHostSTSFoundMatchDupVarValues
-declare -A nHostSTSSkipIdenticalVarValues
-declare -A nHostSTSPurgePrePulseVarValues
-declare -A nHostSTSIgnoreSubsumedVarValues
-declare -A nHostSTSSubsumedAllDupVarValues
-declare -A nHostSTSUnableToInitialize
-declare -A nHostSTSConnectionFailed
-declare -A nHostSTSParserStoppedUnexpect
-declare -A nHostSTSTranslationFailed
-declare -A nHostSTSPulseTimeBackwards
-declare -A nHostSTSNoNeutronPulsesInStream
-declare -A nHostSTSEmptyFinalPulseInfo
-declare -A nHostSTSActiveMQException
-declare -A nHostSTSComBusBroadcastError
-declare -A nHostSTSComBusConnTimeout
-declare -A nHostSTSComBusDisconnectError
-declare -A nHostSTSComBusReconnectThread
-declare -A nHostSTSUpdatingRunInfo
-declare -A nHostSTSDetBankSetConfigErr
-declare -A nHostSTSDetBankSetRestrictEv
-declare -A nHostSTSDuplicatePulse
-declare -A nHostSTSOversizePkt
+declare -A nHostSTCLDAPLookupUserName
+declare -A nHostSTCLDAPSearchFailed
+declare -A nHostSTCMoreThanOnePVValue
+declare -A nHostSTCMoreThanOnePVValuePIDs
+declare -A nHostSTCPVIDReNumbered
+declare -A nHostSTCNoMatchingUnitsPV
+declare -A nHostSTCPrePulseVarValue
+declare -A nHostSTCVarValueSawtooth
+declare -A nHostSTCVarValueTruncateNegTime
+declare -A nHostSTCNormalizeVarValueTimes
+declare -A nHostSTCFoundDupVar
+declare -A nHostSTCFoundMatchDupVarValues
+declare -A nHostSTCSkipIdenticalVarValues
+declare -A nHostSTCPurgePrePulseVarValues
+declare -A nHostSTCIgnoreSubsumedVarValues
+declare -A nHostSTCSubsumedAllDupVarValues
+declare -A nHostSTCUnableToInitialize
+declare -A nHostSTCConnectionFailed
+declare -A nHostSTCParserStoppedUnexpect
+declare -A nHostSTCTranslationFailed
+declare -A nHostSTCPulseTimeBackwards
+declare -A nHostSTCNoNeutronPulsesInStream
+declare -A nHostSTCEmptyFinalPulseInfo
+declare -A nHostSTCActiveMQException
+declare -A nHostSTCComBusBroadcastError
+declare -A nHostSTCComBusConnTimeout
+declare -A nHostSTCComBusDisconnectError
+declare -A nHostSTCComBusReconnectThread
+declare -A nHostSTCUpdatingRunInfo
+declare -A nHostSTCDetBankSetConfigErr
+declare -A nHostSTCDetBankSetRestrictEv
+declare -A nHostSTCDuplicatePulse
+declare -A nHostSTCOversizePkt
 
 declare -A nHostSMSDRunAwayDataSource
 declare -A nHostSMSDIdentifiedIntermittent
@@ -142,8 +170,8 @@ declare -A nHostSMSDPulseBufferOverflow
 declare -A nHostSMSDPulseNoRegEvent
 declare -A nHostSMSDFirstNewEventSource
 declare -A nHostSMSDLastEventSource
-declare -A nHostSMSDSTSConnectionFailed
-declare -A nHostSMSDLostConnectionToSTS
+declare -A nHostSMSDSTCConnectionFailed
+declare -A nHostSMSDLostConnectionToSTC
 declare -A nHostSMSDLiveClientLogs
 declare -A nHostSMSDConnResetByPeer
 declare -A nHostSMSDNoSuchFileOrDirectory
@@ -197,14 +225,14 @@ declare -A nHostDASMONDOversizePkt
 nUnknownDASMOND=0
 nUnknownSMSD=0
 nUnknownPVSD=0
-nUnknownSTS=0
+nUnknownSTC=0
 nUnknownApp=0
 nUnknownLogs=0
 
 nDASMOND=0
 nSMSD=0
 nPVSD=0
-nSTS=0
+nSTC=0
 
 nemail=0
 nblank=0
@@ -237,38 +265,39 @@ PARSE_LOG()
 
 		nHostAltLogs[$host]=0
 
-		nHostSTSLDAPLookupUserName[$host]=0
-		nHostSTSLDAPSearchFailed[$host]=0
-		nHostSTSMoreThanOnePVValue[$host]=0
-		nHostSTSPVIDReNumbered[$host]=0
-		nHostSTSNoMatchingUnitsPV[$host]=0
-		nHostSTSPrePulseVarValue[$host]=0
-		nHostSTSVarValueSawtooth[$host]=0
-		nHostSTSVarValueTruncateNegTime[$host]=0
-		nHostSTSNormalizeVarValueTimes[$host]=0
-		nHostSTSFoundDupVar[$host]=0
-		nHostSTSFoundMatchDupVarValues[$host]=0
-		nHostSTSSkipIdenticalVarValues[$host]=0
-		nHostSTSPurgePrePulseVarValues[$host]=0
-		nHostSTSIgnoreSubsumedVarValues[$host]=0
-		nHostSTSSubsumedAllDupVarValues[$host]=0
-		nHostSTSUnableToInitialize[$host]=0
-		nHostSTSConnectionFailed[$host]=0
-		nHostSTSParserStoppedUnexpect[$host]=0
-		nHostSTSTranslationFailed[$host]=0
-		nHostSTSPulseTimeBackwards[$host]=0
-		nHostSTSNoNeutronPulsesInStream[$host]=0
-		nHostSTSEmptyFinalPulseInfo[$host]=0
-		nHostSTSActiveMQException[$host]=0
-		nHostSTSComBusBroadcastError[$host]=0
-		nHostSTSComBusConnTimeout[$host]=0
-		nHostSTSComBusDisconnectError[$host]=0
-		nHostSTSComBusReconnectThread[$host]=0
-		nHostSTSUpdatingRunInfo[$host]=0
-		nHostSTSDetBankSetConfigErr[$host]=0
-		nHostSTSDetBankSetRestrictEv[$host]=0
-		nHostSTSDuplicatePulse[$host]=0
-		nHostSTSOversizePkt[$host]=0
+		nHostSTCLDAPLookupUserName[$host]=0
+		nHostSTCLDAPSearchFailed[$host]=0
+		nHostSTCMoreThanOnePVValue[$host]=0
+		nHostSTCMoreThanOnePVValuePIDs[$host]=""
+		nHostSTCPVIDReNumbered[$host]=0
+		nHostSTCNoMatchingUnitsPV[$host]=0
+		nHostSTCPrePulseVarValue[$host]=0
+		nHostSTCVarValueSawtooth[$host]=0
+		nHostSTCVarValueTruncateNegTime[$host]=0
+		nHostSTCNormalizeVarValueTimes[$host]=0
+		nHostSTCFoundDupVar[$host]=0
+		nHostSTCFoundMatchDupVarValues[$host]=0
+		nHostSTCSkipIdenticalVarValues[$host]=0
+		nHostSTCPurgePrePulseVarValues[$host]=0
+		nHostSTCIgnoreSubsumedVarValues[$host]=0
+		nHostSTCSubsumedAllDupVarValues[$host]=0
+		nHostSTCUnableToInitialize[$host]=0
+		nHostSTCConnectionFailed[$host]=0
+		nHostSTCParserStoppedUnexpect[$host]=0
+		nHostSTCTranslationFailed[$host]=0
+		nHostSTCPulseTimeBackwards[$host]=0
+		nHostSTCNoNeutronPulsesInStream[$host]=0
+		nHostSTCEmptyFinalPulseInfo[$host]=0
+		nHostSTCActiveMQException[$host]=0
+		nHostSTCComBusBroadcastError[$host]=0
+		nHostSTCComBusConnTimeout[$host]=0
+		nHostSTCComBusDisconnectError[$host]=0
+		nHostSTCComBusReconnectThread[$host]=0
+		nHostSTCUpdatingRunInfo[$host]=0
+		nHostSTCDetBankSetConfigErr[$host]=0
+		nHostSTCDetBankSetRestrictEv[$host]=0
+		nHostSTCDuplicatePulse[$host]=0
+		nHostSTCOversizePkt[$host]=0
 
 		nHostSMSDRunAwayDataSource[$host]=0
 		nHostSMSDIdentifiedIntermittent[$host]=0
@@ -306,8 +335,8 @@ PARSE_LOG()
 		nHostSMSDPulseNoRegEvent[$host]=0
 		nHostSMSDFirstNewEventSource[$host]=0
 		nHostSMSDLastEventSource[$host]=0
-		nHostSMSDSTSConnectionFailed[$host]=0
-		nHostSMSDLostConnectionToSTS[$host]=0
+		nHostSMSDSTCConnectionFailed[$host]=0
+		nHostSMSDLostConnectionToSTC[$host]=0
 		nHostSMSDLiveClientLogs[$host]=0
 		nHostSMSDConnResetByPeer[$host]=0
 		nHostSMSDNoSuchFileOrDirectory[$host]=0
@@ -361,252 +390,268 @@ PARSE_LOG()
 	fi
 	#echo "HostLogCount[$host]=${nHostlogs[$host]}"
 
-	app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
-	#echo "App=[$app]"
+	base_app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
+	#echo "base_app=[$base_app]"
+
+	known=0
 
 	# Flag Any "Alternate" or Additional SMSD Apps... (e.g. "-mon")
-	if [[ "$app" == "smsd-mon" ]]; then
+	if [[ -z ${ALT} && "$base_app" =~ (stc|smsd|pvsd|dasmon)-.* ]]; then
 		nHostAltLogs[$host]=$(( nHostAltLogs[$host] + 1 ))
-		app="smsd"
+		app="$base_app"
+		known=1
+	elif [[ -n ${ALT} && "$base_app" =~ ${ALT}$ ]]; then
+		app="${base_app/${ALT}}"
+	elif [[ -n ${ALT} && "$base_app" =~ (stc|smsd|pvsd|dasmon) ]]; then
+		nHostAltLogs[$host]=$(( nHostAltLogs[$host] + 1 ))
+		app="${base_app}-not-alt"
+		known=1
+	else
+		app="$base_app"
 	fi
+	#echo "app=[$app]"
 
-	known=1
+	if [[ "$app" == "stc" ]]; then
 
-	if [[ "$app" == "sts" ]]; then
+		nSTC=$(( nSTC + 1 ))
 
-		nSTS=$(( nSTS + 1 ))
+		known=1
 
-		# Strip Off STS PID and Error Prefix...
-		if [[ "$log" =~ sts:${S}STS${S}Error: ]]; then
+		# Strip Off STC PID and Error Prefix...
+		if [[ "$log" =~ ${base_app}:${S}STC${S}Error: ]]; then
+			pid=`echo "$log" | awk '{print $5}'`
 			log=`echo "$log" | \
 			awk '{for(i=6;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
+			pid=`echo "$log" | awk '{print $3}'`
 			log=`echo "$log" | \
 			awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		fi
 
-		# "stsLDAPLookupUserName()" Log
-		if [[ "$log" =~ stsLDAPLookupUserName ]]; then
+		# "stcLDAPLookupUserName()" Log
+		if [[ "$log" =~ stcLDAPLookupUserName ]]; then
 			#echo "LDAP Lookup User Name..."
-			nHostSTSLDAPLookupUserName[$host]=$(( \
-				nHostSTSLDAPLookupUserName[$host] + 1 ))
+			nHostSTCLDAPLookupUserName[$host]=$(( \
+				nHostSTCLDAPLookupUserName[$host] + 1 ))
 
-		# "stsLdapConnect(): LDAP Search Failed" Log
+		# "stcLdapConnect(): LDAP Search Failed" Log
 		elif [[ "$log" =~ \
-				stsLdapConnect\(\)\:${S}LDAP${S}Search${S}Failed ]]; then
-			#echo "stsLdapConnect(): LDAP Search Failed..."
-			nHostSTSLDAPSearchFailed[$host]=$(( \
-				nHostSTSLDAPSearchFailed[$host] + 1 ))
+				stcLdapConnect\(\)\:${S}LDAP${S}Search${S}Failed ]]; then
+			#echo "stcLdapConnect(): LDAP Search Failed..."
+			nHostSTCLDAPSearchFailed[$host]=$(( \
+				nHostSTCLDAPSearchFailed[$host] + 1 ))
 
 		# "More Than 1 PV Value for..." Log
 		elif [[ "$log" =~ More${S}Than${S}1${S}PV${S}Value${S}for ]]; then
 			#echo "More Than 1 PV Value for..."
-			nHostSTSMoreThanOnePVValue[$host]=$(( \
-				nHostSTSMoreThanOnePVValue[$host] + 1 ))
+			nHostSTCMoreThanOnePVValue[$host]=$(( \
+				nHostSTCMoreThanOnePVValue[$host] + 1 ))
+			nHostSTCMoreThanOnePVValuePIDs[$host]="\
+				${nHostSTCMoreThanOnePVValuePIDs[$host]}${pid}\n"
 
 		# "PV ID Re-Numbered" Log
 		elif [[ "$log" =~ PV${S}ID${S}Re-Numbered ]]; then
 			#echo "PV ID Re-Numbered..."
-			nHostSTSPVIDReNumbered[$host]=$(( \
-				nHostSTSPVIDReNumbered[$host] + 1 ))
+			nHostSTCPVIDReNumbered[$host]=$(( \
+				nHostSTCPVIDReNumbered[$host] + 1 ))
 
 		# "No Matching Units PV Found..." Log
 		elif [[ "$log" =~ No${S}Matching${S}Units${S}PV${S}Found ]]; then
 			#echo "No Matching Units PV Found..."
-			nHostSTSNoMatchingUnitsPV[$host]=$(( \
-				nHostSTSNoMatchingUnitsPV[$host] + 1 ))
+			nHostSTCNoMatchingUnitsPV[$host]=$(( \
+				nHostSTCNoMatchingUnitsPV[$host] + 1 ))
 
 		# "Got Pre-Pulse Variable Value Update" Log
 		elif [[ "$log" =~ \
 				Got${S}Pre-Pulse${S}Variable${S}Value${S}Update ]]; then
 			#echo "Got Pre-Pulse Variable Value Update..."
-			nHostSTSPrePulseVarValue[$host]=$(( \
-				nHostSTSPrePulseVarValue[$host] + 1 ))
+			nHostSTCPrePulseVarValue[$host]=$(( \
+				nHostSTCPrePulseVarValue[$host] + 1 ))
 
 		# "Variable Value Update SAWTOOTH" Log
 		elif [[ "$log" =~ Variable${S}Value${S}Update${S}SAWTOOTH ]]; then
 			#echo "Variable Value Update SAWTOOTH..."
-			nHostSTSVarValueSawtooth[$host]=$(( \
-				nHostSTSVarValueSawtooth[$host] + 1 ))
+			nHostSTCVarValueSawtooth[$host]=$(( \
+				nHostSTCVarValueSawtooth[$host] + 1 ))
 
 		# "Truncate Negative Variable Value Update Time" Log
 		elif [[ "$log" =~ \
 			Truncate${S}Negative${S}Variable${S}Value${S}Update${S}Time \
 		]]; then
 			#echo "Variable Value Update SAWTOOTH..."
-			nHostSTSVarValueTruncateNegTime[$host]=$(( \
-				nHostSTSVarValueTruncateNegTime[$host] + 1 ))
+			nHostSTCVarValueTruncateNegTime[$host]=$(( \
+				nHostSTCVarValueTruncateNegTime[$host] + 1 ))
 
 		# "Normalizing PV Value Times with First Pulse Time" Log
 		elif [[ "$log" =~ \
 			Normalizing${S}PV${S}Value${S}Times${S}with${S}First${S}Pulse \
 		]]; then
 			#echo "Normalizing PV Value Times with First Pulse Time..."
-			nHostSTSNormalizeVarValueTimes[$host]=$(( \
-				nHostSTSNormalizeVarValueTimes[$host] + 1 ))
+			nHostSTCNormalizeVarValueTimes[$host]=$(( \
+				nHostSTCNormalizeVarValueTimes[$host] + 1 ))
 
 		# "Found PV Marked as Duplicate" Log
 		elif [[ "$log" =~ Found${S}PV${S}Marked${S}as${S}Duplicate ]]; then
 			#echo "Found PV Marked as Duplicate..."
-			nHostSTSFoundDupVar[$host]=$(( \
-				nHostSTSFoundDupVar[$host] + 1 ))
+			nHostSTCFoundDupVar[$host]=$(( \
+				nHostSTCFoundDupVar[$host] + 1 ))
 
 		# "Found Matching Duplicate PV" Log
 		elif [[ "$log" =~ Found${S}Matching${S}Duplicate${S}PV ]]; then
 			#echo "Found Matching Duplicate PV..."
-			nHostSTSFoundMatchDupVarValues[$host]=$(( \
-				nHostSTSFoundMatchDupVarValues[$host] + 1 ))
+			nHostSTCFoundMatchDupVarValues[$host]=$(( \
+				nHostSTCFoundMatchDupVarValues[$host] + 1 ))
 
 		# "Skip Past Identical Values (Subsume)" Log
 		elif [[ "$log" =~ Skip${S}Past${S}Identical${S}Values ]]; then
 			#echo "Skip Past Identical Values..."
-			nHostSTSSkipIdenticalVarValues[$host]=$(( \
-				nHostSTSSkipIdenticalVarValues[$host] + 1 ))
+			nHostSTCSkipIdenticalVarValues[$host]=$(( \
+				nHostSTCSkipIdenticalVarValues[$host] + 1 ))
 
 		# "Purging Pre-First-Pulse Values" Log
 		elif [[ "$log" =~ Purging${S}Pre-First-Pulse${S}Values ]]; then
 			#echo "Purging Pre-First-Pulse Values..."
-			nHostSTSPurgePrePulseVarValues[$host]=$(( \
-				nHostSTSPurgePrePulseVarValues[$host] + 1 ))
+			nHostSTCPurgePrePulseVarValues[$host]=$(( \
+				nHostSTCPurgePrePulseVarValues[$host] + 1 ))
 
 		# "Ignoring Already Subsumed PV Duplicate" Log
 		elif [[ "$log" =~ \
 				Ignoring${S}Already${S}Subsumed${S}PV${S}Duplicate ]]; then
 			#echo "Ignoring Already Subsumed PV Duplicate..."
-			nHostSTSIgnoreSubsumedVarValues[$host]=$(( \
-				nHostSTSIgnoreSubsumedVarValues[$host] + 1 ))
+			nHostSTCIgnoreSubsumedVarValues[$host]=$(( \
+				nHostSTCIgnoreSubsumedVarValues[$host] + 1 ))
 
 		# "PV Has Subsumed All Duplicate PV Log Values" Log
 		elif [[ "$log" =~ \
 				Subsumed${S}All${S}Duplicate${S}PV${S}Log${S}Values \
 		]]; then
 			#echo "PV Has Subsumed All Duplicate PV Log Values..."
-			nHostSTSSubsumedAllDupVarValues[$host]=$(( \
-				nHostSTSSubsumedAllDupVarValues[$host] + 1 ))
+			nHostSTCSubsumedAllDupVarValues[$host]=$(( \
+				nHostSTCSubsumedAllDupVarValues[$host] + 1 ))
 
 		# "Unable to Initialize NeXus File - Retry Later..." Log
 		elif [[ "$log" =~ \
 				Unable${S}to${S}Initialize${S}NeXus${S}File${S}-${S}Retry \
 		]]; then
 			#echo "Unable to Initialize NeXus File - Retry Later..."
-			nHostSTSUnableToInitialize[$host]=$(( \
-				nHostSTSUnableToInitialize[$host] + 1 ))
+			nHostSTCUnableToInitialize[$host]=$(( \
+				nHostSTCUnableToInitialize[$host] + 1 ))
 
 		# "Connection Failed, Not Done Processing" Log
 		elif [[ "$log" =~ \
 				Connection${S}Failed,${S}Not${S}Done${S}Processing ]]; then
 			#echo "Connection Failed, Not Done Processing..."
-			nHostSTSConnectionFailed[$host]=$(( \
-				nHostSTSConnectionFailed[$host] + 1 ))
+			nHostSTCConnectionFailed[$host]=$(( \
+				nHostSTCConnectionFailed[$host] + 1 ))
 
 		# "ADARA parser stopped unexpectedly" Log
 		elif [[ "$log" =~ \
 				ADARA${S}parser${S}stopped${S}unexpectedly ]]; then
 			#echo "ADARA parser stopped unexpectedly..."
-			nHostSTSParserStoppedUnexpect[$host]=$(( \
-				nHostSTSParserStoppedUnexpect[$host] + 1 ))
+			nHostSTCParserStoppedUnexpect[$host]=$(( \
+				nHostSTCParserStoppedUnexpect[$host] + 1 ))
 
 		# "Translation... failed..." Logs
 		elif [[ "$log" =~ Translation${S}.*${S}failed ]]; then
 			#echo "Translation... failed..."
-			nHostSTSTranslationFailed[$host]=$(( \
-				nHostSTSTranslationFailed[$host] + 1 ))
+			nHostSTCTranslationFailed[$host]=$(( \
+				nHostSTCTranslationFailed[$host] + 1 ))
 
 		# "Unexpected input: Pulse time went backwards" Logs
 		elif [[ "$log" =~ \
 			Unexpected${S}input:${S}Pulse${S}time${S}went${S}backwards \
 		]]; then
 			#echo "Unexpected input: Pulse time went backwards..."
-			nHostSTSPulseTimeBackwards[$host]=$(( \
-				nHostSTSPulseTimeBackwards[$host] + 1 ))
+			nHostSTCPulseTimeBackwards[$host]=$(( \
+				nHostSTCPulseTimeBackwards[$host] + 1 ))
 
 		# "No Neutron Pulses Received in Stream" Logs
 		elif [[ "$log" =~ \
 			No${S}Neutron${S}Pulses${S}Received${S}in${S}Stream ]]; \
 		then
 			#echo "No Neutron Pulses Received in Stream..."
-			nHostSTSNoNeutronPulsesInStream[$host]=$(( \
-				nHostSTSNoNeutronPulsesInStream[$host] + 1 ))
+			nHostSTCNoNeutronPulsesInStream[$host]=$(( \
+				nHostSTCNoNeutronPulsesInStream[$host] + 1 ))
 
 		# "Empty Final Pulse Info Buffer(s)" Logs
 		elif [[ "$log" =~ \
 				Empty${S}Final${S}Pulse${S}Info${S}Buffer\(s\) ]]; then
 			#echo "Empty Final Pulse Info Buffer(s)..."
-			nHostSTSEmptyFinalPulseInfo[$host]=$(( \
-				nHostSTSEmptyFinalPulseInfo[$host] + 1 ))
+			nHostSTCEmptyFinalPulseInfo[$host]=$(( \
+				nHostSTCEmptyFinalPulseInfo[$host] + 1 ))
 
 		# "(ComBus) ActiveMQ Exception Listener Called" Log
 		elif [[ "$log" =~ \
 				ActiveMQ${S}Exception${S}Listener${S}Called ]]; then
 			#echo "ActiveMQ Exception Listener Called..."
-			nHostSTSActiveMQException[$host]=$(( \
-				nHostSTSActiveMQException[$host] + 1 ))
+			nHostSTCActiveMQException[$host]=$(( \
+				nHostSTCActiveMQException[$host] + 1 ))
 
 		# "(ComBus) Error Broadcasting Message" Log
 		elif [[ "$log" =~ \
 				broadcast\(\):${S}Error${S}Broadcasting${S}Message ]]; then
 			#echo "ComBus Error Broadcasting Message..."
-			nHostSTSComBusBroadcastError[$host]=$(( \
-				nHostSTSComBusBroadcastError[$host] + 1 ))
+			nHostSTCComBusBroadcastError[$host]=$(( \
+				nHostSTCComBusBroadcastError[$host] + 1 ))
 
 		# "ComBus Connection Timeout for Domain" Log
 		elif [[ "$log" =~ \
 				ComBus${S}Connection${S}Timeout${S}for${S}Domain ]]; then
 			#echo "ComBus Connection Timeout for Domain..."
-			nHostSTSComBusConnTimeout[$host]=$(( \
-				nHostSTSComBusConnTimeout[$host] + 1 ))
+			nHostSTCComBusConnTimeout[$host]=$(( \
+				nHostSTCComBusConnTimeout[$host] + 1 ))
 
 		# "(ComBus) Error Disconnecting Message Producers/Consumers" Log
 		elif [[ "$log" =~ \
 			Error${S}Disconnecting${S}Message${S}Producers/Consumers ]]; \
 		then
 			#echo "ComBus Error Disconnecting Message Producers/Consumers"
-			nHostSTSComBusDisconnectError[$host]=$(( \
-				nHostSTSComBusDisconnectError[$host] + 1 ))
+			nHostSTCComBusDisconnectError[$host]=$(( \
+				nHostSTCComBusDisconnectError[$host] + 1 ))
 
 		# "(ComBus) Reconnect Thread" Logs
 		elif [[ "$log" =~ ComBus:${S}reconnectThread\(\) ]]; then
 			#echo "ComBus Reconnect Thread..."
-			nHostSTSComBusReconnectThread[$host]=$(( \
-				nHostSTSComBusReconnectThread[$host] + 1 ))
+			nHostSTCComBusReconnectThread[$host]=$(( \
+				nHostSTCComBusReconnectThread[$host] + 1 ))
 
 		# "Updating RunInfo" Log
 		elif [[ "$log" =~ Updating${S}RunInfo ]]; then
 			#echo "Updating RunInfo..."
-			nHostSTSUpdatingRunInfo[$host]=$(( \
-				nHostSTSUpdatingRunInfo[$host] + 1 ))
+			nHostSTCUpdatingRunInfo[$host]=$(( \
+				nHostSTCUpdatingRunInfo[$host] + 1 ))
 
 		# "Detector Bank Set Config Error" Log
 		elif [[ "$log" =~ \
 			Detector${S}Bank${S}Set${S}[[:alnum:]]+${S}Config${S}Error \
 		]]; then
 			#echo "Detector Bank Set Config Error..."
-			nHostSTSDetBankSetConfigErr[$host]=$(( \
-				nHostSTSDetBankSetConfigErr[$host] + 1 ))
+			nHostSTCDetBankSetConfigErr[$host]=$(( \
+				nHostSTCDetBankSetConfigErr[$host] + 1 ))
 
 		# "Restricting Detector Bank Set to Event Mode" Log
 		elif [[ "$log" =~ \
 			Restricting${S}Detector${S}Bank${S}Set${S}to${S}Event${S}Mode \
 		]]; then
 			#echo "Restricting Detector Bank Set to Event Mode..."
-			nHostSTSDetBankSetRestrictEv[$host]=$(( \
-				nHostSTSDetBankSetRestrictEv[$host] + 1 ))
+			nHostSTCDetBankSetRestrictEv[$host]=$(( \
+				nHostSTCDetBankSetRestrictEv[$host] + 1 ))
 
 		# "Duplicate Pulse" Log
 		elif [[ "$log" =~ Duplicate${S}Pulse ]]; then
 			#echo "Duplicate Pulse..."
-			nHostSTSDuplicatePulse[$host]=$(( \
-				nHostSTSDuplicatePulse[$host] + 1 ))
+			nHostSTCDuplicatePulse[$host]=$(( \
+				nHostSTCDuplicatePulse[$host] + 1 ))
 
 		# "OversizePkt" Log
 		elif [[ "$log" =~ OversizePkt ]]; then
 			#echo "OversizePkt..."
-			nHostSTSOversizePkt[$host]=$(( \
-				nHostSTSOversizePkt[$host] + 1 ))
+			nHostSTCOversizePkt[$host]=$(( \
+				nHostSTCOversizePkt[$host] + 1 ))
 
 		# Unknown Log Message
 		else
-			nUnknownSTS=$(( nUnknownSTS + 1 ))
+			nUnknownSTC=$(( nUnknownSTC + 1 ))
 			known=0
 		fi
 
@@ -614,14 +659,17 @@ PARSE_LOG()
 
 		nSMSD=$(( nSMSD + 1 ))
 
+		known=1
+
 		# Strip Off SMS Error Prefix...
-		if [[ "$log" =~ smsd:${S}ERROR ]]; then
+		if [[ "$log" =~ ${base_app}:${S}ERROR ]]; then
 			log=`echo "$log" | \
 			awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
 			log=`echo "$log" | \
 			awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		fi
+		#echo "log=[$log]"
 
 		# "Run-Away Data Source" Log
 		if [[ "$log" =~ Run-Away${S}Data${S}Source ]]; then
@@ -694,10 +742,10 @@ PARSE_LOG()
 			nHostSMSDFailedToStartRun[$host]=$(( \
 				nHostSMSDFailedToStartRun[$host] + 1 ))
 
-		# "Asynchronous Lookup Failed for STS" Log
+		# "Asynchronous Lookup Failed for STC" Log
 		elif [[ "$log" =~ \
-				Asynchronous${S}Lookup${S}Failed${S}for${S}STS ]]; then
-			#echo "Asynchronous Lookup Failed for STS..."
+				Asynchronous${S}Lookup${S}Failed${S}for${S}STC ]]; then
+			#echo "Asynchronous Lookup Failed for STC..."
 			nHostSMSDAsynchLookupFailure[$host]=$(( \
 				nHostSMSDAsynchLookupFailure[$host] + 1 ))
 
@@ -867,19 +915,19 @@ PARSE_LOG()
 			nHostSMSDLastEventSource[$host]=$(( \
 				nHostSMSDLastEventSource[$host] + 1 ))
 
-		# "Connection Failed to STS at..." Log
+		# "Connection Failed to STC at..." Log
 		elif [[ "$log" =~ \
-				Connection${S}Failed${S}to${S}STS${S}at ]]; then
-			#echo "Connection Failed to STS at..."
-			nHostSMSDSTSConnectionFailed[$host]=$(( \
-				nHostSMSDSTSConnectionFailed[$host] + 1 ))
+				Connection${S}Failed${S}to${S}STC${S}at ]]; then
+			#echo "Connection Failed to STC at..."
+			nHostSMSDSTCConnectionFailed[$host]=$(( \
+				nHostSMSDSTCConnectionFailed[$host] + 1 ))
 
-		# "Lost Connection to STS for Run..." Log
+		# "Lost Connection to STC for Run..." Log
 		elif [[ "$log" =~ \
-				Lost${S}Connection${S}to${S}STS${S}for${S}Run ]]; then
-			#echo "Lost Connection to STS for Run..."
-			nHostSMSDLostConnectionToSTS[$host]=$(( \
-				nHostSMSDLostConnectionToSTS[$host] + 1 ))
+				Lost${S}Connection${S}to${S}STC${S}for${S}Run ]]; then
+			#echo "Lost Connection to STC for Run..."
+			nHostSMSDLostConnectionToSTC[$host]=$(( \
+				nHostSMSDLostConnectionToSTC[$host] + 1 ))
 
 		# Conglomerated "LiveClient" Logs
 		elif [[ "$log" =~ SMS.LiveClient ]]; then
@@ -974,8 +1022,10 @@ PARSE_LOG()
 
 		nPVSD=$(( nPVSD + 1 ))
 
+		known=1
+
 		# Strip Off PVSD ERROR Prefix...
-		if [[ "$log" =~ pvsd:${S}PVSD${S}ERROR ]]; then
+		if [[ "$log" =~ ${base_app}:${S}PVSD${S}ERROR ]]; then
 			log=`echo "$log" | \
 			awk '{for(i=5;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
@@ -1189,6 +1239,8 @@ PARSE_LOG()
 
 		nDASMOND=$(( nDASMOND + 1 ))
 
+		known=1
+
 		# Strip Off DASMOND Prefix...
 		log=`echo "$log" | \
 			awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
@@ -1246,10 +1298,9 @@ PARSE_LOG()
 			known=0
 		fi
 
-	else
+	elif [[ $known == 0 ]]; then
 		#echo "*** Unknown App Log!"
 		nUnknownApp=$(( nUnknownApp + 1 ))
-		known=0
 	fi
 
 	if [[ $known == 0 ]]; then
@@ -1267,8 +1318,11 @@ PARSE_LOG()
 #
 
 echo
-echo "Processing File List: ${FileList}"
-echo
+
+if [[ ${Terse} == 0 ]]; then
+	echo "Processing File List: ${FileList}"
+	echo
+fi
 
 last_hdr_from=""
 
@@ -1363,9 +1417,14 @@ done
 # Done, Dump Statistics...
 #
 
-echo -e "\n--- Statistics Summary ---\n"
+echo -e "\n--- Statistics Summary ---"
 
-echo "Per Host Statistics:"
+nHosts=`echo "${HostList}" | wc | awk '{print $2}'`
+
+if [[ $nHosts -gt 1 ]]; then
+	echo -e "\nPer Host Statistics:"
+fi
+
 for h in ${HostList} ; do
 	echo -e -n "\nHost [$h] - ${nHostlogs[$h]} Logs Total"
 	if [[ ${nHostUnknownLogs[$h]} -gt 0 ]]; then
@@ -1375,134 +1434,137 @@ for h in ${HostList} ; do
 		echo -n " [Alt=${nHostAltLogs[$h]}]"
 	fi
 	echo
-	# STS Error Stats...
-	if [[ ${nHostSTSTranslationFailed[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSTranslationFailed[$h]} "
-		echo "STS \"Translation... failed...\" Logs"
+	# STC Error Stats...
+	if [[ ${nHostSTCTranslationFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCTranslationFailed[$h]} "
+		echo "STC \"Translation... failed...\" Logs"
 	fi
-	if [[ ${nHostSTSConnectionFailed[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSConnectionFailed[$h]} "
-		echo "STS \"Connection Failed, Not Done Processing\" Logs"
+	if [[ ${nHostSTCConnectionFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCConnectionFailed[$h]} "
+		echo "STC \"Connection Failed, Not Done Processing\" Logs"
 	fi
-	if [[ ${nHostSTSParserStoppedUnexpect[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSParserStoppedUnexpect[$h]} "
-		echo "STS \"ADARA parser stopped unexpectedly\" Logs"
+	if [[ ${nHostSTCParserStoppedUnexpect[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCParserStoppedUnexpect[$h]} "
+		echo "STC \"ADARA parser stopped unexpectedly\" Logs"
 	fi
-	if [[ ${nHostSTSPVIDReNumbered[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSPVIDReNumbered[$h]} "
-		echo "STS \"PV ID Re-Numbered\" Logs"
+	if [[ ${nHostSTCPVIDReNumbered[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCPVIDReNumbered[$h]} "
+		echo "STC \"PV ID Re-Numbered\" Logs"
 	fi
-	if [[ ${nHostSTSPulseTimeBackwards[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSPulseTimeBackwards[$h]} "
-		echo "STS \"Unexpected input: Pulse time went backwards\" Logs"
+	if [[ ${nHostSTCPulseTimeBackwards[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCPulseTimeBackwards[$h]} "
+		echo "STC \"Unexpected input: Pulse time went backwards\" Logs"
 	fi
-	if [[ ${nHostSTSActiveMQException[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSActiveMQException[$h]} "
-		echo "STS \"ActiveMQ Exception Listener Called\" Logs"
+	if [[ ${nHostSTCActiveMQException[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCActiveMQException[$h]} "
+		echo "STC \"ActiveMQ Exception Listener Called\" Logs"
 	fi
-	if [[ ${nHostSTSComBusBroadcastError[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSComBusBroadcastError[$h]} "
-		echo "STS \"ComBus Error Broadcasting Message\" Logs"
+	if [[ ${nHostSTCComBusBroadcastError[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCComBusBroadcastError[$h]} "
+		echo "STC \"ComBus Error Broadcasting Message\" Logs"
 	fi
-	if [[ ${nHostSTSDuplicatePulse[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSDuplicatePulse[$h]} "
-		echo "STS \"Duplicate Pulse\" Logs"
+	if [[ ${nHostSTCDuplicatePulse[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCDuplicatePulse[$h]} "
+		echo "STC \"Duplicate Pulse\" Logs"
 	fi
-	if [[ ${nHostSTSOversizePkt[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSTSOversizePkt[$h]} "
-		echo "STS \"OversizePkt\" Logs"
+	if [[ ${nHostSTCOversizePkt[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCOversizePkt[$h]} "
+		echo "STC \"OversizePkt\" Logs"
 	fi
-	if [[ ${nHostSTSFoundDupVar[$h]} -gt 0 ]]; then
-		echo -n "   ** ${nHostSTSFoundDupVar[$h]} "
-		echo "STS \"Found PV Marked as Duplicate\" Logs"
+	if [[ ${nHostSTCFoundDupVar[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCFoundDupVar[$h]} "
+		echo "STC \"Found PV Marked as Duplicate\" Logs"
 	fi
-	if [[ ${nHostSTSLDAPSearchFailed[$h]} -gt 0 ]]; then
-		echo -n "   ** ${nHostSTSLDAPSearchFailed[$h]} "
-		echo "STS \"stsLdapConnect(): LDAP Search Failed\" Logs"
+	if [[ ${nHostSTCLDAPSearchFailed[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCLDAPSearchFailed[$h]} "
+		echo "STC \"stcLdapConnect(): LDAP Search Failed\" Logs"
 	fi
-	if [[ ${nHostSTSNoNeutronPulsesInStream[$h]} -gt 0 ]]; then
-		echo -n "   * ${nHostSTSNoNeutronPulsesInStream[$h]} "
-		echo "STS \"No Neutron Pulses Received in Stream\" Logs"
+	if [[ ${nHostSTCNoNeutronPulsesInStream[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCNoNeutronPulsesInStream[$h]} "
+		echo "STC \"No Neutron Pulses Received in Stream\" Logs"
 	fi
-	if [[ ${nHostSTSEmptyFinalPulseInfo[$h]} -gt 0 ]]; then
-		echo -n "   * ${nHostSTSEmptyFinalPulseInfo[$h]} "
-		echo "STS \"Empty Final Pulse Info Buffer(s)\" Logs"
+	if [[ ${nHostSTCEmptyFinalPulseInfo[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCEmptyFinalPulseInfo[$h]} "
+		echo "STC \"Empty Final Pulse Info Buffer(s)\" Logs"
 	fi
-	if [[ ${nHostSTSMoreThanOnePVValue[$h]} -gt 0 ]]; then
-		echo -n "   * ${nHostSTSMoreThanOnePVValue[$h]} "
-		echo "STS \"More Than 1 PV Value for\" Logs"
+	if [[ ${nHostSTCMoreThanOnePVValue[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCMoreThanOnePVValue[$h]} "
+		echo "STC \"More Than 1 PV Value for\" Logs"
+		pidlist=`echo -e "${nHostSTCMoreThanOnePVValuePIDs[$h]//	/}" \
+			| sed -e '/^$/d' -e 's/[][]//g' | sort -u -n`
+		echo "        PIDs: "${pidlist}
 	fi
-	if [[ ${nHostSTSUnableToInitialize[$h]} -gt 0 ]]; then
-		echo -n "   * ${nHostSTSUnableToInitialize[$h]} "
-		echo "STS \"Unable to Initialize NeXus File - Retry\" Logs"
+	if [[ ${nHostSTCUnableToInitialize[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCUnableToInitialize[$h]} "
+		echo "STC \"Unable to Initialize NeXus File - Retry\" Logs"
 	fi
-	if [[ ${nHostSTSPurgePrePulseVarValues[$h]} -gt 0 ]]; then
-		echo -n "   * ${nHostSTSPurgePrePulseVarValues[$h]} "
-		echo "STS \"Purging Pre-First-Pulse Values\" Logs"
+	if [[ ${nHostSTCPurgePrePulseVarValues[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCPurgePrePulseVarValues[$h]} "
+		echo "STC \"Purging Pre-First-Pulse Values\" Logs"
 	fi
-	if [[ ${nHostSTSPrePulseVarValue[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSPrePulseVarValue[$h]} "
-		echo "STS \"Pre-Pulse Variable Value Update\" Logs"
+	if [[ ${nHostSTCPrePulseVarValue[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCPrePulseVarValue[$h]} "
+		echo "STC \"Pre-Pulse Variable Value Update\" Logs"
 	fi
-	if [[ ${nHostSTSVarValueSawtooth[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSVarValueSawtooth[$h]} "
-		echo "STS \"Variable Value Update SAWTOOTH\" Logs"
+	if [[ ${nHostSTCVarValueSawtooth[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCVarValueSawtooth[$h]} "
+		echo "STC \"Variable Value Update SAWTOOTH\" Logs"
 	fi
-	if [[ ${nHostSTSVarValueTruncateNegTime[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSVarValueTruncateNegTime[$h]} "
-		echo "STS \"Truncate Negative Variable Value Update Time\" Logs"
+	if [[ ${nHostSTCVarValueTruncateNegTime[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCVarValueTruncateNegTime[$h]} "
+		echo "STC \"Truncate Negative Variable Value Update Time\" Logs"
 	fi
-	if [[ ${nHostSTSNormalizeVarValueTimes[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSNormalizeVarValueTimes[$h]} "
-		echo "STS \"Normalizing PV Value Times with First Pulse\" Logs"
+	if [[ ${nHostSTCNormalizeVarValueTimes[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCNormalizeVarValueTimes[$h]} "
+		echo "STC \"Normalizing PV Value Times with First Pulse\" Logs"
 	fi
-	if [[ ${nHostSTSFoundMatchDupVarValues[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSFoundMatchDupVarValues[$h]} "
-		echo "STS \"Found Matching Duplicate PV\" Logs"
+	if [[ ${nHostSTCFoundMatchDupVarValues[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCFoundMatchDupVarValues[$h]} "
+		echo "STC \"Found Matching Duplicate PV\" Logs"
 	fi
-	if [[ ${nHostSTSSkipIdenticalVarValues[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSSkipIdenticalVarValues[$h]} "
-		echo "STS \"Skip Past Identical Values (Subsume)\" Logs"
+	if [[ ${nHostSTCSkipIdenticalVarValues[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCSkipIdenticalVarValues[$h]} "
+		echo "STC \"Skip Past Identical Values (Subsume)\" Logs"
 	fi
-	if [[ ${nHostSTSIgnoreSubsumedVarValues[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSIgnoreSubsumedVarValues[$h]} "
-		echo "STS \"Ignoring Already Subsumed PV Duplicate\" Logs"
+	if [[ ${nHostSTCIgnoreSubsumedVarValues[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCIgnoreSubsumedVarValues[$h]} "
+		echo "STC \"Ignoring Already Subsumed PV Duplicate\" Logs"
 	fi
-	if [[ ${nHostSTSSubsumedAllDupVarValues[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSSubsumedAllDupVarValues[$h]} "
-		echo "STS \"PV Has Subsumed All Duplicate PV Log Values\" Logs"
+	if [[ ${nHostSTCSubsumedAllDupVarValues[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCSubsumedAllDupVarValues[$h]} "
+		echo "STC \"PV Has Subsumed All Duplicate PV Log Values\" Logs"
 	fi
-	if [[ ${nHostSTSNoMatchingUnitsPV[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSNoMatchingUnitsPV[$h]} "
-		echo "STS \"No Matching Units PV Found\" Logs"
+	if [[ ${nHostSTCNoMatchingUnitsPV[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCNoMatchingUnitsPV[$h]} "
+		echo "STC \"No Matching Units PV Found\" Logs"
 	fi
-	if [[ ${nHostSTSLDAPLookupUserName[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSLDAPLookupUserName[$h]} "
-		echo "STS \"LDAP Lookup User Name\" Logs"
+	if [[ ${nHostSTCLDAPLookupUserName[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCLDAPLookupUserName[$h]} "
+		echo "STC \"LDAP Lookup User Name\" Logs"
 	fi
-	if [[ ${nHostSTSComBusConnTimeout[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSComBusConnTimeout[$h]} "
-		echo "STS \"ComBus Connection Timeout for Domain\" Logs"
+	if [[ ${nHostSTCComBusConnTimeout[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCComBusConnTimeout[$h]} "
+		echo "STC \"ComBus Connection Timeout for Domain\" Logs"
 	fi
-	if [[ ${nHostSTSComBusDisconnectError[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSComBusDisconnectError[$h]} "
-		echo "STS \"ComBus Error Disconnecting Producers/Consumers\" Logs"
+	if [[ ${nHostSTCComBusDisconnectError[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCComBusDisconnectError[$h]} "
+		echo "STC \"ComBus Error Disconnecting Producers/Consumers\" Logs"
 	fi
-	if [[ ${nHostSTSComBusReconnectThread[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSComBusReconnectThread[$h]} "
-		echo "STS \"ComBus Reconnect Thread\" Logs"
+	if [[ ${nHostSTCComBusReconnectThread[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCComBusReconnectThread[$h]} "
+		echo "STC \"ComBus Reconnect Thread\" Logs"
 	fi
-	if [[ ${nHostSTSUpdatingRunInfo[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSUpdatingRunInfo[$h]} "
-		echo "STS \"Updating RunInfo\" Logs"
+	if [[ ${nHostSTCUpdatingRunInfo[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCUpdatingRunInfo[$h]} "
+		echo "STC \"Updating RunInfo\" Logs"
 	fi
-	if [[ ${nHostSTSDetBankSetConfigErr[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSDetBankSetConfigErr[$h]} "
-		echo "STS \"Detector Bank Set Config Error\" Logs"
+	if [[ ${nHostSTCDetBankSetConfigErr[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCDetBankSetConfigErr[$h]} "
+		echo "STC \"Detector Bank Set Config Error\" Logs"
 	fi
-	if [[ ${nHostSTSDetBankSetRestrictEv[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTSDetBankSetRestrictEv[$h]} "
-		echo "STS \"Restricting Detector Bank Set to Event Mode\" Logs"
+	if [[ ${nHostSTCDetBankSetRestrictEv[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCDetBankSetRestrictEv[$h]} "
+		echo "STC \"Restricting Detector Bank Set to Event Mode\" Logs"
 	fi
 	# SMS Error Stats...
 	if [[ ${nHostSMSDFailedToStartRun[$h]} -gt 0 ]]; then
@@ -1511,15 +1573,15 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDAsynchLookupFailure[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDAsynchLookupFailure[$h]} "
-		echo "SMSD \"Asynchronous Lookup Failed for STS\" Logs"
+		echo "SMSD \"Asynchronous Lookup Failed for STC\" Logs"
 	fi
-	if [[ ${nHostSMSDSTSConnectionFailed[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDSTSConnectionFailed[$h]} "
-		echo "SMSD \"Connection Failed to STS at...\" Logs"
+	if [[ ${nHostSMSDSTCConnectionFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDSTCConnectionFailed[$h]} "
+		echo "SMSD \"Connection Failed to STC at...\" Logs"
 	fi
-	if [[ ${nHostSMSDLostConnectionToSTS[$h]} -gt 0 ]]; then
-		echo -n "   *** ${nHostSMSDLostConnectionToSTS[$h]} "
-		echo "SMSD \"Lost Connection to STS for Run...\" Logs"
+	if [[ ${nHostSMSDLostConnectionToSTC[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDLostConnectionToSTC[$h]} "
+		echo "SMSD \"Lost Connection to STC for Run...\" Logs"
 	fi
 	if [[ ${nHostSMSDDataSourceTimedOut[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDDataSourceTimedOut[$h]} "
@@ -1854,51 +1916,98 @@ for h in ${HostList} ; do
 done
 echo
 
-echo "Per App Statistics:"
-if [[ $nSTS -gt 0 ]]; then
-	echo "$nSTS STS Logs"
+separator=""
+newline=""
+
+if [[ ${Terse} == 0 ]]; then
+	echo "Per App Statistics:"
+else
+	newline="-n"
+fi
+if [[ $nSTC -gt 0 ]]; then
+	echo $newline "${separator}$nSTC STC Logs"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
 if [[ $nSMSD -gt 0 ]]; then
-	echo "$nSMSD SMSD Logs"
+	echo $newline "${separator}$nSMSD SMSD Logs"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
 if [[ $nPVSD -gt 0 ]]; then
-	echo "$nPVSD PVSD Logs"
+	echo $newline "${separator}$nPVSD PVSD Logs"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
 if [[ $nDASMOND -gt 0 ]]; then
-	echo "$nDASMOND DASMOND Logs"
+	echo $newline "${separator}$nDASMOND DASMOND Logs"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
-echo
 
-echo "Unknown Log/Error Messages: $nUnknownLogs"
-if [[ $nUnknownSTS -gt 0 ]]; then
-	echo "$nUnknownSTS Unknown STS Logs"
+if [[ ${Terse} == 0 ]]; then
+	echo -e "\nGeneral Statistics:"
+else
+	separator=": "
 fi
-if [[ $nUnknownSMSD -gt 0 ]]; then
-	echo "$nUnknownSMSD Unknown SMSD Logs"
+if [[ $nemail -gt 0 ]]; then
+	label="Emails Found"
+	if [[ ${Terse} == 1 ]]; then label="Emails" ; fi
+	echo $newline "${separator}$nemail ${label}"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
-if [[ $nUnknownPVSD -gt 0 ]]; then
-	echo "$nUnknownPVSD Unknown PVSD Logs"
+if [[ $nlog -gt 0 ]]; then
+	label="Lines of Log Input"
+	if [[ ${Terse} == 1 ]]; then label="Log Lines" ; fi
+	echo $newline "${separator}$nlog ${label}"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
-if [[ $nUnknownDASMOND -gt 0 ]]; then
-	echo "$nUnknownDASMOND Unknown DASMOND Logs"
+if [[ $nhdr -gt 0 ]]; then
+	label="Lines of Non-Log Header Input"
+	if [[ ${Terse} == 1 ]]; then label="Header Lines" ; fi
+	echo $newline "${separator}$nhdr ${label}"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
-echo
+if [[ $nblank -gt 0 ]]; then
+	label="Blank Lines of Input"
+	if [[ ${Terse} == 1 ]]; then label="Blank Lines" ; fi
+	echo $newline "${separator}$nblank ${label}"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+fi
 
-echo "Unknown App Messages: $nUnknownApp"
-echo
-
-echo "General Statistics:"
-echo "$nemail Emails Found"
-echo "$nlog Lines of Log Input"
-echo "$nhdr Lines of Non-Log Header Input"
-echo "$nblank Blank Lines of Input"
-echo
-
-echo "Last Email Per File:"
-for f in ${FileList} ; do
-	if [[ -n "${lastFileFrom[$f]}" ]]; then
-		echo -e "[$f]:\n   ${lastFileFrom[$f]}"
+if [[ $nUnknownLogs -gt 0 ]]; then
+	echo -e "\nUnknown Log/Error Messages: $nUnknownLogs"
+	separator=""
+	if [[ $nUnknownSTC -gt 0 ]]; then
+		echo $newline "${separator}$nUnknownSTC Unknown STC Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 	fi
-done
+	if [[ $nUnknownSMSD -gt 0 ]]; then
+		echo $newline "${separator}$nUnknownSMSD Unknown SMSD Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+	fi
+	if [[ $nUnknownPVSD -gt 0 ]]; then
+		echo $newline "${separator}$nUnknownPVSD Unknown PVSD Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+	fi
+	if [[ $nUnknownDASMOND -gt 0 ]]; then
+		echo $newline "${separator}$nUnknownDASMOND Unknown DASMOND Logs"
+		if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+	fi
+fi
+
+if [[ $nUnknownApp -gt 0 ]]; then
+	echo -e "\nUnknown App Messages: $nUnknownApp"
+	separator=""
+fi
+
+if [[ $nemail -gt 0 ]]; then
+	echo -e "\nLast Email Per File:"
+	for f in ${FileList} ; do
+		if [[ -n "${lastFileFrom[$f]}" ]]; then
+			echo -e "[$f]:\n   ${lastFileFrom[$f]}"
+		fi
+	done
+fi
+
+# Finish Any Open-Ended Output Line...
+if [[ ${Terse} == 1 ]]; then echo ; fi
+
 echo
 

@@ -92,8 +92,10 @@ public:
 
 	uint32_t sourceID(void) const { return m_fields[0]; }
 	bool endOfPulse(void) const { return !!(m_fields[1] & 0x80000000); }
-	uint16_t pktSeq(void) const { return (m_fields[1] >> 16) & 0x7fff; }
-	uint16_t dspSeq(void) const { return m_fields[1] & 0x7fff; }
+	uint32_t pulseSeq(void) const { return (m_fields[1] >> 16) & 0x7fff; }
+	uint32_t maxPulseSeq(void) const { return ( 0x7fff + 1 ); }
+	uint32_t sourceSeq(void) const { return m_fields[1] & 0xffff; }
+	uint32_t maxSourceSeq(void) const { return ( 0xffff + 1 ); }
 
 	bool gotDataFlags(void) const { return m_version >= 0x01; }
 	uint32_t dataFlags(void) const {

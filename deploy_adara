@@ -16,9 +16,9 @@
 #   - switch/create "deploy" soft link for the ADARA Daemon/Service Binary
 #   - (optionally restart the SMS Daemon Service...)
 #   - document the deployment using the "Config" Git repository
-#      -> determine which Beamline/STS Host we are on...
+#      -> determine which Beamline/STC Host we are on...
 #      -> clone a fresh copy of the Config Git repo (in /tmp)
-#      -> check out the correct Beamline/STS Branch
+#      -> check out the correct Beamline/STC Branch
 #      -> update the "deployment.history.txt" file with a proper log
 #
 
@@ -27,8 +27,8 @@
 #
 
 usage="   usage: deploy_adara \\ \n            "
-usage="$usage [ sms | sts | sts_test | sts_dummy  \\ \n"
-usage="$usage                 | sts_hfir | sts_hfir_test \\ \n"
+usage="$usage [ sms | stc | stc_test | stc_dummy  \\ \n"
+usage="$usage                 | stc_hfir | stc_hfir_test \\ \n"
 usage="$usage                 | pvsd | dasmon | dasmond ]"
 
 if [ $# != 1 ]; then
@@ -44,7 +44,7 @@ set -o pipefail
 
 # Parse Command Line Options
 
-IS_STS=0
+IS_STC=0
 IS_PVSD=0
 IS_DASMON=0
 IS_DASMOND=0
@@ -53,31 +53,31 @@ if [ "$1" == "sms" ]; then
 	PROG="SMS_Daemon"
 	prog="smsd"
 	service="smsd"
-elif [ "$1" == "sts" ]; then
-	PROG="STS"
-	prog="sts"
+elif [ "$1" == "stc" ]; then
+	PROG="STC"
+	prog="stc"
 	service=""
-	IS_STS=1
-elif [ "$1" == "sts_test" ]; then
-	PROG="STS_TEST"
-	prog="sts"
+	IS_STC=1
+elif [ "$1" == "stc_test" ]; then
+	PROG="STC_TEST"
+	prog="stc"
 	service=""
-	IS_STS=1
-elif [ "$1" == "sts_dummy" ]; then
-	PROG="STS_DUMMY"
-	prog="sts"
+	IS_STC=1
+elif [ "$1" == "stc_dummy" ]; then
+	PROG="STC_DUMMY"
+	prog="stc"
 	service=""
-	IS_STS=1
-elif [ "$1" == "sts_hfir" ]; then
-	PROG="STS_HFIR"
-	prog="sts"
+	IS_STC=1
+elif [ "$1" == "stc_hfir" ]; then
+	PROG="STC_HFIR"
+	prog="stc"
 	service=""
-	IS_STS=1
-elif [ "$1" == "sts_hfir_test" ]; then
-	PROG="STS_HFIR_TEST"
-	prog="sts"
+	IS_STC=1
+elif [ "$1" == "stc_hfir_test" ]; then
+	PROG="STC_HFIR_TEST"
+	prog="stc"
 	service=""
-	IS_STS=1
+	IS_STC=1
 elif [ "$1" == "pvsd" ]; then
 	PROG="PVSD"
 	prog="pvsd"
@@ -165,14 +165,14 @@ else
 	HOST_PREFIX="bl"
 fi
 
-# Determine the Beamline/STS Branch associated with this computer system
+# Determine the Beamline/STC Branch associated with this computer system
 
 CONFIG="config"
 
-if [ $IS_STS == 1 ]; then
+if [ $IS_STC == 1 ]; then
 	install_host=`hostname`
 	install_branch=`echo "$install_host" | sed -e 's/sns-//' -e 's/\..*//'`
-	HOST_TYPE="STS"
+	HOST_TYPE="STC"
 elif [ $IS_PVSD == 1 ]; then
 	install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
 		| tail -1`
@@ -806,23 +806,71 @@ if [ $need_build == 1 ]; then
 
 	fi
 
-	# STS Client
+	# SMS ADARA Add Run End Script (if present, added in v1.6.26...)
 
-	echo -e "\nCopying STS Client Executable into Archive Release Tag:\n" \
+	if [[ -e sms/adara_add_run_end && -x sms/adara_add_run_end ]]; then
+
+		echo -e -n "\nCopying SMS ADARA Add Run End Script " | tee -a $LOG
+		echo -e "into Archive Release Tag:\n" | tee -a $LOG
+
+		cp -i -p sms/adara_add_run_end "$tag_archive" |& tee -a $LOG
+
+		copy_ok=$?
+
+		if [ $copy_ok != 0 ]; then
+			echo -e -n "\nError Copying ADARA Add Run End Script " \
+				| tee -a $LOG
+			echo -e "into Release Tag Directory! ($copy_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -21
+		fi
+
+		/bin/ls -l "$tag_archive/adara_add_run_end" |& tee -a $LOG
+
+	fi
+
+	# SMS ADARA Data Find Script (if present, added in v1.6.26...)
+
+	if [[ -e sms/adara_data_find && -x sms/adara_data_find ]]; then
+
+		echo -e -n "\nCopying SMS ADARA Data Find Script " | tee -a $LOG
+		echo -e "into Archive Release Tag:\n" | tee -a $LOG
+
+		cp -i -p sms/adara_data_find "$tag_archive" |& tee -a $LOG
+
+		copy_ok=$?
+
+		if [ $copy_ok != 0 ]; then
+			echo -e -n "\nError Copying ADARA Data Find Script " \
+				| tee -a $LOG
+			echo -e "into Release Tag Directory! ($copy_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -21
+		fi
+
+		/bin/ls -l "$tag_archive/adara_data_find" |& tee -a $LOG
+
+	fi
+
+	# STC Client
+
+	echo -e "\nCopying STC Client Executable into Archive Release Tag:\n" \
 		| tee -a $LOG
 
-	cp -i -p sts/sts "$tag_archive" |& tee -a $LOG
+	cp -i -p stc/stc "$tag_archive" |& tee -a $LOG
 
 	copy_ok=$?
 
 	if [ $copy_ok != 0 ]; then
-		echo -e -n "\nError Copying STS " | tee -a $LOG
+		echo -e -n "\nError Copying STC " | tee -a $LOG
 		echo -e "into Release Tag Directory! ($copy_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -22
 	fi
 
-	/bin/ls -l "$tag_archive/sts" |& tee -a $LOG
+	/bin/ls -l "$tag_archive/stc" |& tee -a $LOG
 
 	# PVSD Server
 
@@ -913,7 +961,7 @@ if [ $need_build == 1 ]; then
 fi
 
 #
-# Link New Archive Release Tag into Current Working Set for Beamline/STS
+# Link New Archive Release Tag into Current Working Set for Beamline/STC
 #
 
 # Make sure the Git Config repository has been cloned for deployment
@@ -941,7 +989,7 @@ if [ ! -d "$adara_config" ]; then
 
 fi
 
-# Make sure the Proper Beamline/STS Branch is checked out in Config
+# Make sure the Proper Beamline/STC Branch is checked out in Config
 
 echo -e "\nConfig $HOST_TYPE Repository:\n" | tee -a $LOG
 
@@ -951,7 +999,7 @@ pwd | tee -a $LOG
 
 /bin/ls -l | tee -a $LOG
 
-# Check out the desired Beamline/STS Branch
+# Check out the desired Beamline/STC Branch
 
 echo -e "\nChecking out the Config $HOST_TYPE Branch: $install_branch\n" \
 	| tee -a $LOG
@@ -1115,25 +1163,25 @@ for exe_path in "$tag_archive"/* ; do
 		continue
 	fi
 
-	# Handle Special STS "Test" Version Deployment...
-	if [[ $PROG == "STS_TEST" && $exe == $prog ]]; then
-		echo -e "\nModifying STS Executable $exe for Test Deployment." \
+	# Handle Special STC "Test" Version Deployment...
+	if [[ $PROG == "STC_TEST" && $exe == $prog ]]; then
+		echo -e "\nModifying STC Executable $exe for Test Deployment." \
 			| tee -a $LOG
 		exe="${exe}_test"
-	# Handle Special STS "Dummy" Version Deployment...
-	elif [[ $PROG == "STS_DUMMY" && $exe == $prog ]]; then
-		echo -e "\nModifying STS Executable $exe for Dummy Deployment." \
+	# Handle Special STC "Dummy" Version Deployment...
+	elif [[ $PROG == "STC_DUMMY" && $exe == $prog ]]; then
+		echo -e "\nModifying STC Executable $exe for Dummy Deployment." \
 			| tee -a $LOG
 		exe="${exe}_dummy"
-	# Handle Special STS HFIR Version Deployment...
-	elif [[ $PROG == "STS_HFIR" && $exe == $prog ]]; then
-		echo -e "\nModifying STS Executable $exe for HFIR Deployment." \
+	# Handle Special STC HFIR Version Deployment...
+	elif [[ $PROG == "STC_HFIR" && $exe == $prog ]]; then
+		echo -e "\nModifying STC Executable $exe for HFIR Deployment." \
 			| tee -a $LOG
 		exe="${exe}_hfir"
-	# Handle Special STS HFIR "Test" Version Deployment...
-	elif [[ $PROG == "STS_HFIR_TEST" && $exe == $prog ]]; then
+	# Handle Special STC HFIR "Test" Version Deployment...
+	elif [[ $PROG == "STC_HFIR_TEST" && $exe == $prog ]]; then
 		echo -e \
-			"\nModifying STS Executable $exe for HFIR Test Deployment." \
+			"\nModifying STC Executable $exe for HFIR Test Deployment." \
 			| tee -a $LOG
 		exe="${exe}_hfir_test"
 	fi
@@ -1299,8 +1347,8 @@ pwd | tee -a $LOG
 
 need_sms_subdir=0
 
-if [ $IS_STS == 1 ]; then
-	deploy_history_base="sts.deployment.history.txt"
+if [ $IS_STC == 1 ]; then
+	deploy_history_base="stc.deployment.history.txt"
 elif [ $IS_PVSD == 1 ]; then
 	deploy_history_base="pvsd.deployment.history.txt"
 elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then

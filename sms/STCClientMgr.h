@@ -1,5 +1,5 @@
-#ifndef __STS_CLIENT_MGR_H
-#define __STS_CLIENT_MGR_H
+#ifndef __STC_CLIENT_MGR_H
+#define __STC_CLIENT_MGR_H
 
 #include <boost/property_tree/ptree.hpp>
 #include <string>
@@ -11,7 +11,7 @@
 #include "TimerAdapter.h"
 #include "SignalEvents.h"
 
-class STSClient;
+class STCClient;
 
 class smsFloat64PV;
 class MaxConnectionsPV;
@@ -19,12 +19,12 @@ class smsUint32PV;
 class smsBooleanPV;
 class smsStringPV;
 
-class STSClientMgr {
+class STCClientMgr {
 public:
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
 
-	static STSClientMgr *getInstance(void) { return m_singleton; }
+	static STCClientMgr *getInstance(void) { return m_singleton; }
 	void queueRun(StorageContainer::SharedPtr &c);
 	void startConnect(void);
 
@@ -33,17 +33,17 @@ public:
 	enum QueueMode { BALANCE, OLDEST, NEWEST };
 
 private:
-	STSClientMgr();
-	~STSClientMgr();
+	STCClientMgr();
+	~STCClientMgr();
 
 	typedef boost::signals2::connection connection;
 	typedef std::map<uint32_t, StorageContainer::SharedPtr> RunMap;
 
 	SignalEvents *m_signalEvents;
-	TimerAdapter<STSClientMgr> *m_connect_timer;
-	TimerAdapter<STSClientMgr> *m_reconnect_timer;
-	TimerAdapter<STSClientMgr> *m_transient_timer;
-	TimerAdapter<STSClientMgr> *m_lookup_timer;
+	TimerAdapter<STCClientMgr> *m_connect_timer;
+	TimerAdapter<STCClientMgr> *m_reconnect_timer;
+	TimerAdapter<STCClientMgr> *m_transient_timer;
+	TimerAdapter<STCClientMgr> *m_lookup_timer;
 	int m_fd;
 	ReadyAdapter *m_fdreg;
 	bool m_connecting;
@@ -70,7 +70,7 @@ private:
 	static uint32_t m_max_requeue_count;
 	static bool m_send_paused_data;
 
-	static STSClientMgr *m_singleton;
+	static STCClientMgr *m_singleton;
 
 	void containerChange(StorageContainer::SharedPtr &, bool);
 
@@ -98,8 +98,8 @@ private:
 	boost::shared_ptr<smsBooleanPV> m_pvSendPausedData;
 	boost::shared_ptr<smsStringPV> m_pvServiceURI;
 
-	friend class STSClient;
-	friend class TimerAdapter<STSClientMgr>;
+	friend class STCClient;
+	friend class TimerAdapter<STCClientMgr>;
 };
 
-#endif /* __STS_CLIENT_MGR_H */
+#endif /* __STC_CLIENT_MGR_H */

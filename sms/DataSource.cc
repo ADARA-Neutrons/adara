@@ -35,24 +35,25 @@ RateLimitedLogging::History RLLHistory_DataSource;
 #define RLL_LOCAL_SAWTOOTH_PULSE      2
 #define RLL_RAWDATA_PULSE_IN_PAST     3
 #define RLL_RAWDATA_PULSE_IN_FUTURE   4
-#define RLL_LOCAL_PACKET_SEQUENCE     5
-#define RLL_WONT_CONN                 6
-#define RLL_TRYING_CONN               7
-#define RLL_CONN_REFUSED              8
-#define RLL_CONN_REQUEST_ERROR        9
-#define RLL_CONN_FAILED              10
-#define RLL_PARSE_MAX_READ_CHUNK     11
-#define RLL_READ_EXCEPTION           12
-#define RLL_READ_DELAY               13
-#define RLL_PULSEID_ZERO             14
-#define RLL_UNKNOWN_PACKET           15
-#define RLL_OVERSIZE_PACKET          16
-#define RLL_LOCAL_DUPLICATE_RTDL     17
-#define RLL_LOCAL_SAWTOOTH_RTDL      18
-#define RLL_LOCAL_RTDL_SEQUENCE      19
-#define RLL_RTDL_PULSE_IN_PAST       20
-#define RLL_RTDL_PULSE_IN_FUTURE     21
-#define RLL_HEARTBEAT                22
+#define RLL_LOCAL_PULSE_SEQUENCE      5
+#define RLL_LOCAL_SOURCE_SEQUENCE     6
+#define RLL_WONT_CONN                 7
+#define RLL_TRYING_CONN               8
+#define RLL_CONN_REFUSED              9
+#define RLL_CONN_REQUEST_ERROR       10
+#define RLL_CONN_FAILED              11
+#define RLL_PARSE_MAX_READ_CHUNK     12
+#define RLL_READ_EXCEPTION           13
+#define RLL_READ_DELAY               14
+#define RLL_PULSEID_ZERO             15
+#define RLL_UNKNOWN_PACKET           16
+#define RLL_OVERSIZE_PACKET          17
+#define RLL_LOCAL_DUPLICATE_RTDL     18
+#define RLL_LOCAL_SAWTOOTH_RTDL      19
+#define RLL_LOCAL_RTDL_SEQUENCE      20
+#define RLL_RTDL_PULSE_IN_PAST       21
+#define RLL_RTDL_PULSE_IN_FUTURE     22
+#define RLL_HEARTBEAT                23
 
 // Pulse Time Sanity Check Constants
 #define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
@@ -140,8 +141,8 @@ public:
 		m_dataSource(dataSource),
 		m_name(name), m_hwId(hwId), m_smsId(smsId),
 		m_intermittent(false), m_recoverPktCount(0),
-		m_activePulse(0), m_lastPulse(0), m_dupCount(0), m_pulseGood(true),
-		m_trueNew(true)
+		m_activePulse(0), m_lastPulse(0), m_dupCount(0),
+		m_pulseGood(true), m_trueNew(true)
 	{
 		// Snag an SMSControl Instance Handle _Exactly Once_...! ;-o
 		m_ctrl = SMSControl::getInstance();
@@ -159,6 +160,12 @@ public:
 		m_err_count_second = 0;
 		m_err_count_minute = 0;
 		m_err_count_tenmin = 0;
+
+		// Source Sequence: Increases Per Source Packet, No "Reset"...
+		// - Initialize to 0xffffffff, a Value the 16-bit Source Sequence
+		// will Never Take, so we can _Ignore_ the First Sequence Value
+		// Until we "Prime the Pump"... ;-D
+		m_sourceSeq = (uint32_t) -1;
 
 		// Initialize HWSource Bandwidth PVs...
 		if ( m_hwIndex >= 0 ) {
@@ -357,13 +364,15 @@ public:
 			m_pulseGood = false;
 		}
 
+		// Capture Pulse Invariants...
 		m_flavor = pkt.flavor();
 		m_intraPulse = pkt.intraPulseTime();
 		m_charge = pkt.pulseCharge();
 		m_cycle = pkt.cycle();
 		m_vetoFlags = pkt.vetoFlags();
 		m_timingStatus = pkt.timingStatus();
-		m_pktSeq = 0;
+
+		m_pulseSeq = 0; // Increases Per Event Packet (Resets Per Pulse)
 
 		return( m_pulseGood );
 	}
@@ -403,25 +412,67 @@ public:
 				<< "(" << m_intraPulse << ")");
 	}
 
-	bool checkSeq(const ADARA::RawDataPkt &pkt) {
-		bool ok = (pkt.pktSeq() == m_pktSeq);
-		/* if ( !ok ) {
-			// Rate-limited logging of packet sequence out-of-order?
+	// Increases Per Event Packet (Resets Per Pulse)
+	bool checkPulseSeq(const ADARA::RawDataPkt &pkt) {
+		bool ok = (pkt.pulseSeq() == m_pulseSeq);
+		if ( !ok ) {
+			// Rate-limited logging of Pulse sequence out-of-order?
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-					RLL_LOCAL_PACKET_SEQUENCE, m_name,
+					RLL_LOCAL_PULSE_SEQUENCE, m_name,
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-					<< "checkSeq() Local Packet Sequence Out-of-Order: "
-					<< pkt.pktSeq() << " != " << m_pktSeq
+					<< "checkPulseSeq() "
+					<< "Local Pulse Sequence Out-of-Order: "
+					<< pkt.pulseSeq() << " != " << m_pulseSeq
 					<< std::hex << " src=0x" << m_hwId
 					<< " m_activePulse=0x" << m_activePulse
 					<< " hwId=0x" << m_hwId << std::dec);
 			}
-		} */
-		m_pktSeq++;
-		return !ok;
+		}
+		m_pulseSeq = ( m_pulseSeq + 1 ) % pkt.maxPulseSeq();
+		return ok;
+	}
+
+	// Increases Per Source Packet
+	bool checkSourceSeq(const ADARA::RawDataPkt &pkt) {
+		bool ok = (pkt.sourceSeq() == m_sourceSeq);
+		if ( !ok ) {
+			// Don't Count/Log the _First_ Source Sequence as an Error
+			// - We Don't Yet Know Where the Data Source Sequence is At...!
+			if ( m_sourceSeq == ((uint32_t) -1) ) {
+				DEBUG("checkSourceSeq() Priming the Pump:"
+					<< " m_sourceSeq=" << m_sourceSeq
+					<< " -> pkt.sourceSeq()=" << pkt.sourceSeq()
+					<< std::hex << " src=0x" << m_hwId
+					<< " m_activePulse=0x" << m_activePulse
+					<< " hwId=0x" << m_hwId << std::dec);
+				ok = true;
+			}
+			else {
+				// Rate-limited logging of Source sequence out-of-order?
+				std::string log_info;
+				if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+						RLL_LOCAL_SOURCE_SEQUENCE, m_name,
+						2, 10, 100, log_info ) ) {
+					ERROR(log_info
+						<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+						<< "checkSourceSeq() "
+						<< "Local Source Sequence Out-of-Order: "
+						<< pkt.sourceSeq() << " != " << m_sourceSeq
+						<< std::hex << " src=0x" << m_hwId
+						<< " m_activePulse=0x" << m_activePulse
+						<< " hwId=0x" << m_hwId << std::dec);
+				}
+			}
+			// Try to Ride the Wave... (or "Prime the Pump" on Connect...!)
+			m_sourceSeq = ( pkt.sourceSeq() + 1 ) % pkt.maxSourceSeq();
+		}
+		else {
+			m_sourceSeq = ( m_sourceSeq + 1 ) % pkt.maxSourceSeq();
+		}
+		return ok;
 	}
 
 	// "RTDL Packets with No Data Packets" Count
@@ -471,7 +522,12 @@ private:
 	uint64_t	m_activePulse;
 	uint64_t	m_lastPulse;
 	uint32_t	m_dupCount;
-	uint16_t	m_pktSeq;
+
+	uint32_t	m_sourceSeq;	// Increases Per Source Packet
+
+	uint32_t	m_pulseSeq;		// Increases Per Event Packet
+								// (Resets Per Pulse)
+
 	bool		m_pulseGood;
 
 	/* Pulse invariants -- these should not change between raw event
@@ -494,7 +550,9 @@ DataSource::DataSource( const std::string &name,
 			double connect_retry, double connect_timeout,
 			double data_timeout, uint32_t data_timeout_retry,
 			bool ignore_eop, bool ignore_local_sawtooth,
-			bool mixed_data_packets, unsigned int read_chunk,
+			bool mixed_data_packets,
+			bool check_source_sequence, bool check_pulse_sequence,
+			unsigned int read_chunk,
 			uint32_t rtdlNoDataThresh, bool save_input_stream ) :
 	m_name(uri), m_basename(name), m_uri(uri),
 	m_fdreg(NULL), m_timer(NULL), m_addrinfo(NULL),
@@ -505,6 +563,8 @@ DataSource::DataSource( const std::string &name,
 	m_ignore_eop(ignore_eop),
 	m_ignore_local_sawtooth(ignore_local_sawtooth),
 	m_mixed_data_packets(mixed_data_packets),
+	m_check_source_sequence(check_source_sequence),
+	m_check_pulse_sequence(check_pulse_sequence),
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
 	m_save_input_stream(save_input_stream)
 {
@@ -598,15 +658,18 @@ DataSource::DataSource( const std::string &name,
 		smsConnectedPV(prefix + ":Connected"));
 
 	m_pvConnectRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetryTimeout", 0.0, FLOAT64_MAX,
+		smsFloat64PV(prefix + ":ConnectRetryTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON,
 			/* AutoSave */ true));
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectTimeout", 0.0, FLOAT64_MAX,
+		smsFloat64PV(prefix + ":ConnectTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON,
 			/* AutoSave */ true));
 
 	m_pvDataTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":DataTimeout", 0.0, FLOAT64_MAX,
+		smsFloat64PV(prefix + ":DataTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON,
 			/* AutoSave */ true));
 
 	m_pvDataTimeoutRetry = boost::shared_ptr<smsUint32PV>(new
@@ -622,6 +685,14 @@ DataSource::DataSource( const std::string &name,
 
 	m_pvMixedDataPackets = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":MixedDataPackets", /* AutoSave */ true));
+
+	m_pvCheckSourceSequence = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":CheckSourceSequence",
+		/* AutoSave */ true));
+
+	m_pvCheckPulseSequence = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":CheckPulseSequence",
+		/* AutoSave */ true));
 
 	m_pvMaxReadChunk = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":MaxReadChunk", /* AutoSave */ true));
@@ -685,6 +756,8 @@ DataSource::DataSource( const std::string &name,
 	m_ctrl->addPV(m_pvIgnoreEoP);
 	m_ctrl->addPV(m_pvIgnoreLocalSAWTOOTH);
 	m_ctrl->addPV(m_pvMixedDataPackets);
+	m_ctrl->addPV(m_pvCheckSourceSequence);
+	m_ctrl->addPV(m_pvCheckPulseSequence);
 	m_ctrl->addPV(m_pvMaxReadChunk);
 	m_ctrl->addPV(m_pvRTDLNoDataThresh);
 	m_ctrl->addPV(m_pvSaveInputStream);
@@ -719,6 +792,8 @@ DataSource::DataSource( const std::string &name,
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
 	m_pvIgnoreLocalSAWTOOTH->update(m_ignore_local_sawtooth, &now);
 	m_pvMixedDataPackets->update(m_mixed_data_packets, &now);
+	m_pvCheckSourceSequence->update(m_check_source_sequence, &now);
+	m_pvCheckPulseSequence->update(m_check_pulse_sequence, &now);
 	m_pvRTDLNoDataThresh->update(m_rtdlNoDataThresh, &now);
 	m_pvSaveInputStream->update(m_save_input_stream, &now);
 
@@ -823,6 +898,18 @@ DataSource::DataSource( const std::string &name,
 			bvalue, ts ) ) {
 		m_mixed_data_packets = bvalue;
 		m_pvMixedDataPackets->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvCheckSourceSequence->getName(),
+			bvalue, ts ) ) {
+		m_check_source_sequence = bvalue;
+		m_pvCheckSourceSequence->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvCheckPulseSequence->getName(),
+			bvalue, ts ) ) {
+		m_check_pulse_sequence = bvalue;
+		m_pvCheckPulseSequence->update(bvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV( m_pvRTDLNoDataThresh->getName(),
@@ -2127,6 +2214,23 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 
 	boost::shared_ptr<HWSource> hw_src = getHWSource(pkt->sourceID());
 
+	// [INFREQUENTLY] Update "Check Packet Source/Pulse Sequence" Options
+	// for This Data Source, from Live Config PV Value...
+	// - We don't expect this to change very often, if ever,
+	// so only check rarely, like every 3 minutes... ;-D
+	// (Note: count already incremented above for overall method...!)
+	if ( !(cnt % 33333) ) {
+		m_check_source_sequence = m_pvCheckSourceSequence->value();
+		m_check_pulse_sequence = m_pvCheckPulseSequence->value();
+	}
+
+	// Check for Valid Source Sequence from This Source...
+	// (Increases Per Source Packet)
+	bool sourceSeqOk = true;
+	if ( m_check_source_sequence ) {
+		sourceSeqOk = hw_src->checkSourceSeq(*pkt);
+	}
+
 	// Check for Intermittent HWSource...
 	if ( hw_src->intermittent() ) {
 		uint32_t recoverCount = 0;
@@ -2186,7 +2290,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	 * markers and duplicate pulse ids.
 	 */
 	bool good_pulse = true;
-	if (hw_src->checkPulseInvariants(*pkt))
+	if ( hw_src->checkPulseInvariants(*pkt) )
 		good_pulse = hw_src->newPulse(*pkt);
 	else
 		good_pulse = hw_src->pulseGood();
@@ -2202,16 +2306,18 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// - We don't expect this to change very often, if ever,
 		// so only check very rarely, like every 10 minutes... ;-D
 		// (Note: count already incremented above for overall method...!)
-		if ( !(cnt % 999999) ) {
+		if ( !(cnt % 99999) ) {
 			m_mixed_data_packets = m_pvMixedDataPackets->value();
 		}
 
-		m_ctrl->pulseEvents(*pkt, hw_src->hwId(), hw_src->dupCount(),
+		m_ctrl->pulseEvents( *pkt, hw_src->hwId(), hw_src->dupCount(),
 			is_mapped, m_mixed_data_packets,
-			event_count, meta_count, err_count);
+			event_count, meta_count, err_count );
 
-		if (hw_src->checkSeq(*pkt))
-			m_ctrl->markPartial(pkt->pulseId(), hw_src->dupCount());
+		if ( ( m_check_pulse_sequence && !(hw_src->checkPulseSeq(*pkt)) )
+				|| !sourceSeqOk ) {
+			m_ctrl->markPartial( pkt->pulseId(), hw_src->dupCount() );
+		}
 	}
 
 	// Pulse is "Bad", Count All Events as Errors...
@@ -2225,7 +2331,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	if ( !(cnt % 99999) ) {
 		m_ignore_eop = m_pvIgnoreEoP->value();
 	}
-	if (!m_ignore_eop && pkt->endOfPulse())
+	if ( !m_ignore_eop && pkt->endOfPulse() )
 		hw_src->endPulse();
 
 	// Count Events in Various Statistics...
@@ -2235,7 +2341,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 
 	// Get Current Time for Bandwidth Statistics
 	struct timespec now;
-	clock_gettime(CLOCK_REALTIME_COARSE, &now);
+	clock_gettime( CLOCK_REALTIME_COARSE, &now );
 
 	// Event Count Per Second (Updated Every 3 Seconds)
 	if ( m_last_second_time.tv_sec + 3 < now.tv_sec ) {

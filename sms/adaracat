@@ -230,16 +230,16 @@ echo 1>&2
 # If Automatically Determining Whether to Send Paused Data, Determine It!
 if [[ $SendPausedData == $AutoSendPausedData ]]; then
 
-	# Note: an SMS "STSClient" reads the "SendPausedData" settings
+	# Note: an SMS "STCClient" reads the "SendPausedData" settings
 	# _Exactly Once_ at the Beginning of a New Translation...! ;-D
 	# So we only need to check that one "Initiating Translation" log msg!
 
 	echo -e "Checking Send Paused Data Setting for ${RunNumber} in:\n" 1>&2
 	echo -e "   [$SMSD_LOG]\n" 1>&2
 
-	stsInitLog="Initiating Translation of ${RunNumber} SendPausedData="
+	stcInitLog="Initiating Translation of ${RunNumber} SendPausedData="
 
-	ckSendPaused=`grep "$stsInitLog" $SMSD_LOG`
+	ckSendPaused=`grep "$stcInitLog" $SMSD_LOG`
 
 	if [[ $ckSendPaused == "" ]]; then
 
@@ -251,7 +251,7 @@ if [[ $SendPausedData == $AutoSendPausedData ]]; then
 		echo -e "Trying Live SMS PV Setting...\n" 1>&2
 
 		# Try Latest Live PV Settings...
-		liveSendPausedCmd="caget $WAIT ${PRE}:SMS:STSClient:SendPausedData"
+		liveSendPausedCmd="caget $WAIT ${PRE}:SMS:STCClient:SendPausedData"
 		liveSendPaused=`eval $liveSendPausedCmd | awk '{print $2}'`
 
 		if [[ $liveSendPaused == "true" ]]; then

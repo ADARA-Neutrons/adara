@@ -358,8 +358,42 @@ DeviceAgent::metadataUpdated()
             ich != m_chan_info.end(); ++ich )
     {
         ich->second.m_device.reset();
-        ich->second.m_pv = m_dev_desc->getPvByConnection(
-            ich->second.m_pv->m_connection );
+
+        // Find PV in New Device Instance...
+
+        PVDescriptor *pv = NULL;
+
+        // Check for Active Status PV...
+        if ( !ich->second.m_pv->m_connection.compare(
+                m_dev_desc->m_active_pv_conn ) )
+        {
+            pv = m_dev_desc->m_active_pv;
+        }
+        else
+        {
+            pv = m_dev_desc->getPvByConnection(
+                ich->second.m_pv->m_connection );
+        }
+
+        // Failsafe...! ;-o
+        if ( pv )
+        {
+            ich->second.m_pv = pv;
+        }
+        else
+        {
+            syslog( LOG_ERR,
+                "%s %s: Device [%s] - %s for PV <%s> (%s), %s",
+                "PVSD ERROR:", "DeviceAgent::metadataUpdated()",
+                m_dev_desc->m_name.c_str(),
+                "Error Updating Metadata",
+                ich->second.m_pv->m_name.c_str(),
+                ich->second.m_pv->m_connection.c_str(),
+                "PV Not Found in Device - Skipping!" );
+            usleep(33333); // give syslog a chance...
+
+            continue;
+        }
 
         if ( ich->second.m_chan_state == INFO_AVAILABLE )
         {

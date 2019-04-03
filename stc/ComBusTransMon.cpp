@@ -7,7 +7,7 @@
 #include "ComBusTransMon.h"
 #include "StreamParser.h"
 #include "combus/ComBusMessages.h"
-#include "combus/STSMessages.h"
+#include "combus/STCMessages.h"
 
 using namespace std;
 
@@ -69,7 +69,7 @@ ComBusTransMon::~ComBusTransMon()
   * extracted from the ADARA stream.
   */
 void
-ComBusTransMon::start( STS::StreamParser &a_stream_parser,
+ComBusTransMon::start( STC::StreamParser &a_stream_parser,
         const std::string &a_broker_uri,
         const std::string &a_broker_user,
         const std::string &a_broker_pass,
@@ -109,7 +109,7 @@ ComBusTransMon::success( bool a_moved, const string &a_nexus_file )
     if ( m_terminal_msg )
         return;
 
-    m_terminal_msg = new ADARA::ComBus::STS::TranslationFinishedMsg(
+    m_terminal_msg = new ADARA::ComBus::STC::TranslationFinishedMsg(
         m_stream_parser->getFacilityName(),
         m_stream_parser->getBeamShortName(),
         m_stream_parser->getProposalID(),
@@ -130,7 +130,7 @@ ComBusTransMon::success( bool a_moved, const string &a_nexus_file )
   * end of translation.
   */
 void
-ComBusTransMon::failure( STS::TranslationStatusCode a_code,
+ComBusTransMon::failure( STC::TranslationStatusCode a_code,
         const std::string a_reason )
 {
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
@@ -139,7 +139,7 @@ ComBusTransMon::failure( STS::TranslationStatusCode a_code,
     if ( m_terminal_msg )
         return;
 
-    m_terminal_msg = new ADARA::ComBus::STS::TranslationFailedMsg(
+    m_terminal_msg = new ADARA::ComBus::STC::TranslationFailedMsg(
         m_stream_parser->getBeamShortName(),
         m_stream_parser->getProposalID(),
         m_stream_parser->getRunNumber(),
@@ -211,36 +211,36 @@ ComBusTransMon::commThread()
                         + "." + m_stream_parser->getBeamShortName();
                 }
 
-                // STS ComBus Log Info Prefix
+                // STC ComBus Log Info Prefix
                 stringstream ss_info;
-                ss_info << "[" << g_pid << "] STS ComBus";
+                ss_info << "[" << g_pid << "] STC ComBus";
 
-                // STS ComBus Log Error Prefix
+                // STC ComBus Log Error Prefix
                 stringstream ss_err;
-                ss_err << "[" << g_pid << "] STS Error ComBus";
+                ss_err << "[" << g_pid << "] STC Error ComBus";
 
-                // Make STS ComBus Connection...
-                m_combus = new ADARA::ComBus::Connection( m_domain, "STS",
+                // Make STC ComBus Connection...
+                m_combus = new ADARA::ComBus::Connection( m_domain, "STC",
                     getpid(), m_broker_uri, m_broker_user, m_broker_pass,
                     ss_info.str(), ss_err.str() );
 
                 if ( !m_combus->waitForConnect( 5 ) ) { 
                     syslog( LOG_ERR,
-                    "[%i] STS Error: %s for Domain %s to URI %s as User %s",
+                    "[%i] STC Error: %s for Domain %s to URI %s as User %s",
                         g_pid, "ComBus Connection Timeout",
                         m_domain.c_str(), m_broker_uri.c_str(),
                         m_broker_user.c_str() );
                 }
                 else {
                     syslog( LOG_INFO,
-                        "[%i] STS %s for Domain %s to URI %s as User %s",
+                        "[%i] STC %s for Domain %s to URI %s as User %s",
                         g_pid, "Connected to ComBus", m_domain.c_str(),
                         m_broker_uri.c_str(), m_broker_user.c_str() );
                 }
                 usleep(30000); // give syslog a chance...
 
                 // Send Translation Started message
-                ADARA::ComBus::STS::TranslationStartedMsg msg(
+                ADARA::ComBus::STC::TranslationStartedMsg msg(
                     m_stream_parser->getRunNumber(), m_host );
 
                 m_combus->broadcast( msg );

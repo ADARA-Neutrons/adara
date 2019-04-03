@@ -68,12 +68,12 @@ static LoggerPtr logger(Logger::getLogger("SMS"));
 #include "StorageManager.h"
 #include "ComBusSMSMon.h"
 #include "LiveServer.h"
-#include "STSClientMgr.h"
+#include "STCClientMgr.h"
 
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-std::string SMSD_VERSION = "1.6.25";
+std::string SMSD_VERSION = "1.6.26";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
@@ -191,7 +191,7 @@ static void load_config(const char *pname, ptree::ptree &conf,
 	StorageManager::config(conf);
 	ComBusSMSMon::config(conf);
 	SMSControl::config(conf);
-	STSClientMgr::config(conf);
+	STCClientMgr::config(conf);
 	LiveServer::config(conf);
 }
 
@@ -447,7 +447,7 @@ int main(int argc, char **argv)
 		StorageManager::init();
 		SMSControl::init();
 		LiveServer::init();
-		STSClientMgr::init();
+		STCClientMgr::init();
 
 		SMSControl::late_config(conf);
 	} catch (std::runtime_error e) {

@@ -365,8 +365,23 @@ DeviceDescriptor::operator==( const DeviceDescriptor &a_desc ) const
     if ( m_name == a_desc.m_name
             && m_protocol == a_desc.m_protocol
             && m_source == a_desc.m_source
-            && m_pvs.size() == a_desc.m_pvs.size() )
+            && m_pvs.size() == a_desc.m_pvs.size()
+            && m_enums.size() == a_desc.m_enums.size() )
     {
+        // Dang, Need to Check Enumerated Types for Devices Too...! ;-Q
+        for ( vector<EnumDescriptor*>::const_iterator
+                    my_e = m_enums.begin(),
+                    a_e = a_desc.m_enums.begin() ;
+                my_e != m_enums.end() && a_e != a_desc.m_enums.end() ;
+                ++my_e, ++a_e )
+        {
+            if ( **my_e != **a_e )
+            {
+                return false;
+            }
+        }
+
+        // Compare Device PVs... (All of Them... ;-D)
         const PVDescriptor *ppv;
         res = true;
 

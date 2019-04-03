@@ -1,15 +1,15 @@
-#ifndef STSMESSAGES_H
-#define STSMESSAGES_H
+#ifndef STCMESSAGES_H
+#define STCMESSAGES_H
 
 #include "ComBusDefs.h"
-#include "stsdefs.h"
+#include "stcdefs.h"
 
 namespace ADARA {
 namespace ComBus {
-namespace STS {
+namespace STC {
 
 
-class TranslationStartedMsg : public ADARA::ComBus::TemplMessageBase<MSG_STS_TRANS_STARTED,TranslationStartedMsg>
+class TranslationStartedMsg : public ADARA::ComBus::TemplMessageBase<MSG_STC_TRANS_STARTED,TranslationStartedMsg>
 {
 public:
     TranslationStartedMsg()
@@ -42,7 +42,7 @@ protected:
 };
 
 
-class TranslationFinishedMsg : public ADARA::ComBus::TemplMessageBase<MSG_STS_TRANS_FINISHED,TranslationFinishedMsg>
+class TranslationFinishedMsg : public ADARA::ComBus::TemplMessageBase<MSG_STC_TRANS_FINISHED,TranslationFinishedMsg>
 {
 public:
     TranslationFinishedMsg()
@@ -93,15 +93,15 @@ protected:
 };
 
 
-class TranslationFailedMsg : public ADARA::ComBus::TemplMessageBase<MSG_STS_TRANS_FAILED,TranslationFailedMsg>
+class TranslationFailedMsg : public ADARA::ComBus::TemplMessageBase<MSG_STC_TRANS_FAILED,TranslationFailedMsg>
 {
 public:
     TranslationFailedMsg()
-        : m_run_num(0), m_code(::STS::TS_SUCCESS)
+        : m_run_num(0), m_code(::STC::TS_SUCCESS)
     {}
 
     TranslationFailedMsg( const std::string &a_beam_sname, const std::string &a_proposal_id,
-                          uint32_t a_run_num, ::STS::TranslationStatusCode a_code,
+                          uint32_t a_run_num, ::STC::TranslationStatusCode a_code,
                           const std::string &a_reason, const std::string &a_host )
         : m_beam_sname(a_beam_sname), m_proposal_id(a_proposal_id), m_run_num(a_run_num), m_code(a_code),
           m_reason(a_reason), m_host(a_host)
@@ -110,7 +110,7 @@ public:
     std::string                 m_beam_sname;
     std::string                 m_proposal_id;
     uint32_t                    m_run_num;
-    ::STS::TranslationStatusCode  m_code;
+    ::STC::TranslationStatusCode  m_code;
     std::string                 m_reason;
     std::string                 m_host;
 
@@ -122,7 +122,7 @@ protected:
         m_beam_sname = a_prop_tree.get( "instrument", "" );
         m_proposal_id = a_prop_tree.get( "ipts", "" );
         m_run_num = a_prop_tree.get( "run_number", 0 );
-        m_code = (::STS::TranslationStatusCode) a_prop_tree.get( "code", 0 );
+        m_code = (::STC::TranslationStatusCode) a_prop_tree.get( "code", 0 );
         m_reason = a_prop_tree.get( "reason", "" );
         m_host = a_prop_tree.get( "host", "" );
     }
@@ -142,7 +142,7 @@ protected:
 
 }}}
 
-#endif // STSMESSAGES_H
+#endif // STCMESSAGES_H
 
 // vim: expandtab
 

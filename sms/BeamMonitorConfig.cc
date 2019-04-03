@@ -25,12 +25,26 @@ public:
 	class BeamMonIdPV : public smsUint32PV {
 	public:
 		BeamMonIdPV(const std::string &name,
-				BeamMonitorConfig *config, BeamMonitorInfo *info) :
-			smsUint32PV(name), m_config(config), m_info(info) {}
+				BeamMonitorConfig *config, BeamMonitorInfo *info,
+				uint32_t min = 0, uint32_t max = INT32_MAX,
+				bool auto_save = false) :
+			smsUint32PV(name, min, max, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
 			uint32_t id = value();
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				std::stringstream ss;
+				ss << id;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
 			if ( id != m_info->getId() )
@@ -49,6 +63,8 @@ public:
 	private:
 		BeamMonitorConfig *m_config;
 		BeamMonitorInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	static gddAppFuncTableStatus getFormatEnums(gdd &in)
@@ -78,8 +94,11 @@ public:
 	class BeamMonFormatPV : public smsBooleanPV {
 	public:
 		BeamMonFormatPV(const std::string &name,
-				BeamMonitorConfig *config, BeamMonitorInfo *info) :
-			smsBooleanPV(name), m_config(config), m_info(info) {}
+				BeamMonitorConfig *config, BeamMonitorInfo *info,
+				bool auto_save = false) :
+			smsBooleanPV(name, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		gddAppFuncTableStatus getEnums(gdd &in)
 		{
@@ -96,6 +115,17 @@ public:
 			bool do_histo = value();
 
 			std::string newFormat = ( do_histo ) ? "histo" : "event";
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				// Use String Representation of Boolean for AutoSave File...
+				// (No Special Enum String Support in AutoSave...!)
+				std::string bvalstr = ( do_histo ) ? "true" : "false";
+				StorageManager::autoSavePV( m_pv_name, bvalstr, &ts );
+			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
 			if ( newFormat.compare( m_info->getFormat() ) )
@@ -118,17 +148,33 @@ public:
 	private:
 		BeamMonitorConfig *m_config;
 		BeamMonitorInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	class BeamMonOffsetPV : public smsUint32PV {
 	public:
 		BeamMonOffsetPV(const std::string &name,
-				BeamMonitorConfig *config, BeamMonitorInfo *info) :
-			smsUint32PV(name), m_config(config), m_info(info) {}
+				BeamMonitorConfig *config, BeamMonitorInfo *info,
+				uint32_t min = 0, uint32_t max = INT32_MAX,
+				bool auto_save = false) :
+			smsUint32PV(name, min, max, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
 			uint32_t tofOffset = value();
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				std::stringstream ss;
+				ss << tofOffset;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
 			if ( tofOffset != m_info->getTofOffset() )
@@ -148,17 +194,33 @@ public:
 	private:
 		BeamMonitorConfig *m_config;
 		BeamMonitorInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	class BeamMonMaxPV : public smsUint32PV {
 	public:
 		BeamMonMaxPV(const std::string &name,
-				BeamMonitorConfig *config, BeamMonitorInfo *info) :
-			smsUint32PV(name), m_config(config), m_info(info) {}
+				BeamMonitorConfig *config, BeamMonitorInfo *info,
+				uint32_t min = 0, uint32_t max = INT32_MAX,
+				bool auto_save = false) :
+			smsUint32PV(name, min, max, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
 			uint32_t tofMax = value();
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				std::stringstream ss;
+				ss << tofMax;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
 			if ( tofMax != m_info->getTofMax() )
@@ -178,13 +240,19 @@ public:
 	private:
 		BeamMonitorConfig *m_config;
 		BeamMonitorInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	class BeamMonBinPV : public smsUint32PV {
 	public:
 		BeamMonBinPV(const std::string &name,
-				BeamMonitorConfig *config, BeamMonitorInfo *info) :
-			smsUint32PV(name), m_config(config), m_info(info) {}
+				BeamMonitorConfig *config, BeamMonitorInfo *info,
+				uint32_t min = 0, uint32_t max = INT32_MAX,
+	            bool auto_save = false) :
+			smsUint32PV(name, min, max, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
@@ -195,6 +263,16 @@ public:
 				ERROR("BeamMonBinPV: TOF Histogram Bin Size < 1!"
 					<< " Setting to 1.");
 				tofBin = 1;
+			}
+
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				std::stringstream ss;
+				ss << tofBin;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
 			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
@@ -215,25 +293,43 @@ public:
 	private:
 		BeamMonitorConfig *m_config;
 		BeamMonitorInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	class BeamMonDistancePV : public smsFloat64PV {
 	public:
 		BeamMonDistancePV(const std::string &name,
-				BeamMonitorConfig *config, BeamMonitorInfo *info) :
-			smsFloat64PV(name), m_config(config), m_info(info) {}
+				BeamMonitorConfig *config, BeamMonitorInfo *info,
+				double min = FLOAT64_MIN, double max = FLOAT64_MAX,
+				double epsilon = FLOAT64_EPSILON,
+		        bool auto_save = false) :
+			smsFloat64PV(name, min, max, epsilon, auto_save),
+			m_config(config), m_info(info),
+			m_auto_save(auto_save) {}
 
 		void changed(void)
 		{
 			double distance = value();
 
+			if ( m_auto_save && !m_first_set )
+			{
+				// AutoSave PV Value Change...
+				struct timespec ts;
+				m_value->getTimeStamp(&ts);
+				std::stringstream ss;
+				ss << std::setprecision(17) << distance;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+			}
+
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
-			// TODO Meh, Use "ADARAUtils::approximatelyEqual()" Instead...
-			if ( distance != m_info->getDistance() )
+			if ( !approximatelyEqual( distance, m_info->getDistance(),
+					m_epsilon ) )
 			{
 				INFO("BeamMonDistancePV: Changing Beam Monitor "
 					<< m_info->getId() << " Distance for "
-					<< m_pv_name << " from " << m_info->getDistance()
+					<< m_pv_name << std::setprecision(17)
+					<< " from " << m_info->getDistance()
 					<< " to " << distance);
 
 				m_info->setDistance(distance);
@@ -246,6 +342,8 @@ public:
 	private:
 		BeamMonitorConfig *m_config;
 		BeamMonitorInfo *m_info;
+
+		bool m_auto_save;
 	};
 
 	BeamMonitorInfo(BeamMonitorConfig *config,
@@ -269,22 +367,29 @@ public:
 		prefix += ss.str();
 
 		m_pvId = boost::shared_ptr<BeamMonIdPV>( new
-			BeamMonIdPV(prefix + ":Id", m_config, this) );
+			BeamMonIdPV(prefix + ":Id", m_config, this,
+				0, INT32_MAX, /* AutoSave */ true) );
 
 		m_pvFormat = boost::shared_ptr<BeamMonFormatPV>( new
-			BeamMonFormatPV(prefix + ":Format", m_config, this) );
+			BeamMonFormatPV(prefix + ":Format", m_config, this,
+				/* AutoSave */ true) );
 
 		m_pvOffset = boost::shared_ptr<BeamMonOffsetPV>( new
-			BeamMonOffsetPV(prefix + ":TofOffset", m_config, this) );
+			BeamMonOffsetPV(prefix + ":TofOffset", m_config, this,
+				0, INT32_MAX, /* AutoSave */ true) );
 
 		m_pvMax = boost::shared_ptr<BeamMonMaxPV>( new
-			BeamMonMaxPV(prefix + ":MaxTof", m_config, this) );
+			BeamMonMaxPV(prefix + ":MaxTof", m_config, this,
+				0, INT32_MAX, /* AutoSave */ true) );
 
 		m_pvBin = boost::shared_ptr<BeamMonBinPV>( new
-			BeamMonBinPV(prefix + ":TofBin", m_config, this) );
+			BeamMonBinPV(prefix + ":TofBin", m_config, this,
+				0, INT32_MAX, /* AutoSave */ true) );
 
 		m_pvDistance = boost::shared_ptr<BeamMonDistancePV>( new
-			BeamMonDistancePV(prefix + ":Distance", m_config, this) );
+			BeamMonDistancePV(prefix + ":Distance", m_config, this,
+				FLOAT64_MIN, FLOAT64_MAX, FLOAT64_EPSILON,
+				/* AutoSave */ true) );
 
 		ctrl->addPV(m_pvId);
 		ctrl->addPV(m_pvFormat);
@@ -295,21 +400,70 @@ public:
 
 		// Initialize Beam Monitor Config PVs...
 
-		struct timespec ts;
-		clock_gettime(CLOCK_REALTIME, &ts);
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
 
-		m_pvId->update(m_id, &ts);
+		m_pvId->update(m_id, &now);
 
 		if ( !m_format.compare("histo") )
-			m_pvFormat->update(1, &ts);
+			m_pvFormat->update(1, &now);
 		else // if ( !m_format.compare("event") ), or anything else...
-			m_pvFormat->update(0, &ts);
+			m_pvFormat->update(0, &now);
 
-		m_pvOffset->update(m_tofOffset, &ts);
-		m_pvMax->update(m_tofMax, &ts);
-		m_pvBin->update(m_tofBin, &ts);
+		m_pvOffset->update(m_tofOffset, &now);
+		m_pvMax->update(m_tofMax, &now);
+		m_pvBin->update(m_tofBin, &now);
 
-		m_pvDistance->update(m_distance, &ts);
+		m_pvDistance->update(m_distance, &now);
+
+		/* Restore Any PVs to AutoSaved Config Values... */
+
+		struct timespec ts;
+		uint32_t uvalue;
+		double dvalue;
+		bool bvalue;
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvId->getName(), uvalue, ts ) ) {
+			// Don't Manually Set "m_id" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvId->update(uvalue, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvFormat->getName(), bvalue, ts ) ) {
+			// Don't Manually Set "m_format" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvFormat->update(bvalue, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvOffset->getName(), uvalue, ts ) ) {
+			// Don't Manually Set "m_tofOffset" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvOffset->update(uvalue, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvMax->getName(), uvalue, ts ) ) {
+			// Don't Manually Set "m_tofMax" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvMax->update(uvalue, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvBin->getName(), uvalue, ts ) ) {
+			// Don't Manually Set "m_tofBin" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvBin->update(uvalue, &ts);
+		}
+
+		if ( StorageManager::getAutoSavePV(
+				m_pvDistance->getName(), dvalue, ts ) ) {
+			// Don't Manually Set "m_distance" Value Here...
+			// Let "changed()" Do *All* It's Stuff... ;-D
+			m_pvDistance->update(dvalue, &ts);
+		}
 
 		// Initialize Changed Flag...
 		m_changed = true;

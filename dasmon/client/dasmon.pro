@@ -11,13 +11,13 @@ TEMPLATE = app
 
 DEPENDPATH  +=  ../common \
                 ../../combus \
-                ../../sts \
+                ../../stc \
                 ../server/engine \
                 ../../common
 
 INCLUDEPATH +=  ../common \
                 ../../combus \
-                ../../sts \
+                ../../stc \
                 ../server/engine \
                 ../../common
 

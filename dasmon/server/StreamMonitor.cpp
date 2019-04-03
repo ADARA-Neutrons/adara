@@ -1958,7 +1958,7 @@ StreamMonitor::dbThread()
     PGresult *res;
     map<PVKey,PVInfoBase*>::iterator ipvm;
     string arr_str;
-    char buf[500];
+    char buf[5000];
     bool send_all =  true;
     bool update;
     int  i;
@@ -1982,6 +1982,7 @@ StreamMonitor::dbThread()
         conn = PQconnectdb( connect_string.c_str() );
         if ( conn )
         {
+            syslog( LOG_INFO, "Database Connected." );
             ++m_db_ticker;
             m_db_state = TS_RUNNING;
 
@@ -2082,8 +2083,10 @@ StreamMonitor::dbThread()
                         syslog( LOG_ERR, PQresultErrorMessage( res ));
                         syslog( LOG_ERR, buf );
 
+                        PQclear( res );
                         update = false;
-                        break;
+                        ++m_db_ticker;
+                        continue;
                     }
 
                     PQclear( res );
@@ -2113,8 +2116,10 @@ StreamMonitor::dbThread()
                         syslog( LOG_ERR, PQresultErrorMessage( res ));
                         syslog( LOG_ERR, buf );
 
+                        PQclear( res );
                         update = false;
-                        break;
+                        ++m_db_ticker;
+                        continue;
                     }
 
                     PQclear( res );
@@ -2144,8 +2149,10 @@ StreamMonitor::dbThread()
                         syslog( LOG_ERR, PQresultErrorMessage( res ));
                         syslog( LOG_ERR, buf );
 
+                        PQclear( res );
                         update = false;
-                        break;
+                        ++m_db_ticker;
+                        continue;
                     }
 
                     PQclear( res );
@@ -2154,13 +2161,19 @@ StreamMonitor::dbThread()
                 }
             }
             PQfinish( conn );
+            syslog( LOG_INFO, "Database Disconnected." );
             m_db_state = TS_DB_ERROR;
             ++m_db_ticker;
+        }
+        else
+        {
+            syslog( LOG_INFO, "Database Connect FAILED!" );
         }
 
         // Error may have been caused by DB being off-line,
         // or network error...
         // wait a bit and try connecting again
+        syslog( LOG_INFO, "Sleeping Before Database Connection Attempt." );
         for ( i = 0; i < 15; ++i )
         {
             sleep( 1 );

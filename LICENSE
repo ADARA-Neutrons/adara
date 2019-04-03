@@ -25,7 +25,7 @@ software components:
    network protocol that combines these data along with run-time
    experiment/run meta-data;
 
-   * "Streaming Translation Service (STS)" receives the live data
+   * "Streaming Translation Client (STC)" receives the live data
    stream from the SMS and applies it to produce live NeXus Event
    files, available immediately upon completion of a given
    experimental run, for reduction and analysis;
@@ -36,7 +36,7 @@ software components:
    hybrid network protocol stream;
 
    * "Post-Processing and Reduction" service is notified
-   when the STS completes the generation of the NeXus
+   when the STC completes the generation of the NeXus
    Event file, and proceeds to apply pre-defined data
    post-processing and reduction operations, customizable
    on a per-beamline basis, and then archives and catalogs

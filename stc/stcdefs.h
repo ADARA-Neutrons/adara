@@ -1,5 +1,5 @@
-#ifndef STSDEFS_H
-#define STSDEFS_H
+#ifndef STCDEFS_H
+#define STCDEFS_H
 
 #include <unistd.h>
 #include <stdint.h>
@@ -11,12 +11,12 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STS_VERSION "1.11.0"
+#define STC_VERSION "1.12.0"
 extern pid_t g_pid;
 
-#define STS_DOUBLE_EPSILON (0.00000000000001)
+#define STC_DOUBLE_EPSILON (0.00000000000001)
 
-namespace STS {
+namespace STC {
 
 
 // ============================================================================
@@ -92,7 +92,7 @@ public:
             return;
 
         // Iterate Thru All Detector Bank Sets & Set Up Appropriate Data
-        for ( std::vector<STS::DetectorBankSet *>::iterator dbs =
+        for ( std::vector<STC::DetectorBankSet *>::iterator dbs =
                 m_bank_sets.begin(); dbs != m_bank_sets.end() ; ++dbs )
         {
             if ( !*dbs )
@@ -107,7 +107,7 @@ public:
                 {
                     syslog( LOG_ERR,
                     "[%i] %s %s %u %s %u %s! %s %s %s (%u to %u by %u).",
-                        g_pid, "STS Error:", "Detector Bank", m_id,
+                        g_pid, "STC Error:", "Detector Bank", m_id,
                         "State", m_state,
                         "Duplicate Histogram Request", "Ignoring",
                         (*dbs)->name.c_str(), "Bank Set",
@@ -127,7 +127,7 @@ public:
                         // Better Alert Someone... (this shouldn't happen)
                         syslog( LOG_ERR,
                       "[%i] %s %s %u %s %u %s! %s %s %s (%u to %u by %u).",
-                            g_pid, "STS Error:", "Detector Bank", m_id,
+                            g_pid, "STC Error:", "Detector Bank", m_id,
                             "State", m_state,
                             "No PixelIds for Histogram", "Ignoring",
                             (*dbs)->name.c_str(), "Bank Set",
@@ -182,7 +182,7 @@ public:
                         {
                             syslog( LOG_ERR,
                                 "[%i] %s %s %u %s %u %s: %s=%u < 2!",
-                                g_pid, "STS Error:", "Detector Bank", m_id,
+                                g_pid, "STC Error:", "Detector Bank", m_id,
                                 "State", m_state,
                                 "Histogram Warning",
                                 "num_tof_bins", m_num_tof_bins);
@@ -242,7 +242,7 @@ public:
                     {
                         syslog( LOG_ERR,
                       "[%i] %s %s %u %s %u %s: %s %s.size()=%lu vs. %s %u",
-                            g_pid, "STS Error:", "Detector Bank", m_id,
+                            g_pid, "STC Error:", "Detector Bank", m_id,
                             "State", m_state,
                             "Histogram", "Verifying",
                             "m_data_buffer", m_data_buffer.size(),
@@ -322,7 +322,7 @@ public:
                         {
                             syslog( LOG_INFO,
                              "[%i] %s: %s %u %s %u has %s %lu - Ignoring!",
-                                g_pid, "STS Error", "Detector Bank", m_id,
+                                g_pid, "STC Error", "Detector Bank", m_id,
                                 "State", m_state,
                                 "Duplicate PixelId in Histo Offset Map",
                                 index );
@@ -456,7 +456,7 @@ public:
             {
                 syslog( LOG_ERR,
                     "[%i] %s %s %u Histogram Warning: %s=%u < 2!",
-                    g_pid, "STS Error:", "Beam Monitor", m_id,
+                    g_pid, "STC Error:", "Beam Monitor", m_id,
                     "num_tof_bins", m_num_tof_bins);
                 usleep(30000); // give syslog a chance...
                 m_num_tof_bins = 2;
@@ -605,7 +605,7 @@ struct RunInfo
 };
 
 
-/// Run metrics collected by STS during translation
+/// Run metrics collected by STC during translation
 struct RunMetrics
 {
     RunMetrics() : total_charge(0.0), events_counted(0),
@@ -830,7 +830,7 @@ public:
     virtual int32_t flushBuffers( uint64_t start_time,
         struct RunMetrics *a_run_metrics = 0 ) = 0;
 
-    virtual void createSTSConfigConditionalGroups(void) = 0;
+    virtual void createSTCConfigConditionalGroups(void) = 0;
 
     std::string         m_device_name;  ///< Name of device that owns the PV
     std::string         m_name;         ///< Name of PV
@@ -904,7 +904,7 @@ public:
         double value2                  ///< Double Value
     )
     {
-        return( approximatelyEqual( value1, value2, STS_DOUBLE_EPSILON ) );
+        return( approximatelyEqual( value1, value2, STC_DOUBLE_EPSILON ) );
     }
 
     /// Compare Two String PV Values
@@ -949,7 +949,7 @@ public:
         for ( uint32_t i=0 ; i < value1.size() ; i++ )
         {
             if ( !approximatelyEqual( value1[i], value2[i],
-                    STS_DOUBLE_EPSILON ) ) {
+                    STC_DOUBLE_EPSILON ) ) {
                 return( false );
             }
         }
@@ -1074,7 +1074,7 @@ public:
                     int log_type = LOG_INFO;
                     if ( this->m_last_value_set ) {
                         log_type = LOG_ERR;
-                        log_hdr = "STS Error: ";
+                        log_hdr = "STC Error: ";
                     }
                     std::stringstream ss;
                     ss << log_hdr;
@@ -1144,7 +1144,7 @@ public:
             ss << ")";
             syslog( LOG_ERR,
                "[%i] %s %s < %lu.%09lu (%lu)",
-                g_pid, "STS Error:", ss.str().c_str(),
+                g_pid, "STC Error:", ss.str().c_str(),
                 (unsigned long)( start_time
                         / NANO_PER_SECOND_LL )
                     - ADARA::EPICS_EPOCH_OFFSET,
@@ -1211,7 +1211,7 @@ public:
             if ( ival == this->m_value_buffer.end() )
             {
                 syslog( LOG_ERR, "[%i] %s %s: %s - %s: %s @ %.9lf",
-                    g_pid, "STS Error:", "PVInfo::subsumeValues()",
+                    g_pid, "STC Error:", "PVInfo::subsumeValues()",
                     "END of Our Log",
                     "ADD Omitted Value/Timestamp from Duplicate",
                     valueToString( *ivalDup ).c_str(),
@@ -1229,28 +1229,28 @@ public:
             }
 
             // Skip Our Values/Timestamps that are Omitted in Duplicate...
-            else if ( (*itim) < (*itimDup) - STS_DOUBLE_EPSILON )
+            else if ( (*itim) < (*itimDup) - STC_DOUBLE_EPSILON )
             {
                 syslog( LOG_ERR,
                     "[%i] %s %s: %s: %s @ %.9lf < %.9lf [%lg]",
-                    g_pid, "STS Error:", "PVInfo::subsumeValues()",
+                    g_pid, "STC Error:", "PVInfo::subsumeValues()",
                     "Skip Our Value/Timestamp Omitted in Duplicate",
                     valueToString( *ival ).c_str(),
-                    (*itim), (*itimDup), STS_DOUBLE_EPSILON );
+                    (*itim), (*itimDup), STC_DOUBLE_EPSILON );
                 usleep(30000); // give syslog a chance...
     
                 ++ival; ++itim; ++index;
             }
 
             // Add in Any Omitted Values/Timestamps from Duplicate...
-            else if ( (*itimDup) < (*itim) - STS_DOUBLE_EPSILON )
+            else if ( (*itimDup) < (*itim) - STC_DOUBLE_EPSILON )
             {
                 syslog( LOG_ERR,
                     "[%i] %s %s: %s: %s @ %.9lf < %.9lf [%lg]",
-                    g_pid, "STS Error:", "PVInfo::subsumeValues()",
+                    g_pid, "STC Error:", "PVInfo::subsumeValues()",
                     "ADD Omitted Value/Timestamp from Duplicate",
                     valueToString( *ivalDup ).c_str(),
-                    (*itimDup), (*itim), STS_DOUBLE_EPSILON );
+                    (*itimDup), (*itim), STC_DOUBLE_EPSILON );
                 usleep(30000); // give syslog a chance...
     
                 this->m_value_buffer.insert( ival, *ivalDup );
@@ -1266,18 +1266,18 @@ public:
 
             // Next Timestamp is Identical with Duplicate... 
             else if ( approximatelyEqual( *itim, *itimDup,
-                    STS_DOUBLE_EPSILON ) )
+                    STC_DOUBLE_EPSILON ) )
             {
                 // Skip Past Any Identical Values... (Present in Both Logs)
                 if ( this->valuesEqual( *ival, *ivalDup ) )
                 {
                     syslog( LOG_ERR,
                         "[%i] %s %s: %s: %s @ %.9lf == %s @ %.9lf [%lg]",
-                        g_pid, "STS Error:", "PVInfo::subsumeValues()",
+                        g_pid, "STC Error:", "PVInfo::subsumeValues()",
                         "Skip Past Identical Values",
                         valueToString( *ival ).c_str(), (*itim),
                         valueToString( *ivalDup ).c_str(), (*itimDup),
-                        STS_DOUBLE_EPSILON );
+                        STC_DOUBLE_EPSILON );
                     usleep(30000); // give syslog a chance...
 
                     ++ival; ++itim; ++index;
@@ -1292,12 +1292,12 @@ public:
                 {
                     syslog( LOG_ERR,
                     "[%i] %s %s: %s %s: %s @ %.9lf vs %s @ %.9lf [%lg]",
-                        g_pid, "STS Error:", "PVInfo::subsumeValues()",
+                        g_pid, "STC Error:", "PVInfo::subsumeValues()",
                         "WHOA...! Two Different Values at Same Timestamp!",
                         "ADD Other Value/Timestamp from Duplicate Anyway",
                         valueToString( *ivalDup ).c_str(), (*itimDup),
                         valueToString( *ival ).c_str(), (*itim),
-                        STS_DOUBLE_EPSILON );
+                        STC_DOUBLE_EPSILON );
                     usleep(30000); // give syslog a chance...
      
                     // Insert These Weirdos _After_ Current Value...
@@ -1355,7 +1355,7 @@ public:
     virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id,
                                 uint32_t a_buf_reserve,
                                 uint32_t a_idx_buf_reserve,
-                                STS::BeamMonitorConfig *a_config,
+                                STC::BeamMonitorConfig *a_config,
                                 bool a_known_monitor ) = 0;
     virtual void            updateRunInfo(
                                 const RunInfo &a_run_info ) = 0;
@@ -1369,24 +1369,24 @@ public:
                                 const std::string &a_xml,
                                 bool a_force_init = false ) = 0;
     virtual void            pulseBuffersReady(
-                                STS::PulseInfo &a_pulse_info ) = 0;
+                                STC::PulseInfo &a_pulse_info ) = 0;
     virtual void            bankPidTOFBuffersReady(
-                                STS::BankInfo &a_bank ) = 0;
+                                STC::BankInfo &a_bank ) = 0;
     virtual void            bankIndexBuffersReady(
-                                STS::BankInfo &a_bank,
+                                STC::BankInfo &a_bank,
                                 bool use_default_chunk_size ) = 0;
-    virtual void            bankPulseGap( STS::BankInfo &a_bank,
+    virtual void            bankPulseGap( STC::BankInfo &a_bank,
                                 uint64_t a_count ) = 0;
-    virtual void            bankFinalize( STS::BankInfo &a_bank ) = 0;
+    virtual void            bankFinalize( STC::BankInfo &a_bank ) = 0;
     virtual void            monitorTOFBuffersReady(
-                                STS::MonitorInfo &a_monitor_info ) = 0;
+                                STC::MonitorInfo &a_monitor_info ) = 0;
     virtual void            monitorIndexBuffersReady(
-                                STS::MonitorInfo &a_monitor_info,
+                                STC::MonitorInfo &a_monitor_info,
                                 bool use_default_chunk_size ) = 0;
-    virtual void            monitorPulseGap( STS::MonitorInfo &a_monitor,
+    virtual void            monitorPulseGap( STC::MonitorInfo &a_monitor,
                                 uint64_t a_count ) = 0;
     virtual void            monitorFinalize(
-                                STS::MonitorInfo &a_monitor ) = 0;
+                                STC::MonitorInfo &a_monitor ) = 0;
     virtual void            runComment( const std::string &a_comment,
                                 bool a_force_init = false ) = 0;
     virtual void            markerPause( double a_time, uint64_t tOrig,
@@ -1402,9 +1402,9 @@ public:
     virtual void            markerComment( double a_time, uint64_t tOrig,
                                 const std::string &a_comment ) = 0;
     virtual void            writeDeviceEnums( Identifier a_devId,
-                                std::vector<STS::PVEnumeratedType>
+                                std::vector<STC::PVEnumeratedType>
                                     &a_enumVec ) = 0;
-    virtual void            checkSTSConfigElementUnitsPaths(void) = 0;
+    virtual void            checkSTCConfigElementUnitsPaths(void) = 0;
 };
 
 
@@ -1423,9 +1423,9 @@ enum ErrorCodes
     ERR_LAST
 };
 
-} // End STS Namespace
+} // End STC Namespace
 
-#endif // STSDEFS_H
+#endif // STCDEFS_H
 
 // vim: expandtab
 

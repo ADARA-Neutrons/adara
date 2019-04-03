@@ -330,7 +330,7 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 {
 	if ( !m_terse || m_showEvents ) {
 		printf("%u.%09u %s EVENT DATA (0x%x,v%u)\n"
-			"    srcId 0x%08x pktSeq 0x%x dspSeq 0x%x%s\n"
+			"    srcId 0x%08x pulseSeq 0x%x sourceSeq 0x%x%s\n"
 			"    cycle %u%s vetoFlags 0x%x%s timing 0x%x\n"
 			"    dataFlags=%s 0x%x (%s)\n"
 			"    flavor %d (%s)\n"
@@ -339,7 +339,7 @@ bool Parser::handleDataPkt(const ADARA::RawDataPkt *pkt, bool is_mapped)
 			(uint32_t) (pkt->pulseId() >> 32), (uint32_t) pkt->pulseId(),
 			is_mapped ? "MAPPED" : "RAW",
 			pkt->base_type(), pkt->version(),
-			pkt->sourceID(), pkt->pktSeq(), pkt->dspSeq(),
+			pkt->sourceID(), pkt->pulseSeq(), pkt->sourceSeq(),
 			pkt->endOfPulse() ? " EOP" : "",
 			pkt->cycle(), pkt->badCycle() ? " (BAD)" : "",
 			pkt->vetoFlags(), pkt->badVeto() ? " (BAD)" : "",
