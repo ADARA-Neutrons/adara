@@ -658,15 +658,18 @@ DataSource::DataSource( const std::string &name,
 		smsConnectedPV(prefix + ":Connected"));
 
 	m_pvConnectRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectRetryTimeout", 0.0, FLOAT64_MAX,
+		smsFloat64PV(prefix + ":ConnectRetryTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON,
 			/* AutoSave */ true));
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ConnectTimeout", 0.0, FLOAT64_MAX,
+		smsFloat64PV(prefix + ":ConnectTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON,
 			/* AutoSave */ true));
 
 	m_pvDataTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":DataTimeout", 0.0, FLOAT64_MAX,
+		smsFloat64PV(prefix + ":DataTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON,
 			/* AutoSave */ true));
 
 	m_pvDataTimeoutRetry = boost::shared_ptr<smsUint32PV>(new

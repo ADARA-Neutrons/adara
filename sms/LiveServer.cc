@@ -106,7 +106,8 @@ LiveServer::LiveServer() :
 		smsErrorPV(prefix + ":ListenStatus"));
 
 	m_pvListenRetryTimeout = boost::shared_ptr<smsFloat64PV>(new
-		smsFloat64PV(prefix + ":ListenRetryTimeout", 0.0, FLOAT64_MAX,
+		smsFloat64PV(prefix + ":ListenRetryTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON,
 			/* AutoSave */ true));
 
 	m_pvListenerURI = boost::shared_ptr<ListenStringPV>(new
