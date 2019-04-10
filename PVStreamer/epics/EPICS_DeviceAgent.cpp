@@ -991,16 +991,20 @@ DeviceAgent::controlThread()
 
                         if ( m_dev_record->m_active_pv->m_is_active )
                         {
-                            m_dev_record->m_active = true;
+                            // Only Set/Log if Active Status Changed...
+                            if ( !(m_dev_record->m_active) )
+                            {
+                                m_dev_record->m_active = true;
 
-                            syslog( LOG_INFO,
-                                "%s: %s %s -%s%s [%s = %u (%s)]",
-                                "DeviceAgent::controlThread()",
-                                "Mark Device Active",
-                                "from Active Status PV",
-                                deviceStr.c_str(), pvStr.c_str(),
-                                "active", 1, "true" );
-                            usleep(33333); // give syslog a chance...
+                                syslog( LOG_INFO,
+                                    "%s: %s %s -%s%s [%s = %u (%s)]",
+                                    "DeviceAgent::controlThread()",
+                                    "Mark Device Active",
+                                    "from Active Status PV",
+                                    deviceStr.c_str(), pvStr.c_str(),
+                                    "active", 1, "true" );
+                                usleep(33333); // give syslog a chance...
+                            }
 
                             // If We Didn't Just Send the PV Values
                             // (Because the Device Didn't Change)
@@ -1013,16 +1017,20 @@ DeviceAgent::controlThread()
                         // (i.e. Don't _Actually_ Delete It, Just Pretend!)
                         else
                         {
-                            m_dev_record->m_active = false;
+                            // Only Set/Log if Active Status Changed...
+                            if ( m_dev_record->m_active )
+                            {
+                                m_dev_record->m_active = false;
 
-                            syslog( LOG_INFO,
-                                "%s: %s %s -%s%s [%s = %u (%s)]",
-                                "DeviceAgent::controlThread()",
-                                "Mark Device Inactive",
-                                "from Active Status PV",
-                                deviceStr.c_str(), pvStr.c_str(),
-                                "active", 0, "false" );
-                            usleep(33333); // give syslog a chance...
+                                syslog( LOG_INFO,
+                                    "%s: %s %s -%s%s [%s = %u (%s)]",
+                                    "DeviceAgent::controlThread()",
+                                    "Mark Device Inactive",
+                                    "from Active Status PV",
+                                    deviceStr.c_str(), pvStr.c_str(),
+                                    "active", 0, "false" );
+                                usleep(33333); // give syslog a chance...
+                            }
 
                             if ( m_dev_record.get() )
                             {
@@ -1757,21 +1765,27 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 
                         if ( ich->second.m_device != NULL )
                         {
-                            syslog( LOG_ERR,
+                            // Only Set/Log if Active Status Changed...
+                            if ( ich->second.m_device->m_active
+                                    != active_state )
+                            {
+                                syslog( LOG_ERR,
                                 "%s %s: %s%s%s [%s = %u (%s) -> %u (%s)]",
-                                "PVSD ERROR:",
-                                "DeviceAgent::epicsEventHandler()",
-                                "Setting Active Status for",
-                                deviceStr.c_str(), pvStr.c_str(),
-                                "active",
-                                ich->second.m_device->m_active,
-                                ( (ich->second.m_device->m_active)
-                                    ? "true" : "false" ),
-                                active_state,
-                                ( active_state ? "true" : "false" ) );
-                            usleep(33333); // give syslog a chance...
+                                    "PVSD ERROR:",
+                                    "DeviceAgent::epicsEventHandler()",
+                                    "Setting Active Status for",
+                                    deviceStr.c_str(), pvStr.c_str(),
+                                    "active",
+                                    ich->second.m_device->m_active,
+                                    ( (ich->second.m_device->m_active)
+                                        ? "true" : "false" ),
+                                    active_state,
+                                    ( active_state ? "true" : "false" ) );
+                                usleep(33333); // give syslog a chance...
 
-                            ich->second.m_device->m_active = active_state;
+                                ich->second.m_device->m_active =
+                                    active_state;
+                            }
 
                             // Setting Device Active, Send PV Values...
                             if ( active_state )
