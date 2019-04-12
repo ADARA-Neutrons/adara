@@ -1,4 +1,6 @@
 #!/bin/bash
+# Do not edit, managed by Puppet.
+# Source: /etc/puppetlabs/code/environments/production/modules/neutron_sciences/rsyslog/templates/scripts/rsyslogMailer.erb
 #
 # rsyslogMailer
 #
@@ -125,4 +127,3 @@ do
    criticalMessages="${criticalMessages}\n${line}"
 done < $namedPipeFile
 # note: loop never exits... :)
-
