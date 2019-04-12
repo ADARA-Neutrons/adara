@@ -23,6 +23,8 @@ archiveDir="/SNS/users/y8y/RSyslogErrors"
 
 altArchiveDir="/home/y8y/RSyslogErrors"
 
+fileGroup="adara"
+
 alertRecipient="y8y@ornl.gov"      # the mail recipient for alerts
 
 hostName=`hostname`                # the host are we logging from
@@ -46,9 +48,11 @@ SAVE_ERRORS()
       if [[ -d ${localCacheDir} ]]; then
          dateStr=`date +"%Y%m%d-%H%M"`
          cacheFile="${localCacheDir}/${dateStr}.txt"
-         touch ${cacheFile}
+         touch "${cacheFile}"
+         chgrp ${fileGroup} "${cacheFile}"
+         chmod ugo+w "${cacheFile}"
          if [[ $? == 0 ]]; then
-            echo -e "${criticalMessages}" >> ${cacheFile}
+            echo -e "${criticalMessages}" >> "${cacheFile}"
          else
             echo "Error Writing to Cache File: [${cacheFile}]"
             emailLogErrors=1
@@ -70,9 +74,11 @@ SAVE_ERRORS()
 
          # If there's an Archive File, Save Log Errors Into It...
          if [[ -n ${archiveFile} ]]; then
-            touch ${archiveFile}
+            touch "${archiveFile}"
+            chgrp ${fileGroup} "${archiveFile}"
+            chmod ugo+w "${archiveFile}"
             if [[ $? == 0 ]]; then
-               echo -e "${criticalMessages}" >> ${archiveFile}
+               echo -e "${criticalMessages}" >> "${archiveFile}"
             else
                echo "Error Writing to Archive File: [${archiveFile}]"
                emailLogErrors=1
