@@ -1,7 +1,8 @@
 #!/bin/bash
 #
-# rsyslogMailer: a script to read stdin and collect critical log lines into an
-# alert email. (typically this is used to read a named-pipe written to by syslog)
+# rsyslogMailer: a script to read stdin and collect critical log lines into
+# an alert email. (typically this is used to read a named-pipe written to
+# by syslog)
 #
 #   example usage: rsyslogMailer < /etc/rsyslog.pipes/criticalMessages
 #
@@ -17,17 +18,30 @@ criticalMessages=""
 notifyActive=1
 namedPipeFile="/etc/rsyslog.pipes/criticalMessages"
 deactivateFile="/usr/local/bin/deactivateRsyslogMailer"
+localCacheDir="/SNSlocal/rsyslog.cache"
 if [ -f $deactivateFile ]; then
 	notifyActive=0
 fi
 SEND_EMAIL()
 {
-   if [[ "#${criticalMessages}#" != '##' && notifyActive -eq 1 ]]; then
-      # echo -e "criticalMessages:\n${criticalMessages}"
-      # send the alert
-      echo -e "${criticalMessages}" \
-         | mailx -s "*** Critical ADARA Syslog Error $hostName ***" \
-            ${alertRecipient}
+   if [[ "#${criticalMessages}#" != '##' ]]; then
+      if [[ -d ${localCacheDir} ]]; then
+         dateStr=`date +"%Y%m%d-%H%M"`
+         cacheFile="${localCacheDir}/${dateStr}.txt"
+         touch ${cacheFile}
+         if [[ $? == 0 ]]; then
+            echo -e "${criticalMessages}" >> ${cacheFile}
+         else
+            echo "Error Writing to Cache File: [${cacheFile}]"
+         fi
+      fi
+      if [[ notifyActive -eq 1 ]]; then
+         # echo -e "criticalMessages:\n${criticalMessages}"
+         # send the alert
+         echo -e "${criticalMessages}" \
+            | mailx -s "*** Critical ADARA Syslog Error $hostName ***" \
+               ${alertRecipient}
+      fi
    fi
    exit 0
 }
