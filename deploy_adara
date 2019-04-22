@@ -140,28 +140,29 @@ echo -e "\nDeploying User: $gcos ($userid)." | tee -a $LOG
 
 # Determine if Installing on SNS or HFIR facility computer system...
 HOST_PREFIX=""
-IS_HFIR=0
-IS_SNS=0
 
 hfir_hb_ck=`hostname -A | sed 's/ /\n/g' | grep '^hb' \
 	| wc | awk '{print $1}'`
 hfir_cg_ck=`hostname -A | sed 's/ /\n/g' | grep '^cg' \
 	| wc | awk '{print $1}'`
+stc_ck=`hostname -A | sed 's/ /\n/g' | grep '^sns' \
+	| wc | awk '{print $1}'`
 
 if [[ $hfir_hb_ck != 0 ]]; then
 	echo -e "\nInstalling on a HFIR (HB) Facility Computer System." \
 		| tee -a $LOG
-	IS_HFIR=1
 	HOST_PREFIX="hb"
 elif [[ $hfir_cg_ck != 0 ]]; then
 	echo -e "\nInstalling on a HFIR (CG) Facility Computer System." \
 		| tee -a $LOG
-	IS_HFIR=1
 	HOST_PREFIX="cg"
+elif [[ $stc_ck != 0 ]]; then
+	echo -e "\nInstalling on an STC Server Computer System." \
+		| tee -a $LOG
+	HOST_PREFIX="sns"
 else
 	echo -e "\nAssuming Installing on an SNS Facility Computer System." \
 		| tee -a $LOG
-	IS_SNS=1
 	HOST_PREFIX="bl"
 fi
 
@@ -172,6 +173,15 @@ CONFIG="config"
 if [ $IS_STC == 1 ]; then
 	install_host=`hostname`
 	install_branch=`echo "$install_host" | sed -e 's/sns-//' -e 's/\..*//'`
+	# Handle "All-in-One" Host Install Suffixes...
+	if [[ $HOST_PREFIX != "sns" ]]; then
+		install_suffix=`echo "$install_host" | sed 's/\..*//' \
+			| sed "s/${HOST_PREFIX}.*-//"`
+		if [[ "#$install_suffix#" != '##' ]]; then
+			# Don't Set Install Branch Here, Extracted Differently for STC!
+			CONFIG="${CONFIG}-${install_suffix}"
+		fi
+	fi
 	HOST_TYPE="STC"
 elif [ $IS_PVSD == 1 ]; then
 	install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
@@ -228,13 +238,16 @@ fi
 echo -e -n "\nInstalling ADARA/$PROG " | tee -a $LOG
 echo "for $HOST_TYPE $install_branch ($install_host)." | tee -a $LOG
 
+echo -e "\nUsing Git Config Repository in: ${INSTALL_BASE}/${CONFIG}" \
+	| tee -a $LOG
+
 #
 # Prompt for (Non-Null!) User Inputs:
 #
 
 adara_repo=`git config --get remote.origin.url`
 
-echo "Using ADARA Git Repository = $adara_repo" | tee -a $LOG
+echo -e "\nUsing ADARA Git Repository = $adara_repo" | tee -a $LOG
 
 # Make sure we're in the "right" repo...? ;-)
 
