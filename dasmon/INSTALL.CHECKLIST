@@ -268,6 +268,20 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	./confck
 
+	ls -l /etc/logrotate.d/dasmon_log
+
+	sudo cp ~/gitsrc/ADARA/PVStreamer/dasmon/server/dasmon_log \
+		/etc/logrotate.d/
+
+	ls -l /etc/logrotate.d/dasmon_log
+
+	cp /etc/logrotate.d/dasmon_log ./dasmond/etc.logrotate.d.dasmon_log
+
+	git add ./dasmond/etc.logrotate.d.dasmon_log
+	git commit ./dasmond/etc.logrotate.d.dasmon_log
+
+	./confck
+
 ### Skip for Dasmon Machines for Now...!
 ### - Nothing Logged is Captured or Forwarded as an Email Notification...
 3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
@@ -301,6 +315,26 @@ please set your shell "umask" as follows before proceeding! ;-D
 	###git commit dasmond/etc.crontab
 
 	###./confck
+
+	###ls -l /SNSlocal
+
+	###sudo mkdir /SNSlocal
+
+	###ls -l /SNSlocal/rsyslog.cache
+
+	###sudo mkdir /SNSlocal/rsyslog.cache
+
+	###sudo chown snsdata /SNSlocal/rsyslog.cache
+
+	###sudo chgrp adara /SNSlocal/rsyslog.cache
+
+	###sudo chmod g+ws /SNSlocal/rsyslog.cache
+
+	###ls -ld /SNSlocal/rsyslog.cache
+
+		###drwxrwsr-x 2 snsdata adara 168 Apr 26 13:28 /SNSlocal/rsyslog.cache
+
+	###ls -l /SNSlocal/rsyslog.cache
 
 4. Administrator Crontab Setup:
 
