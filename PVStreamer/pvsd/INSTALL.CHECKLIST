@@ -232,14 +232,14 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	ls -l /etc/logrotate.d/pvsd_log
 
-	sudo cp ~/gitsrc/ADARA/sms/pvsd_log /etc/logrotate.d/
+	sudo cp ~/gitsrc/ADARA/PVStreamer/pvsd/pvsd_log /etc/logrotate.d/
 
 	ls -l /etc/logrotate.d/pvsd_log
 
-	cp /etc/logrotate.d/pvsd_log ./sms/etc.logrotate.d.pvsd_log
+	cp /etc/logrotate.d/pvsd_log ./pvsd/etc.logrotate.d.pvsd_log
 
-	git add ./sms/etc.logrotate.d.pvsd_log
-	git commit ./sms/etc.logrotate.d.pvsd_log
+	git add ./pvsd/etc.logrotate.d.pvsd_log
+	git commit ./pvsd/etc.logrotate.d.pvsd_log
 
 	./confck
 
