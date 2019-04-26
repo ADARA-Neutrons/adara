@@ -230,6 +230,19 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	./confck
 
+	ls -l /etc/logrotate.d/pvsd_log
+
+	sudo cp ~/gitsrc/ADARA/sms/pvsd_log /etc/logrotate.d/
+
+	ls -l /etc/logrotate.d/pvsd_log
+
+	cp /etc/logrotate.d/pvsd_log ./sms/etc.logrotate.d.pvsd_log
+
+	git add ./sms/etc.logrotate.d.pvsd_log
+	git commit ./sms/etc.logrotate.d.pvsd_log
+
+	./confck
+
 3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
 
 	ls -l /etc/rsyslog.pipes
@@ -261,6 +274,26 @@ please set your shell "umask" as follows before proceeding! ;-D
 	git commit pvsd/etc.crontab
 
 	./confck
+
+	ls -l /SNSlocal
+
+	sudo mkdir /SNSlocal
+
+	ls -l /SNSlocal/rsyslog.cache
+
+	sudo mkdir /SNSlocal/rsyslog.cache
+
+	sudo chown snsdata /SNSlocal/rsyslog.cache
+
+	sudo chgrp adara /SNSlocal/rsyslog.cache
+
+	sudo chmod g+ws /SNSlocal/rsyslog.cache
+
+	ls -ld /SNSlocal/rsyslog.cache
+
+		drwxrwsr-x 2 snsdata adara 168 Apr 26 13:28 /SNSlocal/rsyslog.cache
+
+	ls -l /SNSlocal/rsyslog.cache
 
 4. Administrator Crontab Setup:
 
