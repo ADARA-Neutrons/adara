@@ -1,4 +1,7 @@
 
+# SMS Daemon Log Rotate Config
+# - to be installed in: /etc/logrotate.d/smsd_log 
+
 /var/log/smsd.log {
    # to avoid the need for a SIGHUP
    copytruncate
