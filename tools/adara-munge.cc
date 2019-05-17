@@ -1002,6 +1002,26 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 		}
 	}
 
+	// CASE #3: CNCS "Multiply Logs By Factor of 5.0" Fix 5/16/2019
+	// - for IPTS-21648 Runs 288127 to 288305...
+	// -> BL5:Mot:Sample:Axis1 (Sample:Axis1) = bl5-Parker2 Dev 7 Var 1
+	// -> BL5:Mot:omega (omega) = bl5-Parker2 Dev 7 Var 7
+	else if ( m_case == 3 )
+	{
+		ADARA::VariableDoublePkt *PKT =
+			const_cast<ADARA::VariableDoublePkt*>(&pkt);
+		if ( PKT->devId() == 7 )
+		{
+			if ( PKT->varId() == 1 || PKT->varId() == 7 )
+			{
+				// Munge Log Values by Factor of 5.0...! ;-D
+				double value = PKT->value();
+				value *= 5.0;
+				PKT->updateValue( value );
+			}
+		}
+	}
+
 	return false;
 }
 
