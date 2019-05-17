@@ -785,11 +785,16 @@ public:
 		return static_cast<VariableSeverity::Enum>
 							(m_fields[2] & 0xffff);
 	}
-	double value(void) const { return *(const double *) &m_fields[3]; }
+	double value(void) const { return *((const double *) &m_fields[3]); }
 
 	void remapDeviceId(uint32_t dev) {
 		uint32_t *fields = (uint32_t *)const_cast<uint8_t *>(payload());
 		fields[0] = dev;
+	};
+
+	void updateValue(double value) {
+		uint32_t *fields = (uint32_t *)const_cast<uint8_t *>(payload());
+		*((double *) &fields[3]) = value;
 	};
 
 private:
