@@ -35,30 +35,33 @@ RateLimitedLogging::History RLLHistory_DataSource;
 #define RLL_LOCAL_SAWTOOTH_PULSE      2
 #define RLL_RAWDATA_PULSE_IN_PAST     3
 #define RLL_RAWDATA_PULSE_IN_FUTURE   4
-#define RLL_LOCAL_PULSE_SEQUENCE      5
-#define RLL_LOCAL_SOURCE_SEQUENCE     6
-#define RLL_WONT_CONN                 7
-#define RLL_TRYING_CONN               8
-#define RLL_CONN_REFUSED              9
-#define RLL_CONN_REQUEST_ERROR       10
-#define RLL_CONN_FAILED              11
-#define RLL_PARSE_MAX_READ_CHUNK     12
-#define RLL_READ_EXCEPTION           13
-#define RLL_READ_DELAY               14
-#define RLL_PULSEID_ZERO             15
-#define RLL_UNKNOWN_PACKET           16
-#define RLL_OVERSIZE_PACKET          17
-#define RLL_LOCAL_DUPLICATE_RTDL     18
-#define RLL_LOCAL_SAWTOOTH_RTDL      19
-#define RLL_LOCAL_RTDL_SEQUENCE      20
-#define RLL_RTDL_PULSE_IN_PAST       21
-#define RLL_RTDL_PULSE_IN_FUTURE     22
-#define RLL_HEARTBEAT                23
+#define RLL_LEFTOVER_PULSE_SEQUENCE   5
+#define RLL_MISSING_PULSE_SEQUENCE    6
+#define RLL_LOCAL_PULSE_SEQUENCE      7
+#define RLL_LOCAL_SOURCE_SEQUENCE     8
+#define RLL_WONT_CONN                 9
+#define RLL_TRYING_CONN              10
+#define RLL_CONN_REFUSED             11
+#define RLL_CONN_REQUEST_ERROR       12
+#define RLL_CONN_FAILED              13
+#define RLL_PARSE_MAX_READ_CHUNK     14
+#define RLL_READ_EXCEPTION           15
+#define RLL_READ_DELAY               16
+#define RLL_PULSEID_ZERO             17
+#define RLL_UNKNOWN_PACKET           18
+#define RLL_OVERSIZE_PACKET          19
+#define RLL_LOCAL_DUPLICATE_RTDL     20
+#define RLL_LOCAL_SAWTOOTH_RTDL      21
+#define RLL_LOCAL_RTDL_SEQUENCE      22
+#define RLL_RTDL_PULSE_IN_PAST       23
+#define RLL_RTDL_PULSE_IN_FUTURE     24
+#define RLL_HEARTBEAT                25
 
 // Pulse Time Sanity Check Constants
 #define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
 #define SECS_PER_WEEK 604800 // 60 * 60 * 24 * 7
 
+#define MAX_PULSE_SEQ_LIST 10
 
 class DataSourceRequiredPV : public smsBooleanPV {
 public:
@@ -167,6 +170,10 @@ public:
 		// Until we "Prime the Pump"... ;-D
 		m_sourceSeq = (uint32_t) -1;
 
+		// Pulse Sequence List, Track Per HWSource/Source ID, Per Pulse...
+		// Increases Per Event Packet (Resets Per Pulse)
+		m_pulseSeqList.clear();
+
 		// Initialize HWSource Bandwidth PVs...
 		if ( m_hwIndex >= 0 ) {
 			struct timespec now;
@@ -217,6 +224,21 @@ public:
 	uint32_t incrRecoverPktCount(void) { return (++m_recoverPktCount); }
 
 	void resetRecoverPktCount(void) { m_recoverPktCount = 0; }
+
+	std::list< std::pair<uint64_t, uint32_t> >::iterator
+		findPulseSequence( uint64_t pulse )
+	{
+		std::list< std::pair<uint64_t, uint32_t> >::iterator psit;
+
+		for ( psit=m_pulseSeqList.begin() ;
+				psit != m_pulseSeqList.end() ; ++psit )
+		{
+			if ( psit->first == pulse )
+				break;
+		}
+
+		return( psit );
+	}
 
 	uint64_t pulse(void) const { return m_activePulse; }
 	uint64_t lastPulse(void) const { return m_lastPulse; }
@@ -372,7 +394,53 @@ public:
 		m_vetoFlags = pkt.vetoFlags();
 		m_timingStatus = pkt.timingStatus();
 
-		m_pulseSeq = 0; // Increases Per Event Packet (Resets Per Pulse)
+		// Start a New Pulse Sequence Counter
+		// for This HWSource/Source ID and This Pulse...
+		// Increases Per Event Packet (Resets Per Pulse)
+
+		std::list< std::pair<uint64_t, uint32_t> >::iterator psit
+			= findPulseSequence( m_activePulse );
+
+		// Hmmm... Leftover Pulse Sequence Resurrected...?!
+		if ( psit != m_pulseSeqList.end() )
+		{
+			/* Rate-limited logging of Leftover Pulse Sequence?! */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+					RLL_LEFTOVER_PULSE_SEQUENCE, m_name,
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Hmmm... Leftover Pulse Sequence Resurrected...?!"
+					<< std::hex << " src=0x" << m_hwId
+					<< " pulseId=0x" << m_activePulse << std::dec
+					<< " pulseSeq=" << psit->second
+					<< " trueNew=" << m_trueNew
+					<< ( m_trueNew ?
+						" - Resetting Pulse Sequence Counter to 0" : "" )
+					<< " (" << m_name << ")");
+			}
+
+			// If a "True New" (Duplicate) Pulse,
+			// Then Reset the Pulse Sequence Counter...
+			if ( m_trueNew )
+			{
+				psit->second = 0;
+			}
+		}
+
+		// Create New Pulse Sequence Entry, Push to Front of List...
+		else
+		{
+			std::pair<uint64_t, uint32_t> pulse_src( m_activePulse, 0 );
+			m_pulseSeqList.push_front( pulse_src );
+
+			// Keep Pulse Sequence List Size Small... ;-D
+			// Once Maximum Pulse Sequence List Size is Reached,
+			// Pop One Counter Off the End for Every New Counter in Front!
+			if ( m_pulseSeqList.size() > MAX_PULSE_SEQ_LIST )
+				m_pulseSeqList.pop_back();
+		}
 
 		return( m_pulseGood );
 	}
@@ -414,24 +482,73 @@ public:
 
 	// Increases Per Event Packet (Resets Per Pulse)
 	bool checkPulseSeq(const ADARA::RawDataPkt &pkt) {
-		bool ok = (pkt.pulseSeq() == m_pulseSeq);
+
+		// Get Pulse Sequence Counter for
+		// This HWSource/Source ID and This Pulse...
+		// Increases Per Event Packet (Resets Per Pulse)
+
+		std::list< std::pair<uint64_t, uint32_t> >::iterator psit
+			= findPulseSequence( pkt.pulseId() );
+
+		uint32_t pulseSeq = -1;
+
+		// Hmmm... Missing Pulse Sequence for
+		// This HWSource/Source ID and Pulse...?!
+		if ( psit == m_pulseSeqList.end() )
+		{
+			/* Rate-limited logging of Missing Pulse Sequence! */
+			std::string log_info;
+			if ( true || RateLimitedLogging::checkLog( RLLHistory_DataSource,
+					RLL_MISSING_PULSE_SEQUENCE, m_name,
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "Hmmm... Missing Pulse Sequence...?!"
+					<< std::hex << " src=0x" << m_hwId
+					<< " pulseId=0x" << pkt.pulseId() << std::dec
+					<< " (" << m_name << ")");
+			}
+		}
+
+		// Found Pulse Sequence Entry, Grab Current Sequence Counter...
+		else
+		{
+			pulseSeq = psit->second;
+		}
+
+		DEBUG("checkPulseSeq():"
+			<< std::hex
+			<< " src=0x" << m_hwId
+			<< " pkt.pulseId()=0x" << pkt.pulseId()
+			<< " pkt.pulseSeq()=0x" << pkt.pulseSeq()
+			<< " pulseSeq=0x" << pulseSeq
+			<< std::dec
+			<< " m_pulseSeqList.size()=" << m_pulseSeqList.size());
+
+		bool ok = (pkt.pulseSeq() == pulseSeq);
 		if ( !ok ) {
 			// Rate-limited logging of Pulse sequence out-of-order?
 			std::string log_info;
-			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+			if ( true || RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_PULSE_SEQUENCE, m_name,
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "checkPulseSeq() "
 					<< "Local Pulse Sequence Out-of-Order: "
-					<< pkt.pulseSeq() << " != " << m_pulseSeq
+					<< pkt.pulseSeq() << " != " << pulseSeq
 					<< std::hex << " src=0x" << m_hwId
 					<< " m_activePulse=0x" << m_activePulse
 					<< " hwId=0x" << m_hwId << std::dec);
 			}
 		}
-		m_pulseSeq = ( m_pulseSeq + 1 ) % pkt.maxPulseSeq();
+
+		// Increment Pulse Sequence Counter (if found)
+		if ( psit != m_pulseSeqList.end() )
+		{
+			psit->second = ( psit->second + 1 ) % pkt.maxPulseSeq();
+		}
+
 		return ok;
 	}
 
@@ -523,10 +640,11 @@ private:
 	uint64_t	m_lastPulse;
 	uint32_t	m_dupCount;
 
-	uint32_t	m_sourceSeq;	// Increases Per Source Packet
+	uint32_t	m_sourceSeq;		// Increases Per Source Packet
 
-	uint32_t	m_pulseSeq;		// Increases Per Event Packet
-								// (Resets Per Pulse)
+	std::list< std::pair<uint64_t, uint32_t> >
+				m_pulseSeqList;		// Increases Per Event Packet
+									// (Resets Per Pulse)
 
 	bool		m_pulseGood;
 
