@@ -755,6 +755,9 @@ for arg in "$@" ; do
 		SMSD_CONFIG="/SNSlocal/sms${ALT}/conf/smsd.conf"
 		addToIntroOutput "Using SMS Alternate Daemon Config File in:\n" \
 			"   $SMSD_CONFIG\n\n"
+		REPO_CONFIG="./sms${ALT}/conf/smsd.conf"
+		addToIntroOutput "Using SMS Alternate Repo Config File in:\n" \
+			"   $REPO_CONFIG\n\n"
 		# Note: Append $ALT to $CONFIG_REPO Below...!
 	elif [[ "#$key#" == '#--option#' ]]; then
 		command="option"
@@ -881,10 +884,16 @@ if [ ${PRE} == "[NotSet]" ]; then
 fi
 
 daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
+now_ck=`echo "$config_host" | grep "now" | wc | awk '{print $1}'`
 if [ "#$daq_ck#" == '#1#' ]; then
 	addToIntroOutput "[DAQ Beamline Host.]\n\n"
 	CONFIG_REPO="${CONFIG_REPO}-daq1${ALT}"
 	config_branch=`echo "$config_host" | sed 's/\..*//'`
+elif [ "#$now_ck#" == '#1#' ]; then
+	addToIntroOutput "[nED-on-Wheels Beamline Host.]\n\n"
+	config_branch=`echo "$config_host" | sed 's/\..*//'`
+	now_num=`echo "$config_branch" | awk -F "-" '{print $2}'`
+	CONFIG_REPO="${CONFIG_REPO}-${now_num}${ALT}"
 else
 	CONFIG_REPO="${CONFIG_REPO}${ALT}"
 	config_branch="$config_blnum"
