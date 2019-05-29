@@ -356,9 +356,6 @@ public:
 			m_pulseSeqList.push_front( pulse_src );
 			isNewPulse = true;
 
-dumpPulseInvariants("getPulse(): New Pulse",
-	m_pulseSeqList.begin()->first );
-
 			// Find the Most Recent/"Last" PulseId (Time)
 			// for Strict SAWTOOTH Checking...
 			// - Just Use Running Max PulseId Time, Actually
@@ -384,15 +381,12 @@ dumpPulseInvariants("getPulse(): New Pulse",
 				endPulse( --(m_pulseSeqList.end()), false );
 
 				// Remove Last Pulse from Sequence List...
-dumpPulseInvariants( "getPulse(): Erasing Last Pulse",
-	m_pulseSeqList.back().first );
 				m_pulseSeqList.pop_back();
 			}
 
 			// Now Grab Iterator for Our Newly Pushed First Pulse Entry...
 			psit = m_pulseSeqList.begin();
 		}
-else dumpPulseInvariants("getPulse(): Found Existing Pulse", psit->first );
 
 		// Return What We Found or Added...
 		return( psit );
@@ -573,9 +567,6 @@ else dumpPulseInvariants("getPulse(): Found Existing Pulse", psit->first );
 			pulse.m_pulseGood = false;
 		}
 
-std::stringstream ss;
-ss << "newPulse(): New Pulse Checked pulseGood=" << pulse.m_pulseGood;
-dumpPulseInvariants( ss.str(), pulse );
 		return( pulse.m_pulseGood );
 	}
 
