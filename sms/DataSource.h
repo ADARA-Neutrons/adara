@@ -64,7 +64,10 @@ public:
 	void setIntermittent( uint32_t smsId, bool intermittent );
 
 	uint32_t getMaxPulseSeqList(void)
-		{ return m_pvMaxPulseSeqList->value(); }
+	{
+		m_max_pulse_seq_list = m_pvMaxPulseSeqList->value();
+		return m_max_pulse_seq_list;
+	}
 
 private:
 	typedef std::map<uint32_t, boost::shared_ptr<HWSource> > HWSrcMap;
