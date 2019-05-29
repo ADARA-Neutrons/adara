@@ -356,6 +356,7 @@ void SMSControl::addSource(const std::string &name,
 	bool mixed_data_packets;
 	bool check_source_sequence;
 	bool check_pulse_sequence;
+	uint32_t max_pulse_seq_list;
 	uint32_t rtdlNoDataThresh;
 	bool save_input_stream;
 
@@ -388,6 +389,7 @@ void SMSControl::addSource(const std::string &name,
 	mixed_data_packets = info.get<bool>("mixed_data_packets", false);
 	check_source_sequence = info.get<bool>("check_source_sequence", true);
 	check_pulse_sequence = info.get<bool>("check_pulse_sequence", true);
+	max_pulse_seq_list = info.get<uint32_t>("max_pulse_seq_list", 32);
 	rtdlNoDataThresh = info.get<uint32_t>("rtdl_no_data_thresh", 100);
 	save_input_stream = info.get<bool>("save_input_stream", false);
 
@@ -433,6 +435,13 @@ void SMSControl::addSource(const std::string &name,
 			<< name << " - Per Event Packet, Resets Per Pulse...");
 	}
 
+	// Should probably let someone know what our
+	// Max Pulse Sequence List Size will be...! ;-D
+	else {
+		DEBUG("Max Pulse Sequence List (Buffer) Size Set to "
+			<< max_pulse_seq_list << " for " << name);
+	}
+
 	// Probably should also log if we're Saving All the Input Stream
 	// from this particular Data Source... (not something you'd really
 	// wanna do all the time in production... :-)
@@ -455,6 +464,7 @@ void SMSControl::addSource(const std::string &name,
 							 mixed_data_packets,
 							 check_source_sequence,
 							 check_pulse_sequence,
+							 max_pulse_seq_list,
 							 chunk_size,
 							 rtdlNoDataThresh,
 							 save_input_stream));

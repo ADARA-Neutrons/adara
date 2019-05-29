@@ -171,6 +171,14 @@ option_label[$num_options]="[Check Pkt Pulse Sequence Numbers (Resets)]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
+option_name[$num_options]="max_pulse_seq_list"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MaxPulseSeqList"
+option_value_type[$num_options]="UINT32_VALUE(buffer_size)"
+option_default[$num_options]="32"
+option_label[$num_options]="[Max Pulse Sequence List (Buffer) Size]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
 option_name[$num_options]="readsize"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MaxReadChunk"
 option_pv_opt[$num_options]="-S"
@@ -1500,6 +1508,7 @@ if [[ "$command" == "status" \
 					caget $WAIT ${dsprefix}:MixedDataPackets
 					caget $WAIT ${dsprefix}:CheckSourceSequence
 					caget $WAIT ${dsprefix}:CheckPulseSequence
+					caget $WAIT ${dsprefix}:MaxPulseSeqList
 					caget $WAIT -S ${dsprefix}:MaxReadChunk
 					caget $WAIT ${dsprefix}:RTDLNoDataThresh
 					caget $WAIT ${dsprefix}:SaveInputStream
