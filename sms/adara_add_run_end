@@ -42,6 +42,7 @@ XINETD_DIR="/etc/xinetd.d"
 STC1="sns-stc1.sns.gov"
 STC2="sns-stc2.sns.gov"
 
+TOUCH="/usr/bin/touch"
 DIFF="/usr/bin/diff"
 HEAD="/usr/bin/head"
 TAIL="/usr/bin/tail"
@@ -582,6 +583,29 @@ RESUBMIT_RUN()
 			echo -e -n "\nERROR Checking FindNeXus to Verify "
 			echo "that Run ${RUN_NUMBER} Completed...!"
 			echo -e "\n\t${FINDNEXUS} -i ${INST} ${RUN_NUMBER}"
+		fi
+
+	fi
+
+	#
+	# Now Create the "Translation Completed" Marker File...
+	#
+
+	# Prompt User for Creating "Translation Completed" Marker File...
+	local _ckmarker
+	CHECK_PROCEED \
+		"Do You Want To Create the \'translation_completed\' Marker File"
+	_ckmarker=$?
+
+	if [[ ${_ckmarker} == 0 ]]; then
+
+		${TOUCH} "${rundir}/translation_completed"
+		cktouch=$?
+
+		if [[ ${cktouch} != 0 ]]; then
+			echo -e -n "\nERROR Creating the \'translation_completed\' "
+			echo "Marker File for Run ${RUN_NUMBER}...!"
+			echo -e "\n\t${TOUCH} \"${rundir}/translation_completed\""
 		fi
 
 	fi
