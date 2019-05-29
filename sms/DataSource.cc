@@ -60,8 +60,6 @@ RateLimitedLogging::History RLLHistory_DataSource;
 #define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
 #define SECS_PER_WEEK 604800 // 60 * 60 * 24 * 7
 
-#define MAX_PULSE_SEQ_LIST 32
-
 class DataSourceRequiredPV : public smsBooleanPV {
 public:
 	DataSourceRequiredPV( const std::string &name,
@@ -136,7 +134,7 @@ typedef std::list< std::pair<PulseInvariants, uint32_t> > PulseSeqList;
 class HWSource {
 public:
 	HWSource( const std::string &name, int32_t hwIndex,
-			uint32_t hwId, uint32_t smsId,
+			uint32_t hwId, uint32_t smsId, uint32_t maxPulseSeqList,
 			boost::shared_ptr<smsUint32PV> &
 				pvHWSourceHwId,
 			boost::shared_ptr<smsUint32PV> &
@@ -174,6 +172,7 @@ public:
 		m_pvHWSourceErrBandwidthTenMin(pvHWSourceErrBandwidthTenMin),
 		m_dataSource(dataSource),
 		m_name(name), m_hwId(hwId), m_smsId(smsId),
+		m_maxPulseSeqList(maxPulseSeqList),
 		m_intermittent(false), m_recoverPktCount(0),
 		m_lastPulse(0)
 	{
@@ -325,6 +324,8 @@ public:
 	PulseSeqList::iterator getPulse( const ADARA::RawDataPkt &pkt,
 			bool &isNewPulse )
 	{
+		static uint32_t cnt = 0;
+
 		// Extract Pulse Invariants Meta-Data from Raw Data Packet...
 		PulseInvariants pulse;
 		pulse.m_pulseId = pkt.pulseId();
@@ -367,10 +368,16 @@ dumpPulseInvariants("getPulse(): New Pulse",
 				m_lastPulse = pulse.m_pulseId;
 			}
 
+			// Periodically Check for Latest Max Pulse Sequence List Size
+			// (About Once Per Minute...)
+			if ( !(++cnt % 3333) ) {
+				m_maxPulseSeqList = m_dataSource->getMaxPulseSeqList();
+			}
+
 			// Keep Pulse Sequence List Size Small/"Fixed"... ;-D
 			// Once Maximum Pulse Sequence List Size is Reached,
 			// Pop One Pulse Off the End for Every New Pulse in Front!
-			if ( m_pulseSeqList.size() > MAX_PULSE_SEQ_LIST )
+			if ( m_pulseSeqList.size() > m_maxPulseSeqList )
 			{
 				// Finish/Release Oldest Pulse...
 				// (Only Marks Complete *Once*, If Still "PulseGood"...)
@@ -734,6 +741,8 @@ private:
 	uint32_t		m_hwId;
 	uint32_t		m_smsId;
 
+	uint32_t		m_maxPulseSeqList;
+
 	bool			m_intermittent;
 
 	uint32_t		m_recoverPktCount;
@@ -752,6 +761,7 @@ DataSource::DataSource( const std::string &name,
 			bool ignore_eop, bool ignore_local_sawtooth,
 			bool mixed_data_packets,
 			bool check_source_sequence, bool check_pulse_sequence,
+			uint32_t max_pulse_seq_list,
 			unsigned int read_chunk,
 			uint32_t rtdlNoDataThresh, bool save_input_stream ) :
 	m_name(uri), m_basename(name), m_uri(uri),
@@ -765,6 +775,7 @@ DataSource::DataSource( const std::string &name,
 	m_mixed_data_packets(mixed_data_packets),
 	m_check_source_sequence(check_source_sequence),
 	m_check_pulse_sequence(check_pulse_sequence),
+	m_max_pulse_seq_list(max_pulse_seq_list),
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
 	m_save_input_stream(save_input_stream)
 {
@@ -894,6 +905,10 @@ DataSource::DataSource( const std::string &name,
 		smsBooleanPV(prefix + ":CheckPulseSequence",
 		/* AutoSave */ true));
 
+	m_pvMaxPulseSeqList = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MaxPulseSeqList", 0, INT32_MAX,
+			/* AutoSave */ true));
+
 	m_pvMaxReadChunk = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":MaxReadChunk", /* AutoSave */ true));
 
@@ -958,6 +973,7 @@ DataSource::DataSource( const std::string &name,
 	m_ctrl->addPV(m_pvMixedDataPackets);
 	m_ctrl->addPV(m_pvCheckSourceSequence);
 	m_ctrl->addPV(m_pvCheckPulseSequence);
+	m_ctrl->addPV(m_pvMaxPulseSeqList);
 	m_ctrl->addPV(m_pvMaxReadChunk);
 	m_ctrl->addPV(m_pvRTDLNoDataThresh);
 	m_ctrl->addPV(m_pvSaveInputStream);
@@ -994,6 +1010,7 @@ DataSource::DataSource( const std::string &name,
 	m_pvMixedDataPackets->update(m_mixed_data_packets, &now);
 	m_pvCheckSourceSequence->update(m_check_source_sequence, &now);
 	m_pvCheckPulseSequence->update(m_check_pulse_sequence, &now);
+	m_pvMaxPulseSeqList->update(m_max_pulse_seq_list, &now);
 	m_pvRTDLNoDataThresh->update(m_rtdlNoDataThresh, &now);
 	m_pvSaveInputStream->update(m_save_input_stream, &now);
 
@@ -1110,6 +1127,12 @@ DataSource::DataSource( const std::string &name,
 			bvalue, ts ) ) {
 		m_check_pulse_sequence = bvalue;
 		m_pvCheckPulseSequence->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvMaxPulseSeqList->getName(),
+			uvalue, ts ) ) {
+		m_max_pulse_seq_list = uvalue;
+		m_pvMaxPulseSeqList->update(uvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV( m_pvRTDLNoDataThresh->getName(),
@@ -2189,7 +2212,7 @@ void DataSource::resetPacketStats(void)
 	Parser::resetDiscardedPacketsStats();
 }
 
-boost::shared_ptr<HWSource> DataSource::getHWSource(uint32_t hwId)
+boost::shared_ptr<HWSource> DataSource::getHWSource( uint32_t hwId )
 {
 	HWSrcMap::iterator it;
 
@@ -2345,7 +2368,8 @@ boost::shared_ptr<HWSource> DataSource::getHWSource(uint32_t hwId)
 
 		// Create New HWSource... (Pass In Id and Bandwidth PVs...)
 		boost::shared_ptr<HWSource> src( new HWSource(
-			m_name, hwIndex, hwId, smsId, pvHwId, pvSmsId,
+			m_name, hwIndex, hwId, smsId, m_max_pulse_seq_list,
+			pvHwId, pvSmsId,
 			pvEventBwSecond, pvEventBwMinute, pvEventBwTenMin,
 			pvMetaBwSecond, pvMetaBwMinute, pvMetaBwTenMin,
 			pvErrBwSecond, pvErrBwMinute, pvErrBwTenMin,

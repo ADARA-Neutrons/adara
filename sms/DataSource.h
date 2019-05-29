@@ -11,6 +11,7 @@
 #include "ADARAPackets.h"
 #include "POSIXParser.h"
 #include "SMSControl.h"
+#include "SMSControlPV.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
 
@@ -36,6 +37,7 @@ public:
 		bool ignore_eop, bool ignore_local_sawtooth,
 		bool mixed_data_packets,
 		bool check_source_sequence, bool check_pulse_sequence,
+		uint32_t max_pulse_seq_list,
 		unsigned int read_chunk,
 		uint32_t rtdlNoDataThresh, bool save_input_stream);
 	~DataSource();
@@ -60,6 +62,9 @@ public:
 	bool ignoreLocalSAWTOOTH(void) { return m_ignore_local_sawtooth; }
 
 	void setIntermittent( uint32_t smsId, bool intermittent );
+
+	uint32_t getMaxPulseSeqList(void)
+		{ return m_pvMaxPulseSeqList->value(); }
 
 private:
 	typedef std::map<uint32_t, boost::shared_ptr<HWSource> > HWSrcMap;
@@ -88,6 +93,7 @@ private:
 	bool m_mixed_data_packets;
 	bool m_check_source_sequence;
 	bool m_check_pulse_sequence;
+	uint32_t m_max_pulse_seq_list;
 	unsigned int m_max_read_chunk;
 	uint32_t m_rtdlNoDataThresh;
 	bool m_save_input_stream;
@@ -107,6 +113,7 @@ private:
 	boost::shared_ptr<smsBooleanPV> m_pvMixedDataPackets;
 	boost::shared_ptr<smsBooleanPV> m_pvCheckSourceSequence;
 	boost::shared_ptr<smsBooleanPV> m_pvCheckPulseSequence;
+	boost::shared_ptr<smsUint32PV> m_pvMaxPulseSeqList;
 	boost::shared_ptr<smsStringPV> m_pvMaxReadChunk;
 	boost::shared_ptr<smsUint32PV> m_pvRTDLNoDataThresh;
 	boost::shared_ptr<smsBooleanPV> m_pvSaveInputStream;
