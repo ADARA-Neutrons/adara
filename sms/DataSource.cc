@@ -368,7 +368,17 @@ public:
 			// Periodically Check for Latest Max Pulse Sequence List Size
 			// (About Once Per Minute...)
 			if ( !(++cnt % 3333) ) {
-				m_maxPulseSeqList = m_dataSource->getMaxPulseSeqList();
+				uint32_t tmpMaxPulseSeqList =
+					m_dataSource->getMaxPulseSeqList();
+				if ( tmpMaxPulseSeqList != m_maxPulseSeqList )
+				{
+					ERROR("HWSource::getPulse():"
+						<< " Updating Value of"
+						<< " Max Pulse Sequence List (Buffer) Size"
+						<< " from " << m_maxPulseSeqList
+						<< " to " << tmpMaxPulseSeqList);
+					m_maxPulseSeqList = tmpMaxPulseSeqList;
+				}
 			}
 
 			// Keep Pulse Sequence List Size Small/"Fixed"... ;-D
@@ -1962,7 +1972,7 @@ void DataSource::dataReady(void)
 			ssMRC << "Setting Max Read Chunk Size for " << m_name;
 			ssMRC << " to " << m_max_read_chunk;
 			ssMRC << " (" << val << ")";
-			INFO(ssMRC.str());
+			ERROR(ssMRC.str());
 		}
 	}
 
@@ -2066,9 +2076,30 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
 	// (And While We're At It, Also Check "Ignore Local SAWTOOTH" PV... :-)
 	if ( !( ++cnt % 99999 ) ) {
-		m_save_input_stream = m_pvSaveInputStream->value();
-		m_ignore_local_sawtooth = m_pvIgnoreLocalSAWTOOTH->value();
+		bool tmpSaveInputStream = m_pvSaveInputStream->value();
+		if ( tmpSaveInputStream != m_save_input_stream )
+		{
+			ERROR("rxPacket():"
+				<< " Updating Value of"
+				<< " Save Input Stream"
+				<< " for " << m_name
+				<< " from " << m_save_input_stream
+				<< " to " << tmpSaveInputStream);
+			m_save_input_stream = tmpSaveInputStream;
+		}
+		bool tmpIgnoreLocalSAWTOOTH = m_pvIgnoreLocalSAWTOOTH->value();
+		if ( tmpIgnoreLocalSAWTOOTH != m_ignore_local_sawtooth )
+		{
+			ERROR("rxPacket():"
+				<< " Updating Value of"
+				<< " Ignore Local SAWTOOTH"
+				<< " for " << m_name
+				<< " from " << m_ignore_local_sawtooth
+				<< " to " << tmpIgnoreLocalSAWTOOTH);
+			m_ignore_local_sawtooth = tmpIgnoreLocalSAWTOOTH;
+		}
 	}
+
 	if (m_save_input_stream) {
 		StorageManager::savePacket(pkt.packet(), pkt.packet_length(),
 			m_smsSourceId);
@@ -2461,8 +2492,28 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	// so only check rarely, like every 3 minutes... ;-D
 	// (Note: count already incremented above for overall method...!)
 	if ( !(cnt % 33333) ) {
-		m_check_source_sequence = m_pvCheckSourceSequence->value();
-		m_check_pulse_sequence = m_pvCheckPulseSequence->value();
+		bool tmpCheckSourceSequence = m_pvCheckSourceSequence->value();
+		if ( tmpCheckSourceSequence != m_check_source_sequence )
+		{
+			ERROR("handleDataPkt():"
+				<< " Updating Value of"
+				<< " Check Source Sequence Numbers"
+				<< " for " << m_name
+				<< " from " << m_check_source_sequence
+				<< " to " << tmpCheckSourceSequence);
+			m_check_source_sequence = tmpCheckSourceSequence;
+		}
+		bool tmpCheckPulseSequence = m_pvCheckPulseSequence->value();
+		if ( tmpCheckPulseSequence != m_check_pulse_sequence )
+		{
+			ERROR("handleDataPkt():"
+				<< " Updating Value of"
+				<< " Check Pulse Sequence Numbers"
+				<< " for " << m_name
+				<< " from " << m_check_pulse_sequence
+				<< " to " << tmpCheckPulseSequence);
+			m_check_pulse_sequence = tmpCheckPulseSequence;
+		}
 	}
 
 	// Check for Valid Source Sequence from This Source...
@@ -2547,7 +2598,17 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// so only check very rarely, like every 10 minutes... ;-D
 		// (Note: count already incremented above for overall method...!)
 		if ( !(cnt % 99999) ) {
-			m_mixed_data_packets = m_pvMixedDataPackets->value();
+			bool tmpMixedDataPackets = m_pvMixedDataPackets->value();
+			if ( tmpMixedDataPackets != m_mixed_data_packets )
+			{
+				ERROR("handleDataPkt():"
+					<< " Updating Value of"
+					<< " Mixed Data Packets"
+					<< " for " << m_name
+					<< " from " << m_mixed_data_packets
+					<< " to " << tmpMixedDataPackets);
+				m_mixed_data_packets = tmpMixedDataPackets;
+			}
 		}
 
 		m_ctrl->pulseEvents( *pkt, hw_src->hwId(), pulse.m_dupCount,
@@ -2570,8 +2631,19 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	// - Infrequently Update from Live Control PV Value, once per minute?
 	// (Note: count already incremented above for overall method...!)
 	if ( !(cnt % 99999) ) {
-		m_ignore_eop = m_pvIgnoreEoP->value();
+		bool tmpIgnoreEoP = m_pvIgnoreEoP->value();
+		if ( tmpIgnoreEoP != m_ignore_eop )
+		{
+			ERROR("handleDataPkt():"
+				<< " Updating Value of"
+				<< " Ignore Data Packet End-of-Pulse"
+				<< " for " << m_name
+				<< " from " << m_ignore_eop
+				<< " to " << tmpIgnoreEoP);
+			m_ignore_eop = tmpIgnoreEoP;
+		}
 	}
+
 	if ( !m_ignore_eop && pkt->endOfPulse() )
 		hw_src->endPulse( psit );
 
