@@ -375,6 +375,8 @@ public:
 					ERROR("HWSource::getPulse():"
 						<< " Updating Value of"
 						<< " Max Pulse Sequence List (Buffer) Size"
+						<< " for " << m_dataSource->name()
+						<< std::hex << " src=0x" << m_hwId << std::dec
 						<< " from " << m_maxPulseSeqList
 						<< " to " << tmpMaxPulseSeqList);
 					m_maxPulseSeqList = tmpMaxPulseSeqList;
