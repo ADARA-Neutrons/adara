@@ -633,14 +633,14 @@ public:
 			psit->second = ( psit->second + 1 ) % pkt.maxPulseSeq();
 		}
 
-		DEBUG("checkPulseSeq():"
-			<< std::hex
-			<< " src=0x" << m_hwId
-			<< " pkt.pulseId()=0x" << pkt.pulseId()
-			<< " pkt.pulseSeq()=0x" << pkt.pulseSeq()
-			<< " pulseSeq=0x" << pulseSeq
-			<< std::dec
-			<< " m_pulseSeqList.size()=" << m_pulseSeqList.size());
+		// DEBUG("checkPulseSeq():"
+			// << std::hex
+			// << " src=0x" << m_hwId
+			// << " pkt.pulseId()=0x" << pkt.pulseId()
+			// << " pkt.pulseSeq()=0x" << pkt.pulseSeq()
+			// << " pulseSeq=0x" << pulseSeq
+			// << std::dec
+			// << " m_pulseSeqList.size()=" << m_pulseSeqList.size());
 
 		bool ok = ( pkt.pulseSeq() == pulseSeq );
 		if ( !ok ) {
