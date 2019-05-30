@@ -260,6 +260,19 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	./confck
 
+	ls -l /etc/logrotate.d/smsd_log
+
+	sudo cp ~/gitsrc/ADARA/sms/smsd_log /etc/logrotate.d/
+
+	ls -l /etc/logrotate.d/smsd_log
+
+	cp /etc/logrotate.d/smsd_log ./sms/etc.logrotate.d.smsd_log
+
+	git add ./sms/etc.logrotate.d.smsd_log
+	git commit ./sms/etc.logrotate.d.smsd_log
+
+	./confck
+
 3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
 
 	ls -l /etc/rsyslog.pipes
@@ -289,6 +302,22 @@ please set your shell "umask" as follows before proceeding! ;-D
 	git commit ./sms/etc.crontab
 
 	./confck
+
+	ls -l /SNSlocal/rsyslog.cache
+
+	sudo mkdir /SNSlocal/rsyslog.cache
+
+	sudo chown snsdata /SNSlocal/rsyslog.cache
+
+	sudo chgrp adara /SNSlocal/rsyslog.cache
+
+	sudo chmod g+ws /SNSlocal/rsyslog.cache
+
+	ls -ld /SNSlocal/rsyslog.cache
+
+		drwxrwsr-x 2 snsdata adara 168 Apr 26 13:28 /SNSlocal/rsyslog.cache
+
+	ls -l /SNSlocal/rsyslog.cache
 
 4. Administrator Crontab Setup:
 
@@ -330,8 +359,14 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	ls -l /usr/local/bin/
 
+	sudo ln -s /home/controls/config-daq1/deploy/adara_add_run_end \
+		/usr/local/bin/adara_add_run_end
+
 	sudo ln -s /home/controls/config-daq1/deploy/adaracat \
 		/usr/local/bin/adaracat
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara_data_find \
+		/usr/local/bin/adara_data_find
 
 	sudo ln -s /home/controls/config-daq1/deploy/adara-dump \
 		/usr/local/bin/adara-dump
@@ -341,6 +376,9 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	sudo ln -s /home/controls/config-daq1/deploy/adara-gen \
 		/usr/local/bin/adara-gen
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara-munge \
+		/usr/local/bin/adara-munge
 
 	sudo ln -s /home/controls/config-daq1/deploy/adara-parser \
 		/usr/local/bin/adara-parser

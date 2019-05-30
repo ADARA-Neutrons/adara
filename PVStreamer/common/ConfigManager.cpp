@@ -131,13 +131,16 @@ ConfigManager::defineDevice( DeviceDescriptor &a_descriptor,
                 if ( a_descriptor.m_active_pv_conn.compare(
                     record->m_active_pv_conn ) )
                 {
-                    syslog( LOG_ERR, "%s %s: %s: [%s] (%s: [%s] -> [%s])",
+                    syslog( LOG_ERR,
+                        "%s %s: %s: [%s] (%s: [%s] -> [%s], %s = %d (%s))",
                         "PVSD ERROR:", "ConfigManager::defineDevice()",
                         "Re-Creating Active Status PV",
                         a_descriptor.m_name.c_str(),
                         "*** Active Status PV Connection Changed",
                         record->m_active_pv_conn.c_str(),
-                        a_descriptor.m_active_pv_conn.c_str() );
+                        a_descriptor.m_active_pv_conn.c_str(),
+                        "active", a_descriptor.m_active,
+                        ( a_descriptor.m_active ) ? "true" : "false" );
                     usleep(33333); // give syslog a chance...
 
                     delete record->m_active_pv;

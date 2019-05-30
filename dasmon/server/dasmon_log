@@ -1,0 +1,18 @@
+# Place in /etc/logrotate.d/dasmon_log to run daily
+#
+# For test 'right away':
+#    sudo logrotate -v /etc/logrotate.d/dasmon_log
+#
+/var/log/dasmond.log {
+# to avoid the need for a SIGHUP
+   copytruncate                   
+   missingok  
+   notifempty            
+   rotate 7
+   weekly
+   dateext
+   size 10M
+   compress
+# 'create' isn't used with 'copytruncate', but in case we change the mechanism later:
+#   create 0664 root users
+} 

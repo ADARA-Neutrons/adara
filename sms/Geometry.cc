@@ -1,3 +1,8 @@
+
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.Geometry"));
+
 #include <boost/bind.hpp>
 #include <fstream>
 #include <stdint.h>
@@ -21,6 +26,9 @@ Geometry::Geometry(const std::string &path)
 
 	f.seekg(0, std::ios::end);
 	contentsSize = f.tellg();
+
+	DEBUG("Found Geometry File at "
+		<< path << " - " << contentsSize << " Bytes");
 
 	/* TODO error checking, how big is too big? */
 

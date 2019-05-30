@@ -35,30 +35,30 @@ RateLimitedLogging::History RLLHistory_DataSource;
 #define RLL_LOCAL_SAWTOOTH_PULSE      2
 #define RLL_RAWDATA_PULSE_IN_PAST     3
 #define RLL_RAWDATA_PULSE_IN_FUTURE   4
-#define RLL_LOCAL_PULSE_SEQUENCE      5
-#define RLL_LOCAL_SOURCE_SEQUENCE     6
-#define RLL_WONT_CONN                 7
-#define RLL_TRYING_CONN               8
-#define RLL_CONN_REFUSED              9
-#define RLL_CONN_REQUEST_ERROR       10
-#define RLL_CONN_FAILED              11
-#define RLL_PARSE_MAX_READ_CHUNK     12
-#define RLL_READ_EXCEPTION           13
-#define RLL_READ_DELAY               14
-#define RLL_PULSEID_ZERO             15
-#define RLL_UNKNOWN_PACKET           16
-#define RLL_OVERSIZE_PACKET          17
-#define RLL_LOCAL_DUPLICATE_RTDL     18
-#define RLL_LOCAL_SAWTOOTH_RTDL      19
-#define RLL_LOCAL_RTDL_SEQUENCE      20
-#define RLL_RTDL_PULSE_IN_PAST       21
-#define RLL_RTDL_PULSE_IN_FUTURE     22
-#define RLL_HEARTBEAT                23
+#define RLL_MISSING_PULSE_SEQUENCE    5
+#define RLL_LOCAL_PULSE_SEQUENCE      6
+#define RLL_LOCAL_SOURCE_SEQUENCE     7
+#define RLL_WONT_CONN                 8
+#define RLL_TRYING_CONN               9
+#define RLL_CONN_REFUSED             10
+#define RLL_CONN_REQUEST_ERROR       11
+#define RLL_CONN_FAILED              12
+#define RLL_PARSE_MAX_READ_CHUNK     13
+#define RLL_READ_EXCEPTION           14
+#define RLL_READ_DELAY               15
+#define RLL_PULSEID_ZERO             16
+#define RLL_UNKNOWN_PACKET           17
+#define RLL_OVERSIZE_PACKET          18
+#define RLL_LOCAL_DUPLICATE_RTDL     19
+#define RLL_LOCAL_SAWTOOTH_RTDL      20
+#define RLL_LOCAL_RTDL_SEQUENCE      21
+#define RLL_RTDL_PULSE_IN_PAST       22
+#define RLL_RTDL_PULSE_IN_FUTURE     23
+#define RLL_HEARTBEAT                24
 
 // Pulse Time Sanity Check Constants
 #define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
 #define SECS_PER_WEEK 604800 // 60 * 60 * 24 * 7
-
 
 class DataSourceRequiredPV : public smsBooleanPV {
 public:
@@ -99,10 +99,42 @@ private:
 };
 
 
+/* Pulse invariants -- these should not change between raw event
+ * packets for a given pulse, so we can use them to help detect
+ * duplicate pulse IDs
+ */
+struct PulseInvariants {
+	uint64_t	m_pulseId;
+	ADARA::PulseFlavor::Enum m_flavor;
+	uint32_t	m_intraPulseTime;
+	uint32_t	m_pulseCharge;
+	uint16_t	m_cycle;
+	uint16_t	m_vetoFlags;
+	uint8_t		m_timingStatus;
+	bool		m_pulseGood;	// not part of invariants, bookkeeping
+	uint32_t	m_dupCount;		// not part of invariants, bookkeeping
+};
+
+bool operator==( const PulseInvariants &p1, const PulseInvariants &p2 )
+{
+	return( p1.m_pulseId == p2.m_pulseId
+		&& p1.m_flavor == p2.m_flavor
+		&& p1.m_pulseCharge == p2.m_pulseCharge
+		&& p1.m_vetoFlags == p2.m_vetoFlags
+		&& p1.m_cycle == p2.m_cycle
+		&& p1.m_timingStatus == p2.m_timingStatus
+		&& p1.m_intraPulseTime == p2.m_intraPulseTime );
+	// Note: m_pulseGood and m_dupCount are _Not_ part of invariants,
+	// they're just tagalongs for bookkeeping... Don't compare... :-D
+}
+
+typedef std::list< std::pair<PulseInvariants, uint32_t> > PulseSeqList;
+
+
 class HWSource {
 public:
 	HWSource( const std::string &name, int32_t hwIndex,
-			uint32_t hwId, uint32_t smsId,
+			uint32_t hwId, uint32_t smsId, uint32_t maxPulseSeqList,
 			boost::shared_ptr<smsUint32PV> &
 				pvHWSourceHwId,
 			boost::shared_ptr<smsUint32PV> &
@@ -140,9 +172,9 @@ public:
 		m_pvHWSourceErrBandwidthTenMin(pvHWSourceErrBandwidthTenMin),
 		m_dataSource(dataSource),
 		m_name(name), m_hwId(hwId), m_smsId(smsId),
+		m_maxPulseSeqList(maxPulseSeqList),
 		m_intermittent(false), m_recoverPktCount(0),
-		m_activePulse(0), m_lastPulse(0), m_dupCount(0),
-		m_pulseGood(true), m_trueNew(true)
+		m_lastPulse(0)
 	{
 		// Snag an SMSControl Instance Handle _Exactly Once_...! ;-o
 		m_ctrl = SMSControl::getInstance();
@@ -166,6 +198,10 @@ public:
 		// will Never Take, so we can _Ignore_ the First Sequence Value
 		// Until we "Prime the Pump"... ;-D
 		m_sourceSeq = (uint32_t) -1;
+
+		// Pulse Sequence List, Track Per HWSource/Source ID, Per Pulse...
+		// Increases Per Event Packet (Resets Per Pulse)
+		m_pulseSeqList.clear();
 
 		// Initialize HWSource Bandwidth PVs...
 		if ( m_hwIndex >= 0 ) {
@@ -218,22 +254,183 @@ public:
 
 	void resetRecoverPktCount(void) { m_recoverPktCount = 0; }
 
-	uint64_t pulse(void) const { return m_activePulse; }
-	uint64_t lastPulse(void) const { return m_lastPulse; }
-	uint32_t dupCount(void) const { return m_dupCount; }
-	uint32_t pulseGood(void) const { return m_pulseGood; }
+	PulseSeqList	m_pulseSeqList;		// Increases Per Event Packet
+										// (Resets Per Pulse)
 
-	void setPulseGood( bool good )
+	PulseSeqList::iterator findPulseSequence( PulseInvariants &pulse,
+			uint32_t &dupCount )
 	{
-		m_pulseGood = good;
+		PulseSeqList::iterator found = m_pulseSeqList.end();
+
+		PulseSeqList::iterator psit;
+
+		dupCount = 0;
+
+		for ( psit=m_pulseSeqList.begin() ;
+				psit != m_pulseSeqList.end() ; ++psit )
+		{
+			// Count Any "Duplicate" Pulses (Same Time, Diff Invariants)
+			if ( psit->first.m_pulseId == pulse.m_pulseId )
+				dupCount++;
+
+			// Matching Pulse Invariants Found!
+			if ( psit->first == pulse )
+			{
+				found = psit;
+				// Don't Break Out of Loop Yet Here,
+				// Need to Obtain Full "Duplicate" Pulse Count...! ;-D
+			}
+		}
+
+		// Use Any Original Duplicate Count from Initial Pulse Creation...
+		if ( found != m_pulseSeqList.end() )
+		{
+			dupCount = pulse.m_dupCount;
+		}
+
+		// Log Any New (Not Found) Duplicate Pulses in event packets...
+		if ( dupCount && found == m_pulseSeqList.end() ) {
+			/* Rate-limited logging of duplicate pulses */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+					RLL_LOCAL_DUPLICATE_PULSE, m_name,
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "findPulseSequence(): New Pulse (RawDataPkt):"
+					<< " Local Duplicate pulse from "
+					<< m_name
+					<< std::hex << " src=0x" << m_hwId
+					<< " pulseId=0x" << pulse.m_pulseId << std::dec);
+				dumpPulseInvariants( "New Duplicate Pulse", pulse );
+				PulseSeqList::iterator dupsit;
+				for ( dupsit=m_pulseSeqList.begin() ;
+						dupsit != m_pulseSeqList.end() ; ++dupsit )
+				{
+					// Log Any "Duplicate" Pulses
+					// (Same Time, Diff Invariants)
+					if ( dupsit->first.m_pulseId == pulse.m_pulseId )
+					{
+						dumpPulseInvariants( "Matching Duplicate Pulse",
+							dupsit->first );
+					}
+				}
+			}
+		}
+
+		return( found );
 	}
 
-	void endPulse(bool eop = true) {
+	PulseSeqList::iterator getPulse( const ADARA::RawDataPkt &pkt,
+			bool &isNewPulse )
+	{
+		static uint32_t cnt = 0;
 
-		if (!m_activePulse)
+		// Extract Pulse Invariants Meta-Data from Raw Data Packet...
+		PulseInvariants pulse;
+		pulse.m_pulseId = pkt.pulseId();
+		pulse.m_flavor = pkt.flavor();
+		pulse.m_intraPulseTime = pkt.intraPulseTime();
+		pulse.m_pulseCharge = pkt.pulseCharge();
+		pulse.m_cycle = pkt.cycle();
+		pulse.m_vetoFlags = pkt.vetoFlags();
+		pulse.m_timingStatus = pkt.timingStatus();
+		pulse.m_pulseGood = false;
+		pulse.m_dupCount = (uint32_t) -1;
+
+		uint32_t dupCount;
+
+		// See if This Pulse Already Exists in the Pulse Sequence List
+		PulseSeqList::iterator psit = findPulseSequence( pulse, dupCount );
+
+		isNewPulse = false;
+
+		// Pulse Not Found in List, Add It...
+		if ( psit == m_pulseSeqList.end() )
+		{
+			// Assign Any "Duplicate Pulse" Count to Pulse...
+			pulse.m_dupCount = dupCount;
+
+			// Create New Pulse Sequence Entry, Push to Front of List...
+			std::pair<PulseInvariants, uint32_t> pulse_src( pulse, 0 );
+			m_pulseSeqList.push_front( pulse_src );
+			isNewPulse = true;
+
+			// Find the Most Recent/"Last" PulseId (Time)
+			// for Strict SAWTOOTH Checking...
+			// - Just Use Running Max PulseId Time, Actually
+			// More Accurate than the "Last Pulse We Saw"... ;-D
+			if ( pulse.m_pulseId > m_lastPulse )
+			{
+				m_lastPulse = pulse.m_pulseId;
+			}
+
+			// Periodically Check for Latest Max Pulse Sequence List Size
+			// (About Once Per Minute...)
+			if ( !(++cnt % 3333) ) {
+				uint32_t tmpMaxPulseSeqList =
+					m_dataSource->getMaxPulseSeqList();
+				if ( tmpMaxPulseSeqList != m_maxPulseSeqList )
+				{
+					ERROR("HWSource::getPulse():"
+						<< " Updating Value of"
+						<< " Max Pulse Sequence List (Buffer) Size"
+						<< " for " << m_dataSource->name()
+						<< std::hex << " src=0x" << m_hwId << std::dec
+						<< " from " << m_maxPulseSeqList
+						<< " to " << tmpMaxPulseSeqList);
+					m_maxPulseSeqList = tmpMaxPulseSeqList;
+				}
+			}
+
+			// Keep Pulse Sequence List Size Small/"Fixed"... ;-D
+			// Once Maximum Pulse Sequence List Size is Reached,
+			// Pop One Pulse Off the End for Every New Pulse in Front!
+			if ( m_pulseSeqList.size() > m_maxPulseSeqList )
+			{
+				// Finish/Release Oldest Pulse...
+				// (Only Marks Complete *Once*, If Still "PulseGood"...)
+				endPulse( --(m_pulseSeqList.end()), false );
+
+				// Remove Last Pulse from Sequence List...
+				m_pulseSeqList.pop_back();
+			}
+
+			// Now Grab Iterator for Our Newly Pushed First Pulse Entry...
+			psit = m_pulseSeqList.begin();
+		}
+
+		// Return What We Found or Added...
+		return( psit );
+	}
+
+	void endPulse( PulseSeqList::iterator &psit, bool eop = true )
+	{
+		// Hmmm... Missing Pulse Sequence for
+		// This HWSource/Source ID and Pulse...?!
+		if ( psit == m_pulseSeqList.end() )
+		{
+			/* Rate-limited logging of Missing Pulse Sequence! */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+					RLL_MISSING_PULSE_SEQUENCE, m_name,
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "endPulse():"
+					<< " Hmmm... Missing Pulse Sequence...?!"
+					<< " Internal Bookkeeping Error!"
+					<< std::hex << " src=0x" << m_hwId << std::dec
+					<< " (" << m_name << ")");
+			}
 			return;
+		}
 
-		if (!eop) {
+		PulseInvariants &pulse = psit->first;
+
+		// This is _Not_ An Official End-of-Pulse, Mark Pulse as Partial...
+		if ( !eop )
+		{
 #if 0
 			/* We currently get this on every other pulse for
 			 * 30 Hz operation; disable the message until
@@ -242,65 +439,88 @@ public:
 			/* Rate-limited logging of dropped packets */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-					RLL_DROPPED_PACKETS, m_name, 2, 10, 100, log_info ) ) {
+					RLL_DROPPED_PACKETS, m_name, 2, 10, 100, log_info ) )
+			{
 				ERROR(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Dropped packet from " << m_name << " src 0x"
 					<< std::hex << m_hwId << std::dec);
 			}
 #endif
-			if ( m_pulseGood )
-				m_ctrl->markPartial(m_activePulse, m_dupCount);
-
-			m_trueNew = false;
-		}
-		else {
-			m_trueNew = true;
+			// Only Process "Good" Pulses (That Haven't Yet Been Processed)
+			if ( pulse.m_pulseGood )
+				m_ctrl->markPartial( pulse.m_pulseId, pulse.m_dupCount );
 		}
 
-		if ( m_pulseGood )
-			m_ctrl->markComplete(m_activePulse, m_dupCount, m_smsId);
+		// This Is the Official End-of-Pulse,
+		// So Mark Any Preceding/"Incomplete" Pulses as Partial
+		// and Dispatch Them On Their Way...
+		// (_Before_ We Complete This Current Pulse, As They're Older! ;-D)
+		else
+		{
+			// NOTE: Mark & Dispatch Pulses in *Reverse* Order,
+			// i.e. from the End, as in "First In, First Out"...! ;-D
+			PulseSeqList::iterator old_psit = m_pulseSeqList.end();
+			if ( old_psit != m_pulseSeqList.begin() ) --old_psit;
 
-		m_lastPulse = m_activePulse;
-		m_activePulse = 0;
+			// Only Process Up to Current Pulse...
+			for ( ;
+					old_psit != m_pulseSeqList.begin()
+						&& old_psit != psit ;
+					--old_psit )
+			{
+				PulseInvariants &old_pulse = old_psit->first;
+
+				// Only Process "Good" Pulses
+				// (That Haven't Yet Been Processed)
+				if ( old_pulse.m_pulseGood )
+				{
+					// Mark Any Preceding/"Incomplete" Pulses as Partial...
+					m_ctrl->markPartial(
+						old_pulse.m_pulseId, old_pulse.m_dupCount );
+
+					// Dispatch Pulse On Its Way...
+					m_ctrl->markComplete(
+						old_pulse.m_pulseId, old_pulse.m_dupCount,
+						m_smsId );
+
+					// Never Mark the Same Pulse "Complete" Twice...! ;-D
+					// (We Keep Pulses Around in the Pulse Sequence List
+					// Even After They're "Complete", for More Accurate
+					// "Duplicate" Pulse Bookkeeping... ;-D)
+					old_pulse.m_pulseGood = false;
+				}
+			}
+		}
+
+		// Only Process "Good" Pulses (That Haven't Yet Been Processed)
+		if ( pulse.m_pulseGood )
+		{
+			// Dispatch This Pulse On Its Way...
+			m_ctrl->markComplete( pulse.m_pulseId, pulse.m_dupCount,
+				m_smsId );
+
+			// Never Mark the Same Pulse "Complete" Twice...! ;-D
+			// (We Keep Pulses Around in the Pulse Sequence List
+			// Even After They're "Complete", for More Accurate
+			// "Duplicate" Pulse Bookkeeping... ;-D)
+			pulse.m_pulseGood = false;
+		}
 	}
 
-	bool newPulse(const ADARA::RawDataPkt &pkt) {
+	bool newPulse( const ADARA::RawDataPkt &pkt,
+			PulseSeqList::iterator &psit )
+	{
+		uint64_t pulseId = pkt.pulseId();
 
-		if (m_activePulse) {
-			/* We didn't see an end-of-packet, so clear out
-			 * the previous pulse here.
-			 */
-			endPulse(false);
-		}
+		PulseInvariants &pulse = psit->first;
 
-		m_activePulse = pkt.pulseId();
+		// Assume Pulse is "Good" Unless Proven Otherwise... ;-D
+		pulse.m_pulseGood = true;
 
-		m_pulseGood = true;
-
-		// check for Duplicate Pulses in event packets...
-		if (m_activePulse == m_lastPulse) {
-			/* Rate-limited logging of duplicate pulses */
-			std::string log_info;
-			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
-					RLL_LOCAL_DUPLICATE_PULSE, m_name,
-					2, 10, 100, log_info ) ) {
-				ERROR(log_info
-					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-					<< "newPulse(RawDataPkt): Local Duplicate pulse from "
-					<< m_name
-					<< std::hex << " src=0x" << m_hwId
-					<< " pulseId=0x" << m_activePulse << std::dec
-					<< " trueNew=" << m_trueNew);
-				dumpPulseInvariants(pkt);
-			}
-			m_dupCount++;
-		} else
-			m_dupCount = 0;
-
-		// also check for SAWTOOTH Pulse Times in event packets...
+		// Check for SAWTOOTH Pulse Times in event packets...
 		if ( !(m_dataSource->ignoreLocalSAWTOOTH())
-				&& m_activePulse < m_lastPulse ) {
+				&& pulseId < m_lastPulse ) {
 			/* Rate-limited logging of local sawtooth pulses */
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
@@ -312,14 +532,14 @@ public:
 					<< " from " << m_name
 					<< std::hex << " src=0x" << m_hwId
 					<< " m_lastPulse=0x" << m_lastPulse
-					<< " m_activePulse=0x" << m_activePulse << std::dec
+					<< " pulseId=0x" << pulseId << std::dec
 					<< " cycle=" << pkt.cycle()
 					<< " vetoFlags=" << pkt.vetoFlags());
 			}
 		}
 
 		// strip off pulse nanoseconds...
-		time_t sec = m_activePulse >> 32;
+		time_t sec = pulseId >> 32;
 		// check for "totally bogus" pulses, in distant past/future... ;-b
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME_COARSE, &now);
@@ -338,11 +558,11 @@ public:
 					<< "*** Dropping Bogus RawData Pulse Time"
 					<< " from Distant Past (Before Facility Start Time)!"
 					<< std::hex << " src=0x" << m_hwId
-					<< " pulseId=0x" << m_activePulse << std::dec
+					<< " pulseId=0x" << pulseId << std::dec
 					<< " (" << sec << " < " << FACILITY_START_TIME << ")"
 					<< " (" << m_name << ")");
 			}
-			m_pulseGood = false;
+			pulse.m_pulseGood = false;
 		}
 		// more than a week into the future...! :-o
 		else if ( sec > future )
@@ -357,64 +577,77 @@ public:
 					<< "*** Dropping Bogus RawData Pulse Time"
 					<< " from Distant Future (Over One Week from Now)!"
 					<< std::hex << " src=0x" << m_hwId
-					<< " pulseId=0x" << m_activePulse << std::dec
+					<< " pulseId=0x" << pulseId << std::dec
 					<< " (" << sec << " > " << future << ")"
 					<< " (" << m_name << ")");
 			}
-			m_pulseGood = false;
+			pulse.m_pulseGood = false;
 		}
 
-		// Capture Pulse Invariants...
-		m_flavor = pkt.flavor();
-		m_intraPulse = pkt.intraPulseTime();
-		m_charge = pkt.pulseCharge();
-		m_cycle = pkt.cycle();
-		m_vetoFlags = pkt.vetoFlags();
-		m_timingStatus = pkt.timingStatus();
-
-		m_pulseSeq = 0; // Increases Per Event Packet (Resets Per Pulse)
-
-		return( m_pulseGood );
+		return( pulse.m_pulseGood );
 	}
 
-	bool checkPulseInvariants(const ADARA::RawDataPkt &pkt) {
-		/* These fields should not change for any packet in
-		 * the current pulse. If they do, then this is a
-		 * duplicate pulse id (or a new pulse all together.)
-		 */
-		return !(pkt.pulseId() == m_activePulse &&
-			 pkt.flavor() == m_flavor &&
-			 pkt.pulseCharge() == m_charge &&
-			 pkt.vetoFlags() == m_vetoFlags &&
-			 pkt.cycle() == m_cycle &&
-			 pkt.timingStatus() == m_timingStatus &&
-			 pkt.intraPulseTime() == m_intraPulse);
-	}
-
-	bool pulseGood() {
-		return( m_pulseGood );
-	}
-
-	void dumpPulseInvariants(const ADARA::RawDataPkt &pkt) {
-		ERROR("dumpPulseInvariants():"
+	void dumpPulseInvariants( std::string label,
+			const PulseInvariants &pulse )
+	{
+		ERROR("dumpPulseInvariants(): " << label
 			<< std::hex << " src=0x" << m_hwId
-			<< " pulseId=0x" << pkt.pulseId()
-				<< "(0x" << m_activePulse << ")" << std::dec
-			<< " flavor=" << pkt.flavor() << "(" << m_flavor << ")"
-			<< " pulseCharge=" << pkt.pulseCharge()
-				<< "(" << m_charge << ")"
-			<< " vetoFlags=" << pkt.vetoFlags()
-				<< "(" << m_vetoFlags << ")"
-			<< " cycle=" << pkt.cycle() << "(" << m_cycle << ")"
-			<< " timingStatus=" << (uint32_t) pkt.timingStatus()
-				<< "(" << (uint32_t) m_timingStatus << ")"
-			<< " intraPulseTime=" << pkt.intraPulseTime()
-				<< "(" << m_intraPulse << ")");
+			<< " pulseId=0x" << pulse.m_pulseId << std::dec
+			<< " dupCount=" << pulse.m_dupCount
+			<< " flavor=" << pulse.m_flavor
+			<< " pulseCharge=" << pulse.m_pulseCharge
+			<< " vetoFlags=" << pulse.m_vetoFlags
+			<< " cycle=" << pulse.m_cycle
+			<< " timingStatus=" << (uint32_t) pulse.m_timingStatus
+			<< " intraPulseTime=" << pulse.m_intraPulseTime
+			<< " pulseGood=" << pulse.m_pulseGood);
 	}
 
 	// Increases Per Event Packet (Resets Per Pulse)
-	bool checkPulseSeq(const ADARA::RawDataPkt &pkt) {
-		bool ok = (pkt.pulseSeq() == m_pulseSeq);
+	bool checkPulseSeq( const ADARA::RawDataPkt &pkt,
+			PulseSeqList::iterator &psit )
+	{
+		uint32_t pulseSeq = -1;
+
+		// Hmmm... Missing Pulse Sequence for
+		// This HWSource/Source ID and Pulse...?!
+		if ( psit == m_pulseSeqList.end() )
+		{
+			/* Rate-limited logging of Missing Pulse Sequence! */
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+					RLL_MISSING_PULSE_SEQUENCE, m_name,
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "checkPulseSeq():"
+					<< " Hmmm... Missing Pulse Sequence...?!"
+					<< " Internal Bookkeeping Error!"
+					<< std::hex << " src=0x" << m_hwId
+					<< " pulseId=0x" << pkt.pulseId() << std::dec
+					<< " (" << m_name << ")");
+			}
+		}
+
+		// Found Pulse Sequence Entry, Grab Current Sequence Counter...
+		else
+		{
+			pulseSeq = psit->second;
+
+			// Increment Pulse Sequence Counter
+			psit->second = ( psit->second + 1 ) % pkt.maxPulseSeq();
+		}
+
+		// DEBUG("checkPulseSeq():"
+			// << std::hex
+			// << " src=0x" << m_hwId
+			// << " pkt.pulseId()=0x" << pkt.pulseId()
+			// << " pkt.pulseSeq()=0x" << pkt.pulseSeq()
+			// << " pulseSeq=0x" << pulseSeq
+			// << std::dec
+			// << " m_pulseSeqList.size()=" << m_pulseSeqList.size());
+
+		bool ok = ( pkt.pulseSeq() == pulseSeq );
 		if ( !ok ) {
 			// Rate-limited logging of Pulse sequence out-of-order?
 			std::string log_info;
@@ -423,15 +656,16 @@ public:
 					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-					<< "checkPulseSeq() "
-					<< "Local Pulse Sequence Out-of-Order: "
-					<< pkt.pulseSeq() << " != " << m_pulseSeq
+					<< "checkPulseSeq(): "
+					<< "Local Pulse Sequence Out-of-Order:"
+					<< " pkt.pulseSeq()=" << pkt.pulseSeq()
+					<< " !=" << " pulseSeq=" << pulseSeq
 					<< std::hex << " src=0x" << m_hwId
-					<< " m_activePulse=0x" << m_activePulse
+					<< " pkt.pulseId()=0x" << pkt.pulseId()
 					<< " hwId=0x" << m_hwId << std::dec);
 			}
 		}
-		m_pulseSeq = ( m_pulseSeq + 1 ) % pkt.maxPulseSeq();
+
 		return ok;
 	}
 
@@ -446,7 +680,7 @@ public:
 					<< " m_sourceSeq=" << m_sourceSeq
 					<< " -> pkt.sourceSeq()=" << pkt.sourceSeq()
 					<< std::hex << " src=0x" << m_hwId
-					<< " m_activePulse=0x" << m_activePulse
+					<< " pkt.pulseId()=0x" << pkt.pulseId()
 					<< " hwId=0x" << m_hwId << std::dec);
 				ok = true;
 			}
@@ -462,7 +696,7 @@ public:
 						<< "Local Source Sequence Out-of-Order: "
 						<< pkt.sourceSeq() << " != " << m_sourceSeq
 						<< std::hex << " src=0x" << m_hwId
-						<< " m_activePulse=0x" << m_activePulse
+						<< " pkt.pulseId()=0x" << pkt.pulseId()
 						<< " hwId=0x" << m_hwId << std::dec);
 				}
 			}
@@ -512,35 +746,18 @@ private:
 
 	const std::string &m_name;
 
-	uint32_t	m_hwId;
-	uint32_t	m_smsId;
+	uint32_t		m_hwId;
+	uint32_t		m_smsId;
 
-	bool		m_intermittent;
+	uint32_t		m_maxPulseSeqList;
 
-	uint32_t	m_recoverPktCount;
+	bool			m_intermittent;
 
-	uint64_t	m_activePulse;
-	uint64_t	m_lastPulse;
-	uint32_t	m_dupCount;
+	uint32_t		m_recoverPktCount;
 
-	uint32_t	m_sourceSeq;	// Increases Per Source Packet
+	uint64_t		m_lastPulse;
 
-	uint32_t	m_pulseSeq;		// Increases Per Event Packet
-								// (Resets Per Pulse)
-
-	bool		m_pulseGood;
-
-	/* Pulse invariants -- these should not change between raw event
-	 * packets for a given pulse, so we can use them to help detect
-	 * duplicate pulse IDs
-	 */
-	ADARA::PulseFlavor::Enum m_flavor;
-	uint32_t	m_intraPulse;
-	uint32_t	m_charge;
-	uint16_t	m_cycle;
-	uint16_t	m_vetoFlags;
-	uint8_t		m_timingStatus;
-	bool		m_trueNew;
+	uint32_t		m_sourceSeq;		// Increases Per Source Packet
 };
 
 
@@ -552,6 +769,7 @@ DataSource::DataSource( const std::string &name,
 			bool ignore_eop, bool ignore_local_sawtooth,
 			bool mixed_data_packets,
 			bool check_source_sequence, bool check_pulse_sequence,
+			uint32_t max_pulse_seq_list,
 			unsigned int read_chunk,
 			uint32_t rtdlNoDataThresh, bool save_input_stream ) :
 	m_name(uri), m_basename(name), m_uri(uri),
@@ -565,6 +783,7 @@ DataSource::DataSource( const std::string &name,
 	m_mixed_data_packets(mixed_data_packets),
 	m_check_source_sequence(check_source_sequence),
 	m_check_pulse_sequence(check_pulse_sequence),
+	m_max_pulse_seq_list(max_pulse_seq_list),
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
 	m_save_input_stream(save_input_stream)
 {
@@ -694,6 +913,10 @@ DataSource::DataSource( const std::string &name,
 		smsBooleanPV(prefix + ":CheckPulseSequence",
 		/* AutoSave */ true));
 
+	m_pvMaxPulseSeqList = boost::shared_ptr<smsUint32PV>(new
+		smsUint32PV(prefix + ":MaxPulseSeqList", 0, INT32_MAX,
+			/* AutoSave */ true));
+
 	m_pvMaxReadChunk = boost::shared_ptr<smsStringPV>(new
 		smsStringPV(prefix + ":MaxReadChunk", /* AutoSave */ true));
 
@@ -758,6 +981,7 @@ DataSource::DataSource( const std::string &name,
 	m_ctrl->addPV(m_pvMixedDataPackets);
 	m_ctrl->addPV(m_pvCheckSourceSequence);
 	m_ctrl->addPV(m_pvCheckPulseSequence);
+	m_ctrl->addPV(m_pvMaxPulseSeqList);
 	m_ctrl->addPV(m_pvMaxReadChunk);
 	m_ctrl->addPV(m_pvRTDLNoDataThresh);
 	m_ctrl->addPV(m_pvSaveInputStream);
@@ -794,6 +1018,7 @@ DataSource::DataSource( const std::string &name,
 	m_pvMixedDataPackets->update(m_mixed_data_packets, &now);
 	m_pvCheckSourceSequence->update(m_check_source_sequence, &now);
 	m_pvCheckPulseSequence->update(m_check_pulse_sequence, &now);
+	m_pvMaxPulseSeqList->update(m_max_pulse_seq_list, &now);
 	m_pvRTDLNoDataThresh->update(m_rtdlNoDataThresh, &now);
 	m_pvSaveInputStream->update(m_save_input_stream, &now);
 
@@ -910,6 +1135,12 @@ DataSource::DataSource( const std::string &name,
 			bvalue, ts ) ) {
 		m_check_pulse_sequence = bvalue;
 		m_pvCheckPulseSequence->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV( m_pvMaxPulseSeqList->getName(),
+			uvalue, ts ) ) {
+		m_max_pulse_seq_list = uvalue;
+		m_pvMaxPulseSeqList->update(uvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV( m_pvRTDLNoDataThresh->getName(),
@@ -1141,10 +1372,29 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 		if ( it->second->smsId() != (uint32_t) -1 ) {
 			INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "unregisterHWSources():"
-				<< " Ending Current Pulse"
+				<< " Ending Active Pulses"
 				<< " for " << why << " Data Source " << m_name
-				<< " smsId=" << it->second->smsId() );
-			it->second->endPulse( false );
+				<< " smsId=" << it->second->smsId()
+				<< " m_pulseSeqList.size()="
+					<< it->second->m_pulseSeqList.size() );
+			// NOTE: Mark & Dispatch Pulses in *Reverse* Order,
+			// i.e. from the End, as in "First In, First Out"...! ;-D
+			PulseSeqList::iterator psit = it->second->m_pulseSeqList.end();
+			if ( psit != it->second->m_pulseSeqList.begin() ) --psit;
+			for ( ; psit != it->second->m_pulseSeqList.end() ; )
+			{
+				INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "unregisterHWSources():"
+					<< " End Pulse"
+					<< std::hex << " 0x" << psit->first.m_pulseId
+						<< std::dec
+					<< " (" << m_name << ")" );
+				it->second->endPulse( psit, false );
+				// Make Sure We Process the First Pulse in List Too...! ;-D
+				if ( psit != it->second->m_pulseSeqList.begin() ) --psit;
+				else break;
+			}
+			it->second->m_pulseSeqList.clear();
 		}
 
 		// Only Unregister Event Source if Still Active...!
@@ -1734,7 +1984,7 @@ void DataSource::dataReady(void)
 			ssMRC << "Setting Max Read Chunk Size for " << m_name;
 			ssMRC << " to " << m_max_read_chunk;
 			ssMRC << " (" << val << ")";
-			INFO(ssMRC.str());
+			ERROR(ssMRC.str());
 		}
 	}
 
@@ -1838,9 +2088,30 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
 	// (And While We're At It, Also Check "Ignore Local SAWTOOTH" PV... :-)
 	if ( !( ++cnt % 99999 ) ) {
-		m_save_input_stream = m_pvSaveInputStream->value();
-		m_ignore_local_sawtooth = m_pvIgnoreLocalSAWTOOTH->value();
+		bool tmpSaveInputStream = m_pvSaveInputStream->value();
+		if ( tmpSaveInputStream != m_save_input_stream )
+		{
+			ERROR("rxPacket():"
+				<< " Updating Value of"
+				<< " Save Input Stream"
+				<< " for " << m_name
+				<< " from " << m_save_input_stream
+				<< " to " << tmpSaveInputStream);
+			m_save_input_stream = tmpSaveInputStream;
+		}
+		bool tmpIgnoreLocalSAWTOOTH = m_pvIgnoreLocalSAWTOOTH->value();
+		if ( tmpIgnoreLocalSAWTOOTH != m_ignore_local_sawtooth )
+		{
+			ERROR("rxPacket():"
+				<< " Updating Value of"
+				<< " Ignore Local SAWTOOTH"
+				<< " for " << m_name
+				<< " from " << m_ignore_local_sawtooth
+				<< " to " << tmpIgnoreLocalSAWTOOTH);
+			m_ignore_local_sawtooth = tmpIgnoreLocalSAWTOOTH;
+		}
 	}
+
 	if (m_save_input_stream) {
 		StorageManager::savePacket(pkt.packet(), pkt.packet_length(),
 			m_smsSourceId);
@@ -1975,7 +2246,7 @@ void DataSource::resetPacketStats(void)
 	Parser::resetDiscardedPacketsStats();
 }
 
-boost::shared_ptr<HWSource> DataSource::getHWSource(uint32_t hwId)
+boost::shared_ptr<HWSource> DataSource::getHWSource( uint32_t hwId )
 {
 	HWSrcMap::iterator it;
 
@@ -2131,7 +2402,8 @@ boost::shared_ptr<HWSource> DataSource::getHWSource(uint32_t hwId)
 
 		// Create New HWSource... (Pass In Id and Bandwidth PVs...)
 		boost::shared_ptr<HWSource> src( new HWSource(
-			m_name, hwIndex, hwId, smsId, pvHwId, pvSmsId,
+			m_name, hwIndex, hwId, smsId, m_max_pulse_seq_list,
+			pvHwId, pvSmsId,
 			pvEventBwSecond, pvEventBwMinute, pvEventBwTenMin,
 			pvMetaBwSecond, pvMetaBwMinute, pvMetaBwTenMin,
 			pvErrBwSecond, pvErrBwMinute, pvErrBwTenMin,
@@ -2176,8 +2448,15 @@ void DataSource::setIntermittent( uint32_t smsId, bool intermittent )
 			<< " -> Setting intermittent=" << intermittent
 			<< " for hwId=" << it->second->hwId() );
 		if ( intermittent ) {
-			it->second->setPulseGood( false ); // Don't Re-markComplete()!
-			//it->second->endPulse( false );
+			PulseSeqList::iterator psit;
+			for ( psit=it->second->m_pulseSeqList.begin() ;
+					psit != it->second->m_pulseSeqList.end() ; ++psit )
+			{
+				// Don't Re-markComplete()!
+				psit->first.m_pulseGood = false;
+				// But Keep Pulse Around for Recovery Later...
+				// (No Call to endPulse( psit, false )...)
+			}
 			it->second->setSmsId( (uint32_t) -1 );
 		}
 		else {
@@ -2212,7 +2491,12 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	static uint32_t cnt = 0;
 	++cnt;
 
-	boost::shared_ptr<HWSource> hw_src = getHWSource(pkt->sourceID());
+	boost::shared_ptr<HWSource> hw_src = getHWSource( pkt->sourceID() );
+
+	bool isNewPulse;
+	PulseSeqList::iterator psit = hw_src->getPulse( *pkt, isNewPulse );
+
+	PulseInvariants &pulse = psit->first;
 
 	// [INFREQUENTLY] Update "Check Packet Source/Pulse Sequence" Options
 	// for This Data Source, from Live Config PV Value...
@@ -2220,8 +2504,28 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	// so only check rarely, like every 3 minutes... ;-D
 	// (Note: count already incremented above for overall method...!)
 	if ( !(cnt % 33333) ) {
-		m_check_source_sequence = m_pvCheckSourceSequence->value();
-		m_check_pulse_sequence = m_pvCheckPulseSequence->value();
+		bool tmpCheckSourceSequence = m_pvCheckSourceSequence->value();
+		if ( tmpCheckSourceSequence != m_check_source_sequence )
+		{
+			ERROR("handleDataPkt():"
+				<< " Updating Value of"
+				<< " Check Source Sequence Numbers"
+				<< " for " << m_name
+				<< " from " << m_check_source_sequence
+				<< " to " << tmpCheckSourceSequence);
+			m_check_source_sequence = tmpCheckSourceSequence;
+		}
+		bool tmpCheckPulseSequence = m_pvCheckPulseSequence->value();
+		if ( tmpCheckPulseSequence != m_check_pulse_sequence )
+		{
+			ERROR("handleDataPkt():"
+				<< " Updating Value of"
+				<< " Check Pulse Sequence Numbers"
+				<< " for " << m_name
+				<< " from " << m_check_pulse_sequence
+				<< " to " << tmpCheckPulseSequence);
+			m_check_pulse_sequence = tmpCheckPulseSequence;
+		}
 	}
 
 	// Check for Valid Source Sequence from This Source...
@@ -2235,15 +2539,14 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	if ( hw_src->intermittent() ) {
 		uint32_t recoverCount = 0;
 		// See If Any Data Here, Or Just End of Last Long-Lost Pulse...?
-		if ( hw_src->pulse() == pkt->pulseId()
-				&& pkt->num_events() == 0 ) {
+		if ( !isNewPulse && pkt->num_events() == 0 ) {
 			DEBUG( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "handleDataPkt(): Intermittent Data Source Activity"
 				<< std::hex << " pulseId=0x" << pkt->pulseId() << std::dec
 				<< " Long-Lost Pulse Returns for srcId=" << m_smsSourceId
 				<< " hwId=" << hw_src->hwId()
 				<< " - No Events: Ignore This Pulse, Wait for Data..." );
-			hw_src->setPulseGood( false ); // Don't Re-markComplete()!
+			pulse.m_pulseGood = false; // Don't Re-markComplete()!
 			return false;
 		}
 		// "Open Loop Hysteresis" Recovery from Intermittent Data Source
@@ -2290,10 +2593,10 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	 * markers and duplicate pulse ids.
 	 */
 	bool good_pulse = true;
-	if ( hw_src->checkPulseInvariants(*pkt) )
-		good_pulse = hw_src->newPulse(*pkt);
+	if ( isNewPulse )
+		good_pulse = hw_src->newPulse( *pkt, psit );
 	else
-		good_pulse = hw_src->pulseGood();
+		good_pulse = pulse.m_pulseGood;
 
 	// Event Type Counts for Live Bandwidth Statistics...
 	uint32_t event_count = 0, meta_count = 0, err_count = 0;
@@ -2307,16 +2610,27 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 		// so only check very rarely, like every 10 minutes... ;-D
 		// (Note: count already incremented above for overall method...!)
 		if ( !(cnt % 99999) ) {
-			m_mixed_data_packets = m_pvMixedDataPackets->value();
+			bool tmpMixedDataPackets = m_pvMixedDataPackets->value();
+			if ( tmpMixedDataPackets != m_mixed_data_packets )
+			{
+				ERROR("handleDataPkt():"
+					<< " Updating Value of"
+					<< " Mixed Data Packets"
+					<< " for " << m_name
+					<< " from " << m_mixed_data_packets
+					<< " to " << tmpMixedDataPackets);
+				m_mixed_data_packets = tmpMixedDataPackets;
+			}
 		}
 
-		m_ctrl->pulseEvents( *pkt, hw_src->hwId(), hw_src->dupCount(),
+		m_ctrl->pulseEvents( *pkt, hw_src->hwId(), pulse.m_dupCount,
 			is_mapped, m_mixed_data_packets,
 			event_count, meta_count, err_count );
 
-		if ( ( m_check_pulse_sequence && !(hw_src->checkPulseSeq(*pkt)) )
-				|| !sourceSeqOk ) {
-			m_ctrl->markPartial( pkt->pulseId(), hw_src->dupCount() );
+		if ( ( m_check_pulse_sequence
+				&& !(hw_src->checkPulseSeq( *pkt, psit )) )
+					|| !sourceSeqOk ) {
+			m_ctrl->markPartial( pkt->pulseId(), pulse.m_dupCount );
 		}
 	}
 
@@ -2329,10 +2643,21 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	// - Infrequently Update from Live Control PV Value, once per minute?
 	// (Note: count already incremented above for overall method...!)
 	if ( !(cnt % 99999) ) {
-		m_ignore_eop = m_pvIgnoreEoP->value();
+		bool tmpIgnoreEoP = m_pvIgnoreEoP->value();
+		if ( tmpIgnoreEoP != m_ignore_eop )
+		{
+			ERROR("handleDataPkt():"
+				<< " Updating Value of"
+				<< " Ignore Data Packet End-of-Pulse"
+				<< " for " << m_name
+				<< " from " << m_ignore_eop
+				<< " to " << tmpIgnoreEoP);
+			m_ignore_eop = tmpIgnoreEoP;
+		}
 	}
+
 	if ( !m_ignore_eop && pkt->endOfPulse() )
-		hw_src->endPulse();
+		hw_src->endPulse( psit );
 
 	// Count Events in Various Statistics...
 
@@ -2400,8 +2725,17 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 
 	bool drop_pulse = false;
 
-	// do duplicate checking on a per-datasource basis
+	// Do Duplicate Pulse Checking on a Per-DataSource Basis...
+	// NOTE: This is a Bit "Loose" Relative to the DataSource::HWSource
+	// Duplicate Pulse Checking, which Queues Up the Last So Many Pulses
+	// to Ensure an Accurate "Duplicate" Count (Used as a Pulse "Index"!).
+	// TODO: If this Ever Becomes More of a Problem, We Should Really
+	// Do the Same Thing for RTDLs that we do for Raw/Mapped Data Packets,
+	// which is Buffer Some Number of RTDLs to Catch Interleaved Dups! ;-D
+	// (But Hopefully We Should Always have Non-Duplicate Pulses Anyway,
+	// Right...? ;-D)
 	if (pkt.pulseId() == m_lastRTDLPulseId) {
+		m_dupRTDL++;
 		/* Rate-limited logging of duplicate RTDLs */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
@@ -2413,9 +2747,9 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 				<< " from " << m_name
 				<< std::hex << " pulseId=0x" << pkt.pulseId() << std::dec
 				<< " cycle=" << pkt.cycle()
-				<< " vetoFlags=" << pkt.vetoFlags());
+				<< " vetoFlags=" << pkt.vetoFlags()
+				<< " m_dupRTDL=" << m_dupRTDL);
 		}
-		m_dupRTDL++;
 	}
 	else m_dupRTDL = 0;
 
