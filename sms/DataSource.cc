@@ -458,11 +458,16 @@ public:
 		// (_Before_ We Complete This Current Pulse, As They're Older! ;-D)
 		else
 		{
-			// Skip Past Current Pulse...
-			PulseSeqList::iterator old_psit = psit;
-			++old_psit;
+			// NOTE: Mark & Dispatch Pulses in *Reverse* Order,
+			// i.e. from the End, as in "First In, First Out"...! ;-D
+			PulseSeqList::iterator old_psit = m_pulseSeqList.end();
+			if ( old_psit != m_pulseSeqList.begin() ) --old_psit;
 
-			for ( ; old_psit != m_pulseSeqList.end() ; ++old_psit )
+			// Only Process Up to Current Pulse...
+			for ( ;
+					old_psit != m_pulseSeqList.begin()
+						&& old_psit != psit ;
+					--old_psit )
 			{
 				PulseInvariants &old_pulse = old_psit->first;
 
@@ -1372,9 +1377,11 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 				<< " smsId=" << it->second->smsId()
 				<< " m_pulseSeqList.size()="
 					<< it->second->m_pulseSeqList.size() );
-			PulseSeqList::iterator psit;
-			for ( psit=it->second->m_pulseSeqList.begin() ;
-					psit != it->second->m_pulseSeqList.end() ; ++psit )
+			// NOTE: Mark & Dispatch Pulses in *Reverse* Order,
+			// i.e. from the End, as in "First In, First Out"...! ;-D
+			PulseSeqList::iterator psit = it->second->m_pulseSeqList.end();
+			if ( psit != it->second->m_pulseSeqList.begin() ) --psit;
+			for ( ; psit != it->second->m_pulseSeqList.end() ; )
 			{
 				INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "unregisterHWSources():"
@@ -1383,6 +1390,9 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 						<< std::dec
 					<< " (" << m_name << ")" );
 				it->second->endPulse( psit, false );
+				// Make Sure We Process the First Pulse in List Too...! ;-D
+				if ( psit != it->second->m_pulseSeqList.begin() ) --psit;
+				else break;
 			}
 			it->second->m_pulseSeqList.clear();
 		}
