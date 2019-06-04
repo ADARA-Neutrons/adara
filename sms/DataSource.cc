@@ -697,6 +697,9 @@ public:
 						<< pkt.sourceSeq() << " != " << m_sourceSeq
 						<< std::hex << " src=0x" << m_hwId
 						<< " pkt.pulseId()=0x" << pkt.pulseId()
+						<< " pkt.cycle()=0x" << pkt.cycle()
+						<< ( (pkt.cycle() == 0x3FF)
+							? " [MISSING RTDL from DSP?]" : "" )
 						<< " hwId=0x" << m_hwId << std::dec);
 				}
 			}
