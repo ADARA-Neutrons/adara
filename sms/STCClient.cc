@@ -458,7 +458,7 @@ void STCClient::readable(void)
 			 * unexpected connection loss.
 			 * Take care of that case here.
 			 */
-			ERROR("Lost connection to STC for Run " << m_run->runNumber()
+			ERROR("Lost Connection to STC for Run " << m_run->runNumber()
 				 << " (m_stc_fd=" << m_stc_fd << ") "
 				 << " log_info=(" << log_info << ")");
 		}
