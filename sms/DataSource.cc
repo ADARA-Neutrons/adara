@@ -360,6 +360,7 @@ public:
 			// for Strict SAWTOOTH Checking...
 			// - Just Use Running Max PulseId Time, Actually
 			// More Accurate than the "Last Pulse We Saw"... ;-D
+			// (Unless of course a Bogus Future Pulse Time comes in... ;-b)
 			if ( pulse.m_pulseId > m_lastPulse )
 			{
 				m_lastPulse = pulse.m_pulseId;
@@ -375,7 +376,7 @@ public:
 					ERROR("HWSource::getPulse():"
 						<< " Updating Value of"
 						<< " Max Pulse Sequence List (Buffer) Size"
-						<< " for " << m_dataSource->name()
+						<< " for " << m_name
 						<< std::hex << " src=0x" << m_hwId << std::dec
 						<< " from " << m_maxPulseSeqList
 						<< " to " << tmpMaxPulseSeqList);
@@ -388,9 +389,40 @@ public:
 			// Pop One Pulse Off the End for Every New Pulse in Front!
 			if ( m_pulseSeqList.size() > m_maxPulseSeqList )
 			{
+				PulseSeqList::iterator old_pulse_it =
+					--(m_pulseSeqList.end());
+
+				// Check for Bogus Future Pulse Time Corruption
+				// of our Most Recent/Last/Max Pulse Time... ;-b
+				if ( old_pulse_it->first.m_pulseId == m_lastPulse ) {
+					ERROR("HWSource::getPulse():"
+						<< " Hmmm... Oldest Pulse in Pulse Sequence List"
+						<< " has Last Pulse Time...?!"
+						<< " m_lastPulse=0x"
+						<< std::hex << m_lastPulse << std::dec
+						<< " Possible Corruption of Last Pulse Time"
+						<< " from Bogus Future Pulse Time..."
+						<< std::hex << " src=0x" << m_hwId << std::dec
+						<< " (" << m_name << ")");
+					m_lastPulse = 0;
+					PulseSeqList::iterator psit_max =
+						m_pulseSeqList.begin();
+					while ( psit_max != old_pulse_it ) {
+						if ( psit_max->first.m_pulseId > m_lastPulse )
+							m_lastPulse = psit_max->first.m_pulseId;
+						psit_max++;
+					}
+					ERROR("HWSource::getPulse():"
+						<< " Resetting Last Pulse Time to "
+						<< " m_lastPulse=0x"
+						<< std::hex << m_lastPulse
+						<< " src=0x" << m_hwId << std::dec
+						<< " (" << m_name << ")");
+				}
+
 				// Finish/Release Oldest Pulse...
 				// (Only Marks Complete *Once*, If Still "PulseGood"...)
-				endPulse( --(m_pulseSeqList.end()), false );
+				endPulse( old_pulse_it, false );
 
 				// Remove Last Pulse from Sequence List...
 				m_pulseSeqList.pop_back();
