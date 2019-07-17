@@ -44,14 +44,15 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
 #define RLL_PULSE_BUFFER_OVERFLOW        3
 #define RLL_SET_SOURCES_READ_DELAY       4
-#define RLL_RTDL_OUT_OF_ORDER_WITH_DATA  5
-#define RLL_PULSE_PCHG_UNCORRECTED       6
-#define RLL_PULSE_PCHG_BUFFER_EMPTY      7
-#define RLL_NO_RTDL_FOR_PULSE            8
-#define RLL_CHOPPER_SYNC_ISSUE           9
-#define RLL_CHOPPER_GLITCH_ISSUE        10
-#define RLL_BOGUS_PULSE_ENERGY_ZERO     11
-#define RLL_BOGUS_PULSE_ENERGY_BETA     12
+#define RLL_UNKNOWN_FAST_META_PIXEL_ID   5
+#define RLL_RTDL_OUT_OF_ORDER_WITH_DATA  6
+#define RLL_PULSE_PCHG_UNCORRECTED       7
+#define RLL_PULSE_PCHG_BUFFER_EMPTY      8
+#define RLL_NO_RTDL_FOR_PULSE            9
+#define RLL_CHOPPER_SYNC_ISSUE          10
+#define RLL_CHOPPER_GLITCH_ISSUE        11
+#define RLL_BOGUS_PULSE_ENERGY_ZERO     12
+#define RLL_BOGUS_PULSE_ENERGY_BETA     13
 
 uint32_t SMSControl::m_targetStationNumber;
 
@@ -2436,6 +2437,22 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					pulse->m_fastMetaEvents.push_back(events[i]);
 					meta_count++;
 					continue;
+				}
+				else {
+					// Rate-Limited Log Unknown Fast Meta-Data PixelId...
+					std::stringstream ss;
+					ss << phys;
+					std::string log_info;
+					if ( RateLimitedLogging::checkLog(
+							RLLHistory_SMSControl,
+							RLL_UNKNOWN_FAST_META_PIXEL_ID, ss.str(),
+							2, 10, 100, log_info ) ) {
+						ERROR(log_info
+							<< ( m_recording ? "[RECORDING] " : "" )
+							<< "pulseEvents():"
+							<< " Unknown Fast Meta-Data PixelId "
+							<< std::hex << " phys=0x" << phys << std::dec);
+					}
 				}
 				// No mapping, Error Pixel...
 				/* FALLTHROUGH */
