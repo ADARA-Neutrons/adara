@@ -1454,7 +1454,7 @@ UPDATE_PROPOSAL_METADATA()
 		# 3. If Successful, Keep Branching Back to Label "a"...
 		white_sub_new_line=`echo "${_ipts_new_line}" \
 			| ${SED} \
-				":a;s/^\([[:space:]]*\)[[:space:]]/\1${SPACE_MARKER}/;ta"`
+				":a;s@^\([[:space:]]*\)[[:space:]]@\1${SPACE_MARKER}@;ta"`
 		cksedwhite=$?
 
 		if [[ ${cksedwhite} != 0 ]]; then
@@ -1476,7 +1476,7 @@ UPDATE_PROPOSAL_METADATA()
 		echo -e "\t-> New Value: [${_new_value}]"
 
 		_ipts_new_line=`echo "${_ipts_new_line}" \
-			| ${SED} "s/${update_old_value}/${_new_value}/"`
+			| ${SED} "s@${update_old_value}@${_new_value}@"`
 		cksedvalue=$?
 
 		if [[ ${cksedvalue} != 0 ]]; then
@@ -1882,7 +1882,7 @@ for run in ${RUN_NUMBERS} ; do
 			| ${HEAD} -2`
 		echo -e -n "\nUsing First Set of RunInfo Lines "
 		echo -e "of the First Data File for Run ${run}:\n"
-		echo "${runinfo_lines_wnum}" | ${SED} 's/runinfo.*/runinfo.../'
+		echo "${runinfo_lines_wnum}" | ${SED} 's@runinfo.*@runinfo...@'
 			# Allow Self-Indenting from XML Line(s)
 	# Else Take Last Set of RunInfo Lines of the Last Data File...
 	else
@@ -1890,7 +1890,7 @@ for run in ${RUN_NUMBERS} ; do
 			| ${TAIL} -2`
 		echo -e -n "\nUsing Last Set of RunInfo Lines "
 		echo -e "of the Last Data File for Run ${run}:\n"
-		echo "${runinfo_lines_wnum}" | ${SED} 's/runinfo.*/runinfo.../'
+		echo "${runinfo_lines_wnum}" | ${SED} 's@runinfo.*@runinfo...@'
 			# Allow Self-Indenting from XML Line(s)
 	fi
 
@@ -1956,7 +1956,7 @@ for run in ${RUN_NUMBERS} ; do
 	#
 
 	# Parse Proposal Number from Proposal Id...
-	prop_num=`echo "${IPTS_NEW}" | ${SED} -e "s/^IPTS-//"`
+	prop_num=`echo "${IPTS_NEW}" | ${SED} -e "s@^IPTS-@@"`
 
 	# Set Bash Pipefail Option as Needed...
 	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
@@ -2049,7 +2049,7 @@ for run in ${RUN_NUMBERS} ; do
 		if [[ -n "${USERS_NEW}" ]]; then
 
 			# Extract New User List...
-			new_user_list=`echo "${USERS_NEW}" | ${SED} "s/;/ /g"`
+			new_user_list=`echo "${USERS_NEW}" | ${SED} "s@;@ @g"`
 
 			old_user_list=""
 
@@ -2101,10 +2101,10 @@ for run in ${RUN_NUMBERS} ; do
 							echo "from Both Lists - Ok As Is!"
 
 							new_user_list=`echo "$new_user_list" \
-								| ${SED} -e "s/[[:space:]]*${new_user}//"`
+								| ${SED} -e "s@[[:space:]]*${new_user}@@"`
 
 							old_user_list=`echo "$old_user_list" \
-								| ${SED} -e "s/[[:space:]]*${old_user}//"`
+								| ${SED} -e "s@[[:space:]]*${old_user}@@"`
 
 							found=1
 
@@ -2145,11 +2145,11 @@ for run in ${RUN_NUMBERS} ; do
 
 						# Remove This New User from the List...
 						new_user_list=`echo "$new_user_list" \
-							| ${SED} -e "s/[[:space:]]*${new_user}//"`
+							| ${SED} -e "s@[[:space:]]*${new_user}@@"`
 
 						# Remove This Old User from the List...
 						old_user_list=`echo "$old_user_list" \
-							| ${SED} -e "s/^[[:space:]]*${old_user}//"`
+							| ${SED} -e "s@^[[:space:]]*${old_user}@@"`
 
 						echo -e -n "\nSubstituting New User [${new_user}] "
 						echo "for Old User [${old_user}]."

@@ -54,6 +54,8 @@ void FastMeta::addDevices(const ptree &conf)
 			continue;
 		}
 
+		DEBUG("addDevices(): Found Fast Meta-Data Device"
+			<< " [" << name << "]");
 		addDevice(name, it->second);
 	}
 }
@@ -179,6 +181,9 @@ void FastMeta::addDevice(const std::string &name,
 		throw std::runtime_error(msg);
 	}
 
+	DEBUG("addDevice(): Reading Descriptor for Fast Meta-Data Device"
+		<< " [" << name << "]"
+		<< " at [" << path->second.data() << "]");
 	readFile(name, path->second.data(), ddp);
 
 	bool reconnected = false; // ignored for FastMeta devices...
@@ -197,6 +202,10 @@ void FastMeta::addDevice(const std::string &name,
 		std::string val(cval, 0, cval.find_first_of(";#"));
 		boost::trim_right(val);
 
+		DEBUG("addDevice(): Parsing Variable Id for Fast Meta-Data Device"
+			<< " [" << name << "]"
+			<< " id=" << v.first
+			<< " val=[" << val << "]");
 		parseEntry(name, v.first, val, varId, key, persist);
 
 		if (m_vars.count(key)) {
@@ -208,6 +217,13 @@ void FastMeta::addDevice(const std::string &name,
 			throw std::runtime_error(msg);
 		}
 
+		DEBUG("addDevice():"
+			<< " Defining Device/Variable for Fast Meta-Data Device"
+			<< " [" << name << "]"
+			<< " devId=" << devId
+			<< " varId=" << varId
+			<< " key=0x" << std::hex << key << std::dec
+			<< " persist=" << persist);
 		m_vars[key].m_devId = devId;
 		m_vars[key].m_varId = varId;
 		m_vars[key].m_persist = persist;

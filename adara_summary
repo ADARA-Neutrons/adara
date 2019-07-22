@@ -199,6 +199,7 @@ declare -A nHostPVSDUndefineDevicePkt
 declare -A nHostPVSDMakePvNamesUnique
 declare -A nHostPVSDAssignPVID
 declare -A nHostPVSDInactiveDeviceID
+declare -A nHostPVSDSetDeviceActiveStatus
 declare -A nHostPVSDFailedChannelInfoPV
 declare -A nHostPVSDDeviceNotYetDefined
 declare -A nHostPVSDSubscriptionCreated
@@ -364,6 +365,7 @@ PARSE_LOG()
 		nHostPVSDMakePvNamesUnique[$host]=0
 		nHostPVSDAssignPVID[$host]=0
 		nHostPVSDInactiveDeviceID[$host]=0
+		nHostPVSDSetDeviceActiveStatus[$host]=0
 		nHostPVSDFailedChannelInfoPV[$host]=0
 		nHostPVSDDeviceNotYetDefined[$host]=0
 		nHostPVSDSubscriptionCreated[$host]=0
@@ -1148,6 +1150,14 @@ PARSE_LOG()
 			nHostPVSDInactiveDeviceID[$host]=$(( \
 				nHostPVSDInactiveDeviceID[$host] + 1 ))
 
+		# "Setting Active Status for Device" Log
+		elif [[ "$log" =~ \
+			Setting${S}Active${S}Status${S}for${S}Device ]]; \
+		then
+			#echo "Setting Active Status for Device..."
+			nHostPVSDSetDeviceActiveStatus[$host]=$(( \
+				nHostPVSDSetDeviceActiveStatus[$host] + 1 ))
+
 		# "Failed to get channel info for PV" Log
 		elif [[ "$log" =~ \
 			Failed${S}to${S}get${S}channel${S}info${S}for${S}PV ]]; \
@@ -1845,6 +1855,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDInactiveDeviceID[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDInactiveDeviceID[$h]} "
 		echo "PVSD \"Inactive Device ID\" Logs"
+	fi
+	if [[ ${nHostPVSDSetDeviceActiveStatus[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDSetDeviceActiveStatus[$h]} "
+		echo "PVSD \"Setting Active Status for Device\" Logs"
 	fi
 	if [[ ${nHostPVSDDeviceNotYetDefined[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDDeviceNotYetDefined[$h]} "
