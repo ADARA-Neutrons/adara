@@ -39,6 +39,16 @@ private:
 };
 
 
+enum DeviceIsActiveEnum
+{
+    DEVICE_IS_INACTIVE,   // Device is Inactive
+    DEVICE_IS_ACTIVE,     // Device is Active
+    DEVICE_IS_UNKNOWN     // Device Active Status *Unknown*,
+                          // Active Status PV is Disconnected...
+                          // (Leave Device Status Unchanged...!)
+};
+
+
 class PVDescriptor
 {
 public:
@@ -71,7 +81,7 @@ public:
     EnumDescriptor     *m_enum;
     string              m_units;
     bool                m_is_active_pv;
-    bool                m_is_active;
+    DeviceIsActiveEnum  m_is_active;
     bool                m_ignore;
 
     friend class DeviceDescriptor;
