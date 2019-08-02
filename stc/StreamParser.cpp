@@ -4499,6 +4499,16 @@ StreamParser::pvValueUpdate
                 << " not of correct type." )
     }
 
+    // Did the PV Value *Change* with This Update...?
+    bool value_changed = false;
+    bool new_value = false;
+    if ( pvinfo->m_last_value_set )
+    {
+        value_changed =
+            !( pvinfo->valuesEqual( pvinfo->m_last_value, a_value ) );
+    }
+    else new_value = true;
+
     uint64_t ts_nano = timespec_to_nsec( a_timestamp );
 
     // Check this update to see if the timestamp is newer than the
@@ -4520,8 +4530,7 @@ StreamParser::pvValueUpdate
     // So Assume SMS File Boundary Duplicate - Ignore PV Update...
     // (*Don't* Log, Frequent Occurrence...)
     if ( ts_nano == pvinfo->m_last_time
-            && pvinfo->m_last_value_set
-            && pvinfo->valuesEqual( pvinfo->m_last_value, a_value ) )
+            && pvinfo->m_last_value_set && !value_changed )
     {
         return;
     }
@@ -4544,7 +4553,7 @@ StreamParser::pvValueUpdate
                 << " [" << pvinfo->m_connection << "]" << ")";
             ssinfo << " = " << pvinfo->valueToString( a_value ) << " @";
             syslog( LOG_ERR,
-                "[%i] %s %s%s %s %s %lu.%09lu (%lu) < %lu.%09lu (%lu) %s",
+            "[%i] %s %s%s %s %s %lu.%09lu (%lu) < %lu.%09lu (%lu) %s %s",
                 g_pid, "STC Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update SAWTOOTH",
@@ -4556,6 +4565,8 @@ StreamParser::pvValueUpdate
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL),
                 pvinfo->m_last_time,
+                ( ( value_changed ) ? "(Value Changed)"
+                    : ( ( new_value ) ? "(New Value)" : "(Same Value)" ) ),
                 "- Pass Thru Anyway..."
             );
             // give syslog a chance...
@@ -4600,7 +4611,7 @@ StreamParser::pvValueUpdate
                 << " [" << pvinfo->m_connection << "]" << ")";
             ssinfo << " = " << pvinfo->valueToString( a_value ) << " @";
 
-            // If there Only *One* PV Value before this one,
+            // If there's Only *One* PV Value before this one,
             // and it's _Also_ a Negative Time Offset, then
             // throw That One away and keep This One instead... ;-D
             if ( pvinfo->m_value_buffer.size() == 1
@@ -4627,12 +4638,12 @@ StreamParser::pvValueUpdate
                         pvinfo->m_value_buffer[0] );
                     ss2 << " @ " << pvinfo->m_last_time;
                     ss2 << " - Keep New Value";
+                    ss2 << ": " << ssinfo.str();
                     syslog( log_type,
-                    "[%i] %s%s%s %s: %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                    "[%i] %s%s%s %s %lu.%09lu (%lu) < %lu.%09lu (%lu) %s",
                         g_pid, log_hdr.c_str(), log_info.c_str(),
                         "StreamParser::pvValueUpdate()",
                         ss2.str().c_str(),
-                        ssinfo.str().c_str(),
                         a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                         a_timestamp.tv_nsec,
                         ts_nano,
@@ -4641,7 +4652,10 @@ StreamParser::pvValueUpdate
                             - ADARA::EPICS_EPOCH_OFFSET,
                         (unsigned long)(m_pulse_info.start_time
                             % NANO_PER_SECOND_LL),
-                        m_pulse_info.start_time
+                        m_pulse_info.start_time,
+                        ( ( value_changed ) ? "(Value Changed)"
+                            : ( ( new_value )
+                                ? "(New Value)" : "(Same Value)" ) )
                     );
                     usleep(30000); // give syslog a chance...
                 }
@@ -4670,7 +4684,7 @@ StreamParser::pvValueUpdate
                         log_hdr = "STC Error: ";
                     }
                     syslog( log_type,
-                        "[%i] %s%s%s %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                    "[%i] %s%s%s %s %lu.%09lu (%lu) < %lu.%09lu (%lu) %s",
                         g_pid, log_hdr.c_str(), log_info.c_str(),
                         "StreamParser::pvValueUpdate()",
                         ssinfo.str().c_str(),
@@ -4682,7 +4696,10 @@ StreamParser::pvValueUpdate
                             - ADARA::EPICS_EPOCH_OFFSET,
                         (unsigned long)(m_pulse_info.start_time
                             % NANO_PER_SECOND_LL),
-                        m_pulse_info.start_time
+                        m_pulse_info.start_time,
+                        ( ( value_changed ) ? "(Value Changed)"
+                            : ( ( new_value )
+                                ? "(New Value)" : "(Same Value)" ) )
                     );
                     usleep(30000); // give syslog a chance...
                 }
@@ -4710,7 +4727,8 @@ StreamParser::pvValueUpdate
                 << " (" << pvinfo->m_device_name << ")";
             ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
                 << " [" << pvinfo->m_connection << "]" << ")";
-            syslog( LOG_ERR, "[%i] %s %s%s %s %s = %s @ %lu.%09lu (%lu)",
+            syslog( LOG_ERR,
+                "[%i] %s %s%s %s %s = %s @ %lu.%09lu (%lu) %s",
                 g_pid, "STC Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Got Pre-Pulse Variable Value Update",
@@ -4718,7 +4736,9 @@ StreamParser::pvValueUpdate
                 pvinfo->valueToString( a_value ).c_str(),
                 a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                 a_timestamp.tv_nsec,
-                ts_nano
+                ts_nano,
+                ( ( value_changed ) ? "(Value Changed)"
+                    : ( ( new_value ) ? "(New Value)" : "(Same Value)" ) )
             );
             // give syslog a chance...
             usleep(30000);
@@ -4728,9 +4748,14 @@ StreamParser::pvValueUpdate
         t = -1.0;
     }
 
+    // Set "Last Value" for PV, It's Ok if Overwritten in flushBuffers()...
+    // - if it does get overwritten, it will be the same value... ;-D
+    // - sometimes we need to "make sure" the Last Value is Set,
+    // like for a "Duplicate" PV that never actually flushes its buffers!
     pvinfo->m_last_time = ts_nano;
     pvinfo->m_last_value = a_value;
     pvinfo->m_last_value_set = true;
+    pvinfo->m_value_changed = value_changed;
 
     pvinfo->m_value_buffer.push_back(a_value);
     pvinfo->m_abs_time_buffer.push_back(ts_nano);

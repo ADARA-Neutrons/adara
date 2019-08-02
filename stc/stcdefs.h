@@ -11,7 +11,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STC_VERSION "1.12.0"
+#define STC_VERSION "1.12.1"
 extern pid_t g_pid;
 
 #define STC_DOUBLE_EPSILON (0.00000000000001)
@@ -878,7 +878,8 @@ public:
     : PVInfoBase( a_device_name, a_name, a_connection,
         a_device_id, a_pv_id, a_type, a_enum_vector, a_enum_index,
         a_units, a_ignore, a_duplicate ),
-    m_last_value_set(false), m_last_value_more(false)
+    m_last_value_set(false), m_last_value_more(false),
+    m_value_changed(false)
     {}
 
     /// PVInfo destructor
@@ -1321,7 +1322,8 @@ public:
     std::string m_last_enum_string; ///< Enum for Last Recorded PV Value
     T   m_last_value;   ///< Last Recorded Value for PV (Conditional Groups)
     bool    m_last_value_set;   ///< Has there been a "Last Value"...? ;-D
-    bool    m_last_value_more;   ///< More than just a "Last Value"...? ;-O
+    bool    m_last_value_more;  ///< More than just a "Last Value"...? ;-O
+    bool    m_value_changed;    ///< Did PV Value "Change" During Run? :-D
 };
 
 

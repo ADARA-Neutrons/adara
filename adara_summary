@@ -157,6 +157,7 @@ declare -A nHostSMSDNoRTDLForPulse
 declare -A nHostSMSDRTDLOutOfOrderWithRawData
 declare -A nHostSMSDMissingRTDLForProtonCharge
 declare -A nHostSMSDNoMorePulsesForCorrect
+declare -A nHostSMSDMissingRTDLFromDSP
 declare -A nHostSMSDNewChopperId
 declare -A nHostSMSDChopperEventSync
 declare -A nHostSMSDChopperGlitchEvent
@@ -323,6 +324,7 @@ PARSE_LOG()
 		nHostSMSDRTDLOutOfOrderWithRawData[$host]=0
 		nHostSMSDMissingRTDLForProtonCharge[$host]=0
 		nHostSMSDNoMorePulsesForCorrect[$host]=0
+		nHostSMSDMissingRTDLFromDSP[$host]=0
 		nHostSMSDNewChopperId[$host]=0
 		nHostSMSDChopperEventSync[$host]=0
 		nHostSMSDChopperGlitchEvent[$host]=0
@@ -828,6 +830,12 @@ PARSE_LOG()
 			#echo "No More Pulses for Proton Charge/Veto Flags Correction"
 			nHostSMSDNoMorePulsesForCorrect[$host]=$(( \
 				nHostSMSDNoMorePulsesForCorrect[$host] + 1 ))
+
+		# "MISSING RTDL from DSP?" Log
+		elif [[ "$log" =~ MISSING${S}RTDL${S}from${S}DSP ]]; then
+			#echo "MISSING RTDL from DSP?"
+			nHostSMSDMissingRTDLFromDSP[$host]=$(( \
+				nHostSMSDMissingRTDLFromDSP[$host] + 1 ))
 
 		# "New Chopper id=" Log
 		elif [[ "$log" =~ New${S}Chopper${S}id= ]]; then
@@ -1649,6 +1657,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDDataSourceReadDelay[$h]} -gt 0 ]]; then
 		echo -n "   ** ${nHostSMSDDataSourceReadDelay[$h]} "
 		echo "SMSD \"Read Delay Threshold Exceeded\" Logs"
+	fi
+	if [[ ${nHostSMSDMissingRTDLFromDSP[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSMSDMissingRTDLFromDSP[$h]} "
+		echo "SMSD \"MISSING RTDL from DSP?\" Logs"
 	fi
 	if [[ ${nHostSMSDDataSourceTimedOutRetry[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSMSDDataSourceTimedOutRetry[$h]} "

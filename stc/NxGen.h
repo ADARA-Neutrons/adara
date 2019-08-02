@@ -388,6 +388,22 @@ private:
             m_nxgen.writeSlab( m_log_path + "/value",
                 value_buffer, m_cur_size );
 
+            // Did this PV's Value *Change* for the First Time here...?
+            if ( !(this->m_value_changed) )
+            {
+                uint32_t value = ( this->m_last_value_set )
+                    ? ( this->m_last_value ) : ( value_buffer.front() );
+                for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+                {
+                    // PV Value Changed...
+                    if ( value_buffer[i] != value )
+                    {
+                        this->m_value_changed = true;
+                        break;
+                    }
+                }
+            }
+
             // Save Last Value for Conditional STC Config Groups
             this->m_last_value = value_buffer.back();
             this->m_last_value_set = true;
@@ -481,6 +497,22 @@ private:
             m_nxgen.writeSlab( m_log_path + "/value",
                 value_buffer, m_cur_size );
 
+            // Did this PV's Value *Change* for the First Time here...?
+            if ( !(this->m_value_changed) )
+            {
+                double value = ( this->m_last_value_set )
+                    ? ( this->m_last_value ) : ( value_buffer.front() );
+                for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
+                {
+                    // PV Value Changed...
+                    if ( value_buffer[i] != value )
+                    {
+                        this->m_value_changed = true;
+                        break;
+                    }
+                }
+            }
+
             // Save Last Value for Conditional STC Config Groups
             this->m_last_value = value_buffer.back();
             this->m_last_value_set = true;
@@ -525,9 +557,18 @@ private:
 
                 // Pad the Strings with Spaces to Be of Uniform Length...
                 std::vector<std::string> value_vec;
+                // (And See if PV's Value *Changed* for First Time here...)
+                std::string value = ( this->m_last_value_set )
+                    ? ( this->m_last_value ) : ( value_buffer.front() );
                 for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
                 {
                     std::string str = value_buffer[i];
+                    // PV Value Changed...
+                    if ( !(this->m_value_changed)
+                            && value.compare( str ) )
+                    {
+                        this->m_value_changed = true;
+                    }
                     if ( str.size() < max_len )
                         str.insert( str.end(), max_len - str.size(), ' ' );
                     value_vec.push_back( str );
@@ -590,8 +631,28 @@ private:
 
                 // Pad the Arrays with Zeros to Be of Uniform Length...
                 std::vector<uint32_t> value_vec;
+                // (And See if PV's Value *Changed* for First Time here...)
+                std::vector<uint32_t> &value = ( this->m_last_value_set )
+                    ? ( this->m_last_value ) : ( value_buffer.front() );
                 for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
                 {
+                    // Did PV Value Change...?
+                    if ( !(this->m_value_changed) )
+                    {
+                        if ( value.size() != value_buffer[i].size() )
+                            this->m_value_changed = true;
+                        else
+                        {
+                            for ( uint32_t j=0 ; j < value.size() ; j++ )
+                            {
+                                if ( value[j] != (value_buffer[i])[j] )
+                                {
+                                    this->m_value_changed = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     value_vec.reserve( value_vec.size() + max_len );
                     value_vec.insert( value_vec.end(),
                         value_buffer[i].begin(), value_buffer[i].end() );
@@ -659,8 +720,30 @@ private:
 
                 // Pad the Arrays with Zeros to Be of Uniform Length...
                 std::vector<double> value_vec;
+                // (And See if PV's Value *Changed* for First Time here...)
+                std::vector<double> &value = ( this->m_last_value_set )
+                    ? ( this->m_last_value ) : ( value_buffer.front() );
                 for ( uint32_t i=0 ; i < value_buffer.size() ; i++ )
                 {
+                    // Did PV Value Change...?
+                    if ( !(this->m_value_changed) )
+                    {
+                        if ( value.size() != value_buffer[i].size() )
+                            this->m_value_changed = true;
+                        else
+                        {
+                            for ( uint32_t j=0 ; j < value.size() ; j++ )
+                            {
+                                if ( !(approximatelyEqual(
+                                        value[j], (value_buffer[i])[j],
+                                        STC_DOUBLE_EPSILON )) )
+                                {
+                                    this->m_value_changed = true;
+                                    break;
+                                }
+                            }
+                        }
+                    }
                     value_vec.reserve( value_vec.size() + max_len );
                     value_vec.insert( value_vec.end(),
                         value_buffer[i].begin(), value_buffer[i].end() );
@@ -1927,7 +2010,8 @@ private:
 
                                     // Log Error if There Were More Than 1
                                     // Values in This PV Time-Series Log!
-                                    if ( this->m_last_value_more )
+                                    if ( this->m_last_value_more
+                                            && this->m_value_changed )
                                     {
                                         syslog( LOG_ERR,
                                             "[%i] %s %s %s %s - %s %s",
@@ -2085,7 +2169,7 @@ private:
                         || boost::regex_search(
                             this->m_internal_connection, subs, expr ) )
                     {
-                        if ( ! E->unitsValue.size() )
+                        if ( !(E->unitsValue.size()) )
                         {
                             std::stringstream ss;
                             ss << this->valueToString(
@@ -2104,6 +2188,23 @@ private:
                             usleep(30000);
 
                             E->unitsValue = ss.str();
+
+                            // Log Error if There Were More Than 1
+                            // Values in This PV Time-Series Log!
+                            if ( this->m_last_value_more
+                                    && this->m_value_changed )
+                            {
+                                syslog( LOG_ERR,
+                                "[%i] %s %s %s in %s \"%s\" %s - %s %s",
+                                    g_pid, "STC Error:",
+                                    "More Than 1 PV Value for",
+                                    this->m_device_pv_str.c_str(),
+                                    "Group", G->name.c_str(),
+                                    units_patt_str.c_str(),
+                                    "Check", m_log_path.c_str() );
+                                // give syslog a chance...
+                                usleep(30000);
+                            }
                         }
 
                         else

@@ -989,7 +989,10 @@ DeviceAgent::controlThread()
                             + m_dev_record->m_active_pv->m_connection
                             + ")";
 
-                        if ( m_dev_record->m_active_pv->m_is_active )
+                        // If Device is Active, Make Sure Device Status Set
+                        // (And Send Current Values as Needed...)
+                        if ( m_dev_record->m_active_pv->m_is_active
+                                == DEVICE_IS_ACTIVE )
                         {
                             // Only Set/Log if Active Status Changed...
                             if ( !(m_dev_record->m_active) )
@@ -1013,9 +1016,39 @@ DeviceAgent::controlThread()
                                 sendCurrentValues();
                         }
 
+                        // If Device Status is Unknown, Leave Device As Is!
+                        // (Just Send Current Values as Needed...)
+                        else if ( m_dev_record->m_active_pv->m_is_active
+                                == DEVICE_IS_UNKNOWN )
+                        {
+                            syslog( LOG_ERR,
+                                "%s %s: %s, %s %s -%s%s [%s = %u (%s)]",
+                                "PVSD ERROR:",
+                                "DeviceAgent::controlThread()",
+                                "Device Active Status Unknown",
+                                "Active Status PV Disconnected!",
+                                "Leave Device Status As Is",
+                                deviceStr.c_str(), pvStr.c_str(),
+                                "active", m_dev_record->m_active,
+                                ( ( m_dev_record->m_active )
+                                    ? "true" : "false" ) );
+                            usleep(33333); // give syslog a chance...
+
+                            // If Device is Active,
+                            // And We Didn't Just Send the PV Values
+                            // (Because the Device Didn't Change)
+                            // Then Send Them Now! ;-D
+                            if ( m_dev_record->m_active
+                                    && !device_changed )
+                            {
+                                sendCurrentValues();
+                            }
+                        }
+
                         // If Device is Inactive, "Soft-Delete" Device
                         // (i.e. Don't _Actually_ Delete It, Just Pretend!)
-                        else
+                        else if ( m_dev_record->m_active_pv->m_is_active
+                                == DEVICE_IS_INACTIVE )
                         {
                             // Only Set/Log if Active Status Changed...
                             if ( m_dev_record->m_active )
@@ -1426,21 +1459,27 @@ DeviceAgent::epicsConnectionHandler(
                 {
                     // Always Save Active Status to PV Descriptor...
                     // (This PV Could Become an Active Status PV... ;-D)
-                    ich->second.m_pv->m_is_active = false;
+                    ich->second.m_pv->m_is_active = DEVICE_IS_UNKNOWN;
 
                     // Lost Connection for Active Status PV...!
                     if ( ich->second.m_pv->m_is_active_pv )
                     {
-                        // If Active Status PV Goes Away,
-                        // Set Device "Inactive"
-                        if ( ich->second.m_device != NULL )
-                            ich->second.m_device->m_active = false;
+                        // NOTE: Just Because Active Status PV Goes Away,
+                        // *Don't* Set Device to "Inactive"...
+                        // Leave Device Status As Is! ;-D (8/1/2019)
+                        // if ( ich->second.m_device != NULL )
+                            // ich->second.m_device->m_active = false;
+
+                        std::string statusStr = "unknown";
+                        bool active_state = false;
 
                         std::string deviceStr = " *** NO DEVICE ***";
                         if ( ich->second.m_device != NULL )
                         {
                             deviceStr = " Device ["
                                 + ich->second.m_device->m_name + "]";
+                            active_state = ich->second.m_device->m_active;
+                            statusStr = active_state ? "true" : "false";
                         }
 
                         std::string pvStr = "";
@@ -1451,33 +1490,36 @@ DeviceAgent::epicsConnectionHandler(
                                 + ich->second.m_pv->m_connection + ")";
                         }
 
-                        syslog( LOG_ERR, "%s %s: %s%s%s [%s = %s]",
+                        syslog( LOG_ERR,
+                            "%s %s: %s%s%s - %s [%s = %u (%s)]",
                             "PVSD ERROR:",
                             "DeviceAgent::epicsConnectionHandler()",
                             "Lost Active Status PV Connection for",
                             deviceStr.c_str(), pvStr.c_str(),
-                            "active", "false" );
+                            "Device Active Status Remains Unchanged",
+                            "active", active_state, statusStr.c_str() );
                         usleep(33333); // give syslog a chance...
 
+                        // NOTE: *Don't* "Soft-Delete" Device! Leave As Is!
                         // Device has Gone Inactive, "Soft-Delete" Device
                         // (i.e. Don't _Actually_ Delete It, Just Pretend!)
-                        if ( m_dev_record.get() )
-                        {
-                            m_stream_api.getCfgMgr().undefineDevice(
-                                m_dev_record,
-                                /* Don't Delete Device! */ false );
-                        }
-                        else
-                        {
-                            syslog( LOG_ERR,
-                                "%s %s: %s%s%s [%s = %u (%s)]",
-                                "PVSD ERROR:",
-                                "DeviceAgent::epicsConnectionHandler()",
-                                "Couldn't Soft-Undefine Now-Inactive",
-                                deviceStr.c_str(), pvStr.c_str(),
-                                "active", 0, "false" );
-                            usleep(33333); // give syslog a chance...
-                        }
+                        // if ( m_dev_record.get() )
+                        // {
+                            // m_stream_api.getCfgMgr().undefineDevice(
+                                // m_dev_record,
+                                // /* Don't Delete Device! */ false );
+                        // }
+                        // else
+                        // {
+                            // syslog( LOG_ERR,
+                                // "%s %s: %s%s%s [%s = %u (%s)]",
+                                // "PVSD ERROR:",
+                                // "DeviceAgent::epicsConnectionHandler()",
+                                // "Couldn't Soft-Undefine Now-Inactive",
+                                // deviceStr.c_str(), pvStr.c_str(),
+                                // "active", 0, "false" );
+                            // usleep(33333); // give syslog a chance...
+                        // }
 
                         // Don't Send Variable Value Updates
                         // for Active Status PVs...!
@@ -1742,7 +1784,9 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                 {
                     // Always Save Active Status to PV Descriptor...
                     // (This PV Could Become an Active Status PV... ;-D)
-                    ich->second.m_pv->m_is_active = active_state;
+                    ich->second.m_pv->m_is_active =
+                        ( active_state )
+                            ? DEVICE_IS_ACTIVE : DEVICE_IS_INACTIVE;
 
                     // Set Device Active Status
                     // If This PV is an Active Status PV...
