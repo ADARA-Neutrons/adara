@@ -1341,7 +1341,9 @@ if [[ "$command" == "status" \
 			|| "$command" == "run_status" \
 			|| "$command" == "sys_status" ]]; then
 
-		caget -S $WAIT ${PRE}:SMS:Version | sed "s/ (/\n   (/"
+		caget -a -S $WAIT ${PRE}:SMS:Version \
+			| sed -e "s/ 2/   2/" -e "s/SMSD/ SMSD/" -e "s/ (/\n  (/" \
+				-e "s/[[:space:]]*$//"
 
 		echo
 
@@ -1380,8 +1382,6 @@ if [[ "$command" == "status" \
 
 		sendSampleInRunInfo=`echo "$sendSampleInRunInfoOut" \
 			| grep $ssiri | awk '{print $2}'`
-
-		echo
 
 		# Omit Sample Meta-Data for Run Status If Not Actually Using... :-D
 		if [[ "$command" != "run_status"
