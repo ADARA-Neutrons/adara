@@ -1374,31 +1374,42 @@ if [[ "$command" == "status" \
 			|| "$command" == "run_status"
 			|| "$command" == "sample_status" ]]; then
 
-		caget $WAIT ${PRE}:SMS:RunInfo:SendSampleInRunInfo
+		ssiri="${PRE}:SMS:RunInfo:SendSampleInRunInfo"
+		sendSampleInRunInfoOut=`caget $WAIT $ssiri`
+		echo "$sendSampleInRunInfoOut"
+
+		sendSampleInRunInfo=`echo "$sendSampleInRunInfoOut" \
+			| grep $ssiri | awk '{print $2}'`
 
 		echo
 
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Id
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Name
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Nature
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Formula
-		caget $WAIT ${PRE}:SMS:RunInfo:Sample:Mass
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassUnits
-		caget $WAIT ${PRE}:SMS:RunInfo:Sample:Density
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityUnits
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerId
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerName
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Component
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanIndicator
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanBarcode
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanName
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanMaterials
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Description
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Comments
+		# Omit Sample Meta-Data for Run Status If Not Actually Using... :-D
+		if [[ "$command" != "run_status"
+				|| "$sendSampleInRunInfo" != "false" ]]; then
 
-		echo
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Id
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Name
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Nature
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Formula
+			caget $WAIT ${PRE}:SMS:RunInfo:Sample:Mass
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassString
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassUnits
+			caget $WAIT ${PRE}:SMS:RunInfo:Sample:Density
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityString
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityUnits
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerId
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerName
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Component
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanIndicator
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanBarcode
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanName
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanMaterials
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Description
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Comments
+
+			echo
+
+		fi
 
 	fi
 
