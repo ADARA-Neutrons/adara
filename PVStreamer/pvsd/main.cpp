@@ -49,6 +49,7 @@
 #include "ADARA_OutputAdapter.h"
 #include "ComBus.h"
 #include "TraceException.h"
+#include "ADARA.h"
 #include "ADARAUtils.h"
 
 using namespace std;
@@ -56,7 +57,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.7.3"
+#define PVSD_VERSION "1.7.4"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -161,9 +162,9 @@ daemonize()
     // Reopen log
     openlog( "pvsd", 0, LOG_DAEMON );
     syslog( LOG_INFO,
-        "PVSD Daemon %s Starting. (ADARA Common %s, ComBus %s)",
+        "PVSD Daemon %s Starting. (ADARA Common %s, ComBus %s, Tag %s)",
         PVSD_VERSION, ::ADARA::VERSION.c_str(),
-        ::ADARA::ComBus::VERSION.c_str() );
+        ::ADARA::ComBus::VERSION.c_str(), ::ADARA::TAG_NAME.c_str() );
 
     // Chdir to "/"
     if ( chdir("/") < 0 )
@@ -188,9 +189,11 @@ int main(int argc, char *argv[])
 
     // Initialize SysLog
     openlog( "pvsd", 0, LOG_DAEMON );
-    syslog( LOG_INFO, "PVSD %s Starting (%s %s, %s %s)", PVSD_VERSION,
+    syslog( LOG_INFO, "PVSD %s Starting (%s %s, %s %s, %s %s)",
+        PVSD_VERSION,
         "ADARA Common", ::ADARA::VERSION.c_str(),
-        "ComBus", ::ADARA::ComBus::VERSION.c_str() );
+        "ComBus", ::ADARA::ComBus::VERSION.c_str(),
+        "Tag", ::ADARA::TAG_NAME.c_str() );
 
     // Setup signal handlers to catch all termination handlers so we can
     // implement orderly shutdown.
@@ -282,7 +285,10 @@ int main(int argc, char *argv[])
     else if ( opt_map.count( "version" ) && !daemon )
     {
         cout << PVSD_VERSION
-            << " (ADARA Common " << ::ADARA::VERSION << ")" << endl;
+            << " (ADARA Common " << ::ADARA::VERSION
+            << ", ComBus" << ::ADARA::ComBus::VERSION
+            << ", Tag" << ::ADARA::TAG_NAME
+            << ")" << endl;
         return 0;
     }
 
@@ -378,9 +384,9 @@ int main(int argc, char *argv[])
                 ss << output->numPVs();
                 ss << " Output PVs Defined";
 
-                syslog( logType, "%s%s %s - %s.",
-                    logPrefix.c_str(),
-                    "PVSD is Alive at", output->serverAddr().c_str(),
+                syslog( logType, "%sPVSD %s %s %s - %s.",
+                    logPrefix.c_str(), PVSD_VERSION,
+                    "is Alive at", output->serverAddr().c_str(),
                     ss.str().c_str() );
             }
 
