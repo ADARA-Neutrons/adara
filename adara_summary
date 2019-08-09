@@ -1043,8 +1043,8 @@ PARSE_LOG()
 			awk '{for(i=3;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		fi
 
-		# "PVSD is Alive" (Partial/Hung Device Log)
-		if [[ "$log" =~ ^PVSD${S}is${S}Alive${S}at${S} ]]; then
+		# "PVSD [VERSION] is Alive" (Partial/Hung Device Log)
+		if [[ "$log" =~ ^PVSD.+is${S}Alive${S}at${S} ]]; then
 			#echo "PVSD is Alive at..."
 			nHostPVSDAlive[$host]=$(( nHostPVSDAlive[$host] + 1 ))
 			np=`echo "$log" | awk -F "[ ()]" '{print $12}'`
