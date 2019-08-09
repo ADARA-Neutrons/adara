@@ -1342,7 +1342,7 @@ if [[ "$command" == "status" \
 			|| "$command" == "sys_status" ]]; then
 
 		caget -a -S $WAIT ${PRE}:SMS:Version \
-			| sed -e "s/ 2/   2/" -e "s/SMSD/ SMSD/" -e "s/ (/\n  (/" \
+			| sed -e "s/ 2/   2/" -e "s/SMSD/ SMSD/" -e "s/ (/\n   (/" \
 				-e "s/[[:space:]]*$//"
 
 		echo
