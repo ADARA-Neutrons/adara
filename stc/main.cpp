@@ -245,7 +245,7 @@ int main( int argc, char** argv )
 
     openlog( "stc", 0, LOG_DAEMON );
     syslog( LOG_INFO,
-        "[%i] %s. %s Version %s, %s Version %s, %s Version %s, Tag: %s",
+        "[%i] %s. %s Version %s, %s Version %s, %s Version %s, Tag %s",
         g_pid, "Started", "STC", STC_VERSION,
         "ADARA Common", ADARA::VERSION.c_str(),
         "ComBus", ADARA::ComBus::VERSION.c_str(),
@@ -310,7 +310,8 @@ int main( int argc, char** argv )
         {
             cout << STC_VERSION
                  << " (ADARA Common " << ADARA::VERSION
-                 << ", Tag Name " << ADARA::TAG_NAME << ")" << endl;
+                 << ", ComBus Version " << ADARA::ComBus::VERSION
+                 << ", Tag " << ADARA::TAG_NAME << ")" << endl;
             return STC::TS_TRANSIENT_ERROR;
         }
 
@@ -419,27 +420,47 @@ int main( int argc, char** argv )
         // (else screws up the STC-to-SMS return status...! ;-D)
         if ( interact && verbose )
         {
-            cout << "stc information" << endl;
-            cout << "  version       : " << STC_VERSION << endl;
-            cout << "  ADARA version : " << ADARA::VERSION << endl;
-            cout << "  tag name      : " << ADARA::TAG_NAME << endl;
-            cout << "  nexus file    : " << nexus_outfile << endl;
-            cout << "  adara file    : " << adara_outfile << endl;
-            cout << "  strict        : " << ( move ? "yes" : "no" ) << endl;
-            cout << "  work root     : " << work_root << endl;
-            cout << "  work base     : " << work_base << endl;
-            cout << " (work path     : " << work_path << ")" << endl;
-            cout << "  base path     : " << base_path << endl;
-            cout << "  config file   : " << config_file << endl;
-            cout << "  move nexus    : " << ( move ? "yes" : "no" ) << endl;
-            cout << "  chunk size    : " << chunk_size
-                 << " (Dataset Elements!)" << endl;
-            cout << "  cache size    : " << cache_size << " (bytes)" << endl;
-            cout << "  evt buf size  : " << evt_buf_size << " (chunks)" << endl;
-            cout << "  anc buf size  : " << anc_buf_size << " (chunks)" << endl;
-            cout << "  comp lev      : " << compression_level <<  endl;
-            cout << "  keep temp     : " << ( keep_temp ? "yes" : "no" ) << endl;
-            cout << "  gather stats  : " << ( gather_stats ? "yes" : "no" ) << endl;
+            cout << "STC Information:" << endl;
+            cout << "   STC Version    : "
+                 << STC_VERSION << endl;
+            cout << "   ADARA Common   : "
+                 << ADARA::VERSION << endl;
+            cout << "   ComBus Version : "
+                 << ADARA::ComBus::VERSION << endl;
+            cout << "   ADARA Tag Name : "
+                 << ADARA::TAG_NAME << endl;
+            cout << "   NeXus File     : "
+                 << nexus_outfile << endl;
+            cout << "   ADARA File     : "
+                 << adara_outfile << endl;
+            cout << "   Strict         : "
+                 << ( move ? "yes" : "no" ) << endl;
+            cout << "   Work Root      : "
+                 << work_root << endl;
+            cout << "   Work Base      : "
+                 << work_base << endl;
+            cout << "  (Work Path      : "
+                 << work_path << ")" << endl;
+            cout << "   Base Path      : "
+                 << base_path << endl;
+            cout << "   Config File    : "
+                 << config_file << endl;
+            cout << "   Move NeXus     : "
+                 << ( move ? "yes" : "no" ) << endl;
+            cout << "   Chunk Size     : "
+                 << chunk_size << " (Dataset Elements!)" << endl;
+            cout << "   Cache Size     : "
+                 << cache_size << " (bytes)" << endl;
+            cout << "   Event Buf Size : "
+                 << evt_buf_size << " (chunks)" << endl;
+            cout << "   Ancil Buf Size : "
+                 << anc_buf_size << " (chunks)" << endl;
+            cout << "   Compress Level : "
+                 << compression_level <<  endl;
+            cout << "   Keep Temp      : "
+                 << ( keep_temp ? "yes" : "no" ) << endl;
+            cout << "   Gather Stats   : "
+                 << ( gather_stats ? "yes" : "no" ) << endl;
         }
 
         if ( opt_map.count( "file" ))
