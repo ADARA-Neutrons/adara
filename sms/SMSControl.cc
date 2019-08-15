@@ -2447,7 +2447,9 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				else {
 					// Rate-Limited Log Unknown Fast Meta-Data PixelId...
 					std::stringstream ss;
-					ss << phys;
+					// Just Use Device ID for RLL Key...
+					uint32_t devId = phys >> 16;
+					ss << std::hex << "0x" << devId;
 					std::string log_info;
 					if ( RateLimitedLogging::checkLog(
 							RLLHistory_SMSControl,
@@ -2456,8 +2458,12 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 						ERROR(log_info
 							<< ( m_recording ? "[RECORDING] " : "" )
 							<< "pulseEvents():"
-							<< " Unknown Fast Meta-Data PixelId "
-							<< std::hex << " phys=0x" << phys << std::dec);
+							<< " Unknown Fast Meta-Data"
+							<< ( ( (phys >> 28) == 5 ) ?
+								" Trigger" : " Analog/ADC" )
+							<< " PixelId phys=0x"
+							<< std::hex << phys << std::dec
+							<< " (Device ID " << ss.str() << ")");
 					}
 				}
 				// No mapping, Error Pixel...
