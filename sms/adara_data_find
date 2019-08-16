@@ -46,7 +46,7 @@ USAGE()
 	echo "    [--SMS|--sms] \\"
 	echo "    [--nED|--ned|--ds=1] \\"
 	echo "    [--PVSD|--pvsd|--ds=3] \\"
-	echo "    [--ds=<N>] [--pkt=\"RTDL|VARIABLE\"] \\"
+	echo "    [--ds=<N>] [--pkt=\"RTDL|VARIABLE|DATA\"] \\"
 	echo "    [--delay=<Hours>] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
 	echo "    [--extra_parser_args=\"--showfoo\"]  \\"
@@ -240,7 +240,7 @@ GET_DATA_START_TIME()
 
 FILE_TYPE="SMS"
 FILE_PREFIX="f"
-FILE_PACKET="RTDL"
+FILE_PACKET=""
 
 DIR_DELAY=1
 
@@ -288,25 +288,37 @@ for arg in "$@" ; do
 		fi
 	elif [[ "#$key#" == '#--SMS#' || "#$key#" == '#--sms#' ]]; then
 		FILE_TYPE="SMS"
-		FILE_PREFIX="f"
-		FILE_PACKET="RTDL"
 		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		FILE_PREFIX="f"
 		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
-		echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		if [[ -z "${FILE_PACKET}" ]]; then
+			FILE_PACKET="RTDL"
+			echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		else
+			echo -e "\n\tLEAVING File Packet Type As: \"${FILE_PACKET}\""
+		fi
 	elif [[ "#$key#" == '#--nED#' || "#$key#" == '#--ned#' ]]; then
 		FILE_TYPE="nED"
-		FILE_PREFIX="ds00000001-s"
-		FILE_PACKET="RTDL"
 		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		FILE_PREFIX="ds00000001-s"
 		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
-		echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		if [[ -z "${FILE_PACKET}" ]]; then
+			FILE_PACKET="RTDL"
+			echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		else
+			echo -e "\n\tLEAVING File Packet Type As: \"${FILE_PACKET}\""
+		fi
 	elif [[ "#$key#" == '#--PVSD#' || "#$key#" == '#--pvsd#' ]]; then
 		FILE_TYPE="PVSD"
-		FILE_PREFIX="ds00000003-s"
-		FILE_PACKET="VARIABLE"
 		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		FILE_PREFIX="ds00000003-s"
 		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
-		echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		if [[ -z "${FILE_PACKET}" ]]; then
+			FILE_PACKET="VARIABLE"
+			echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		else
+			echo -e "\n\tLEAVING File Packet Type As: \"${FILE_PACKET}\""
+		fi
 	elif [[ "#$key#" == '#--ds#' ]]; then
 		# Single-Digit Data Source Numbers...
 		if [[ ${value} -lt 10 ]]; then
@@ -320,10 +332,14 @@ for arg in "$@" ; do
 			echo -n "\nReally...?! More than 100 Data Sources...?? ;-D"
 			exit -99
 		fi
-		FILE_PACKET="RTDL"   # Can be overridden by "--pkt=FOO"...
 		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
 		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
-		echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		if [[ -z "${FILE_PACKET}" ]]; then
+			FILE_PACKET="RTDL"   # Can be overridden by "--pkt=FOO"...
+			echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		else
+			echo -e "\n\tLEAVING File Packet Type As: \"${FILE_PACKET}\""
+		fi
 	elif [[ "#$key#" == '#--pkt#' ]]; then
 		FILE_PACKET="${value}"
 		echo -e "\nFile Packet Type Set to: \"${FILE_PACKET}\""
@@ -367,6 +383,11 @@ EPICSSecs=`echo "${EPICSTimeInSeconds}" | ${SED} 's/\.[0-9]*//'`
 # Snag Nanoseconds...
 EPICSNsecs=`echo "${EPICSTimeInSeconds}" | ${SED} "s/${EPICSSecs}\.//"`
 
+if [[ -z "${FILE_PACKET}" ]]; then
+	FILE_PACKET="RTDL"   # Can be overridden by "--pkt=FOO"...
+	echo -e "\n\tUsing Default File Packet Type: \"${FILE_PACKET}\""
+fi
+
 #
 # Ready to Begin...! :-D
 #
@@ -399,9 +420,42 @@ target_str=`date --date="1970-01-01 UTC ${target_secs_delay} seconds"`
 echo -e "\n\"${DIR_DELAY} Hour(s) Earlier\" Target Date String:"
 echo -e "\n\t[${target_str}]"
 
-data_dirs=`${FIND} ${SMS_DATA} \
-	-mindepth 2 -maxdepth 2 -newermt "${target_str}" \
+echo -e "\nSearching Raw Data Files..."
+
+newer_files=`${FIND} ${SMS_DATA} \
+	-mindepth 3 -maxdepth 3 -newermt "${target_str}" \
 	| ${GREP} -v "state-storage" | ${SORT}` 
+
+if [[ -z "${newer_files}" ]]; then
+	echo -e "\nError: No Candidate Newer Data Files Found...!"
+	echo -e "\n${SMS_DATA}:\n"
+	${LS} -lt ${SMS_DATA} | ${HEAD} -n 20
+	echo
+	exit 3
+fi
+
+echo -e -n "\nCollecting Raw Data Directories..."
+
+data_dirs=""
+
+for nf in ${newer_files} ; do
+
+	echo -n "."
+
+	#echo "nf=[${nf}]"
+
+	data_dir=`dirname "${nf}"`
+	#echo "data_dir=[${data_dir}]"
+
+	if [[ -z "${data_dirs}" ]]; then
+		data_dirs="${data_dir}"
+	else
+		data_dirs="${data_dirs}\n${data_dir}"
+	fi
+
+done
+
+echo
 
 if [[ -z "${data_dirs}" ]]; then
 	echo -e "\nError: No Candidate Data Subdirectories Found...!"
@@ -410,6 +464,10 @@ if [[ -z "${data_dirs}" ]]; then
 	echo
 	exit 3
 fi
+
+echo -e "\nEliminating Duplicate Raw Data Directories..."
+
+data_dirs=`echo -e "${data_dirs}" | sort --unique`
 
 echo -e "\nFound Potential Local SMS Data Subdirectories:\n\n$data_dirs"
 
