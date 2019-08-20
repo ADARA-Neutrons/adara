@@ -95,8 +95,13 @@ int main( int argc, char** argv )
     unsigned short  compression_level;
     std::string     nexus_source;
     std::string     nexus_dest;
+    std::string     dest_bank;
     bool            verbose;
     bool            dump;
+
+    std::vector<hsize_t> dim_vec;
+    hsize_t vec_size;
+    int rank;
 
     // Setup global syslog info
     g_pid = getpid();
@@ -112,6 +117,7 @@ int main( int argc, char** argv )
                 ("dump,d", po::bool_switch( &dump ), "dump array values")
                 ("nexus_source",po::value<std::string>( &nexus_source ),"NeXus input file to read from")
                 ("nexus_dest",po::value<std::string>( &nexus_dest ),"NeXus output file to write to")
+                ("dest_bank",po::value<std::string>( &dest_bank ),"destination detector bank for unmapped events")
                 ("compression-level,c", po::value<unsigned short>( &compression_level )->default_value( 0 ), "set nexus compression level (0=off,9=max)")
                 ("chunk-size", po::value<unsigned long>( &chunk_size )->default_value( 49152 ),"set hdf5 chunk size (in Dataset Elements!)")
                 ("cache-size", po::value<unsigned long>( &cache_size )->default_value( 1024 ),"set hdf5 cache size (in KB)")
@@ -121,10 +127,19 @@ int main( int argc, char** argv )
         po::store( po::parse_command_line(argc,argv,options), opt_map );
         po::notify( opt_map );
 
-        if ( opt_map.count( "help" ))
+        if ( opt_map.count( "help" ) )
         {
-            std::cout << options << std::endl;
+            std::cout << std::endl << options << std::endl;
             return( -1 );
+        }
+
+        if ( !opt_map.count( "dest_bank" ) )
+        {
+            std::cout << std::endl
+                << "Error: No Destination Detector Bank Specified...!"
+                << std::endl;
+            std::cout << std::endl << options << std::endl;
+            return( -2 );
         }
 
         if ( verbose )
@@ -136,6 +151,8 @@ int main( int argc, char** argv )
                  << nexus_source << std::endl;
             std::cout << "   Dest NeXus File     : "
                  << nexus_dest << std::endl;
+            std::cout << "   Dest Detector Bank  : "
+                 << dest_bank << std::endl;
             std::cout << "   Chunk Size          : "
                  << chunk_size << " (Dataset Elements!)" << std::endl;
             std::cout << "   Cache Size          : "
@@ -196,19 +213,6 @@ int main( int argc, char** argv )
 
     m_h5nx.H5NXset_cache_size( cache_size );
 
-    // Read Datasets from Source NeXus File
-
-    std::vector<uint32_t> unmapped_event_id;
-    std::vector<uint32_t> unmapped_event_time_offset;
-
-    std::vector<uint64_t> unmapped_event_index;
-
-    uint64_t unmapped_total_counts;
-
-    std::vector<hsize_t> dim_vec;
-    hsize_t vec_size;
-    int rank;
-
     // Open NeXus Source Data File
 
     if ( m_h5nx.H5NXopen_file( nexus_source ) != SUCCEED )
@@ -226,6 +230,15 @@ int main( int argc, char** argv )
             << "   [" << nexus_source << "]"
             << std::endl << std::flush;
     }
+
+    // Read Unmapped Datasets from Source NeXus File
+
+    std::vector<uint32_t> unmapped_event_id;
+    std::vector<uint32_t> unmapped_event_time_offset;
+
+    std::vector<uint64_t> unmapped_event_index;
+
+    uint64_t unmapped_total_counts;
 
     // Read Unmapped Event ID Dataset
 
@@ -433,6 +446,194 @@ int main( int argc, char** argv )
     {
         std::cout << std::endl
             << "Total Unmapped Event Count = " << unmapped_total_counts
+            << std::endl << std::flush;
+    }
+
+    // Read Dest Bank Datasets from Source NeXus File
+
+    std::string dest_path = "/entry/instrument/" + dest_bank;
+
+    std::vector<uint32_t> dest_event_id;
+    std::vector<uint32_t> dest_event_time_offset;
+
+    std::vector<uint64_t> dest_event_index;
+
+    uint64_t dest_total_counts;
+
+    // Read Dest Bank Event ID Dataset
+
+    dim_vec.reserve( H5S_MAX_RANK );
+
+    if ( m_h5nx.H5NXget_dataset_dims( dest_path + "/event_id",
+            rank, dim_vec ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Getting Dest Bank Event ID Dataset Dimensions!"
+            << " Bailing..." << std::endl;
+        return( -110 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Got Dest Bank Event ID Dataset Dimensions"
+            << " rank=" << rank << ", dim[0]=" << dim_vec[0]
+            << std::endl << std::flush;
+    }
+
+    vec_size = m_h5nx.H5NXget_vector_size( rank, dim_vec );
+
+    if ( verbose )
+    {
+        std::cout << std::endl
+            << "Dest Bank Event ID Vector has " << vec_size << " Elements."
+            << std::endl << std::flush;
+    }
+
+    dest_event_id.reserve( vec_size );
+
+    if ( m_h5nx.H5NXread_slab( dest_path + "/event_id",
+            dest_event_id, vec_size, 0 ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Reading Event ID Dataset! Bailing..."
+            << std::endl;
+        return( -120 );
+    }
+    else if ( dump )
+    {
+        std::cout << std::endl
+            << "Dest Bank Event ID Vector:" << std::endl;
+        for ( hsize_t i=0 ; i < vec_size ; i++ )
+        {
+            std::cout << i << ": "
+                << dest_event_id[i]
+                << " (0x" << std::hex << dest_event_id[i]
+                    << std::dec << ")"
+                << std::endl;
+        }
+        std::cout << std::flush;
+    }
+
+    // Read Dest Bank Event Time Offset Dataset
+
+    if ( m_h5nx.H5NXget_dataset_dims( dest_path + "/event_time_offset",
+            rank, dim_vec ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Getting Dest Bank Event Time Offset Dimensions!"
+            << " Bailing..." << std::endl;
+        return( -210 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Got Dest Bank Event Time Offset Dataset Dimensions"
+            << " rank=" << rank << ", dim[0]=" << dim_vec[0]
+            << std::endl << std::flush;
+    }
+
+    vec_size = m_h5nx.H5NXget_vector_size( rank, dim_vec );
+
+    if ( verbose )
+    {
+        std::cout << std::endl
+            << "Dest Bank Event Time Offset Vector has "
+            << vec_size << " Elements."
+            << std::endl << std::flush;
+    }
+
+    dest_event_time_offset.reserve( vec_size );
+
+    if ( m_h5nx.H5NXread_slab( dest_path + "/event_time_offset",
+            dest_event_time_offset, vec_size, 0 ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Reading Event Time Offset Dataset! Bailing..."
+            << std::endl;
+        return( -220 );
+    }
+    else if ( dump )
+    {
+        std::cout << std::endl
+            << "Dest Bank Event Time Offset Vector:" << std::endl;
+        for ( hsize_t i=0 ; i < vec_size ; i++ )
+        {
+            std::cout << i << ": "
+                << dest_event_time_offset[i]
+                << " (0x" << std::hex << dest_event_time_offset[i]
+                    << std::dec << ")"
+                << std::endl;
+        }
+        std::cout << std::flush;
+    }
+
+    // Read Dest Bank Event Index Dataset
+
+    if ( m_h5nx.H5NXget_dataset_dims( dest_path + "/event_index",
+            rank, dim_vec ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Getting Dest Bank Event Index Dimensions!"
+            << " Bailing..." << std::endl;
+        return( -310 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Got Dest Bank Event Index Dataset Dimensions"
+            << " rank=" << rank << ", dim[0]=" << dim_vec[0]
+            << std::endl << std::flush;
+    }
+
+    vec_size = m_h5nx.H5NXget_vector_size( rank, dim_vec );
+
+    if ( verbose )
+    {
+        std::cout << std::endl
+            << "Dest Bank Event Index Vector has "
+            << vec_size << " Elements."
+            << std::endl << std::flush;
+    }
+
+    dest_event_index.reserve( vec_size );
+
+    if ( m_h5nx.H5NXread_slab( dest_path + "/event_index",
+            dest_event_index, vec_size, 0 ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Reading Event Index Dataset! Bailing..."
+            << std::endl;
+        return( -320 );
+    }
+    else if ( dump )
+    {
+        std::cout << std::endl
+            << "Dest Bank Event Index Vector:" << std::endl;
+        for ( hsize_t i=0 ; i < vec_size ; i++ )
+        {
+            std::cout << i << ": "
+                << dest_event_index[i]
+                << " (0x" << std::hex << dest_event_index[i]
+                    << std::dec << ")"
+                << std::endl;
+        }
+        std::cout << std::flush;
+    }
+
+    // Read Dest Bank Bank Total Counts
+
+    if ( m_h5nx.H5NXread_dataset_scalar( dest_path + "/total_counts",
+            dest_total_counts ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Reading Dest Bank Bank Total Counts! Bailing..."
+            << std::endl;
+        return( -400 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Total Dest Bank Event Count = " << dest_total_counts
             << std::endl << std::flush;
     }
 
