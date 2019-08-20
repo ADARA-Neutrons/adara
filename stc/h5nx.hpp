@@ -46,7 +46,10 @@ public:
     H5nx( unsigned short a_compression_level = 0 );
 
     //create the file
-    int H5NXcreate_file(const std::string &file_name );
+    int H5NXcreate_file( const std::string &file_name );
+
+    //open an existing file
+    int H5NXopen_file( const std::string &file_name );
 
     //close the file 
     int H5NXclose_file();
@@ -81,6 +84,9 @@ public:
     template <typename NumT>
     int H5NXmake_dataset_scalar( const std::string &group_path,
         const std::string &dataset_name, const NumT &value );
+    template <typename NumT>
+    int H5NXread_dataset_scalar( const std::string &dataset_path,
+        NumT &value );
 
     //create/write a VECTOR NUMERICAL dataset
     template <typename NumT>
@@ -108,6 +114,10 @@ public:
                                    int nxdatatype,
                                    hsize_t chunk );
 
+    int H5NXget_dataset_dims( const std::string &dataset_path,
+		int &rank, std::vector<hsize_t> &dim_vec );
+    hsize_t H5NXget_vector_size( int rank, std::vector<hsize_t> &dim_vec );
+
     /////////////////////////////////////////////
     // WARNING
     // THIS IS FOR A 1D CASE
@@ -116,6 +126,10 @@ public:
     int H5NXwrite_slab( const std::string &dataset_path,
         const std::vector<NumT> &slab, uint64_t slab_size,
         uint64_t cur_size );
+    template <typename NumT>
+    int H5NXread_slab( const std::string &dataset_path,
+        std::vector<NumT> &slab, uint64_t slab_size,
+        uint64_t slab_offset );
 
     ////////////////////////////////////////////
     int H5NXmake_link( const std::string &current_name,
