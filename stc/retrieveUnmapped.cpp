@@ -130,7 +130,8 @@ int main( int argc, char** argv )
         if ( verbose )
         {
             std::cout << std::endl
-                << "RetrieveUnmapped Information:" << std::endl;
+                << "RetrieveUnmapped Information:"
+                << std::endl << std::endl;
             std::cout << "   Source NeXus File   : "
                  << nexus_source << std::endl;
             std::cout << "   Dest NeXus File     : "
@@ -155,7 +156,8 @@ int main( int argc, char** argv )
                     std::cout << std::endl
                         << "No Output NeXus File Destination Specified."
                         << std::endl << std::endl
-                        << "Using Default NeXus File:" << std::endl
+                        << "Using Default NeXus File:"
+                        << std::endl << std::endl
                         << "   [" << nexus_dest << "]" << std::endl;
                 }
             }
@@ -197,8 +199,10 @@ int main( int argc, char** argv )
     // Read Datasets from Source NeXus File
 
     std::vector<uint32_t> unmapped_event_id;
-    //std::vector<uint64_t> unmapped_event_index;
-    //std::vector<uint32_t> unmapped_event_time_offset;
+    std::vector<uint32_t> unmapped_event_time_offset;
+
+    std::vector<uint64_t> unmapped_event_index;
+
     uint64_t unmapped_total_counts;
 
     std::vector<hsize_t> dim_vec;
@@ -217,7 +221,8 @@ int main( int argc, char** argv )
     else if ( verbose )
     {
         std::cout << std::endl
-            << "Opened NeXus Source Data File for Processing:" << std::endl
+            << "Opened NeXus Source Data File for Processing:"
+            << std::endl << std::endl
             << "   [" << nexus_source << "]"
             << std::endl << std::flush;
     }
@@ -269,7 +274,8 @@ int main( int argc, char** argv )
             << "Unmapped Event ID Vector:" << std::endl;
         for ( hsize_t i=0 ; i < vec_size ; i++ )
         {
-            std::cout << unmapped_event_id[i]
+            std::cout << i << ": "
+                << unmapped_event_id[i]
                 << " (0x" << std::hex << unmapped_event_id[i]
                     << std::dec << ")"
                 << std::endl;
@@ -294,11 +300,122 @@ int main( int argc, char** argv )
         unmapped_event_id[i] &= 0x0FFFFFFF;
         if ( dump )
         {
-            std::cout << unmapped_event_id[i]
+            std::cout << i << ": "
+                << unmapped_event_id[i]
                 << " (0x" << std::hex << unmapped_event_id[i]
                     << std::dec << ")"
                 << std::endl;
         }
+    }
+
+    // Read Unmapped Event Time Offset Dataset
+
+    if ( m_h5nx.H5NXget_dataset_dims(
+            "/entry/instrument/bank_unmapped/event_time_offset",
+            rank, dim_vec ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Getting Unmapped Event Time Offset Dimensions!"
+            << " Bailing..." << std::endl;
+        return( -210 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Got Unmapped Event Time Offset Dataset Dimensions"
+            << " rank=" << rank << ", dim[0]=" << dim_vec[0]
+            << std::endl << std::flush;
+    }
+
+    vec_size = m_h5nx.H5NXget_vector_size( rank, dim_vec );
+
+    if ( verbose )
+    {
+        std::cout << std::endl
+            << "Unmapped Event Time Offset Vector has "
+            << vec_size << " Elements."
+            << std::endl << std::flush;
+    }
+
+    unmapped_event_time_offset.reserve( vec_size );
+
+    if ( m_h5nx.H5NXread_slab(
+            "/entry/instrument/bank_unmapped/event_time_offset",
+            unmapped_event_time_offset, vec_size, 0 ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Reading Event Time Offset Dataset! Bailing..."
+            << std::endl;
+        return( -220 );
+    }
+    else if ( dump )
+    {
+        std::cout << std::endl
+            << "Unmapped Event Time Offset Vector:" << std::endl;
+        for ( hsize_t i=0 ; i < vec_size ; i++ )
+        {
+            std::cout << i << ": "
+                << unmapped_event_time_offset[i]
+                << " (0x" << std::hex << unmapped_event_time_offset[i]
+                    << std::dec << ")"
+                << std::endl;
+        }
+        std::cout << std::flush;
+    }
+
+    // Read Unmapped Event Index Dataset
+
+    if ( m_h5nx.H5NXget_dataset_dims(
+            "/entry/instrument/bank_unmapped/event_index",
+            rank, dim_vec ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Getting Unmapped Event Index Dimensions!"
+            << " Bailing..." << std::endl;
+        return( -310 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Got Unmapped Event Index Dataset Dimensions"
+            << " rank=" << rank << ", dim[0]=" << dim_vec[0]
+            << std::endl << std::flush;
+    }
+
+    vec_size = m_h5nx.H5NXget_vector_size( rank, dim_vec );
+
+    if ( verbose )
+    {
+        std::cout << std::endl
+            << "Unmapped Event Index Vector has "
+            << vec_size << " Elements."
+            << std::endl << std::flush;
+    }
+
+    unmapped_event_index.reserve( vec_size );
+
+    if ( m_h5nx.H5NXread_slab(
+            "/entry/instrument/bank_unmapped/event_index",
+            unmapped_event_index, vec_size, 0 ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Reading Event Index Dataset! Bailing..."
+            << std::endl;
+        return( -320 );
+    }
+    else if ( dump )
+    {
+        std::cout << std::endl
+            << "Unmapped Event Index Vector:" << std::endl;
+        for ( hsize_t i=0 ; i < vec_size ; i++ )
+        {
+            std::cout << i << ": "
+                << unmapped_event_index[i]
+                << " (0x" << std::hex << unmapped_event_index[i]
+                    << std::dec << ")"
+                << std::endl;
+        }
+        std::cout << std::flush;
     }
 
     // Read Unmapped Bank Total Counts
@@ -310,7 +427,7 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Error Reading Unmapped Bank Total Counts! Bailing..."
             << std::endl;
-        return( -130 );
+        return( -400 );
     }
     else if ( verbose )
     {
@@ -326,7 +443,7 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Error Closing NeXus Source Data File! Bailing..."
             << std::endl;
-        return( -190 );
+        return( -700 );
     }
     else if ( verbose )
     {
