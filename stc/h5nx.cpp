@@ -2141,6 +2141,9 @@ int H5nx::H5NXwrite_slab( const std::string &dataset_path,
 // H5NXread_slab
 ////////////////////////////////////////////////////////////////////
 
+// NOTE: Supplied Vector Buffer Must Be Pre-Allocated and Initialized
+// to Hold "slab_size" Elements...! (Use "assign()", Not "reserve()"!)
+
 template
 int H5nx::H5NXread_slab( const std::string &dataset_path,
         std::vector<double> &slab, uint64_t slab_size,
@@ -2197,6 +2200,9 @@ int H5nx::H5NXread_slab( const std::string &dataset_path,
     hid_t   msid;
     hsize_t count[H5S_MAX_RANK];
     hsize_t start[H5S_MAX_RANK];
+
+    // NOTE: Supplied Vector Buffer Must Be Pre-Allocated and Initialized
+    // to Hold "slab_size" Elements...! (Use "assign()", Not "reserve()"!)
 
     ///////////////////////////////////////////////////////////////////
     // FOR 1D DATASET
