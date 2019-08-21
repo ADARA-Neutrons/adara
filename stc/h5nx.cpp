@@ -1109,14 +1109,14 @@ NeXus::NXnumtype to_nx_type( float UNUSED(number) )
 
 // declare instantiations of the types of templated functions needed
 template
-int H5nx::H5NXmake_attribute_scalar( const std::string &group_path,
-        const std::string &dataset_name, const uint16_t &value );
+int H5nx::H5NXmake_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, const uint16_t &value );
 template
-int H5nx::H5NXmake_attribute_scalar( const std::string &group_path,
-        const std::string &dataset_name, const uint32_t &value );
+int H5nx::H5NXmake_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, const uint32_t &value );
 template
-int H5nx::H5NXmake_attribute_scalar( const std::string &group_path,
-        const std::string &dataset_name, const uint64_t &value );
+int H5nx::H5NXmake_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, const uint64_t &value );
 
 template <typename NumT>
 int H5nx::H5NXmake_attribute_scalar( const std::string &dataset_path,
@@ -1241,6 +1241,191 @@ int H5nx::H5NXmake_attribute_scalar( const std::string &dataset_path,
 
     return SUCCEED;
 }
+
+///////////////////////////////////////////////////////////////////
+// H5NXwrite_attribute_scalar
+// write a SCALAR NUMERICAL attribute
+////////////////////////////////////////////////////////////////////
+
+// declare instantiations of the types of templated functions needed
+template
+int H5nx::H5NXwrite_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, const uint16_t &value );
+template
+int H5nx::H5NXwrite_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, const uint32_t &value );
+template
+int H5nx::H5NXwrite_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, const uint64_t &value );
+
+template <typename NumT>
+int H5nx::H5NXwrite_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, const NumT &value )
+{
+    hid_t   did;  // dataset ID
+    hid_t   aid;  // attribute ID
+    hid_t   tid;  // nx_datatype ID
+
+    if ( (did = H5Dopen2( this->m_fid, dataset_path.c_str(),
+            H5P_DEFAULT )) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STC Error", "H5nx::H5NXwrite_attribute_scalar",
+            "H5Dopen2", "dataset_path", dataset_path.c_str(),
+            "Open Dataset" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr(
+            "H5nx::H5NXwrite_attribute_scalar(): H5Dopen2() Open Dataset");
+        return FAIL;
+    }
+
+    if ( (aid = H5Aopen( did, attr_name.c_str(), H5P_DEFAULT )) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STC Error", "H5nx::H5NXwrite_attribute_scalar",
+            "H5Aopen", "attr_name", attr_name.c_str(),
+            "Open Attribute" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr("H5nx::H5NXwrite_attribute_scalar(): H5Aopen()"
+            + std::string(" Open Attribute"));
+        return FAIL;
+    }
+
+    // get the NeXus type; some template magic here
+    NeXus::NXnumtype nx_numtype = to_nx_type<NumT>();
+
+    // get the HDF5 type from the NeXus type
+    tid = nx_to_hdf5_type( nx_numtype );
+
+    if ( H5Awrite( aid, tid, &value ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%u %s",
+            g_pid, "STC Error", "H5nx::H5NXwrite_attribute_scalar",
+            "H5Awrite", attr_name.c_str(), (unsigned) value,
+            "Write Attribute" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr("H5nx::H5NXwrite_attribute_scalar(): H5Awrite()"
+            + std::string(" Write Attribute"));
+        return FAIL;
+    }
+
+    if ( H5Aclose( aid ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STC Error", "H5nx::H5NXwrite_attribute_scalar",
+            "H5Aclose", "Close Attribute" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr("H5nx::H5NXwrite_attribute_scalar(): H5Aclose()"
+            + std::string(" Close Attribute"));
+        return FAIL;
+    }
+
+    if ( H5Dclose( did ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STC Error", "H5nx::H5NXwrite_attribute_scalar",
+            "H5Dclose", "Close Dataset" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr("H5nx::H5NXwrite_attribute_scalar(): H5Dclose()"
+            + std::string(" Close Dataset"));
+        return FAIL;
+    }
+
+    return SUCCEED;
+}
+
+///////////////////////////////////////////////////////////////////
+// H5NXread_attribute_scalar
+// read a SCALAR NUMERICAL attribute
+////////////////////////////////////////////////////////////////////
+
+// declare instantiations of the types of templated functions needed
+template
+int H5nx::H5NXread_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, uint16_t &value );
+template
+int H5nx::H5NXread_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, uint32_t &value );
+template
+int H5nx::H5NXread_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, uint64_t &value );
+
+template <typename NumT>
+int H5nx::H5NXread_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, NumT &value )
+{
+    hid_t   did;  // dataset ID
+    hid_t   aid;  // attribute ID
+    hid_t   tid;  // nx_datatype ID
+
+    if ( (did = H5Dopen2( this->m_fid, dataset_path.c_str(),
+            H5P_DEFAULT )) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STC Error", "H5nx::H5NXread_attribute_scalar",
+            "H5Dopen2", "dataset_path", dataset_path.c_str(),
+            "Open Dataset" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr(
+            "H5nx::H5NXread_attribute_scalar(): H5Dopen2() Open Dataset");
+        return FAIL;
+    }
+
+    if ( (aid = H5Aopen( did, attr_name.c_str(), H5P_DEFAULT )) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STC Error", "H5nx::H5NXread_attribute_scalar",
+            "H5Aopen", "attr_name", attr_name.c_str(),
+            "Open Attribute" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr("H5nx::H5NXread_attribute_scalar(): H5Aopen()"
+            + std::string(" Open Attribute"));
+        return FAIL;
+    }
+
+    // get the NeXus type; some template magic here
+    NeXus::NXnumtype nx_numtype = to_nx_type<NumT>();
+
+    // get the HDF5 type from the NeXus type
+    tid = nx_to_hdf5_type( nx_numtype );
+
+    if ( H5Aread( aid, tid, &value ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%u %s",
+            g_pid, "STC Error", "H5nx::H5NXread_attribute_scalar",
+            "H5Aread", attr_name.c_str(), (unsigned) value,
+            "Write Attribute" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr("H5nx::H5NXread_attribute_scalar(): H5Aread()"
+            + std::string(" Write Attribute"));
+        return FAIL;
+    }
+
+    if ( H5Aclose( aid ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STC Error", "H5nx::H5NXread_attribute_scalar",
+            "H5Aclose", "Close Attribute" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr("H5nx::H5NXread_attribute_scalar(): H5Aclose()"
+            + std::string(" Close Attribute"));
+        return FAIL;
+    }
+
+    if ( H5Dclose( did ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STC Error", "H5nx::H5NXread_attribute_scalar",
+            "H5Dclose", "Close Dataset" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr("H5nx::H5NXread_attribute_scalar(): H5Dclose()"
+            + std::string(" Close Dataset"));
+        return FAIL;
+    }
+
+    return SUCCEED;
+}
+
 
 ///////////////////////////////////////////////////////////////////
 // H5NXmake_dataset_scalar

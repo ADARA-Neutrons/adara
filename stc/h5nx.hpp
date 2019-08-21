@@ -79,6 +79,12 @@ public:
     template <typename NumT>
     int H5NXmake_attribute_scalar( const std::string &dataset_path,
         const std::string &attr_name, const NumT &value );
+    template <typename NumT>
+    int H5NXwrite_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, const NumT &value );
+    template <typename NumT>
+    int H5NXread_attribute_scalar( const std::string &dataset_path,
+        const std::string &attr_name, NumT &value );
 
     //create/write a SCALAR NUMERICAL dataset
     template <typename NumT>
