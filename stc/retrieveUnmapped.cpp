@@ -1,4 +1,3 @@
-
 //
 // SNS ADARA SYSTEM - Retrieve Unmapped Events Utility
 // 
@@ -99,7 +98,7 @@ int main( int argc, char** argv )
     bool            verbose;
     bool            dump;
 
-    std::vector<hsize_t> dim_vec;
+    std::vector<hsize_t> dim_vec( H5S_MAX_RANK );
     hsize_t vec_size;
     int rank;
 
@@ -242,8 +241,6 @@ int main( int argc, char** argv )
 
     // Read Unmapped Event ID Dataset
 
-    dim_vec.reserve( H5S_MAX_RANK );
-
     if ( m_h5nx.H5NXget_dataset_dims(
             "/entry/instrument/bank_unmapped/event_id",
             rank, dim_vec ) != SUCCEED )
@@ -270,7 +267,7 @@ int main( int argc, char** argv )
             << std::endl << std::flush;
     }
 
-    unmapped_event_id.reserve( vec_size );
+    unmapped_event_id.assign( vec_size, 0 );
 
     if ( m_h5nx.H5NXread_slab(
             "/entry/instrument/bank_unmapped/event_id",
@@ -350,7 +347,7 @@ int main( int argc, char** argv )
             << std::endl << std::flush;
     }
 
-    unmapped_event_time_offset.reserve( vec_size );
+    unmapped_event_time_offset.assign( vec_size, 0 );
 
     if ( m_h5nx.H5NXread_slab(
             "/entry/instrument/bank_unmapped/event_time_offset",
@@ -405,7 +402,7 @@ int main( int argc, char** argv )
             << std::endl << std::flush;
     }
 
-    unmapped_event_index.reserve( vec_size );
+    unmapped_event_index.assign( vec_size, 0 );
 
     if ( m_h5nx.H5NXread_slab(
             "/entry/instrument/bank_unmapped/event_index",
@@ -462,15 +459,13 @@ int main( int argc, char** argv )
 
     // Read Dest Bank Event ID Dataset
 
-    dim_vec.reserve( H5S_MAX_RANK );
-
     if ( m_h5nx.H5NXget_dataset_dims( dest_path + "/event_id",
             rank, dim_vec ) != SUCCEED )
     {
         std::cerr << std::endl
             << "Error Getting Dest Bank Event ID Dataset Dimensions!"
             << " Bailing..." << std::endl;
-        return( -110 );
+        return( -510 );
     }
     else if ( verbose )
     {
@@ -489,7 +484,7 @@ int main( int argc, char** argv )
             << std::endl << std::flush;
     }
 
-    dest_event_id.reserve( vec_size );
+    dest_event_id.assign( vec_size, 0 );
 
     if ( m_h5nx.H5NXread_slab( dest_path + "/event_id",
             dest_event_id, vec_size, 0 ) != SUCCEED )
@@ -497,7 +492,7 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Error Reading Event ID Dataset! Bailing..."
             << std::endl;
-        return( -120 );
+        return( -520 );
     }
     else if ( dump )
     {
@@ -522,7 +517,7 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Error Getting Dest Bank Event Time Offset Dimensions!"
             << " Bailing..." << std::endl;
-        return( -210 );
+        return( -610 );
     }
     else if ( verbose )
     {
@@ -542,7 +537,7 @@ int main( int argc, char** argv )
             << std::endl << std::flush;
     }
 
-    dest_event_time_offset.reserve( vec_size );
+    dest_event_time_offset.assign( vec_size, 0 );
 
     if ( m_h5nx.H5NXread_slab( dest_path + "/event_time_offset",
             dest_event_time_offset, vec_size, 0 ) != SUCCEED )
@@ -550,7 +545,7 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Error Reading Event Time Offset Dataset! Bailing..."
             << std::endl;
-        return( -220 );
+        return( -620 );
     }
     else if ( dump )
     {
@@ -575,7 +570,7 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Error Getting Dest Bank Event Index Dimensions!"
             << " Bailing..." << std::endl;
-        return( -310 );
+        return( -710 );
     }
     else if ( verbose )
     {
@@ -595,7 +590,7 @@ int main( int argc, char** argv )
             << std::endl << std::flush;
     }
 
-    dest_event_index.reserve( vec_size );
+    dest_event_index.assign( vec_size, 0 );
 
     if ( m_h5nx.H5NXread_slab( dest_path + "/event_index",
             dest_event_index, vec_size, 0 ) != SUCCEED )
@@ -603,7 +598,7 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Error Reading Event Index Dataset! Bailing..."
             << std::endl;
-        return( -320 );
+        return( -720 );
     }
     else if ( dump )
     {
@@ -620,15 +615,15 @@ int main( int argc, char** argv )
         std::cout << std::flush;
     }
 
-    // Read Dest Bank Bank Total Counts
+    // Read Dest Bank Total Counts
 
     if ( m_h5nx.H5NXread_dataset_scalar( dest_path + "/total_counts",
             dest_total_counts ) != SUCCEED )
     {
         std::cerr << std::endl
-            << "Error Reading Dest Bank Bank Total Counts! Bailing..."
+            << "Error Reading Dest Bank Total Counts! Bailing..."
             << std::endl;
-        return( -400 );
+        return( -800 );
     }
     else if ( verbose )
     {
@@ -644,13 +639,191 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Error Closing NeXus Source Data File! Bailing..."
             << std::endl;
-        return( -700 );
+        return( -900 );
     }
     else if ( verbose )
     {
         std::cout << std::endl
             << "Closed NeXus Source Data File."
             << std::endl << std::flush;
+    }
+
+    // Sanity Check the Event Indices...
+    if ( unmapped_event_index.size() != dest_event_index.size() )
+    {
+        std::cerr << std::endl
+            << "Error: Event Index (Time) Vector Size Mismatch!"
+            << std::endl;
+        std::cerr << std::endl
+            << "Unmapped Event Index has "
+            << unmapped_event_index.size() << " Elements,"
+            << std::endl << "And Dest Bank Event Index has "
+            << dest_event_index.size() << " Elements!"
+            << " Bailing..."
+            << std::endl;
+        return( -1000 );
+    }
+    else
+    {
+        std::cerr << std::endl
+            << "Event Index (Time) Vector Sizes Match."
+            << std::endl;
+        std::cerr << std::endl
+            << "Unmapped Event Index has "
+            << unmapped_event_index.size() << " Elements,"
+            << std::endl << "And Dest Bank Event Index has "
+            << dest_event_index.size() << " Elements."
+            << std::endl;
+    }
+
+    // Now Merge Unmapped Events into Destination Detector Bank...
+
+    std::vector<uint32_t> merged_event_id;
+    std::vector<uint32_t> merged_event_time_offset;
+
+    std::vector<uint64_t> merged_event_index;
+
+    uint64_t merged_total_counts;
+
+    uint64_t unmapped_last_event_index = 0;
+    uint64_t dest_last_event_index = 0;
+
+    uint64_t next_merged_event_index = 0;
+
+    uint64_t unmapped_index = 0;
+    uint64_t dest_index = 0;
+    uint64_t time_index = 0;
+
+    while ( time_index < dest_event_index.size() )
+    {
+        // Initialize Merged Event Index
+        merged_event_index.push_back( next_merged_event_index );
+
+        // Check for Unmapped Events to Add to Merged Set...
+        if ( unmapped_event_index[ time_index ]
+                != unmapped_last_event_index )
+        {
+            if ( dump )
+            {
+                std::cout << "Add "
+                    << unmapped_event_index[ time_index ]
+                        - unmapped_last_event_index
+                    << " Unmapped Events..." << std::endl;
+            }
+
+            // Add Unmapped Event(s) to Merged Set...
+            for ( uint64_t i = unmapped_last_event_index ;
+                    i < unmapped_event_index[ time_index ] ; i++ )
+            {
+                if ( dump )
+                {
+                    std::cout << "   idx=" << unmapped_index
+                        << " event_id="
+                        << unmapped_event_id[ unmapped_index ]
+                        << " time_offset="
+                        << unmapped_event_time_offset[ unmapped_index ]
+                        << std::endl;
+                }
+
+                merged_event_id.push_back(
+                    unmapped_event_id[ unmapped_index ] );
+                merged_event_time_offset.push_back(
+                    unmapped_event_time_offset[ unmapped_index ] );
+                unmapped_index++;
+            }
+
+            // Update Merged Event Index...
+            merged_event_index[ time_index ] +=
+                unmapped_event_index[ time_index ]
+                    - unmapped_last_event_index;
+
+            // Save Last Unmapped Event Index
+            unmapped_last_event_index = unmapped_event_index[ time_index ];
+        }
+
+        // Check for Original Dest Bank Events to Add to Merged Set...
+        if ( dest_event_index[ time_index ]
+                != dest_last_event_index )
+        {
+            if ( dump )
+            {
+                std::cout << "Add "
+                    << dest_event_index[ time_index ]
+                        - dest_last_event_index
+                    << " Original Dest Events..." << std::endl;
+            }
+
+            // Add Original Dest Bank Event(s) to Merged Set...
+            for ( uint64_t i = dest_last_event_index ;
+                    i < dest_event_index[ time_index ] ; i++ )
+            {
+                if ( dump )
+                {
+                    std::cout << "   idx=" << dest_index
+                        << " event_id=" << dest_event_id[ dest_index ]
+                        << " time_offset="
+                        << dest_event_time_offset[ dest_index ]
+                        << std::endl;
+                }
+
+                merged_event_id.push_back(
+                    dest_event_id[ dest_index ] );
+                merged_event_time_offset.push_back(
+                    dest_event_time_offset[ dest_index ] );
+                dest_index++;
+            }
+
+            // Update Merged Event Index...
+            merged_event_index[ time_index ] +=
+                dest_event_index[ time_index ]
+                    - dest_last_event_index;
+
+            // Save Last Unmapped Event Index
+            dest_last_event_index = dest_event_index[ time_index ];
+        }
+
+        // Advance to Next Time Index...
+
+        if ( dump )
+        {
+            std::cout << "merged_event_index[ " << time_index << " ] = "
+                << merged_event_index[ time_index ] << std::endl;
+        }
+
+        next_merged_event_index = merged_event_index[ time_index ];
+
+        time_index++;
+    }
+
+    // Verify Merged Total Event Counts...
+
+    merged_total_counts = unmapped_total_counts + dest_total_counts;
+
+    if ( merged_total_counts != merged_event_id.size() )
+    {
+        std::cerr << std::endl
+            << "Error: Merged Total Counts Mismatch!"
+            << std::endl;
+        std::cerr << std::endl
+            << "Calculated Merged Total Counts of "
+            << merged_total_counts
+            << std::endl << "Does Not Equal Merged Event ID Vector Size of "
+            << merged_event_id.size() << "!"
+            << " Bailing..."
+            << std::endl;
+        return( -1010 );
+    }
+    else
+    {
+        std::cerr << std::endl
+            << "Merged Total Counts Match."
+            << std::endl;
+        std::cerr << std::endl
+            << "Calculated Merged Total Counts of "
+            << merged_total_counts
+            << std::endl << "Equals Merged Event ID Vector Size of "
+            << merged_event_id.size() << "."
+            << std::endl;
     }
 
     // Open Destination NeXus File
