@@ -729,11 +729,45 @@ int main( int argc, char** argv )
             << std::endl << std::flush;
     }
 
-
+    // Move Original Unmapped Instrument Bank Data Out of the Way...
+    if ( m_h5nx.H5NXmove_link( "/entry/instrument/bank_unmapped",
+            "/entry/instrument/bank_retrieved" ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Renaming/Moving Unmapped Instrument Bank Group!"
+            << std::endl << "   from \"/entry/instrument/bank_unmapped\""
+            << std::endl << "   to \"/entry/instrument/bank_retrieved\""
+            << std::endl << "Bailing..." << std::endl;
+        return( -640 );
+    }
+    else if ( verbose )
+    {
+        std::cerr << std::endl
+            << "Successfully Renamed/Moved"
+            << " Unmapped Instrument Bank Group" << std::endl
+            << "   from \"/entry/instrument/bank_unmapped\"" << std::endl
+            << "   to \"/entry/instrument/bank_retrieved\"" << std::endl;
+    }
 
     // Move Original Unmapped Bank Data Out of the Way...
-
-
+    if ( m_h5nx.H5NXmove_link( "/entry/bank_unmapped_events",
+            "/entry/bank_retrieved_events" ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Renaming/Moving Unmapped Bank Group!"
+            << std::endl << "   from \"/entry/bank_unmapped_events\""
+            << std::endl << "   to \"/entry/bank_retrieved_events\""
+            << std::endl << "Bailing..." << std::endl;
+        return( -640 );
+    }
+    else if ( verbose )
+    {
+        std::cerr << std::endl
+            << "Successfully Renamed/Moved"
+            << " Unmapped Bank Group" << std::endl
+            << "   from \"/entry/bank_unmapped_events\"" << std::endl
+            << "   to \"/entry/bank_retrieved_events\"" << std::endl;
+    }
 
     // Overwrite Destination Bank Total Counts
     if ( m_h5nx.H5NXwrite_dataset_scalar( dest_path + "/total_counts",
