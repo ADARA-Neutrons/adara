@@ -145,6 +145,9 @@ public:
         const std::string &destination_name );
     int H5NXmake_group_link( const std::string &current_name,
         const std::string &destination_name );
+    int H5NXmove_link( const std::string &current_name,
+        const std::string &destination_name );
+		// (a.k.a. "Rename A Link/Dataset"...)
 
     //call H5Fflush: causes all buffers associated with a file
     //to be immediately flushed to disk
