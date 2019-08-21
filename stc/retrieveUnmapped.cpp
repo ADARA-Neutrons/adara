@@ -115,7 +115,7 @@ readVector( H5nx &a_h5nx, std::vector<NumT> &a_vector,
     {
         std::cout << std::endl
             << "Got " << a_label << " Dataset Dimensions"
-            << " rank=" << rank << ", dim[0]=" << dim_vec[0]
+            << std::endl << "   rank=" << rank << ", dim[0]=" << dim_vec[0]
             << std::endl << std::flush;
     }
 
@@ -290,7 +290,6 @@ int main( int argc, char** argv )
     m_h5nx.H5NXset_cache_size( cache_size );
 
     // Open NeXus Source Data File
-
     if ( m_h5nx.H5NXopen_file( nexus_source ) != SUCCEED )
     {
         std::cerr << std::endl
@@ -390,11 +389,11 @@ int main( int argc, char** argv )
     else if ( verbose )
     {
         std::cout << std::endl
-            << "Total Unmapped Event Count = " << unmapped_total_counts
+            << "Total Unmapped Event Counts = " << unmapped_total_counts
             << std::endl << std::flush;
     }
 
-    // Read Dest Bank Datasets from Source NeXus File
+    // Read Destination Bank Datasets from Source NeXus File
 
     std::string dest_path = "/entry/instrument/" + dest_bank;
 
@@ -405,7 +404,7 @@ int main( int argc, char** argv )
 
     uint64_t dest_total_counts;
 
-    // Read Dest Bank Event ID Dataset
+    // Read Destination Bank Event ID Dataset
     if ( (cc = readVector( m_h5nx, dest_event_id,
             dest_path + "/event_id",
             "Destination Bank Event ID" )) != 0 )
@@ -417,7 +416,7 @@ int main( int argc, char** argv )
         return( cc );
     }
 
-    // Read Dest Bank Event Time Offset Dataset
+    // Read Destination Bank Event Time Offset Dataset
     if ( (cc = readVector( m_h5nx, dest_event_time_offset,
             dest_path + "/event_time_offset",
             "Destination Bank Event Time Offset" )) != 0 )
@@ -429,7 +428,7 @@ int main( int argc, char** argv )
         return( cc );
     }
 
-    // Read Dest Bank Event Index Dataset
+    // Read Destination Bank Event Index Dataset
     if ( (cc = readVector( m_h5nx, dest_event_index,
             dest_path + "/event_index",
             "Destination Bank Event Index" )) != 0 )
@@ -441,19 +440,19 @@ int main( int argc, char** argv )
         return( cc );
     }
 
-    // Read Dest Bank Total Counts
+    // Read Destination Bank Total Counts
     if ( m_h5nx.H5NXread_dataset_scalar( dest_path + "/total_counts",
             dest_total_counts ) != SUCCEED )
     {
         std::cerr << std::endl
-            << "Error Reading Dest Bank Total Counts! Bailing..."
+            << "Error Reading Destination Bank Total Counts! Bailing..."
             << std::endl;
-        return( -800 );
+        return( -300 );
     }
     else if ( verbose )
     {
         std::cout << std::endl
-            << "Total Dest Bank Event Count = " << dest_total_counts
+            << "Total Destination Bank Event Counts = " << dest_total_counts
             << std::endl << std::flush;
     }
 
@@ -463,7 +462,7 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Error Closing NeXus Source Data File! Bailing..."
             << std::endl;
-        return( -900 );
+        return( -400 );
     }
     else if ( verbose )
     {
@@ -481,11 +480,11 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Unmapped Event Index has "
             << unmapped_event_index.size() << " Elements,"
-            << std::endl << "And Dest Bank Event Index has "
+            << std::endl << "   And Destination Bank Event Index has "
             << dest_event_index.size() << " Elements!"
             << " Bailing..."
             << std::endl;
-        return( -1000 );
+        return( -500 );
     }
     else
     {
@@ -495,7 +494,7 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Unmapped Event Index has "
             << unmapped_event_index.size() << " Elements,"
-            << std::endl << "And Dest Bank Event Index has "
+            << std::endl << "   And Destination Bank Event Index has "
             << dest_event_index.size() << " Elements."
             << std::endl;
     }
@@ -508,6 +507,10 @@ int main( int argc, char** argv )
     std::vector<uint64_t> merged_event_index;
 
     uint64_t merged_total_counts;
+
+    uint64_t total_uncounted_counts;
+    uint64_t events_have_no_bank;
+    uint64_t total_counts;
 
     uint64_t unmapped_last_event_index = 0;
     uint64_t dest_last_event_index = 0;
@@ -567,7 +570,7 @@ int main( int argc, char** argv )
             unmapped_last_event_index = unmapped_event_index[ time_index ];
         }
 
-        // Check for Original Dest Bank Events to Add to Merged Set...
+        // Check for Original Destination Bank Events to Add to Merged Set
         if ( dest_event_index[ time_index ]
                 != dest_last_event_index )
         {
@@ -576,10 +579,10 @@ int main( int argc, char** argv )
                 std::cout << "Add "
                     << dest_event_index[ time_index ]
                         - dest_last_event_index
-                    << " Original Dest Events..." << std::endl;
+                    << " Original Destination Events..." << std::endl;
             }
 
-            // Add Original Dest Bank Event(s) to Merged Set...
+            // Add Original Destination Bank Event(s) to Merged Set...
             for ( uint64_t i = dest_last_event_index ;
                     i < dest_event_index[ time_index ] ; i++ )
             {
@@ -633,11 +636,11 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Calculated Merged Total Counts of "
             << merged_total_counts
-            << std::endl << "Does Not Equal Merged Event ID Vector Size of "
-            << merged_event_id.size() << "!"
+            << std::endl << "   Does Not Equal Merged Event ID Vector"
+            << " Size of " << merged_event_id.size() << "!"
             << " Bailing..."
             << std::endl;
-        return( -1010 );
+        return( -510 );
     }
     else
     {
@@ -647,13 +650,271 @@ int main( int argc, char** argv )
         std::cerr << std::endl
             << "Calculated Merged Total Counts of "
             << merged_total_counts
-            << std::endl << "Equals Merged Event ID Vector Size of "
+            << std::endl << "   Equals Merged Event ID Vector Size of "
             << merged_event_id.size() << "."
             << std::endl;
     }
 
     // Open Destination NeXus File
+    if ( m_h5nx.H5NXopen_file( nexus_dest ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Opening NeXus Destination Data File! Bailing..."
+            << std::endl;
+        return( -600 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Opened NeXus Destination Data File for Processing:"
+            << std::endl << std::endl
+            << "   [" << nexus_dest << "]"
+            << std::endl << std::flush;
+    }
 
+    // Overwrite/Extend Destination Bank Event ID Dataset
+    if ( m_h5nx.H5NXwrite_slab( dest_path + "/event_id",
+            merged_event_id,
+            merged_event_id.size(), 0 ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Overwriting/Extending"
+            << " Bank Event ID Dataset!"
+            << std::endl << "Bailing..." << std::endl;
+        return( -610 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Successfully Overwrote/Extended"
+            << " Bank Event ID Dataset."
+            << std::endl << std::flush;
+    }
+
+    // Overwrite/Extend Destination Bank Event Time Offset Dataset
+    if ( m_h5nx.H5NXwrite_slab( dest_path + "/event_time_offset",
+            merged_event_time_offset,
+            merged_event_time_offset.size(), 0 ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Overwriting/Extending"
+            << " Bank Event Time Offset Dataset!"
+            << std::endl << "Bailing..." << std::endl;
+        return( -620 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Successfully Overwrote/Extended"
+            << " Bank Event Time Offset Dataset."
+            << std::endl << std::flush;
+    }
+
+    // Overwrite/Extend Destination Bank Event Index Dataset
+    if ( m_h5nx.H5NXwrite_slab( dest_path + "/event_index",
+            merged_event_index,
+            merged_event_index.size(), 0 ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Overwriting/Extending"
+            << " Bank Event Index Dataset!"
+            << std::endl << "Bailing..." << std::endl;
+        return( -630 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Successfully Overwrote/Extended"
+            << " Bank Event Index Dataset."
+            << std::endl << std::flush;
+    }
+
+
+
+    // Move Original Unmapped Bank Data Out of the Way...
+
+
+
+    // Overwrite Destination Bank Total Counts
+    if ( m_h5nx.H5NXwrite_dataset_scalar( dest_path + "/total_counts",
+            merged_total_counts ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Overwriting Bank Total Counts Dataset!"
+            << std::endl << "   merged_total_counts=" << merged_total_counts
+            << std::endl << "Bailing..." << std::endl;
+        return( -650 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Successfully Overwrote Bank Total Counts Dataset."
+            << std::endl << "   merged_total_counts=" << merged_total_counts
+            << std::endl << std::flush;
+    }
+
+    // Overwrite Destination File Overall Total Counts...
+
+    // Read Destination File Overall Total Counts
+    if ( m_h5nx.H5NXread_dataset_scalar( "/entry/total_counts",
+            total_counts ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Reading Destination File Overall Total Counts!"
+            << " Bailing..."
+            << std::endl;
+        return( -660 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Original Destination File Overall Total Counts = "
+            << total_counts
+            << std::endl << std::flush;
+    }
+
+    total_counts += unmapped_total_counts;
+
+    // Overwrite Destination File Overall Total Counts
+    if ( m_h5nx.H5NXwrite_dataset_scalar( "/entry/total_counts",
+            total_counts ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Overwriting File Overall Total Counts Dataset!"
+            << std::endl << "   total_counts=" << total_counts
+            << std::endl << "Bailing..." << std::endl;
+        return( -670 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Successfully Overwrote File Overall Total Counts Dataset."
+            << std::endl << "   total_counts=" << total_counts
+            << std::endl << std::flush;
+    }
+
+    // Overwrite Destination File Total Uncounted Counts...
+
+    // Read Destination File Total Uncounted Counts
+    if ( m_h5nx.H5NXread_dataset_scalar( "/entry/total_uncounted_counts",
+            total_uncounted_counts ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Reading Destination File Total Uncounted Counts!"
+            << " Bailing..."
+            << std::endl;
+        return( -680 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Original Destination File Total Uncounted Counts = "
+            << total_uncounted_counts
+            << std::endl << std::flush;
+    }
+
+    total_uncounted_counts -= unmapped_total_counts;
+
+    // Overwrite Destination File Total Uncounted Counts
+    if ( m_h5nx.H5NXwrite_dataset_scalar( "/entry/total_uncounted_counts",
+            total_uncounted_counts ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Overwriting File Total Uncounted Counts Dataset!"
+            << std::endl << "   total_uncounted_counts="
+            << total_uncounted_counts
+            << std::endl << "Bailing..." << std::endl;
+        return( -690 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Successfully Overwrote File Total Uncounted Counts Dataset."
+            << std::endl << "   total_uncounted_counts="
+            << total_uncounted_counts
+            << std::endl << std::flush;
+    }
+
+    // Overwrite Destination File "Events Have No Bank" Count...
+
+    // Read Destination File "Events Have No Bank" Counts
+    if ( m_h5nx.H5NXread_attribute_scalar(
+            "/entry/total_uncounted_counts",
+            "events_have_no_bank", events_have_no_bank ) != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Reading Destination File"
+            << " \"Events Have No Bank\" Counts!" << std::endl
+            << "Skipping...!"
+            << std::endl;
+    }
+    else
+    {
+        if ( verbose )
+        {
+            std::cout << std::endl
+                << "Original Destination File"
+                << " \"Events Have No Bank\" Counts = "
+                << events_have_no_bank
+                << std::endl << std::flush;
+        }
+
+        // Deduct Formerly Unmapped Counts...
+        if ( events_have_no_bank < unmapped_total_counts )
+        {
+            std::cout << std::endl
+                << "WARNING: \"Events Have No Bank\" Counts is"
+                << " LESS Than the Unmapped Total Counts Deducted!!"
+                << std::endl
+                << "   events_have_no_bank=" << events_have_no_bank
+                << " unmapped_total_counts=" << unmapped_total_counts
+                << std::endl
+                << "   Setting events_have_no_bank=0" << std::endl;
+            events_have_no_bank = 0;
+        }
+        else
+        {
+            events_have_no_bank -= unmapped_total_counts;
+        }
+
+        // Overwrite Destination File "Events Have No Bank" Counts
+        if ( m_h5nx.H5NXwrite_attribute_scalar(
+                "/entry/total_uncounted_counts",
+                "events_have_no_bank", events_have_no_bank ) != SUCCEED )
+        {
+            std::cerr << std::endl
+                << "Error Overwriting File"
+                << " \"Events Have No Bank\" Counts Dataset!"
+                << std::endl
+                << "   events_have_no_bank=" << events_have_no_bank
+                << std::endl << "Bailing..." << std::endl;
+            return( -700 );
+        }
+        else if ( verbose )
+        {
+            std::cout << std::endl
+                << "Successfully Overwrote File"
+                << " \"Events Have No Bank\" Counts Dataset."
+                << std::endl
+                << "   events_have_no_bank=" << events_have_no_bank
+                << std::endl << std::flush;
+        }
+    }
+
+    // Close NeXus Destination Data File
+    if ( m_h5nx.H5NXclose_file() != SUCCEED )
+    {
+        std::cerr << std::endl
+            << "Error Closing NeXus Destination Data File! Bailing..."
+            << std::endl;
+        return( -800 );
+    }
+    else if ( verbose )
+    {
+        std::cout << std::endl
+            << "Closed NeXus Destination Data File."
+            << std::endl << std::flush;
+    }
 
     // Done
 
