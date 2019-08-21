@@ -1351,6 +1351,85 @@ int H5nx::H5NXmake_dataset_scalar( const std::string &group_path,
 }
 
 ///////////////////////////////////////////////////////////////////
+// H5NXwrite_dataset_scalar
+// create/write a SCALAR NUMERICAL dataset
+////////////////////////////////////////////////////////////////////
+
+// declare instantiations of the types of templated functions needed
+template
+int H5nx::H5NXwrite_dataset_scalar( const std::string &dataset_path,
+        uint16_t &value );
+
+template
+int H5nx::H5NXwrite_dataset_scalar( const std::string &dataset_path,
+        double &value );
+
+template
+int H5nx::H5NXwrite_dataset_scalar( const std::string &dataset_path,
+        float &value );
+
+template
+int H5nx::H5NXwrite_dataset_scalar( const std::string &dataset_path,
+        uint32_t &value );
+
+template
+int H5nx::H5NXwrite_dataset_scalar( const std::string &dataset_path,
+        uint64_t &value );
+
+template <typename NumT>
+int H5nx::H5NXwrite_dataset_scalar( const std::string &dataset_path,
+        NumT &value )
+{
+    hid_t   did;                   // dataset ID
+    hid_t   tid;                   // nx_datatype ID
+
+    //open dataset
+    if ( (did = H5Dopen2( this->m_fid, dataset_path.c_str(),
+            H5P_DEFAULT )) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s=%s %s",
+            g_pid, "STC Error", "H5nx::H5NXwrite_dataset_scalar",
+            "H5Dopen2", "dataset_path", dataset_path.c_str(),
+            "Open Dataset" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr("H5nx::H5NXwrite_dataset_scalar(): H5Dopen2()"
+            + std::string(" Open Dataset"));
+        return FAIL;
+    }
+
+    //get the NeXus type; some template magic here
+    NeXus::NXnumtype nx_numtype = to_nx_type<NumT>();
+
+    //get the HDF5 type from the NeXus type
+    tid = nx_to_hdf5_type( nx_numtype );
+
+    if ( H5Dwrite( did, tid, H5S_ALL, H5S_ALL, H5P_DEFAULT, &value ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STC Error", "H5nx::H5NXwrite_dataset_scalar",
+            "H5Dwrite", "Read Dataset" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr(
+            "H5nx::H5NXwrite_dataset_scalar(): H5Dwrite() Read Dataset");
+        return FAIL;
+    }
+
+    //close dataset
+    if ( H5Dclose( did ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() %s",
+            g_pid, "STC Error", "H5nx::H5NXwrite_dataset_scalar",
+            "H5Dclose", "Close Dataset" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr(
+            "H5nx::H5NXwrite_dataset_scalar(): H5Dclose() Close Dataset");
+        return FAIL;
+    }
+
+    return SUCCEED;
+}
+
+///////////////////////////////////////////////////////////////////
 // H5NXread_dataset_scalar
 // create/write a SCALAR NUMERICAL dataset
 ////////////////////////////////////////////////////////////////////

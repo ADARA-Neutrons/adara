@@ -85,6 +85,9 @@ public:
     int H5NXmake_dataset_scalar( const std::string &group_path,
         const std::string &dataset_name, const NumT &value );
     template <typename NumT>
+    int H5NXwrite_dataset_scalar( const std::string &dataset_path,
+        NumT &value );
+    template <typename NumT>
     int H5NXread_dataset_scalar( const std::string &dataset_path,
         NumT &value );
 
