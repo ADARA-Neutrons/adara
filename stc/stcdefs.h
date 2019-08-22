@@ -1162,10 +1162,8 @@ public:
                 this->m_value_buffer.begin()
                     + last_pre_pulse_index );
 
-            this->m_abs_time_buffer.erase(
-                this->m_abs_time_buffer.begin(),
-                this->m_abs_time_buffer.begin()
-                    + last_pre_pulse_index );
+            // Don't Bother Erasing Entries from Absolute Time Buffer,
+            // We're Done With It Now, And About to Free the Whole Thing...
 
             this->m_time_buffer.erase(
                 this->m_time_buffer.begin(),
@@ -1181,6 +1179,7 @@ public:
         }
 
         // Done Normalizing This PV's Value Updates.
+        this->m_abs_time_buffer.clear();
         this->m_has_non_normalized = false;
     }
 
