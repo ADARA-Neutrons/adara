@@ -4580,6 +4580,8 @@ StreamParser::pvValueUpdate
     // Note: if first pulse has not arrived, truncate all PV times to 0.
     double t = 0.0;
 
+    bool save_abs_time = false;
+
     // First Pulse Has Arrived...
     if ( m_pulse_info.start_time )
     {
@@ -4662,6 +4664,7 @@ StreamParser::pvValueUpdate
 
                 // Purge Existing Pre-Pulse PV Data...
                 pvinfo->m_value_buffer.clear();
+                pvinfo->m_abs_time_buffer.clear();
                 pvinfo->m_time_buffer.clear();
                 pvinfo->m_stats.reset();
             }
@@ -4745,6 +4748,7 @@ StreamParser::pvValueUpdate
         }
 
         pvinfo->m_has_non_normalized = true;
+        save_abs_time = true;
         t = -1.0;
     }
 
@@ -4758,7 +4762,7 @@ StreamParser::pvValueUpdate
     pvinfo->m_value_changed = value_changed;
 
     pvinfo->m_value_buffer.push_back(a_value);
-    pvinfo->m_abs_time_buffer.push_back(ts_nano);
+    if ( save_abs_time ) pvinfo->m_abs_time_buffer.push_back(ts_nano);
     pvinfo->m_time_buffer.push_back(t);
 
     if ( t >= 0.0 )
@@ -5866,6 +5870,8 @@ StreamParser::collapseDuplicatePVs()
                             // This Duplicate PV's Values have
                             // Now Been Subsumed, So Mark It to Ignore...
                             // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupU32->m_value_buffer.clear();
+                            pvinfoDupU32->m_time_buffer.clear();
                             pvinfoDupU32->m_ignore = true;
 
                             break;
@@ -5932,6 +5938,8 @@ StreamParser::collapseDuplicatePVs()
                             // This Duplicate PV's Values have
                             // Now Been Subsumed, So Mark It to Ignore...
                             // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupDbl->m_value_buffer.clear();
+                            pvinfoDupDbl->m_time_buffer.clear();
                             pvinfoDupDbl->m_ignore = true;
 
                             break;
@@ -5997,6 +6005,8 @@ StreamParser::collapseDuplicatePVs()
                             // This Duplicate PV's Values have
                             // Now Been Subsumed, So Mark It to Ignore...
                             // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupStr->m_value_buffer.clear();
+                            pvinfoDupStr->m_time_buffer.clear();
                             pvinfoDupStr->m_ignore = true;
 
                             break;
@@ -6064,6 +6074,8 @@ StreamParser::collapseDuplicatePVs()
                             // This Duplicate PV's Values have
                             // Now Been Subsumed, So Mark It to Ignore...
                             // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupU32Arr->m_value_buffer.clear();
+                            pvinfoDupU32Arr->m_time_buffer.clear();
                             pvinfoDupU32Arr->m_ignore = true;
 
                             break;
@@ -6131,6 +6143,8 @@ StreamParser::collapseDuplicatePVs()
                             // This Duplicate PV's Values have
                             // Now Been Subsumed, So Mark It to Ignore...
                             // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupDblArr->m_value_buffer.clear();
+                            pvinfoDupDblArr->m_time_buffer.clear();
                             pvinfoDupDblArr->m_ignore = true;
 
                             break;
@@ -6169,9 +6183,9 @@ StreamParser::collapseDuplicatePVs()
 }
 
 
-/*! \brief This method retrieves tha human-readable name of an ADARA packet type.
+/*! \brief This method retrieves the human-readable name of an ADARA packet type.
  *
- * This method retrieves tha human-readable name of an ADARA packet type.
+ * This method retrieves the human-readable name of an ADARA packet type.
  */
 const char*
 StreamParser::getPktName(
