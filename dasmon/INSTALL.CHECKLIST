@@ -132,7 +132,16 @@ please set your shell "umask" as follows before proceeding! ;-D
 	sudo cp ~/gitsrc/ADARA/dasmon/server/init.dasmond.conf \
 		/etc/init/dasmond.conf
 
-	cp /etc/init/dasmond dasmond/init.dasmond.conf
+	cp /etc/init/dasmond.conf dasmond/init.dasmond.conf
+
+    -OR-
+
+	# DASMOND Init Script (RedHat7)
+
+	sudo cp ~/gitsrc/ADARA/dasmon/server/systemd.dasmond.service \
+		/etc/systemd/system/dasmond.service
+
+	cp /etc/systemd/system/dasmond.service dasmond/systemd.dasmond.service
 
 	# DASMOND Wrapper Script
 
@@ -173,9 +182,22 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# Dasmon GUI Client Init Script (RedHat6)
 
-	sudo cp ~/gitsrc/ADARA/dasmon/client/dasmongui.conf /etc/init/
+	sudo cp ~/gitsrc/ADARA/dasmon/client/init.dasmongui.conf \
+		/etc/init/dasmongui.conf
 
 	cp /etc/init/dasmongui.conf dasmon/
+
+    -OR-
+
+	# Dasmon GUI Client Init Script (RedHat7)
+
+	sudo cp ~/gitsrc/ADARA/dasmon/client/systemd.dasmongui.service \
+		/etc/systemd/system/dasmongui.service
+
+	cp /etc/systemd/system/dasmongui.service \
+		dasmond/systemd.dasmongui.service
+
+	# Binary Deploy Links
 
 	sudo ln -s /home/controls/config-dasmon/deploy/dasmond /usr/sbin/dasmond
 
