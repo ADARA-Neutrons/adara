@@ -129,8 +129,12 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# DASMOND Init Script (RedHat6)
 
+	ls -l /etc/init/dasmond.conf
+
 	sudo cp ~/gitsrc/ADARA/dasmon/server/init.dasmond.conf \
 		/etc/init/dasmond.conf
+
+	ls -l /etc/init/dasmond.conf
 
 	cp /etc/init/dasmond.conf dasmond/init.dasmond.conf
 
@@ -138,12 +142,18 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# DASMOND Init Script (RedHat7)
 
+	ls -l /etc/systemd/system/dasmond.service
+
 	sudo cp ~/gitsrc/ADARA/dasmon/server/systemd.dasmond.service \
 		/etc/systemd/system/dasmond.service
+
+	ls -l /etc/systemd/system/dasmond.service
 
 	cp /etc/systemd/system/dasmond.service dasmond/systemd.dasmond.service
 
 	# DASMOND Wrapper Script
+
+	ls -l /usr/local/bin/dasmond
 
 	sudo cp ~/gitsrc/ADARA/dasmon/server/dasmond.wrapper \
 		/usr/local/bin/dasmond
@@ -153,11 +163,17 @@ please set your shell "umask" as follows before proceeding! ;-D
 		- replace "XXX" with beamline short name (a la "PG3")
 		- for testing, replace "amqbroker" with "amqbrokerdev"...
 
+	ls -l /usr/local/bin/dasmond
+
 	cp /usr/local/bin/dasmond dasmond/usr.local.bin.dasmond
 
 	# ADARA Mailer Config
 
+	ls -l /etc/rsyslog.d/adaraMailer.conf
+
 	sudo cp /SNS/users/y8y/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+
+	ls -l /etc/rsyslog.d/adaraMailer.conf
 
 	cp /etc/rsyslog.d/adaraMailer.conf dasmond/adaraMailer.conf
 
@@ -169,6 +185,8 @@ please set your shell "umask" as follows before proceeding! ;-D
 	mkdir dasmon
 
 	# Dasmon GUI Client XInitrc File
+
+	ls -l /etc/X11/xinit/xinitrc.dasmon
 
 	sudo cp ~/gitsrc/ADARA/dasmon/client/xinitrc.dasmon /etc/X11/xinit/
 
@@ -182,8 +200,12 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# Dasmon GUI Client Init Script (RedHat6)
 
+	ls -l /etc/init/dasmongui.conf
+
 	sudo cp ~/gitsrc/ADARA/dasmon/client/init.dasmongui.conf \
 		/etc/init/dasmongui.conf
+
+	ls -l /etc/init/dasmongui.conf
 
 	cp /etc/init/dasmongui.conf dasmon/init.dasmongui.conf
 
@@ -191,13 +213,19 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# Dasmon GUI Client Init Script (RedHat7)
 
+	ls -l /etc/systemd/system/dasmongui.service
+
 	sudo cp ~/gitsrc/ADARA/dasmon/client/systemd.dasmongui.service \
 		/etc/systemd/system/dasmongui.service
+
+	ls -l /etc/systemd/system/dasmongui.service
 
 	cp /etc/systemd/system/dasmongui.service \
 		dasmon/systemd.dasmongui.service
 
 	# Binary Deploy Links
+
+	ls -l /usr/sbin/dasmon*
 
 	sudo ln -s /home/controls/config-dasmon/deploy/dasmond /usr/sbin/dasmond
 
@@ -213,21 +241,37 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	./confck
 
-	sudo cp dasmond/usr.local.bin.dasmond /usr/local/bin/dasmond
+	ls -l /usr/local/bin/dasmond /etc/rsyslog.d/adaraMailer.conf   
 
-	sudo cp dasmond/init.dasmond.conf /etc/init/dasmond.conf
+	sudo cp dasmond/usr.local.bin.dasmond /usr/local/bin/dasmond
 
 	sudo cp dasmond/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
 
-	ls -l /usr/local/bin/dasmond /etc/init/dasmond.conf \
-		/etc/rsyslog.d/adaraMailer.conf   
-
-		-rw-r--r-- 1 root root  207 Mar 31  2017 /etc/init/dasmond.conf
+	ls -l /usr/local/bin/dasmond /etc/rsyslog.d/adaraMailer.conf   
 
 		-rw-r--r-- 1 root root  513 Mar 27  2017
 			/etc/rsyslog.d/adaraMailer.conf
 
 		-rwxr-xr-x 1 root root  801 May 31 18:35 /usr/local/bin/dasmond*
+
+	# DASMOND Init Script (RedHat6)
+
+	ls -l /etc/init/dasmond.conf
+
+	sudo cp dasmond/init.dasmond.conf /etc/init/dasmond.conf
+
+	ls -l /etc/init/dasmond.conf
+
+    -OR-
+
+	# DASMOND Init Script (RedHat7)
+
+	ls -l /etc/systemd/system/dasmond.service
+
+	sudo cp dasmond/systemd.dasmond.service \
+		/etc/systemd/system/dasmond.service
+
+	ls -l /etc/systemd/system/dasmond.service
 
 	./confck
 
@@ -243,11 +287,34 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	./confck
 
+	ls -l /etc/X11/xinit/xinitrc.dasmon
+
 	sudo cp dasmon/xinitrc.dasmon /etc/X11/xinit/
 
-	sudo cp dasmon/dasmongui.conf /etc/init/
+	ls -l /etc/X11/xinit/xinitrc.dasmon
 
-	ls -l /etc/X11/xinit/xinitrc.dasmon /etc/init/dasmongui.conf
+	# Dasmon GUI Client Init Script (RedHat6)
+
+	ls -l /etc/init/dasmongui.conf
+
+	sudo cp dasmon/init.dasmongui.conf /etc/init/
+
+	ls -l /etc/init/dasmongui.conf
+
+    -OR-
+
+	# Dasmon GUI Client Init Script (RedHat7)
+
+	ls -l /etc/systemd/system/dasmongui.service
+
+	sudo cp dasmon/systemd.dasmongui.service \
+		/etc/systemd/system/dasmongui.service
+
+	ls -l /etc/systemd/system/dasmongui.service
+
+	# Binary Deploy Links
+
+	ls -l /usr/sbin/dasmon*
 
 	sudo ln -s /home/controls/config-dasmon/deploy/dasmond /usr/sbin/dasmond
 
