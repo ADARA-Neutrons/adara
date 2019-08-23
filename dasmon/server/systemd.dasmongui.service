@@ -1,0 +1,19 @@
+# Do not edit, managed by Puppet.
+# Source: /etc/puppetlabs/code/environments/production/modules/neutron_sciences/dasmon_server/templates/systemd/dasmongui.service.erb
+
+# Starts the dasmon GUI on a dedicated X server
+
+[Unit]
+Description=dasmondgui
+After=getty.target
+
+[Service]
+Type=simple
+User=root
+Group=root
+Restart=always
+ExecStart=/usr/bin/xinit /etc/X11/xinit/xinitrc.dasmon
+TimeoutSec=0
+
+[Install]
+WantedBy=multi-user.target
