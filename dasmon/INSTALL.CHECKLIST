@@ -364,7 +364,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	cp /etc/rsyslog.conf dasmond/rsyslog.conf
 
-	sudo cp /etc/rsyslog.d/dasmon.conf dasmond/dasmon_syslog.conf
+	cp /etc/rsyslog.d/dasmon.conf dasmond/dasmon_syslog.conf
 
 	git add dasmond/rsyslog.conf dasmond/dasmon_syslog.conf
 	git commit dasmond/rsyslog.conf dasmond/dasmon_syslog.conf
@@ -445,8 +445,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	crontab -e
 
-		#MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
-		MAILTO=kohlja@ornl.gov
+		MAILTO=idac_adara_notify@email.ornl.gov
 		0-59/10 * * * * /SNS/users/y8y/stuff/exec/dasmond_mon
 		0 8,17 * * * /home/controls/config-dasmon/confck --quiet
 
