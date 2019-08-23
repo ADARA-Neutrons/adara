@@ -185,7 +185,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 	sudo cp ~/gitsrc/ADARA/dasmon/client/init.dasmongui.conf \
 		/etc/init/dasmongui.conf
 
-	cp /etc/init/dasmongui.conf dasmon/
+	cp /etc/init/dasmongui.conf dasmon/init.dasmongui.conf
 
     -OR-
 
@@ -195,7 +195,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 		/etc/systemd/system/dasmongui.service
 
 	cp /etc/systemd/system/dasmongui.service \
-		dasmond/systemd.dasmongui.service
+		dasmon/systemd.dasmongui.service
 
 	# Binary Deploy Links
 
