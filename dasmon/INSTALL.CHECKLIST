@@ -279,6 +279,10 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	sudo cp dasmond/rsyslog.conf /etc/rsyslog.conf
 
+	diff dasmond/dasmon_syslog.conf /etc/rsyslog.d/dasmon.conf
+
+	sudo cp dasmond/dasmon_syslog.conf /etc/rsyslog.d/dasmon.conf
+
 	./confck
 
 	diff dasmond/etc.crontab /etc/crontab
@@ -332,6 +336,14 @@ please set your shell "umask" as follows before proceeding! ;-D
 		if $programname == 'dasmond' then /var/log/dasmond.log
 		& ~
 
+	-OR-
+
+	sudo vi /etc/rsyslog.d/dasmon.conf
+
+		#dasmond log
+		if $programname == 'dasmond' then /var/log/dasmond.log
+		& ~
+
 	ls -l /var/log/dasmond.log
 
 	sudo touch /var/log/dasmond.log
@@ -352,8 +364,10 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	cp /etc/rsyslog.conf dasmond/rsyslog.conf
 
-	git add dasmond/rsyslog.conf
-	git commit dasmond/rsyslog.conf
+	sudo cp /etc/rsyslog.d/dasmon.conf dasmond/dasmon_syslog.conf
+
+	git add dasmond/rsyslog.conf dasmond/dasmon_syslog.conf
+	git commit dasmond/rsyslog.conf dasmond/dasmon_syslog.conf
 
 	./confck
 
