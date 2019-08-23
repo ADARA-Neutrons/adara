@@ -475,15 +475,21 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	rm -rf /tmp/share
 
+	ls -l /home/controls/prod/epics/base
+
 	mkdir -p /home/controls/prod/epics/base
 
 	cp -rp /home/controls/epics/base/master \
 		/home/controls/prod/epics/base/rel3.14.12.6_20170606
 
+	ls -l /home/controls/prod/epics/extensions
+
 	mkdir -p /home/controls/prod/epics/extensions
 
 	cp -rp /home/controls/epics/extensions/master \
 		/home/controls/prod/epics/extensions/rel1.3_20170606
+
+	ls -l /home/controls/prod/epics/basev4
 
 	mkdir -p /home/controls/prod/epics/basev4
 
