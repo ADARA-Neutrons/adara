@@ -51,7 +51,7 @@
 
 namespace ADARA {
 
-const std::string VERSION = "1.9.4";
+const std::string VERSION = "1.9.5";
 const std::string TAG_NAME = "XXX_TAG_NAME_XXX";
 
 const std::string ATTRIB = "ADARA Data Acquisition System, Neutron Sciences Directorate, Oak Ridge National Laboratory (ORNL), UT-Battelle LLC";
@@ -112,7 +112,7 @@ namespace PacketType {
 		GEOMETRY_VERSION				=	0x00,
 		BEAMLINE_INFO_VERSION			=	0x01,
 		DATA_DONE_VERSION				=	0x00,
-		BEAM_MONITOR_CONFIG_VERSION		=	0x00,
+		BEAM_MONITOR_CONFIG_VERSION		=	0x01,
 		DETECTOR_BANK_SETS_VERSION		=	0x00,
 		DEVICE_DESC_VERSION				=	0x00,
 		VAR_VALUE_U32_VERSION			=	0x00,
