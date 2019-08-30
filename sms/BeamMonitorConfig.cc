@@ -72,7 +72,7 @@ public:
 		aitFixedString *str;
 		fixedStringDestructor *des;
 
-		str = new aitFixedString[2];
+		str = new aitFixedString[3];
 		if (!str)
 			return S_casApp_noMemory;
 
@@ -81,22 +81,38 @@ public:
 			delete [] str;
 			return S_casApp_noMemory;
 		}
-		strncpy(str[0].fixed_string, "event", sizeof(str[0].fixed_string));
-		strncpy(str[1].fixed_string, "histo", sizeof(str[1].fixed_string));
+
+		uint32_t flag;
+
+		// None
+		flag = 0;
+		strncpy( str[flag].fixed_string, "none",
+			sizeof(str[flag].fixed_string));
+
+		// Event
+		flag = ADARA::EVENT_FORMAT;
+		strncpy(str[flag].fixed_string, "event",
+			sizeof(str[flag].fixed_string));
+
+		// Histo
+		flag = ADARA::HISTO_FORMAT;
+		strncpy(str[flag].fixed_string, "histo",
+			sizeof(str[flag].fixed_string));
 
 		in.setDimension(1);
-		in.setBound(0, 0, 2);
+		in.setBound(0, 0, 3);
 		in.putRef(str, des);
 
 		return S_cas_success;
 	}
 
-	class BeamMonFormatPV : public smsBooleanPV {
+	class BeamMonFormatPV : public smsUint32PV {
 	public:
 		BeamMonFormatPV(const std::string &name,
 				BeamMonitorConfig *config, BeamMonitorInfo *info,
+				uint32_t min = 0, uint32_t max = INT32_MAX,
 				bool auto_save = false) :
-			smsBooleanPV(name, auto_save),
+			smsUint32PV(name, min, max, auto_save),
 			m_config(config), m_info(info),
 			m_auto_save(auto_save) {}
 
@@ -112,33 +128,45 @@ public:
 
 		void changed(void)
 		{
-			bool do_histo = value();
+			uint32_t oldFormatFlags = m_info->getFormatFlags();
 
-			std::string newFormat = ( do_histo ) ? "histo" : "event";
+			std::string oldFormatStr = "none";
+			if ( oldFormatFlags == ADARA::EVENT_FORMAT )
+				oldFormatStr = "event";
+			else if ( oldFormatFlags == ADARA::HISTO_FORMAT )
+				oldFormatStr = "histo";
+
+			uint32_t newFormatFlags = value();
+
+			std::string newFormatStr = "none";
+			if ( newFormatFlags == ADARA::EVENT_FORMAT )
+				newFormatStr = "event";
+			else if ( newFormatFlags == ADARA::HISTO_FORMAT )
+				newFormatStr = "histo";
 
 			if ( m_auto_save && !m_first_set )
 			{
 				// AutoSave PV Value Change...
 				struct timespec ts;
 				m_value->getTimeStamp(&ts);
-				// Use String Representation of Boolean for AutoSave File...
-				// (No Special Enum String Support in AutoSave...!)
-				std::string bvalstr = ( do_histo ) ? "true" : "false";
-				StorageManager::autoSavePV( m_pv_name, bvalstr, &ts );
+				std::stringstream ss;
+				ss << newFormatFlags;
+				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
 			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
-			if ( newFormat.compare( m_info->getFormat() ) )
+			if ( newFormatStr.compare( oldFormatStr ) )
 			{
 				INFO("BeamMonFormatPV: Changing Beam Monitor "
 					<< m_info->getId() << " Output Format for "
-					<< m_pv_name << " from " << m_info->getFormat()
-					<< " to " << newFormat);
+					<< m_pv_name << " from " << oldFormatStr
+					<< " to " << newFormatStr);
 
-				m_info->setFormat(newFormat);
+				m_info->setFormatFlags( newFormatFlags );
 
 				// Update Event/Histo Counts in Config...
-				m_config->updateFormatCounts(do_histo);
+				m_config->updateFormatCounts( oldFormatFlags,
+					newFormatFlags );
 
 				// Reset Timestamp on Prologue Packet...
 				m_config->resetPacketTime();
@@ -347,10 +375,11 @@ public:
 	};
 
 	BeamMonitorInfo(BeamMonitorConfig *config,
-			uint32_t index, uint32_t id, std::string format,
+			uint32_t index, uint32_t id, uint32_t formatFlags,
 			uint32_t tofOffset, uint32_t tofMax, uint32_t tofBin,
 			double distance) :
-		m_config(config), m_index(index), m_id(id), m_format(format),
+		m_config(config), m_index(index), m_id(id),
+		m_formatFlags(formatFlags),
 		m_tofOffset(tofOffset), m_tofMax(tofMax), m_tofBin(tofBin),
 		m_distance(distance)
 	{
@@ -372,7 +401,7 @@ public:
 
 		m_pvFormat = boost::shared_ptr<BeamMonFormatPV>( new
 			BeamMonFormatPV(prefix + ":Format", m_config, this,
-				/* AutoSave */ true) );
+				0, INT32_MAX, /* AutoSave */ true) );
 
 		m_pvOffset = boost::shared_ptr<BeamMonOffsetPV>( new
 			BeamMonOffsetPV(prefix + ":TofOffset", m_config, this,
@@ -405,10 +434,7 @@ public:
 
 		m_pvId->update(m_id, &now);
 
-		if ( !m_format.compare("histo") )
-			m_pvFormat->update(1, &now);
-		else // if ( !m_format.compare("event") ), or anything else...
-			m_pvFormat->update(0, &now);
+		m_pvFormat->update(m_formatFlags, &now);
 
 		m_pvOffset->update(m_tofOffset, &now);
 		m_pvMax->update(m_tofMax, &now);
@@ -421,7 +447,6 @@ public:
 		struct timespec ts;
 		uint32_t uvalue;
 		double dvalue;
-		bool bvalue;
 
 		if ( StorageManager::getAutoSavePV(
 				m_pvId->getName(), uvalue, ts ) ) {
@@ -431,10 +456,10 @@ public:
 		}
 
 		if ( StorageManager::getAutoSavePV(
-				m_pvFormat->getName(), bvalue, ts ) ) {
-			// Don't Manually Set "m_format" Value Here...
+				m_pvFormat->getName(), uvalue, ts ) ) {
+			// Don't Manually Set "m_formatFlags" Value Here...
 			// Let "changed()" Do *All* It's Stuff... ;-D
-			m_pvFormat->update(bvalue, &ts);
+			m_pvFormat->update(uvalue, &ts);
 		}
 
 		if ( StorageManager::getAutoSavePV(
@@ -473,7 +498,7 @@ public:
 
 	uint32_t getId(void) const { return m_id; }
 
-	std::string getFormat(void) const { return m_format; }
+	uint32_t getFormatFlags(void) const { return m_formatFlags; }
 
 	uint32_t getTofOffset(void) const { return m_tofOffset; }
 	uint32_t getTofMax(void) const { return m_tofMax; }
@@ -486,8 +511,8 @@ public:
 	void setId(uint32_t id)
 		{ m_id = id; m_changed = true; }
 
-	void setFormat(std::string format)
-		{ m_format = format; m_changed = true; }
+	void setFormatFlags(uint32_t formatFlags)
+		{ m_formatFlags = formatFlags; m_changed = true; }
 
 	void setTofOffset(uint32_t tofOffset)
 		{ m_tofOffset = tofOffset; m_changed = true; }
@@ -505,15 +530,23 @@ public:
 	// Update Prologue Packet Contents for This Beam Monitor Index...
 	void updatePacket(uint8_t *m_packet)
 	{
-		uint32_t *fields = (uint32_t *) m_packet;
+		uint32_t *section = (uint32_t *) ( m_packet + sizeof(ADARA::Header)
+			+ sizeof(uint32_t) + ( m_index * m_config->sectionSize() ) );
 
-		fields[(m_index * 6) + 5] = m_id;
+		section[0] = m_id;
+		section[1] = m_tofOffset;
+		section[2] = m_tofMax;
+		section[3] = m_tofBin;
 
-		fields[(m_index * 6) + 6] = m_tofOffset;
-		fields[(m_index * 6) + 7] = m_tofMax;
-		fields[(m_index * 6) + 8] = m_tofBin;
+		*((double *) &(section[4])) = m_distance;
 
-		*((double *) &(fields[(m_index * 6) + 9])) = m_distance;
+		// Final (N+1) "Format Section"... ;-b
+		uint32_t *format_section =
+			(uint32_t *) ( m_packet + sizeof(ADARA::Header)
+				+ sizeof(uint32_t)
+				+ ( m_config->beamMonCount() * m_config->sectionSize() ) );
+
+		format_section[ m_index ] = m_formatFlags;
 
 		m_changed = false;
 	}
@@ -527,7 +560,7 @@ private:
 
 	uint32_t m_id;
 
-	std::string m_format;
+	uint32_t m_formatFlags;
 
 	uint32_t m_tofOffset;
 	uint32_t m_tofMax;
@@ -552,6 +585,11 @@ BeamMonitorConfig::BeamMonitorConfig(
 	std::string conf_prefix("monitor ");
 	size_t plen = conf_prefix.length();
 
+	m_alwaysSendBMConfig = conf.get<bool>(
+		"sms.always_send_bmon_config", true);
+	INFO("Setting Always Send Beam Monitor Config to "
+		<< m_alwaysSendBMConfig << ".");
+
 	// Count how many Beam Monitors we have defined...
 	m_numBeamMonitors = 0;
 	for (it = conf.begin(); it != conf.end(); ++it) {
@@ -574,9 +612,27 @@ BeamMonitorConfig::BeamMonitorConfig(
 						smsUint32PV(prefix + ":Control:NumBeamMonitors") );
 								// yeah, we're not really "Control" here...
 
+	m_pvAlwaysSendBMConfig = boost::shared_ptr<smsBooleanPV>( new
+						smsBooleanPV(prefix + ":Control:AlwaysSendBMConfig",
+								// yeah, we're not really "Control" here...
+							/* AutoSave */ true) );
+
 	ctrl->addPV(m_pvNumBeamMonitors);
+	ctrl->addPV(m_pvAlwaysSendBMConfig);
 
 	m_pvNumBeamMonitors->update(m_numBeamMonitors, &now);
+	m_pvAlwaysSendBMConfig->update(m_alwaysSendBMConfig, &now);
+
+	// Restore Any PVs to AutoSaved Config Values...
+
+	struct timespec ts;
+	bool bvalue;
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvAlwaysSendBMConfig->getName(), bvalue, ts ) ) {
+		m_alwaysSendBMConfig = bvalue;
+		m_pvNumBeamMonitors->update(bvalue, &ts);
+	}
 
 	// Are We _Only_ Ever Saving Beam Monitor Events...?
 	if ( m_numBeamMonitors == 0 ) {
@@ -586,8 +642,10 @@ BeamMonitorConfig::BeamMonitorConfig(
 
 	// Allocate Prologue Packet...
 
-	m_sectionSize = sizeof(double) + (4 * sizeof(uint32_t));
-	m_payloadSize = sizeof(uint32_t) + (m_numBeamMonitors * m_sectionSize);
+	m_sectionSize = ( 4 * sizeof(uint32_t) ) + sizeof(double);
+	m_payloadSize = sizeof(uint32_t)  // Beam Monitor Count
+		+ ( m_numBeamMonitors * m_sectionSize )  // Config Sections
+		+ ( m_numBeamMonitors * sizeof(uint32_t) );  // Formats Appendix
 	m_packetSize = m_payloadSize + sizeof(ADARA::Header);
 
 	m_packet = new uint8_t[m_packetSize];
@@ -619,6 +677,7 @@ BeamMonitorConfig::BeamMonitorConfig(
 
 	// Accumulate Format Request Counts...
 	std::string format;
+	uint32_t formatFlags;
 	m_numEvent = 0;
 	m_numHisto = 0;
 
@@ -630,10 +689,17 @@ BeamMonitorConfig::BeamMonitorConfig(
 		buffer >> bmonId;
 
 		format = it->second.get<std::string>("format", "event");
-		if ( !format.compare("event") )
+
+		// Set Format Flags...
+		formatFlags = 0;
+		if ( !format.compare("event") ) {
+			formatFlags = ADARA::EVENT_FORMAT;
 			m_numEvent++;
-		else if ( !format.compare("histo") )
+		}
+		else if ( !format.compare("histo") ) {
+			formatFlags = ADARA::HISTO_FORMAT;
 			m_numHisto++;
+		}
 
 		tofOffset = it->second.get<uint32_t>("offset", 0);
 		tofMax = it->second.get<uint32_t>("max", -1);
@@ -650,13 +716,15 @@ BeamMonitorConfig::BeamMonitorConfig(
 
 		DEBUG("Beam Monitor " << bmonId << " Histo Config:"
 			<< " format=" << format
+			<< " formatFlags=" << formatFlags
 			<< " tofOffset=" << tofOffset
 			<< " tofMax=" << tofMax
 			<< " tofBin=" << tofBin
 			<< " distance=" << distance);
 
 		BeamMonitorInfo *bmonInfo = new BeamMonitorInfo(this,
-			index++, bmonId, format, tofOffset, tofMax, tofBin, distance);
+			index++, bmonId, formatFlags,
+			tofOffset, tofMax, tofBin, distance);
 
 		bmonInfo->updatePacket(m_packet);
 
@@ -687,15 +755,29 @@ BeamMonitorConfig::~BeamMonitorConfig()
 	m_connection.disconnect();
 }
 
-void BeamMonitorConfig::updateFormatCounts(bool new_histo)
+void BeamMonitorConfig::updateFormatCounts(uint32_t old_formatFlags,
+		uint32_t new_formatFlags)
 {
-	if ( new_histo ) {
-		m_numHisto++;
+	// Decrement Old Format Count...
+	if ( old_formatFlags == ADARA::HISTO_FORMAT ) {
+		m_numHisto--;
+	}
+	else if ( old_formatFlags == ADARA::EVENT_FORMAT ) {
 		m_numEvent--;
 	}
 	else {
+		ERROR("updateFormatCounts(): Old Format Flags Set to \"None\"...!");
+	}
+
+	// Increment New Format Count...
+	if ( new_formatFlags == ADARA::HISTO_FORMAT ) {
+		m_numHisto++;
+	}
+	else if ( new_formatFlags == ADARA::EVENT_FORMAT ) {
 		m_numEvent++;
-		m_numHisto--;
+	}
+	else {
+		ERROR("updateFormatCounts(): New Format Flags Set to \"None\"...!");
 	}
 }
 
@@ -712,10 +794,15 @@ void BeamMonitorConfig::resetPacketTime(void)
 
 void BeamMonitorConfig::onPrologue(void)
 {
-	// We are in Histogram Beam Monitor Mode, Add to Prologue...!
-	// TODO: *Only* _Start_ Sending Beam Monitor Config on New Run Boundary!
-	if ( m_numEvent == 0 && m_numHisto > 0 ) {
+	// TODO: *Only* Send New Beam Monitor Config on New Run Boundary!
 
+	// Always Update Latest "Always Send Beam Monitor Config" PV Setting...
+	m_alwaysSendBMConfig = m_pvAlwaysSendBMConfig->value();
+
+	// Either Always Send Beam Monitor Config Packet,
+	// Or Else _Only_ Send When _All_ Beam Monitors are Histogramming...
+	if ( m_alwaysSendBMConfig || ( m_numEvent == 0 && m_numHisto > 0 ) )
+	{
 		// Update Prologue Packet with Latest Beam Monitor Configs...
 		std::vector<BeamMonitorInfo *>::iterator bmi;
 		for (bmi=bmonInfos.begin(); bmi != bmonInfos.end(); ++bmi) {
