@@ -543,7 +543,8 @@ NxGen::initializeNxMonitor
         makeGroup( a_mi->m_path, a_mi->m_group_type );
 
         // Histo-based Monitor
-        if ( a_mi->m_config != NULL )
+        if ( a_mi->m_config != NULL
+                && a_mi->m_config->format == ADARA::HISTO_FORMAT )
         {
             // (Defer creation/writing of actual histogram data
             //     to monitorFinalize(), create & write in one shot...)
@@ -2145,7 +2146,8 @@ NxGen::monitorTOFBuffersReady
             initializeNxMonitor( mi );
 
         // Event-based Monitors Only...
-        if ( mi->m_config == NULL )
+        if ( mi->m_config == NULL
+                || mi->m_config->format == ADARA::EVENT_FORMAT )
         {
             // Create Monitor TOF Dataset on First (or Final) Buffer Flush
             // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
@@ -2220,7 +2222,8 @@ NxGen::monitorIndexBuffersReady
             initializeNxMonitor( mi );
 
         // Event-based Monitors Only...
-        if ( mi->m_config == NULL )
+        if ( mi->m_config == NULL
+                || mi->m_config->format == ADARA::EVENT_FORMAT )
         {
             // Create Monitor Event Index Dataset
             //    on First (or Final) Buffer Flush
@@ -2301,7 +2304,8 @@ NxGen::monitorPulseGap
             initializeNxMonitor( mi );
 
         // Event-based Monitors Only...
-        if ( mi->m_config == NULL )
+        if ( mi->m_config == NULL
+                || mi->m_config->format == ADARA::EVENT_FORMAT )
         {
             // Note: monitorIndexBuffersReady() must have been called
             //    _Before_ Now, to Create Monitor Event Index Dataset...!
@@ -2361,7 +2365,8 @@ NxGen::monitorFinalize
             initializeNxMonitor( mi );
 
         // Histo-based Monitor
-        if ( mi->m_config != NULL )
+        if ( mi->m_config != NULL
+                && mi->m_config->format == ADARA::HISTO_FORMAT )
         {
             // Create Monitor Histo Data and TOF Bins Now...
             // (including proper Chunk Size Overriding...! ;-D)
