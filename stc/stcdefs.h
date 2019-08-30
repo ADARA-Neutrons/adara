@@ -99,7 +99,7 @@ public:
                 continue;
 
             // Histo-based Detector Bank
-            if ( (*dbs)->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+            if ( (*dbs)->flags & ADARA::HISTO_FORMAT )
             {
                 // Only Room for *One* Histogram per Detector Bank
                 // (for now)
@@ -345,7 +345,7 @@ public:
             }
 
             // Event-based Detector Bank
-            if ( (*dbs)->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
+            if ( (*dbs)->flags & ADARA::EVENT_FORMAT )
             {
                 // Only Allocate Event Storage *Once*...
                 if ( !m_has_event )
@@ -409,6 +409,7 @@ public:
 struct BeamMonitorConfig
 {
     uint32_t                id;
+    uint32_t                format;
     uint32_t                tofOffset;
     uint32_t                tofMax;
     uint32_t                tofBin;
@@ -437,7 +438,7 @@ public:
         m_config(a_config)
     {
         // Histo-based Monitor
-        if ( m_config != NULL )
+        if ( m_config != NULL && m_config->format == ADARA::HISTO_FORMAT )
         {
             // Number of Time Bin Values Needed...
             m_num_tof_bins = ( ( m_config->tofMax - m_config->tofOffset )

@@ -1703,8 +1703,7 @@ StreamParser::processBankEvents
                     continue;
 
                 // Histo-based Detector Bank
-                if ( (*dbs)->flags
-                        & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+                if ( (*dbs)->flags & ADARA::HISTO_FORMAT )
                 {
                     uint32_t tofbin;
                     uint32_t index;
@@ -2032,7 +2031,8 @@ StreamParser::processMonitorEvents
     const uint32_t *epos = a_rpos + a_event_count;
 
     // Histo-based Monitors...
-    if ( imi->second->m_config != NULL )
+    if ( imi->second->m_config != NULL
+            && imi->second->m_config->format == ADARA::HISTO_FORMAT )
     {
         // Process Monitor Events (into Histogram)... :-D
 
@@ -2183,8 +2183,11 @@ StreamParser::handleMonitorPulseGap
 )
 {
     // Event-based Monitors Only...
-    if ( a_mi.m_config != NULL )
+    if ( a_mi.m_config != NULL
+            && a_mi.m_config->format == ADARA::HISTO_FORMAT )
+    {
         return;
+    }
 
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
@@ -2745,14 +2748,23 @@ StreamParser::rxPacket
         STC::BeamMonitorConfig config;
 
         config.id = a_pkt.bmonId(i);
+
+        config.format = a_pkt.format(i);
+
         config.tofOffset = a_pkt.tofOffset(i);
         config.tofMax = a_pkt.tofMax(i);
         config.tofBin = a_pkt.tofBin(i);
+
         config.distance = a_pkt.distance(i);
 
         syslog( LOG_INFO,
-            "[%i] Beam Monitor %u: distance=%lf histo=(%u to %u by %u).",
-            g_pid, config.id, config.distance,
+            "[%i] %s %u: %s=%u (%s), %s=%lf, histo=(%u to %u by %u).",
+            g_pid, "Beam Monitor", config.id,
+            "format", config.format,
+            ( ( config.format & ADARA::EVENT_FORMAT ) ?  "Event"
+                : ( ( config.format & ADARA::HISTO_FORMAT ) ? "Histo"
+                    : "NONE" ) ),
+            "distance", config.distance,
             config.tofOffset, config.tofMax, config.tofBin );
         usleep(30000); // give syslog a chance...
 
@@ -2895,12 +2907,12 @@ StreamParser::rxPacket
         set->suffix = a_pkt.suffix(i);
 
         std::string format;
-        if ( set->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT
-                && set->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+        if ( set->flags & ADARA::EVENT_FORMAT
+                && set->flags & ADARA::HISTO_FORMAT )
             format = "both";
-        else if ( set->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
+        else if ( set->flags & ADARA::EVENT_FORMAT )
             format = "event";
-        else if ( set->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+        else if ( set->flags & ADARA::HISTO_FORMAT )
             format = "histo";
         else
             format = "[None/Unknown!]";  // "None"... (implies *NO DATA*!)
@@ -2925,7 +2937,7 @@ StreamParser::rxPacket
                 "[%i] %s Restricting Detector Bank Set to Event Mode!",
                 g_pid, "STC Error:" );
             usleep(30000); // give syslog a chance...
-            set->flags &= !(ADARA::DetectorBankSetsPkt::HISTO_FORMAT);
+            set->flags &= !(ADARA::HISTO_FORMAT);
         }
 
         // Make Sure Time Bin is > 0 ! (also checked in SMS... :)
@@ -5682,7 +5694,8 @@ StreamParser::finalizeStreamProcessing()
             imi != m_monitors.end(); ++imi )
     {
         // Event-based Monitors Only...
-        if ( imi->second->m_config == NULL )
+        if ( imi->second->m_config == NULL
+                || imi->second->m_config->format == ADARA::EVENT_FORMAT )
         {
             // Detect gaps in monitor data and fill event index if present
             if ( imi->second->m_last_pulse_with_data < m_pulse_count )
