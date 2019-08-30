@@ -141,18 +141,17 @@ public:
 			sizeof(str[flag].fixed_string));
 
 		// Event
-		flag = ADARA::DetectorBankSetsPkt::EVENT_FORMAT;
+		flag = ADARA::EVENT_FORMAT;
 		strncpy(str[flag].fixed_string, "event",
 			sizeof(str[flag].fixed_string));
 
 		// Histo
-		flag = ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+		flag = ADARA::HISTO_FORMAT;
 		strncpy(str[flag].fixed_string, "histo",
 			sizeof(str[flag].fixed_string));
 
-		// Histo
-		flag = ADARA::DetectorBankSetsPkt::EVENT_FORMAT
-			| ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+		// Both Event & Histo
+		flag = ADARA::EVENT_FORMAT | ADARA::HISTO_FORMAT;
 		strncpy(str[flag].fixed_string, "both",
 			sizeof(str[flag].fixed_string));
 
@@ -185,34 +184,32 @@ public:
 
 		void changed(void)
 		{
-			uint32_t oldFlags = m_info->getFlags();
+			uint32_t oldFormatFlags = m_info->getFormatFlags();
 
-			std::string oldFormat;
-			if ( oldFlags == 0 )
-				oldFormat = "none";
-			else if ( oldFlags == ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
-				oldFormat = "event";
-			else if ( oldFlags == ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
-				oldFormat = "histo";
-			else if ( oldFlags ==
-					( ADARA::DetectorBankSetsPkt::EVENT_FORMAT
-						| ADARA::DetectorBankSetsPkt::HISTO_FORMAT ) ) {
-				oldFormat = "both";
+			std::string oldFormatStr;
+			if ( oldFormatFlags == 0 )
+				oldFormatStr = "none";
+			else if ( oldFormatFlags == ADARA::EVENT_FORMAT )
+				oldFormatStr = "event";
+			else if ( oldFormatFlags == ADARA::HISTO_FORMAT )
+				oldFormatStr = "histo";
+			else if ( oldFormatFlags ==
+					( ADARA::EVENT_FORMAT | ADARA::HISTO_FORMAT ) ) {
+				oldFormatStr = "both";
 			}
 
-			uint32_t newFlags = value();
+			uint32_t newFormatFlags = value();
 
-			std::string newFormat;
-			if ( newFlags == 0 )
-				newFormat = "none";
-			else if ( newFlags == ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
-				newFormat = "event";
-			else if ( newFlags == ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
-				newFormat = "histo";
-			else if ( newFlags ==
-					( ADARA::DetectorBankSetsPkt::EVENT_FORMAT
-						| ADARA::DetectorBankSetsPkt::HISTO_FORMAT ) ) {
-				newFormat = "both";
+			std::string newFormatStr;
+			if ( newFormatFlags == 0 )
+				newFormatStr = "none";
+			else if ( newFormatFlags == ADARA::EVENT_FORMAT )
+				newFormatStr = "event";
+			else if ( newFormatFlags == ADARA::HISTO_FORMAT )
+				newFormatStr = "histo";
+			else if ( newFormatFlags ==
+					( ADARA::EVENT_FORMAT | ADARA::HISTO_FORMAT ) ) {
+				newFormatStr = "both";
 			}
 
 			if ( m_auto_save && !m_first_set )
@@ -221,19 +218,19 @@ public:
 				struct timespec ts;
 				m_value->getTimeStamp(&ts);
 				std::stringstream ss;
-				ss << newFlags;
+				ss << newFormatFlags;
 				StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
 			}
 
 			// Did Our Internal State _Really_ Change...? (i.e. Startup...)
-			if ( newFormat.compare( oldFormat ) )
+			if ( newFormatStr.compare( oldFormatStr ) )
 			{
 				INFO("DetBankSetFormatPV: Changing Detector Bank Set "
 					<< m_info->getName() << " Output Format for "
-					<< m_pv_name << " from " << oldFormat
-					<< " to " << newFormat);
+					<< m_pv_name << " from " << oldFormatStr
+					<< " to " << newFormatStr);
 
-				m_info->setFlags(newFlags);
+				m_info->setFormatFlags(newFormatFlags);
 
 				// Reset Timestamp on Prologue Packet...
 				m_config->resetPacketTime();
@@ -513,11 +510,11 @@ public:
 
 	DetectorBankSetInfo(DetectorBankSet *config,
 			uint32_t index, uint32_t sectionOffset, std::string name,
-			std::vector<uint32_t> banklist, uint32_t flags,
+			std::vector<uint32_t> banklist, uint32_t formatFlags,
 			uint32_t tofOffset, uint32_t tofMax, uint32_t tofBin,
 			double throttle, std::string suffix) :
 		m_config(config), m_index(index), m_sectionOffset(sectionOffset),
-		m_name(name), m_banklist(banklist), m_flags(flags),
+		m_name(name), m_banklist(banklist), m_formatFlags(formatFlags),
 		m_tofOffset(tofOffset), m_tofMax(tofMax), m_tofBin(tofBin),
 		m_throttle(throttle), m_suffix(suffix)
 	{
@@ -585,7 +582,7 @@ public:
 		Utils::printArrayString( m_banklist, banklistStr );
 		m_pvBanks->update(banklistStr, &now);
 
-		m_pvFormat->update(m_flags, &now);
+		m_pvFormat->update(m_formatFlags, &now);
 
 		m_pvOffset->update(m_tofOffset, &now);
 		m_pvMax->update(m_tofMax, &now);
@@ -618,7 +615,7 @@ public:
 
 		if ( StorageManager::getAutoSavePV(
 				m_pvFormat->getName(), uvalue, ts ) ) {
-			// Don't Manually Set "m_flags" Value Here...
+			// Don't Manually Set "m_formatFlags" Value Here...
 			// Let "changed()" Do *All* It's Stuff... ;-D
 			m_pvFormat->update(uvalue, &ts);
 		}
@@ -668,7 +665,7 @@ public:
 
 	std::vector<uint32_t> getBanklist(void) const { return m_banklist; }
 
-	uint32_t getFlags(void) const { return m_flags; }
+	uint32_t getFormatFlags(void) const { return m_formatFlags; }
 
 	uint32_t getTofOffset(void) const { return m_tofOffset; }
 	uint32_t getTofMax(void) const { return m_tofMax; }
@@ -694,8 +691,8 @@ public:
 	void setBanklist(std::vector<uint32_t> banklist)
 		{ m_banklist = banklist; m_changed = true; }
 
-	void setFlags(uint32_t flags)
-		{ m_flags = flags; m_changed = true; }
+	void setFormatFlags(uint32_t formatFlags)
+		{ m_formatFlags = formatFlags; m_changed = true; }
 
 	void setTofOffset(uint32_t tofOffset)
 		{ m_tofOffset = tofOffset; m_changed = true; }
@@ -735,7 +732,7 @@ public:
 		index += ADARA::DetectorBankSetsPkt::SET_NAME_SIZE
 			/ sizeof(uint32_t);
 
-		fields[m_sectionOffset + index++] = m_flags;
+		fields[m_sectionOffset + index++] = m_formatFlags;
 
 		fields[m_sectionOffset + index++] = m_banklist.size();
 
@@ -781,7 +778,7 @@ private:
 
 	std::vector<uint32_t> m_banklist;
 
-	uint32_t m_flags;
+	uint32_t m_formatFlags;
 
 	uint32_t m_tofOffset;
 	uint32_t m_tofMax;
@@ -852,7 +849,7 @@ DetectorBankSet::DetectorBankSet(const boost::property_tree::ptree & conf)
 
 	std::string format;
 
-	uint32_t flags;
+	uint32_t formatFlags;
 
 	uint32_t tofOffset;
 	uint32_t tofMax;
@@ -920,15 +917,14 @@ DetectorBankSet::DetectorBankSet(const boost::property_tree::ptree & conf)
 		format = it->second.get<std::string>("format", "event");
 
 		// Set Format Flags...
-		flags = 0;
+		formatFlags = 0;
 		if ( !format.compare("histo") )
-			flags |= ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+			formatFlags |= ADARA::HISTO_FORMAT;
 		else if ( !format.compare("both") ) {
-			flags |= ADARA::DetectorBankSetsPkt::EVENT_FORMAT
-				| ADARA::DetectorBankSetsPkt::HISTO_FORMAT;
+			formatFlags |= ADARA::EVENT_FORMAT | ADARA::HISTO_FORMAT;
 		}
 		else // if ( !format.compare("event") )
-			flags |= ADARA::DetectorBankSetsPkt::EVENT_FORMAT;
+			formatFlags |= ADARA::EVENT_FORMAT;
 
 		std::string banklistStr =
 			it->second.get<std::string>("banklist", "none");
@@ -972,7 +968,7 @@ DetectorBankSet::DetectorBankSet(const boost::property_tree::ptree & conf)
 			<< " sectionOffset=" << sectionOffset
 			<< " banklist=" << newBanklist
 			<< " format=" << format
-			<< " flags=" << flags
+			<< " formatFlags=" << formatFlags
 			<< " tofOffset=" << tofOffset
 			<< " tofMax=" << tofMax
 			<< " tofBin=" << tofBin
@@ -980,7 +976,7 @@ DetectorBankSet::DetectorBankSet(const boost::property_tree::ptree & conf)
 			<< " suffix=" << suffix);
 
 		DetectorBankSetInfo *detBankSetInfo = new DetectorBankSetInfo(this,
-			index++, sectionOffset, detBankSetName, banklist, flags,
+			index++, sectionOffset, detBankSetName, banklist, formatFlags,
 			tofOffset, tofMax, tofBin, throttle, suffix);
 
 		detBankSetInfos.push_back(detBankSetInfo);
