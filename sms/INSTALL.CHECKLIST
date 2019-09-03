@@ -330,6 +330,16 @@ please set your shell "umask" as follows before proceeding! ;-D
 		0 8,17 * * * /home/controls/config-daq1/confck --quiet
 		0 8,17 * * * /usr/local/bin/liveconf --terse --quiet confck
 
+	* Optional SMSD-MON Crontab Commands:
+
+		# SMS-MON
+		0-59/10 * * * * /SNS/users/y8y/stuff/exec/smsd_mon --alt="-mon"
+		0 8,17 * * * /home/controls/config-daq1-mon/confck --quiet
+		0 8,17 * * * /usr/local/bin/liveconf
+	!	   --config=/SNSlocal/sms-mon/conf/smsd.conf --terse --quiet confck
+		0 0 * * * /SNS/users/y8y/stuff/exec/bump_mon_run
+	!	   --config="/SNSlocal/sms-mon/conf/smsd.conf"
+
 	crontab -l
 
 5. Add SMS to Local Run Levels
