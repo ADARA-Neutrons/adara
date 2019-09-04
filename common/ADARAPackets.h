@@ -615,6 +615,18 @@ public:
 			return( HISTO_FORMAT );
 	}
 
+	void countFormats(uint32_t &numEvent, uint32_t &numHisto) const
+	{
+		numEvent = 0;
+		numHisto = 0;
+		for (uint32_t i=0 ; i < beamMonCount() ; i++) {
+			if ( format(i) == EVENT_FORMAT )
+				numEvent++;
+			else if ( format(i) == HISTO_FORMAT )
+				numHisto++;
+		}
+	}
+
 private:
 	const uint32_t *m_fields;
 	size_t m_sectionSize;
