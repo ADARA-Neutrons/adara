@@ -2739,9 +2739,28 @@ StreamParser::rxPacket
 )
 {
     syslog( LOG_INFO,
-        "[%i] Beam Monitor Config Received: %u Histo Monitors",
+        "[%i] Beam Monitor Config Received: %u Beam Monitors",
         g_pid, a_pkt.beamMonCount() );
     usleep(30000); // give syslog a chance...
+
+    // Count Number of Histo vs. Event Beam Monitors,
+    // So We Can Clamp to "All" One or the Other... ;-D
+    uint32_t numEvent = 0;
+    uint32_t numHisto = 0;
+    a_pkt.countFormats(numEvent, numHisto);
+
+    // If Mixed Formatting for Beam Monitors, Default to Event Format...
+    // (Because You Can Generate Histo from Events, But Not Vice Versa! ;-)
+    bool forceEvent = false;
+    if ( numEvent > 0 && numHisto > 0 ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: %s %s=%u %s=%u - %s",
+            g_pid, "STC Error:", "Beam Monitor Config Error",
+            "Mixed Event and Histo Beam Monitor Formats",
+            "numEvent", numEvent, "numHisto", numHisto,
+            "Forcing All Beam Monitors to Event Format!" );
+        forceEvent = true;
+    }
 
     for (uint32_t i=0 ; i < a_pkt.beamMonCount() ; i++) {
 
@@ -2749,7 +2768,10 @@ StreamParser::rxPacket
 
         config.id = a_pkt.bmonId(i);
 
-        config.format = a_pkt.format(i);
+        if ( forceEvent )
+            config.format = ADARA::EVENT_FORMAT;
+        else
+            config.format = a_pkt.format(i);
 
         config.tofOffset = a_pkt.tofOffset(i);
         config.tofMax = a_pkt.tofMax(i);
@@ -2758,12 +2780,13 @@ StreamParser::rxPacket
         config.distance = a_pkt.distance(i);
 
         syslog( LOG_INFO,
-            "[%i] %s %u: %s=%u (%s), %s=%lf, histo=(%u to %u by %u).",
+            "[%i] %s %u: %s=%u (%s%s), %s=%lf, histo=(%u to %u by %u).",
             g_pid, "Beam Monitor", config.id,
             "format", config.format,
             ( ( config.format & ADARA::EVENT_FORMAT ) ?  "Event"
                 : ( ( config.format & ADARA::HISTO_FORMAT ) ? "Histo"
                     : "NONE" ) ),
+            ( forceEvent ? " [FORCED!]" : "" ),
             "distance", config.distance,
             config.tofOffset, config.tofMax, config.tofBin );
         usleep(30000); // give syslog a chance...
