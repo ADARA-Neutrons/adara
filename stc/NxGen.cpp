@@ -481,15 +481,14 @@ NxGen::makeMonitorInfo
     uint16_t a_id,                    ///< [in] ID of detector bank
     uint32_t a_buf_reserve,           ///< [in] Event buffer initial capacity
     uint32_t a_idx_buf_reserve,       ///< [in] Index buffer initial capacity
-    STC::BeamMonitorConfig *a_config, ///< [in] Beam Monitor Histo Config (opt)
-    bool a_known_monitor              ///< [in] Is this a "Known" Monitor?
+    STC::BeamMonitorConfig &a_config  ///< [in] Beam Monitor Config
 )
 {
     try
     {
         NxMonitorInfo* mi = new NxMonitorInfo(
             a_id, a_buf_reserve, a_idx_buf_reserve,
-            a_config, a_known_monitor, *this );
+            a_config, *this );
 
         // Initialization now done separately via
         // NxGen::initializeNxMonitor(), to account for
@@ -543,14 +542,13 @@ NxGen::initializeNxMonitor
         makeGroup( a_mi->m_path, a_mi->m_group_type );
 
         // Histo-based Monitor
-        if ( a_mi->m_config != NULL
-                && a_mi->m_config->format == ADARA::HISTO_FORMAT )
+        if ( a_mi->m_config.format == ADARA::HISTO_FORMAT )
         {
             // (Defer creation/writing of actual histogram data
             //     to monitorFinalize(), create & write in one shot...)
 
             writeScalar( a_mi->m_path, "distance",
-                a_mi->m_config->distance, "" );
+                a_mi->m_config.distance, "" );
             writeString( a_mi->m_path, "mode", "monitor" );
         }
 
@@ -2146,8 +2144,7 @@ NxGen::monitorTOFBuffersReady
             initializeNxMonitor( mi );
 
         // Event-based Monitors Only...
-        if ( mi->m_config == NULL
-                || mi->m_config->format == ADARA::EVENT_FORMAT )
+        if ( mi->m_config.format == ADARA::EVENT_FORMAT )
         {
             // Create Monitor TOF Dataset on First (or Final) Buffer Flush
             // ("Lazy" Dataset Create, with Chunk Size Override...! :-D)
@@ -2222,8 +2219,7 @@ NxGen::monitorIndexBuffersReady
             initializeNxMonitor( mi );
 
         // Event-based Monitors Only...
-        if ( mi->m_config == NULL
-                || mi->m_config->format == ADARA::EVENT_FORMAT )
+        if ( mi->m_config.format == ADARA::EVENT_FORMAT )
         {
             // Create Monitor Event Index Dataset
             //    on First (or Final) Buffer Flush
@@ -2304,8 +2300,7 @@ NxGen::monitorPulseGap
             initializeNxMonitor( mi );
 
         // Event-based Monitors Only...
-        if ( mi->m_config == NULL
-                || mi->m_config->format == ADARA::EVENT_FORMAT )
+        if ( mi->m_config.format == ADARA::EVENT_FORMAT )
         {
             // Note: monitorIndexBuffersReady() must have been called
             //    _Before_ Now, to Create Monitor Event Index Dataset...!
@@ -2365,8 +2360,7 @@ NxGen::monitorFinalize
             initializeNxMonitor( mi );
 
         // Histo-based Monitor
-        if ( mi->m_config != NULL
-                && mi->m_config->format == ADARA::HISTO_FORMAT )
+        if ( mi->m_config.format == ADARA::HISTO_FORMAT )
         {
             // Create Monitor Histo Data and TOF Bins Now...
             // (including proper Chunk Size Overriding...! ;-D)
@@ -2393,6 +2387,7 @@ NxGen::monitorFinalize
         // Event-based Monitor
         else
         {
+            // Write Final Monitor Total Counts
             writeScalar( m_entry_path + "/" + mi->m_name,
                 "total_counts", mi->m_event_count, "" );
 
