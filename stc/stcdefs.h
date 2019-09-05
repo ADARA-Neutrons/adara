@@ -427,7 +427,7 @@ public:
         uint16_t a_id,               ///< [in] ID of detector bank
         uint32_t a_buf_reserve,      ///< [in] Event buffer initial capacity
         uint32_t a_idx_buf_reserve,  ///< [in] Index buffer initial capacity
-        BeamMonitorConfig *a_config  ///< [in] Beam Mon Histo Config (opt)
+        BeamMonitorConfig &a_config  ///< [in] Beam Mon Histo Config
     )
     :
         m_id(a_id),
@@ -438,16 +438,16 @@ public:
         m_config(a_config)
     {
         // Histo-based Monitor
-        if ( m_config != NULL && m_config->format == ADARA::HISTO_FORMAT )
+        if ( m_config.format == ADARA::HISTO_FORMAT )
         {
             // Number of Time Bin Values Needed...
-            m_num_tof_bins = ( ( m_config->tofMax - m_config->tofOffset )
-                / m_config->tofBin ) + 1;
+            m_num_tof_bins = ( ( m_config.tofMax - m_config.tofOffset )
+                / m_config.tofBin ) + 1;
 
             // If Max TOF doesn't divide evenly into TOF Bin size,
             // then need "One Extra" Bin Value...
-            if ( ( m_config->tofMax - m_config->tofOffset )
-                    % m_config->tofBin )
+            if ( ( m_config.tofMax - m_config.tofOffset )
+                    % m_config.tofBin )
             {
                 m_num_tof_bins++;
             }
@@ -472,20 +472,20 @@ public:
             syslog( LOG_INFO,
                 "[%i] Beam Monitor %u Histogram: %u %s, %u to %u by %u",
                 g_pid, m_id, m_num_tof_bins, "Time Bin Values",
-                m_config->tofOffset, m_config->tofMax, m_config->tofBin );
+                m_config.tofOffset, m_config.tofMax, m_config.tofBin );
             usleep(30000); // give syslog a chance...
 
-            uint32_t tofbin = m_config->tofOffset;
+            uint32_t tofbin = m_config.tofOffset;
             for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
             {
                 m_data_buffer.push_back(0);
 
                 m_tofbin_buffer.push_back((float)tofbin);
-                tofbin += m_config->tofBin;
+                tofbin += m_config.tofBin;
             }
 
             // Max TOF Bin Value...
-            m_tofbin_buffer.push_back((float)(m_config->tofMax));
+            m_tofbin_buffer.push_back((float)(m_config.tofMax));
         }
 
         // Event-based Monitor
@@ -512,7 +512,7 @@ public:
     std::vector<uint32_t>   m_data_buffer;          ///< Histo data buffer
     std::vector<float>      m_tofbin_buffer;        ///< Histo TOF Bin buffer
 
-    BeamMonitorConfig      *m_config;               ///< Any (Histogram) config info for this monitor
+    BeamMonitorConfig       m_config;               ///< Beam Monitor Config
 };
 
 
@@ -1357,8 +1357,7 @@ public:
     virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id,
                                 uint32_t a_buf_reserve,
                                 uint32_t a_idx_buf_reserve,
-                                STC::BeamMonitorConfig *a_config,
-                                bool a_known_monitor ) = 0;
+                                STC::BeamMonitorConfig &a_config ) = 0;
     virtual void            updateRunInfo(
                                 const RunInfo &a_run_info ) = 0;
     virtual void            processBeamlineInfo(
