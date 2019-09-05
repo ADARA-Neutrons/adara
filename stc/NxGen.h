@@ -129,8 +129,7 @@ private:
             uint16_t a_id,                    ///< [in] ID of detector bank
             uint32_t a_buf_reserve,           ///< [in] Event buffer initial capacity
             uint32_t a_idx_buf_reserve,       ///< [in] Index buffer initial capacity
-            STC::BeamMonitorConfig *a_config, ///< [in] Beam Mon Histo Config (opt)
-            bool a_known_monitor,             ///< [in] Valid Beam Mon Config?
+            STC::BeamMonitorConfig &a_config, ///< [in] Beam Monitor Config
             NxGen &a_nxgen                    ///< [in] Parent NxGen instance
         )
         :
@@ -141,25 +140,10 @@ private:
             m_event_cur_size(0),
             m_nxgen(a_nxgen)
         {
-            // "Known" Monitor - Valid Histo Config or No Configs at All
-            if ( a_known_monitor )
-            {
-                m_name = std::string("monitor")
-                    + boost::lexical_cast<std::string>(a_id);
+            m_name = std::string("monitor")
+                + boost::lexical_cast<std::string>(a_id);
 
-                m_group_type = std::string("NXmonitor");
-            }
-
-            // "Unknown" Monitor - Invalid or Missing Histo Config
-            // (Make it obvious on casual visual inspection that
-            //    this monitor is whack... ;-)
-            else
-            {
-                m_name = std::string("UnknownMonitor")
-                    + boost::lexical_cast<std::string>(a_id);
-
-                m_group_type = std::string("NXcollection");
-            }
+            m_group_type = std::string("NXmonitor");
 
             m_path = m_nxgen.m_entry_path + "/" + m_name;
 
@@ -2497,8 +2481,7 @@ protected:
     STC::MonitorInfo*   makeMonitorInfo( uint16_t a_id,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve,
-                            STC::BeamMonitorConfig *a_config,
-                            bool a_known_monitor );
+                            STC::BeamMonitorConfig &a_config );
     void                initializeNxMonitor( NxMonitorInfo *a_mi );
     void                processBeamlineInfo(
                             const STC::BeamlineInfo &a_beamline_info,
