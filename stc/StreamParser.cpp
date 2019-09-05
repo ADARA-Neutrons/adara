@@ -122,7 +122,7 @@ StreamParser::~StreamParser()
             delete *dbs;
     }
 
-    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin();
+    for ( map<Identifier, MonitorInfo*>::iterator imi = m_monitors.begin();
             imi != m_monitors.end(); ++imi ) {
         if ( imi->second )
             delete imi->second;
@@ -2014,25 +2014,35 @@ StreamParser::processMonitorEvents
     const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
 )
 {
-    map<Identifier,MonitorInfo*>::iterator imi =
+    map<Identifier, MonitorInfo*>::iterator imi =
         m_monitors.find( a_monitor_id );
     if ( imi == m_monitors.end() )
     {
-        bool known_monitor = true;
-        STC::BeamMonitorConfig *config =
-            getBeamMonitorConfig(a_monitor_id, known_monitor);
+        STC::BeamMonitorConfig config;
+        getBeamMonitorConfig( a_monitor_id, config );
+        std::stringstream ss_new;
+        ss_new << "["
+            << "format=" << config.format << " ("
+            << ( ( config.format & ADARA::EVENT_FORMAT ) ?
+                "Event" : "Histo" ) << ")"
+            << " tofOffset=" << config.tofOffset
+            << " tofMax=" << config.tofMax
+            << " tofBin=" << config.tofBin
+            << " distance=" << config.distance
+            << "]";
+        syslog( LOG_INFO, "[%i] %s: Adding New Beam Monitor %u: %s",
+            g_pid, "StreamParser::processMonitorEvents()",
+            a_monitor_id, ss_new.str().c_str() );
         MonitorInfo *mi = makeMonitorInfo( a_monitor_id,
-            m_event_buf_write_thresh, m_anc_buf_write_thresh,
-            config, known_monitor );
+            m_event_buf_write_thresh, m_anc_buf_write_thresh, config );
         imi = m_monitors.insert( m_monitors.begin(),
-            pair<Identifier,MonitorInfo*>(a_monitor_id,mi));
+            pair<Identifier, MonitorInfo*>( a_monitor_id, mi ) );
     }
 
     const uint32_t *epos = a_rpos + a_event_count;
 
     // Histo-based Monitors...
-    if ( imi->second->m_config != NULL
-            && imi->second->m_config->format == ADARA::HISTO_FORMAT )
+    if ( imi->second->m_config.format == ADARA::HISTO_FORMAT )
     {
         // Process Monitor Events (into Histogram)... :-D
 
@@ -2049,12 +2059,12 @@ StreamParser::processMonitorEvents
             // Ignore TOF Less than Minimum Offset
             //    and Greater than or Equal to Maximum TOF...
             //    (Non-Inclusive Max...! ;-D)
-            if ( tof >= imi->second->m_config->tofOffset
-                    && tof < imi->second->m_config->tofMax )
+            if ( tof >= imi->second->m_config.tofOffset
+                    && tof < imi->second->m_config.tofMax )
             {
                 // Calculate index into Histogram based on TOF...
-                tofbin = ( tof - imi->second->m_config->tofOffset )
-                    / imi->second->m_config->tofBin;
+                tofbin = ( tof - imi->second->m_config.tofOffset )
+                    / imi->second->m_config.tofBin;
 
                 // Sanity Test, Just to Be Sure... ;-b
                 // (This should never happen, but the logic is confusing.)
@@ -2183,8 +2193,7 @@ StreamParser::handleMonitorPulseGap
 )
 {
     // Event-based Monitors Only...
-    if ( a_mi.m_config != NULL
-            && a_mi.m_config->format == ADARA::HISTO_FORMAT )
+    if ( a_mi.m_config.format == ADARA::HISTO_FORMAT )
     {
         return;
     }
@@ -2738,9 +2747,13 @@ StreamParser::rxPacket
     const ADARA::BeamMonitorConfigPkt &a_pkt     ///< [in] The ADARA Beam Monitor Config Packet to process
 )
 {
+    map<Identifier, MonitorInfo*>::iterator imi;
+
+    MonitorInfo *mi;
+
     syslog( LOG_INFO,
-        "[%i] Beam Monitor Config Received: %u Beam Monitors",
-        g_pid, a_pkt.beamMonCount() );
+        "[%i] %s: Beam Monitor Config Received: %u Beam Monitors",
+        g_pid, "BeamMonitorConfigPkt", a_pkt.beamMonCount() );
     usleep(30000); // give syslog a chance...
 
     // Count Number of Histo vs. Event Beam Monitors,
@@ -2754,8 +2767,9 @@ StreamParser::rxPacket
     bool forceEvent = false;
     if ( numEvent > 0 && numHisto > 0 ) {
         syslog( LOG_ERR,
-            "[%i] %s %s: %s %s=%u %s=%u - %s",
-            g_pid, "STC Error:", "Beam Monitor Config Error",
+            "[%i] %s %s: %s: %s %s=%u %s=%u - %s",
+            g_pid, "STC Error:", "BeamMonitorConfigPkt",
+            "Beam Monitor Config Error",
             "Mixed Event and Histo Beam Monitor Formats",
             "numEvent", numEvent, "numHisto", numHisto,
             "Forcing All Beam Monitors to Event Format!" );
@@ -2779,101 +2793,172 @@ StreamParser::rxPacket
 
         config.distance = a_pkt.distance(i);
 
-        syslog( LOG_INFO,
-            "[%i] %s %u: %s=%u (%s%s), %s=%lf, histo=(%u to %u by %u).",
-            g_pid, "Beam Monitor", config.id,
-            "format", config.format,
-            ( ( config.format & ADARA::EVENT_FORMAT ) ?  "Event"
-                : ( ( config.format & ADARA::HISTO_FORMAT ) ? "Histo"
-                    : "NONE" ) ),
-            ( forceEvent ? " [FORCED!]" : "" ),
-            "distance", config.distance,
-            config.tofOffset, config.tofMax, config.tofBin );
+        std::stringstream ss_new;
+        ss_new << "["
+            << "format=" << config.format << " ("
+            << ( ( config.format & ADARA::EVENT_FORMAT ) ?
+                "Event" : "Histo" )
+            << ( forceEvent ? " [FORCED!]" : "" ) << ")"
+            << " tofOffset=" << config.tofOffset
+            << " tofMax=" << config.tofMax
+            << " tofBin=" << config.tofBin
+            << " distance=" << config.distance
+            << "]";
+
+        syslog( LOG_INFO, "[%i] %s: %s %u Config: %s",
+            g_pid, "BeamMonitorConfigPkt",
+            "Beam Monitor", config.id, ss_new.str().c_str() );
         usleep(30000); // give syslog a chance...
 
         // Basic Sanity Check...
-        if ( config.tofOffset >= config.tofMax )
-        {
-            syslog( LOG_ERR,
-                "[%i] %s %s %u Config Error: Offset %u >= Max %u",
-                g_pid, "STC Error:", "Beam Monitor", config.id,
+        if ( config.tofOffset >= config.tofMax ) {
+            syslog( LOG_ERR, "[%i] %s %s: %s %u %s: Offset %u >= Max %u",
+                g_pid, "STC Error:", "BeamMonitorConfigPkt",
+                "Beam Monitor", config.id, "Histogram Config Error",
                 config.tofOffset, config.tofMax );
-            syslog( LOG_ERR,
-                "[%i] %s Reverting to Beam Monitor Event Mode!",
-                g_pid, "STC Error:" );
-            usleep(30000); // give syslog a chance...
-            m_monitor_config.clear();
-            break;
+            if ( config.format == ADARA::HISTO_FORMAT ) {
+                syslog( LOG_ERR,
+                    "[%i] %s %s: Reverting Beam Monitor %u to Event Mode!",
+                    g_pid, "STC Error:", "BeamMonitorConfigPkt",
+                    config.id );
+                usleep(30000); // give syslog a chance...
+                config.format = ADARA::EVENT_FORMAT;
+            } else {
+                syslog( LOG_WARNING,
+                    "[%i] %s: Beam Monitor %u Stays in Event Mode...",
+                    g_pid, "BeamMonitorConfigPkt", config.id );
+                usleep(30000); // give syslog a chance...
+            }
         }
 
         // Make Sure Time Bin is > 0 ! (also checked in SMS... :)
-        if ( config.tofBin < 1 )
-        {
+        if ( config.tofBin < 1 ) {
             syslog( LOG_ERR,
-                "[%i] %s %s %u Histogram Config Issue: Time Bin %u < 1",
-                g_pid, "STC Error:", "Beam Monitor", config.id,
-                config.tofBin );
+                "[%i] %s %s: %s %u %s: Time Bin %u < 1 - Setting to 1.",
+                g_pid, "STC Error:", "BeamMonitorConfigPkt",
+                "Beam Monitor", config.id,
+                "Histogram Config Error", config.tofBin );
             usleep(30000); // give syslog a chance...
             config.tofBin = 1;
         }
 
         m_monitor_config.push_back(config);
+
+        // Go Ahead & Create Beam Monitor Info for
+        // This Expected Beam Monitor's Definition...
+        imi = m_monitors.find( config.id );
+        if ( imi == m_monitors.end() ) {
+            // Add New Monitor...
+            syslog( LOG_INFO, "[%i] %s: Adding New Beam Monitor %u: %s",
+                g_pid, "BeamMonitorConfigPkt",
+                config.id, ss_new.str().c_str() );
+            usleep(30000); // give syslog a chance...
+            mi = makeMonitorInfo( config.id,
+                m_event_buf_write_thresh, m_anc_buf_write_thresh, config );
+            m_monitors.insert( m_monitors.begin(),
+                pair<Identifier, MonitorInfo*>( config.id, mi ) );
+        }
+        else {
+            // Duplicate Beam Monitor Found...?
+            // Compare Fields...
+            if ( imi->second->m_config.format != config.format
+                    || imi->second->m_config.tofOffset != config.tofOffset
+                    || imi->second->m_config.tofMax != config.tofMax
+                    || imi->second->m_config.tofBin != config.tofBin
+                    || !approximatelyEqual(
+                            imi->second->m_config.distance,
+                            config.distance, STC_DOUBLE_EPSILON ) )
+            {
+                std::stringstream ss_orig;
+                ss_orig << "["
+                    << "format=" << imi->second->m_config.format << " ("
+                    << ( ( imi->second->m_config.format
+                            & ADARA::EVENT_FORMAT ) ?
+                        "Event" : "Histo" ) << ")"
+                    << " tofOffset=" << imi->second->m_config.tofOffset
+                    << " tofMax=" << imi->second->m_config.tofMax
+                    << " tofBin=" << imi->second->m_config.tofBin
+                    << " distance=" << imi->second->m_config.distance
+                    << "]";
+                syslog( LOG_ERR,
+                    "[%i] %s %s: %s %u - %s: New=%s != Orig=%s - %s...!",
+                    g_pid, "STC Error:", "BeamMonitorConfigPkt",
+                    "Duplicate Beam Monitor", config.id,
+                    "Doesn't Match Existing Definition",
+                    ss_new.str().c_str(), ss_orig.str().c_str(),
+                    "Ignoring" );
+                usleep(30000); // give syslog a chance...
+            } else {
+                syslog( LOG_ERR, "[%i] %s %s: %s %u - %s: %s - %s...",
+                    g_pid, "STC Error:", "BeamMonitorConfigPkt",
+                    "Duplicate Beam Monitor", config.id,
+                    "Matches Existing Definition", ss_new.str().c_str(),
+                    "Ignoring" );
+                usleep(30000); // give syslog a chance...
+            }
+        }
     }
 
     return false;
 }
 
 
-/*! \brief This method looks up any Histogram Config for a Beam Monitor
+/*! \brief This method looks for Any Beam Monitor Config
  *  \return Pointer to element of the BeamMonitorConfig vector or NULL
  *
- * This method looks for a Beam Monitor Histogramming Config amongst
- * any optionally received prologue information, to define proper
+ * This method looks for a Beam Monitor Config amongst any
+ * optionally received prologue information, e.g. to define proper
  * Histogramming parameters for processing/accumulating Beam Monitor data.
  */
-STC::BeamMonitorConfig *
+void
 StreamParser::getBeamMonitorConfig
 (
-    Identifier a_monitor_id,    ///< [in] Beam Monitor Id (uint32_t)
-    bool & known_monitor        ///< [in] Flag for "Unknown" Monitors...
+    Identifier a_monitor_id,            ///< [in] Beam Monitor Id (uint32_t)
+    STC::BeamMonitorConfig &a_config    ///< [out] Beam Monitor Config
 )
 {
-    STC::BeamMonitorConfig *config = (STC::BeamMonitorConfig *) NULL;
-
-    // Innocent until Presumed Guilty...
-    // (or like, if there isn't any Beam Monitor Config info... :-)
-    known_monitor = true;
-
-    // Any Beam Monitor Histogramming Parameters...? (If not, we're done.)
-    if (m_monitor_config.size() == 0)
-        return(config); // NULL...
-
     // Look for a matching Beam Monitor Id in Any Config...
+    bool found = false;
     for ( vector<STC::BeamMonitorConfig>::iterator bmc =
                 m_monitor_config.begin();
-            bmc != m_monitor_config.end() && config == NULL ; ++bmc )
+            bmc != m_monitor_config.end() && found == false ; ++bmc )
     {
-        if (bmc->id == a_monitor_id)
-            config = &(*bmc);
+        if ( bmc->id == a_monitor_id )
+        {
+            a_config = *bmc;
+            found = true;
+        }
     }
 
-    // If we didn't find one, then there's Trouble... ;-b
-    if (config == NULL)
+    // Beam Monitor Config Not Found - Use Default Config Values...
+    if ( found == false )
     {
-        // "Trouble"...
+        a_config.id = a_monitor_id;
+        a_config.format = ADARA::EVENT_FORMAT;
+        a_config.tofOffset = 0;
+        a_config.tofMax = (uint32_t) -1;
+        a_config.tofBin = (uint32_t) -1; // "One Big Bin"... ;-D
+        a_config.distance = 0.0;
+
+        std::stringstream ss_mon;
+        ss_mon << "["
+            << "format=" << a_config.format << " ("
+            << ( ( a_config.format & ADARA::EVENT_FORMAT ) ?
+                "Event" : "Histo" ) << ")"
+            << " tofOffset=" << a_config.tofOffset
+            << " tofMax=" << a_config.tofMax
+            << " tofBin=" << a_config.tofBin
+            << " distance=" << a_config.distance
+            << "]";
         syslog( LOG_ERR,
-            "[%i] %s %s %d Missing in Histogramming Config! %s",
+            "[%i] %s %s %u %s Beam Monitor Configs[%lu]! %s %s - %s",
             g_pid, "STC Error:", "Beam Monitor", a_monitor_id,
-            "[Unknown Monitor]" );
+            "Missing from", m_monitor_config.size(),
+            "Setting Beam Monitor Config to Defaults",
+            ss_mon.str().c_str(),
+            "Please Add Missing Beam Monitor to Beamline Config!" );
         usleep(30000); // give syslog a chance...
-
-        // Now What?!
-        // - flag this Beam Monitor as "Unknown"
-        //   (still save events, just _Not_ in an official NXmonitor...)
-        known_monitor = false;
     }
-
-    return(config);
 }
 
 
@@ -5713,12 +5798,28 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in monitor buffers
 
-    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin();
+    for ( map<Identifier, MonitorInfo*>::iterator imi = m_monitors.begin();
             imi != m_monitors.end(); ++imi )
     {
+        std::stringstream ss_mon;
+        ss_mon << "["
+            << "format=" << imi->second->m_config.format << " ("
+            << ( ( imi->second->m_config.format & ADARA::EVENT_FORMAT ) ?
+                "Event" : "Histo" ) << ")"
+            << " tofOffset=" << imi->second->m_config.tofOffset
+            << " tofMax=" << imi->second->m_config.tofMax
+            << " tofBin=" << imi->second->m_config.tofBin
+            << " distance=" << imi->second->m_config.distance
+            << "]";
+        syslog( LOG_INFO,
+            "[%i] %s: Finalizing Beam Monitor %u: %s",
+            g_pid, "StreamParser::finalizeStreamProcessing()",
+            imi->second->m_id, ss_mon.str().c_str() );
+        // give syslog a chance...
+        usleep(30000);
+
         // Event-based Monitors Only...
-        if ( imi->second->m_config == NULL
-                || imi->second->m_config->format == ADARA::EVENT_FORMAT )
+        if ( imi->second->m_config.format == ADARA::EVENT_FORMAT )
         {
             // Detect gaps in monitor data and fill event index if present
             if ( imi->second->m_last_pulse_with_data < m_pulse_count )

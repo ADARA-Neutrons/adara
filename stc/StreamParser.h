@@ -177,9 +177,8 @@ private:
                     uint32_t a_event_count, const uint32_t *a_rpos );
     void        handleMonitorPulseGap( MonitorInfo &a_mi,
                     uint64_t a_count );
-    STC::BeamMonitorConfig *
-                getBeamMonitorConfig( Identifier a_monitor_id,
-                    bool & known_monitor );
+    void        getBeamMonitorConfig( Identifier a_monitor_id,
+                    STC::BeamMonitorConfig &a_config );
     std::vector<STC::DetectorBankSet *>
                 getDetectorBankSets( Identifier a_bank_id );
     void        associateDetectorBankSet(
