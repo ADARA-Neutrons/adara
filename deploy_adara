@@ -26,13 +26,17 @@
 # What are we actually Deploying...? (Check Command Line Options... :-)
 #
 
-usage="   usage: deploy_adara \\ \n            "
-usage="$usage [ sms | stc | stc_test | stc_dummy  \\ \n"
-usage="$usage                 | stc_hfir | stc_hfir_test \\ \n"
-usage="$usage                 | pvsd | dasmon | dasmond ]"
+USAGE()
+{
+	echo -e "\n   usage: deploy_adara [--help] \\"
+	echo "             [ sms | stc | stc_test | stc_dummy  \\"
+	echo "                 | stc_hfir | stc_hfir_test \\"
+	echo "                 | pvsd | dasmon | dasmond ]"
+	echo
+}
 
-if [ $# != 1 ]; then
-	echo -e "\n$usage\n"
+if [[ $# != 1 || $1 == "--help" ]]; then
+	USAGE
 	exit -1
 fi
 
@@ -41,6 +45,53 @@ umask 002
 
 # Catch Errors Amidst Pipelines... ;-Q
 set -o pipefail
+
+# Initialize Log File...
+LOG=""
+
+# Check Proceed Function
+CHECK_PROCEED()
+{
+	local _option=""
+
+	if [[ -n "$1" ]]; then
+		_option="$1"
+	fi
+
+	local _option_prompt=""
+	if [[ -n "${_option}" ]]; then
+		_option_prompt="/[${_option}]"
+	fi
+
+	echo -e -n "\nOk to Proceed (yes/No/quit${_option_prompt}) "
+
+	read proceed_response
+
+	proceed_ck=`echo "$proceed_response" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ "$proceed_ck" == ""
+			|| "$proceed_ck" == "n" || "$proceed_ck" == "no" \
+			|| "$proceed_ck" == "q" || "$proceed_ck" == "quit" ]]; then
+
+		if [[ -n "$LOG" ]]; then
+			echo -e "\nExiting ADARA Deploy Script at User's Request." \
+				| tee -a $LOG
+		else
+			echo -e "\nExiting ADARA Deploy Script at User's Request."
+		fi
+
+		exit 0
+
+	fi
+
+	# Set Option Global to User Prompt Response...
+	if [[ -n ${_option} ]]; then
+		if [[ "$proceed_ck" != "y" && "$proceed_ck" != "yes" ]]; then
+			echo -e "\nSetting ${_option} Option to [${proceed_response}]."
+			eval "${_option}=${proceed_response}"
+		fi
+	fi
+}
 
 # Parse Command Line Options
 
@@ -95,7 +146,7 @@ elif [ "$1" == "dasmond" ]; then
 	IS_DASMOND=1
 else
 	echo -e "\n   Unknown Deployment Target: $1"
-	echo -e "\n$usage\n"
+	USAGE
 	exit -1
 fi
 
@@ -105,7 +156,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.6.1"
+DEPLOY_VERSION="1.6.2"
 
 TMP_DIR="/tmp"
 
@@ -119,6 +170,16 @@ CONFIG_REPO="git+ssh://trac.sns.gov/var/repos/config"
 
 CONFIG_LINE=\
 "------------------------------------------------------------------"
+
+WAIT="-w 9"
+
+awkLineBreak=" \
+	{ \
+		printf(\"%s\n   \", \$1); \
+		for (i=2; i<NF; i++) \
+			printf(\"%s \", \$(i)); \
+		printf(\"%s\n\", \$NF); \
+	}"
 
 LOG="$TMP_DIR/ADARA_${PROG}_Deploy_Log.$$.txt"
 
@@ -170,6 +231,8 @@ fi
 
 CONFIG="config"
 
+PV_PREFIX=""
+
 if [ $IS_STC == 1 ]; then
 	install_host=`hostname`
 	install_branch=`echo "$install_host" | sed -e 's/sns-//' -e 's/\..*//'`
@@ -198,6 +261,41 @@ elif [ $IS_PVSD == 1 ]; then
 	if [[ "#$install_suffix#" != '##' ]]; then
 		install_branch="${install_branch}-${install_suffix}"
 		CONFIG="${CONFIG}-${install_suffix}"
+	fi
+	# Additionally Grab Beamline EPICS PV Prefix for Later...
+	# Note: the $BEAMLINE and $BL environment variable are set in:
+	#    /home/controls/etc/profile.d/01_<beamline>.sh
+	# as sourced from:
+	#    /home/controls/share/master/scripts/managed/bash_profile.sh
+	# as sourced from:
+	#    /etc/profile.d/epics.sh
+	# :-D
+	no_check_proceed=0
+	if [[ -n "$BL" ]]; then
+		PV_PREFIX="$BL"
+	# Otherwise, Try to Deduce from Hostname...
+	elif [[ "$install_branch" =~ dassrv ]]; then
+		PV_PREFIX=`echo "${install_branch/-dassrv[0-9]}" \
+			| tr '[:lower:]' '[:upper:]'`
+	elif [[ "$install_branch" =~ daq ]]; then
+		PV_PREFIX=`echo "${install_branch/-daq[0-9]}" \
+			| tr '[:lower:]' '[:upper:]'`
+	# Or just prompt the user, lol... ;-D
+	else
+		echo -e "\nCannot Determine Beamline EPICS PV Prefix..."
+		echo -e "\n   -> Install Branch = [${install_branch}]"
+		echo -e -n "\nPlease Enter PV Prefix (e.g. BL123): [None] "
+		read PV_PREFIX
+		if [[ -z "$PV_PREFIX" ]]; then
+			echo -e "\nUnsetting EPICS PV Prefix."
+		else
+			echo -e "\nSetting EPICS PV Prefix to [${PV_PREFIX}]."
+		fi
+		no_check_proceed=1
+	fi
+	if [[ $no_check_proceed == 0 ]]; then
+		echo -e "\nBeamline EPICS PV Prefix Set to [${PV_PREFIX}]."
+		CHECK_PROCEED "PV_PREFIX"
 	fi
 	HOST_TYPE="PVSD"
 elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
@@ -240,6 +338,11 @@ echo "for $HOST_TYPE $install_branch ($install_host)." | tee -a $LOG
 
 echo -e "\nUsing Git Config Repository in: ${INSTALL_BASE}/${CONFIG}" \
 	| tee -a $LOG
+
+if [[ -n "$PV_PREFIX" ]]; then
+	echo -e "\nUsing Beamline EPICS PV Prefix = [${PV_PREFIX}]." \
+		| tee -a $LOG
+fi
 
 #
 # Prompt for (Non-Null!) User Inputs:
@@ -301,7 +404,7 @@ if [ "#$release_tag#" == '#Already_Deployed_Locally#' ]; then
 
 else
 
-	tag_ck=`git tag -l | grep "$release_tag" | wc | awk '{print $1}'`
+	tag_ck=`git tag -l | grep "^${release_tag}$" | wc | awk '{print $1}'`
 
 	if [ $tag_ck != 1 ]; then
 		echo -e "\nError: Not a Valid Release Tag!\n" | tee -a $LOG
@@ -1101,18 +1204,7 @@ if [ $tag_ok != 0 ]; then
 		echo -e "\nNew Current Local and Remote Branches:" | tee -a $LOG
 		git branch -a |& tee -a $LOG
 
-		echo -e -n "\nOk to Proceed (yes/No/quit) "
-
-		read proceed_ck
-		proceed_ck=`echo "$proceed_ck" | tr '[:upper:]' '[:lower:]'`
-
-		if [[ "$proceed_ck" == ""
-				|| "$proceed_ck" == "n" || "$proceed_ck" == "no" \
-				|| "$proceed_ck" == "q" || "$proceed_ck" == "quit" ]]; then
-			echo -e "\nExiting Deploy Script at User's Request." \
-				| tee -a $LOG
-			exit 0
-		fi
+		CHECK_PROCEED
 
 	elif [[ "#$mkbranch_ck#" == '#n#' || "#$mkbranch_ck#" == '#no#' \
 		|| "#$mkbranch_ck#" == '#q#' || "#$mkbranch_ck#" == '#quit#' ]]; \
@@ -1601,18 +1693,7 @@ if [[ $PROG == "SMS_Daemon" ]]; then
 	liveconf confck
 fi
 
-echo -e -n "\nOk to Proceed (yes/No/quit) "
-
-read proceed_ck
-proceed_ck=`echo "$proceed_ck" | tr '[:upper:]' '[:lower:]'`
-
-if [[ "$proceed_ck" == ""
-		|| "$proceed_ck" == "n" || "$proceed_ck" == "no" \
-		|| "$proceed_ck" == "q" || "$proceed_ck" == "quit" ]]; then
-	echo -e "\nExiting Deploy Script at User's Request." \
-		| tee -a $LOG
-	exit 0
-fi
+CHECK_PROCEED
 
 #
 # Check the Run/Recording Status of the SMS Daemon Before Restarting...
@@ -1627,6 +1708,9 @@ fi
 # Optionally restart the SMS Daemon Service...? (Or PVSD Service...)
 #
 
+restart_ck="no"
+restart_ok=1
+
 # System Init Services...
 if [[ $PROG == "PVSD" || $PROG == "SMS_Daemon" ]]; then
 
@@ -1634,6 +1718,15 @@ if [[ $PROG == "PVSD" || $PROG == "SMS_Daemon" ]]; then
 
 	echo "sudo /sbin/service $service status" | tee -a $LOG
 	sudo /sbin/service $service status |& tee -a $LOG
+
+	if [[ $PROG == "PVSD" ]]; then
+		echo -e "\nChecking Current Run/Recording Status of Beamline:\n"
+		caget $WAIT -a ${PV_PREFIX}:SMS:Recording
+		caget $WAIT ${PV_PREFIX}:SMS:RunNumber
+		caget $WAIT ${PV_PREFIX}:SMS:Summary
+		sr="${PV_PREFIX}:SMS:SummaryReason"
+		caget $WAIT -S $sr | grep $sr | awk "$awkLineBreak"
+	fi
 
 	echo -e -n \
 		"\nDo You want to Restart the $PROG service now [yes/No]? "
@@ -1714,6 +1807,18 @@ echo -e "   $LOG\n" | tee -a $LOG
 echo -e "   $tag_archive\n" | tee -a $LOG
 
 cp -p $LOG $tag_archive
+
+#
+# For PVSD, Show Tail of Log File After Restart (If Restarted...)
+#
+
+if [[ $PROG == "PVSD" ]]; then
+	if [[ "#$restart_ck#" == '#y#' || "#$restart_ck#" == '#yes#' ]]; then
+		if [ $restart_ok == 0 ]; then
+			tail -f /var/log/pvsd.log
+		fi
+	fi
+fi
 
 #
 # Done.
