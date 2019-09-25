@@ -80,6 +80,8 @@ public:
 
     bool getDoRename(void) { return m_do_rename; }
 
+    bool verbose(void) { return m_verbose; }
+
 private:
 
     typedef std::pair<uint32_t, uint32_t> BankIndex;
