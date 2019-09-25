@@ -1603,7 +1603,7 @@ StreamParser::processBankEvents
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
-            bi->initializeBank( false );
+            bi->initializeBank( false, m_verbose );
 
         // Event-based Data Processing
         if ( bi->m_has_event )
@@ -1854,7 +1854,7 @@ StreamParser::handleBankPulseGap
 {
     // Make Sure Data has been (Late) Initialized...
     if ( !(a_bi.m_initialized) )
-        a_bi.initializeBank( false );
+        a_bi.initializeBank( false, m_verbose );
 
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
@@ -5773,7 +5773,7 @@ StreamParser::finalizeStreamProcessing()
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(ibi->second->m_initialized) )
-            ibi->second->initializeBank( true );
+            ibi->second->initializeBank( true, m_verbose );
 
         // Detect gaps in bank data and fill event index if present
         if ( ibi->second->m_last_pulse_with_data < m_pulse_count )
