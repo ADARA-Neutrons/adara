@@ -396,7 +396,7 @@ NxGen::initializeNxBank
     // Make Sure BankInfo has been (Late) Initialized...
     // (to know whether Events, Histo or Both...?)
     if ( !(a_bi->m_initialized) )
-        a_bi->initializeBank( a_end_of_run );
+        a_bi->initializeBank( a_end_of_run, verbose() );
 
     if ( !m_gen_nexus )
         return;
@@ -1720,7 +1720,7 @@ NxGen::bankPidTOFBuffersReady
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
-            bi->initializeBank( false );
+            bi->initializeBank( false, verbose() );
 
         // Do We Have a Valid Initialized NeXus Data File...?
         // (We shouldn't get called if not, so if we do, better force it,
@@ -1813,7 +1813,7 @@ NxGen::bankIndexBuffersReady
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
-            bi->initializeBank( false );
+            bi->initializeBank( false, verbose() );
 
         // Do We Have a Valid Initialized NeXus Data File...?
         // (We shouldn't get called if not, so if we do, better force it,
@@ -2860,11 +2860,14 @@ NxGen::writeDeviceEnums
         }
         while ( !done );
 
-        stringstream ss;
-        ss << "Creating Enum Log Group for Device " << a_devId
-            << " enum_name=" << enum_name;
-        syslog( LOG_INFO, "[%i] %s", g_pid, ss.str().c_str() );
-        usleep(30000); // give syslog a chance...
+        if ( verbose() )
+        {
+            stringstream ss;
+            ss << "Creating Enum Log Group for Device " << a_devId
+                << " enum_name=" << enum_name;
+            syslog( LOG_INFO, "[%i] %s", g_pid, ss.str().c_str() );
+            usleep(30000); // give syslog a chance...
+        }
 
         // Save "New Name" for Enum, For Subsequent Comparisons...!
         ienum->name = enum_name;
@@ -2925,7 +2928,7 @@ NxGen::writeDeviceEnums
             if ( max_len == (uint32_t) -1 || max_len == 0 )
                 max_len = 1;
 
-            syslog( LOG_ERR, "[%i] Enum %s size=%lu max_len=%u", g_pid,
+            syslog( LOG_INFO, "[%i] Enum %s size=%lu max_len=%u", g_pid,
                 ss.str().c_str(), ienum->element_names.size(), max_len );
             usleep(30000); // give syslog a chance...
 
@@ -3147,12 +3150,6 @@ NxGen::parseSTCConfigFile
             tag = (char*)root->name;
             getXmlNodeValue( root, value );
 
-            // REMOVE ME...
-            //syslog( LOG_INFO, "[%i] %s Root <%s>=[%s]",
-                //g_pid, "Parsing STC Config File",
-                //tag.c_str(), value.c_str() );
-            //usleep(30000); // give syslog a chance...
-
             if ( xmlStrcmp( root->name,
                     (const xmlChar*)"stc_config" ) != 0 )
             {
@@ -3172,7 +3169,6 @@ NxGen::parseSTCConfigFile
 
                 parsed = true;
 
-                // REMOVE ME...
                 //syslog( LOG_INFO, "[%i] %s Level 1 <%s>=[%s]",
                     //g_pid, "Parsing STC Config File",
                     //tag.c_str(), value.c_str() );
@@ -3198,10 +3194,12 @@ NxGen::parseSTCConfigFile
 
                     conditionIndex = 0;
 
-                    // REMOVE ME...
-                    //syslog( LOG_INFO, "[%i] %s Found Group [%s]",
-                        //g_pid, "STC Config", value.c_str() );
-                    //usleep(30000); // give syslog a chance...
+                    if ( verbose() )
+                    {
+                        syslog( LOG_INFO, "[%i] %s Found Group [%s]",
+                            g_pid, "STC Config", value.c_str() );
+                        usleep(30000); // give syslog a chance...
+                    }
 
                     for ( xmlNode *lev2 = lev1->children;
                             lev2 != 0; lev2 = lev2->next )
@@ -3209,7 +3207,6 @@ NxGen::parseSTCConfigFile
                         tag = (char*)lev2->name;
                         getXmlNodeValue( lev2, value );
 
-                        // REMOVE ME...
                         //syslog( LOG_INFO, "[%i] %s Level 2 <%s>=[%s]",
                             //g_pid, "Parsing STC Config File",
                             //tag.c_str(), value.c_str() );
@@ -3229,9 +3226,8 @@ NxGen::parseSTCConfigFile
                                     "Using New Group Name..." );
                                 usleep(30000); // give syslog a chance...
                             }
-                            else
+                            else if ( verbose() )
                             {
-                                // REMOVE ME...
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Name [%s]",
                                     g_pid, "STC Config", value.c_str() );
@@ -3266,9 +3262,8 @@ NxGen::parseSTCConfigFile
                                     "Using New Group Path..." );
                                 usleep(30000); // give syslog a chance...
                             }
-                            else
+                            else if ( verbose() )
                             {
-                                // REMOVE ME...
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Path [%s]",
                                     g_pid, "STC Config", value.c_str() );
@@ -3292,9 +3287,8 @@ NxGen::parseSTCConfigFile
                                     "Using New Group Type..." );
                                 usleep(30000); // give syslog a chance...
                             }
-                            else
+                            else if ( verbose() )
                             {
-                                // REMOVE ME...
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Type [%s]",
                                     g_pid, "STC Config", value.c_str() );
@@ -3338,11 +3332,13 @@ NxGen::parseSTCConfigFile
 
                             element.lastIndex = 0;
 
-                            // REMOVE ME...
-                            //syslog( LOG_INFO,
-                                //"[%i] %s Group Element [%s]",
-                                //g_pid, "STC Config", value.c_str() );
-                            //usleep(30000); // give syslog a chance...
+                            if ( verbose() )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s Group Element [%s]",
+                                    g_pid, "STC Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
 
                             for ( xmlNode *lev3 = lev2->children;
                                     lev3 != 0; lev3 = lev3->next )
@@ -3350,24 +3346,26 @@ NxGen::parseSTCConfigFile
                                 tag = (char*)lev3->name;
                                 getXmlNodeValue( lev3, value );
 
-                                // REMOVE ME...
                                 //syslog( LOG_INFO,
                                     //"[%i] %s Element Level 3 <%s>=[%s]",
                                     //g_pid, "Parsing STC Config File",
                                     //tag.c_str(), value.c_str() );
-                                //usleep(30000); // give syslog a chance...
+                                // give syslog a chance...
+                                //usleep(30000);
 
                                 if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"pattern" ) == 0 )
                                 {
-                                    // REMOVE ME...
-                                    //syslog( LOG_INFO,
-                                    //"[%i] %s Element Pattern #%ld [%s]",
-                                        //g_pid, "STC Config",
-                                        //element.patterns.size() + 1,
-                                        //value.c_str() );
-                                    // give syslog a chance
-                                    //usleep(30000);
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                       "[%i] %s Element Pattern #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            element.patterns.size() + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     element.patterns.push_back( value );
                                 }
@@ -3375,14 +3373,16 @@ NxGen::parseSTCConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"index" ) == 0 )
                                 {
-                                    // REMOVE ME...
-                                    //syslog( LOG_INFO,
-                                    //"[%i] %s Element Index #%ld [%s]",
-                                        //g_pid, "STC Config",
-                                        //element.indices.size() + 1,
-                                        //value.c_str() );
-                                    // give syslog a chance
-                                    //usleep(30000);
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                        "[%i] %s Element Index #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            element.indices.size() + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     element.indices.push_back( value );
                                 }
@@ -3404,16 +3404,15 @@ NxGen::parseSTCConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    //else
-                                    //{
-                                        // REMOVE ME...
-                                        //syslog( LOG_INFO,
-                                            //"[%i] %s Element Name [%s]",
-                                            //g_pid, "STC Config",
-                                            //value.c_str() );
+                                    else if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Element Name [%s]",
+                                            g_pid, "STC Config",
+                                            value.c_str() );
                                         // give syslog a chance
-                                        //usleep(30000);
-                                    //}
+                                        usleep(30000);
+                                    }
 
                                     element.name = value;
                                 }
@@ -3422,15 +3421,18 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)
                                             "units_value" ) == 0 )
                                 {
-                                    // REMOVE ME...
-                                    //syslog( LOG_INFO,
-                                        //"[%i] %s %s #%ld [%s]",
-                                        //g_pid, "STC Config",
-                                        //"Element Units Value Pattern",
-                                        //element.unitsPatterns.size() + 1,
-                                        //value.c_str() );
-                                    // give syslog a chance
-                                    //usleep(30000);
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s %s #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            "Element Units Value Pattern",
+                                            element.unitsPatterns.size()
+                                                + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     element.unitsPatterns.push_back(
                                         value );
@@ -3453,16 +3455,15 @@ NxGen::parseSTCConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    //else
-                                    //{
-                                        // REMOVE ME...
-                                        //syslog( LOG_INFO,
-                                            //"[%i] %s Element Units [%s]",
-                                            //g_pid, "STC Config",
-                                            //value.c_str() );
+                                    else if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Element Units [%s]",
+                                            g_pid, "STC Config",
+                                            value.c_str() );
                                         // give syslog a chance
-                                        //usleep(30000);
-                                    //}
+                                        usleep(30000);
+                                    }
 
                                     element.units = value;
                                 }
@@ -3541,7 +3542,6 @@ NxGen::parseSTCConfigFile
                                 }
                                 else
                                 {
-                                    // REMOVE ME...
                                     syslog( LOG_INFO,
                                         "[%i] %s %s \"%s\" - %s",
                                         g_pid, "STC Config",
@@ -3572,7 +3572,6 @@ NxGen::parseSTCConfigFile
 
                             condition.is_set = false;
 
-                            // REMOVE ME...
                             syslog( LOG_INFO,
                                 "[%i] %s Group Condition [%s]",
                                 g_pid, "STC Config", value.c_str() );
@@ -3584,13 +3583,13 @@ NxGen::parseSTCConfigFile
                                 tag = (char*)lev3->name;
                                 getXmlNodeValue( lev3, value );
 
-                                // REMOVE ME...
                                 //syslog( LOG_INFO,
                                     //"[%i] %s %s Level 3 <%s>=[%s]",
                                     //g_pid, "Parsing STC Config File",
                                     //"Condition",
                                     //tag.c_str(), value.c_str() );
-                                //usleep(30000); // give syslog a chance...
+                                // give syslog a chance...
+                                //usleep(30000);
 
                                 if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"name" ) == 0 )
@@ -3610,16 +3609,15 @@ NxGen::parseSTCConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    //else
-                                    //{
-                                        // REMOVE ME...
-                                        //syslog( LOG_INFO,
-                                           //"[%i] %s Condition Name [%s]",
-                                            //g_pid, "STC Config",
-                                            //value.c_str() );
+                                    else if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                           "[%i] %s Condition Name [%s]",
+                                            g_pid, "STC Config",
+                                            value.c_str() );
                                         // give syslog a chance
-                                        //usleep(30000);
-                                    //}
+                                        usleep(30000);
+                                    }
 
                                     condition.name = value;
                                 }
@@ -3627,14 +3625,16 @@ NxGen::parseSTCConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"pattern" ) == 0 )
                                 {
-                                    // REMOVE ME...
-                                    //syslog( LOG_INFO,
-                                        //"[%i] %s Condition %s #%ld [%s]",
-                                        //g_pid, "STC Config", "Pattern",
-                                        //condition.patterns.size() + 1,
-                                        //value.c_str() );
-                                    // give syslog a chance
-                                    //usleep(30000);
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                          "[%i] %s Condition %s #%ld [%s]",
+                                            g_pid, "STC Config", "Pattern",
+                                            condition.patterns.size() + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     condition.patterns.push_back( value );
                                 }
@@ -3643,15 +3643,17 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)"value_string" )
                                             == 0 )
                                 {
-                                    // REMOVE ME...
-                                    //syslog( LOG_INFO,
-                                        //"[%i] %s Condition %s #%ld [%s]",
-                                        //g_pid, "STC Config",
-                                        //"Value String",
-                                      //condition.value_strings.size() + 1,
-                                        //value.c_str() );
-                                    // give syslog a chance
-                                    //usleep(30000);
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                          "[%i] %s Condition %s #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            "Value String",
+                                        condition.value_strings.size() + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     condition.value_strings.push_back(
                                         value );
@@ -3660,14 +3662,16 @@ NxGen::parseSTCConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"value" ) == 0 )
                                 {
-                                    // REMOVE ME...
-                                    //syslog( LOG_INFO,
-                                        //"[%i] %s Condition %s #%ld [%s]",
-                                        //g_pid, "STC Config", "Value",
-                                        //condition.values.size() + 1,
-                                        //value.c_str() );
-                                    // give syslog a chance
-                                    //usleep(30000);
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                          "[%i] %s Condition %s #%ld [%s]",
+                                            g_pid, "STC Config", "Value",
+                                            condition.values.size() + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     condition.values.push_back( value );
                                 }
@@ -3676,16 +3680,18 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)"not_value_string"
                                             ) == 0 )
                                 {
-                                    // REMOVE ME...
-                                    //syslog( LOG_INFO,
-                                        //"[%i] %s Condition %s #%ld [%s]",
-                                        //g_pid, "STC Config",
-                                        //"NOT Value String",
-                                       //condition.not_value_strings.size()
-                                            //+ 1,
-                                        //value.c_str() );
-                                    // give syslog a chance
-                                    //usleep(30000);
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                          "[%i] %s Condition %s #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            "NOT Value String",
+                                        condition.not_value_strings.size()
+                                                + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     condition.not_value_strings.push_back(
                                         value );
@@ -3695,14 +3701,18 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)"not_value" )
                                             == 0 )
                                 {
-                                    // REMOVE ME...
-                                    //syslog( LOG_INFO,
-                                        //"[%i] %s Condition %s #%ld [%s]",
-                                        //g_pid, "STC Config", "NOT Value",
-                                        //condition.not_values.size() + 1,
-                                        //value.c_str() );
-                                    // give syslog a chance
-                                    //usleep(30000);
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                          "[%i] %s Condition %s #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            "NOT Value",
+                                            condition.not_values.size()
+                                                + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     condition.not_values.push_back(
                                         value );
@@ -3742,13 +3752,16 @@ NxGen::parseSTCConfigFile
 
                                     element.lastIndex = 0;
 
-                                    // REMOVE ME...
-                                    //syslog( LOG_INFO, "[%i] %s %s [%s]",
-                                        //g_pid, "STC Config",
-                                        //"Group Condition Element",
-                                        //value.c_str() );
-                                    // give syslog a chance...
-                                    //usleep(30000);
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s %s [%s]",
+                                            g_pid, "STC Config",
+                                            "Group Condition Element",
+                                            value.c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
 
                                     for ( xmlNode *lev4 = lev3->children;
                                             lev4 != 0; lev4 = lev4->next )
@@ -3756,13 +3769,13 @@ NxGen::parseSTCConfigFile
                                         tag = (char*)lev4->name;
                                         getXmlNodeValue( lev4, value );
 
-                                        // REMOVE ME...
                                         //syslog( LOG_INFO,
                                             //"[%i] %s %s <%s>=[%s]",
                                             //g_pid,
                                             //"Parsing STC Config File",
                                             //"Condition Element Level 3",
-                                            //tag.c_str(), value.c_str() );
+                                            //tag.c_str(),
+                                            //value.c_str() );
                                         // give syslog a chance...
                                         //usleep(30000);
 
@@ -3770,17 +3783,19 @@ NxGen::parseSTCConfigFile
                                                 (const xmlChar*)"pattern" )
                                                     == 0 )
                                         {
-                                            // REMOVE ME...
-                                            //syslog( LOG_INFO,
-                                               //"[%i] %s %s %s #%ld [%s]",
-                                                //g_pid, "STC Config",
-                                                //"Condition Element",
-                                                //"Pattern",
-                                                //element.patterns.size()
-                                                    //+ 1,
-                                                //value.c_str() );
-                                            // give syslog a chance
-                                            //usleep(30000);
+                                            if ( verbose() )
+                                            {
+                                                syslog( LOG_INFO,
+                                                "[%i] %s %s %s #%ld [%s]",
+                                                    g_pid, "STC Config",
+                                                    "Condition Element",
+                                                    "Pattern",
+                                                    element.patterns.size()
+                                                        + 1,
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
 
                                             element.patterns.push_back(
                                                 value );
@@ -3790,16 +3805,19 @@ NxGen::parseSTCConfigFile
                                                 (const xmlChar*)"index" )
                                                     == 0 )
                                         {
-                                            // REMOVE ME...
-                                            //syslog( LOG_INFO,
-                                               //"[%i] %s %s %s #%ld [%s]",
-                                                //g_pid, "STC Config",
-                                                //"Condition Element",
-                                                //"Index",
-                                              //element.indices.size() + 1,
-                                                //value.c_str() );
-                                            // give syslog a chance
-                                            //usleep(30000);
+                                            if ( verbose() )
+                                            {
+                                                syslog( LOG_INFO,
+                                                "[%i] %s %s %s #%ld [%s]",
+                                                    g_pid, "STC Config",
+                                                    "Condition Element",
+                                                    "Index",
+                                                    element.indices.size()
+                                                        + 1,
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
 
                                             element.indices.push_back(
                                                 value );
@@ -3824,17 +3842,16 @@ NxGen::parseSTCConfigFile
                                                 // give syslog a chance...
                                                 usleep(30000);
                                             }
-                                            //else
-                                            //{
-                                                // REMOVE ME...
-                                                //syslog( LOG_INFO,
-                                                    //"[%i] %s %s [%s]",
-                                                    //g_pid, "STC Config",
-                                                //"Condition Element Name",
-                                                    //value.c_str() );
+                                            else if ( verbose() )
+                                            {
+                                                syslog( LOG_INFO,
+                                                    "[%i] %s %s [%s]",
+                                                    g_pid, "STC Config",
+                                                  "Condition Element Name",
+                                                    value.c_str() );
                                                 // give syslog a chance
-                                                //usleep(30000);
-                                            //}
+                                                usleep(30000);
+                                            }
 
                                             element.name = value;
                                         }
@@ -3843,16 +3860,18 @@ NxGen::parseSTCConfigFile
                                                 (const xmlChar*)
                                                     "units_value" ) == 0 )
                                         {
-                                            // REMOVE ME...
-                                            //syslog( LOG_INFO,
-                                                //"[%i] %s %s #%ld [%s]",
-                                                //g_pid, "STC Config",
-                                           //"Element Units Value Pattern",
-                                                //element.unitsPatterns
-                                                    //.size() + 1,
-                                                //value.c_str() );
-                                            // give syslog a chance
-                                            //usleep(30000);
+                                            if ( verbose() )
+                                            {
+                                                syslog( LOG_INFO,
+                                                    "[%i] %s %s #%ld [%s]",
+                                                    g_pid, "STC Config",
+                                             "Element Units Value Pattern",
+                                                    element.unitsPatterns
+                                                        .size() + 1,
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
 
                                             element.unitsPatterns
                                                 .push_back( value );
@@ -3878,16 +3897,15 @@ NxGen::parseSTCConfigFile
                                                 // give syslog a chance...
                                                 usleep(30000);
                                             }
-                                            //else
-                                            //{
-                                                // REMOVE ME...
-                                                //syslog( LOG_INFO,
-                                            //"[%i] %s Element Units [%s]",
-                                                    //g_pid, "STC Config",
-                                                    //value.c_str() );
+                                            else if ( verbose() )
+                                            {
+                                                syslog( LOG_INFO,
+                                              "[%i] %s Element Units [%s]",
+                                                    g_pid, "STC Config",
+                                                    value.c_str() );
                                                 // give syslog a chance
-                                                //usleep(30000);
-                                            //}
+                                                usleep(30000);
+                                            }
 
                                             element.units = value;
                                         }
@@ -4005,7 +4023,6 @@ NxGen::parseSTCConfigFile
                                         }
                                         else
                                         {
-                                            // REMOVE ME...
                                             std::string info =
                                                 "STC Config Adding";
                                             info += " Element";
@@ -4122,7 +4139,6 @@ NxGen::parseSTCConfigFile
                                     || condition.not_value_strings.size()
                                     || condition.not_values.size() ) )
                             {
-                                // REMOVE ME...
                                 syslog( LOG_INFO,
                                     "[%i] %s \"%s\" %s \"%s\" - %s",
                                     g_pid,
@@ -4170,7 +4186,6 @@ NxGen::parseSTCConfigFile
                             && ( group.elements.size()
                                 || group.conditions.size() ) )
                     {
-                        // REMOVE ME...
                         syslog( LOG_INFO,
                     "[%i] %s \"%s\" %s - %s=[%s] %s=[%s] (%lu %s, %lu %s)",
                             g_pid, "Adding Group Container",
