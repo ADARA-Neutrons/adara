@@ -85,7 +85,7 @@ public:
     virtual ~BankInfo()
     {}
 
-    void initializeBank( bool a_end_of_run )
+    void initializeBank( bool a_end_of_run, bool a_verbose )
     {
         // Already Initialized...
         if ( m_initialized )
@@ -151,7 +151,7 @@ public:
                         // Divide the TOF Range "Evenly"...
                         m_tof_bin_size = (*dbs)->tofMax / 2;
 
-                        syslog( LOG_ERR,
+                        syslog( LOG_INFO,
                             "[%i] %s %u %s %u %s: %s %s to %u, %s to %u",
                             g_pid, "Detector Bank", m_id,
                             "State", m_state,
@@ -194,16 +194,41 @@ public:
                         m_tof_bin_size = (*dbs)->tofBin;
                     }
 
-                    // syslog( LOG_ERR,
-                        // "[%i] %s %u %s %u %s: %s=%u %s=%u %s=%u (%u)",
-                        // g_pid, "Detector Bank", m_id,
-                        // "State", m_state,
-                        // "Histogram",
-                        // "num_tof_bins", m_num_tof_bins,
-                        // "tof_bin_size", m_tof_bin_size,
-                        // "num_pids", num_pids,
-                        // num_pids * ( m_num_tof_bins - 1 ) );
-                    // usleep(30000); // give syslog a chance...
+                    // Calculate Per-PixelId Offset Index
+                    //    into Histogram Data Buffer...
+                    // (saves time, and we sorta _Have_ to do this
+                    //    to account for non-contiguous PixelId spaces!)
+
+                    // Determine Min & Max PixelIds for This Bank...
+                    uint32_t minPid, maxPid;
+                    minPid = maxPid = m_logical_pixelids[0];
+                    for (uint32_t p=1 ; p < num_pids ; p++)
+                    {
+                        if ( m_logical_pixelids[p] < minPid )
+                            minPid = m_logical_pixelids[p];
+                        if ( m_logical_pixelids[p] > maxPid )
+                            maxPid = m_logical_pixelids[p];
+                    }
+
+                    // Save Minimum PixelId as Offset into Offset Index!
+                    m_base_pid = minPid;
+
+                    // Determine Required Offset Index Size...
+                    size_t offset_size = maxPid - minPid + 1;
+
+                    std::stringstream ss;
+                    ss << "Detector Bank " << m_id
+                        << " State " << m_state
+                        << " Histogram: "
+                        << m_num_tof_bins << " Time Bin Values, "
+                        << (*dbs)->tofOffset << " to " << (*dbs)->tofMax
+                        << " by " << m_tof_bin_size << ","
+                        << " minPid=" << minPid << " maxPid=" << maxPid
+                        << " offset_size=" << offset_size << " ("
+                        << ( num_pids * ( m_num_tof_bins - 1 ) ) << ")";
+
+                    syslog( LOG_INFO, "[%i] %s", g_pid, ss.str().c_str() );
+                    usleep(30000); // give syslog a chance...
 
                     // Actual Histogram Storage, Non-Inclusive Max TOF Bin
                     m_data_buffer.reserve( num_pids
@@ -211,16 +236,6 @@ public:
 
                     // TOF Bin Values...
                     m_tofbin_buffer.reserve(m_num_tof_bins);
-
-                    syslog( LOG_INFO,
-                        "[%i] %s %u %s %u %s: %u %s, %u to %u by %u",
-                        g_pid, "Detector Bank", m_id,
-                        "State", m_state, "Histogram",
-                        m_num_tof_bins,
-                        "Time Bin Values",
-                        (*dbs)->tofOffset,
-                        (*dbs)->tofMax, m_tof_bin_size );
-                    usleep(30000); // give syslog a chance...
 
                     uint32_t tofbin = (*dbs)->tofOffset;
                     for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
@@ -251,48 +266,11 @@ public:
                         usleep(30000); // give syslog a chance...
                     }
 
-                    // Calculate Per-PixelId Offset Index
-                    //    into Histogram Data Buffer...
-                    // (saves time, and we sorta _Have_ to do this
-                    //    to account for non-contiguous PixelId spaces!)
-
-                    // Determine Min & Max PixelIds for This Bank...
-                    uint32_t minPid, maxPid;
-                    minPid = maxPid = m_logical_pixelids[0];
-                    for (uint32_t p=1 ; p < num_pids ; p++)
-                    {
-                        if ( m_logical_pixelids[p] < minPid )
-                            minPid = m_logical_pixelids[p];
-                        if ( m_logical_pixelids[p] > maxPid )
-                            maxPid = m_logical_pixelids[p];
-                    }
-
-                    // Save Minimum PixelId as Offset into Offset Index!
-                    m_base_pid = minPid;
-
-                    // Determine Required Offset Index Size...
-                    size_t offset_size = maxPid - minPid + 1;
-
-                    syslog( LOG_ERR,
-                        "[%i] %s %u %s %u %s: %s=%u %s=%u %s=%lu (%u)",
-                        g_pid, "Detector Bank", m_id,
-                        "State", m_state, "Histogram",
-                        "minPid", minPid, "maxPid", maxPid,
-                        "offset_size", offset_size,
-                        num_pids * ( m_num_tof_bins - 1 ) );
-                    usleep(30000); // give syslog a chance...
-
                     // Reserve Required Index Size & Initialize Vector...
                     // (I hope there aren't huge gaps in the PixelIds...!)
                     m_histo_pid_offset.reserve( offset_size );
                     for (size_t i=0 ; i < offset_size ; i++)
                         m_histo_pid_offset.push_back( -1 );
-
-                    // syslog( LOG_ERR,
-                        // "[%i] %s %u %s %u %s: Filling in Offsets...",
-                        // g_pid, "Detector Bank", m_id,
-                        // "State", m_state, "Histogram" );
-                    // usleep(30000); // give syslog a chance...
 
                     // Fill In Offsets per PixelId...
                     size_t offset = 0;
@@ -308,7 +286,7 @@ public:
                             m_histo_pid_offset[ index ] = 
                                 offset++ * ( m_num_tof_bins - 1 );
 
-                            // syslog( LOG_ERR,
+                            // syslog( LOG_INFO,
                             // "[%i] %s %u %s %u %s: p=%u offset[%lu]=%d",
                                 // g_pid, "Detector Bank", m_id,
                                 // "State", m_state, "Histogram",
@@ -320,7 +298,7 @@ public:
                         // Duplicate PixelId!  (shouldn't happen...)
                         else
                         {
-                            syslog( LOG_INFO,
+                            syslog( LOG_ERR,
                              "[%i] %s: %s %u %s %u has %s %lu - Ignoring!",
                                 g_pid, "STC Error", "Detector Bank", m_id,
                                 "State", m_state,
@@ -333,11 +311,14 @@ public:
                         }
                     }
 
-                    syslog( LOG_ERR,
-                        "[%i] %s %u %s %u Done with Histogram Init.",
-                        g_pid, "Detector Bank", m_id,
-                        "State", m_state );
-                    usleep(30000); // give syslog a chance...
+                    if ( a_verbose )
+                    {
+                        syslog( LOG_INFO,
+                            "[%i] %s %u %s %u Done with Histogram Init.",
+                            g_pid, "Detector Bank", m_id,
+                            "State", m_state );
+                        usleep(30000); // give syslog a chance...
+                    }
 
                     // Got One, That's All We'll Ever Need... ;-D
                     m_has_histo = true;
