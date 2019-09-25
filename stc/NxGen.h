@@ -1699,6 +1699,10 @@ private:
                         // Indexed Groups...
                         if ( G->hasIndex )
                         {
+                            std::stringstream ss_index;
+                            ss_index <<
+                                 "createSTCConfigGroupMatchingElements():";
+
                             std::string indexedName;
 
                             uint32_t index = -1;
@@ -1714,14 +1718,10 @@ private:
                                 if ( sscanf( this->m_internal_name.c_str(),
                                         I.c_str(), &index ) == 1 )
                                 {
-                                    syslog( LOG_INFO,
-                                   "[%i] %s: Index \"%s\" %s \"%s\" as %d",
-                                        g_pid,
-                                  "createSTCConfigGroupMatchingElements()",
-                                        I.c_str(),
-                                        "Matched Internal Name",
-                                        this->m_internal_name.c_str(),
-                                        index );
+                                    ss_index << " Index \"" << I << "\""
+                                        << " Matched Internal Name \""
+                                        << this->m_internal_name << "\""
+                                        << " as " << index;
 
                                     gotIndex = true;
                                 }
@@ -1731,14 +1731,11 @@ private:
                                             .c_str(),
                                         I.c_str(), &index ) == 1 )
                                 {
-                                    syslog( LOG_INFO,
-                                   "[%i] %s: Index \"%s\" %s \"%s\" as %d",
-                                        g_pid,
-                                  "createSTCConfigGroupMatchingElements()",
-                                        I.c_str(),
-                                        "Matched Internal Connection",
-                                        this->m_internal_connection
-                                            .c_str(), index );
+                                    ss_index << " Index \"" << I << "\""
+                                        << " Matched Internal"
+                                        << " Connection \""
+                                        << this->m_internal_connection
+                                        << "\"" << " as " << index;
 
                                     gotIndex = true;
                                 }
@@ -1752,9 +1749,9 @@ private:
                                 if ( start == std::string::npos )
                                 {
                                     syslog( LOG_ERR,
-                                       "[%i] %s %s: %s \"%s\" for %s (%s)",
+                                      "[%i] %s %s - %s \"%s\" for %s (%s)",
                                         g_pid, "STC Error:",
-                                  "createSTCConfigGroupMatchingElements()",
+                                        ss_index.str().c_str(),
                                         "Index Not Found in Group Name",
                                         G->name.c_str(),
                                         this->m_device_pv_str.c_str(),
@@ -1776,9 +1773,8 @@ private:
                                         ss.str() );
 
                                     syslog( LOG_INFO,
-                                        "[%i] %s: %s %s as %s \"%s\" %s",
-                                        g_pid,
-                                  "createSTCConfigGroupMatchingElements()",
+                                        "[%i] %s - %s %s as %s \"%s\" %s",
+                                        g_pid, ss_index.str().c_str(),
                                         "Indexed Group Name Found for",
                                         this->m_device_pv_str.c_str(),
                                         "Group", indexedName.c_str(),
