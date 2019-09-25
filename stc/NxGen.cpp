@@ -3186,6 +3186,16 @@ NxGen::parseSTCConfigFile
                 else if ( xmlStrcmp( lev1->name,
                         (const xmlChar*)"group" ) == 0 )
                 {
+                    std::stringstream ss_elements;
+                    ss_elements << "elements=[";
+
+                    std::string elem_sep = "";
+
+                    std::stringstream ss_conditions;
+                    ss_conditions << "conditions=[";
+
+                    std::string cond_sep = "";
+
                     struct GroupInfo group;
 
                     group.created = false;
@@ -3542,15 +3552,23 @@ NxGen::parseSTCConfigFile
                                 }
                                 else
                                 {
-                                    syslog( LOG_INFO,
-                                        "[%i] %s %s \"%s\" - %s",
-                                        g_pid, "STC Config",
-                                        "Adding Element to Group",
-                                        group.name.c_str(),
-                                        ss.str().c_str() );
-                                    usleep(30000); // give syslog a chance
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s %s \"%s\" - %s",
+                                            g_pid, "STC Config",
+                                            "Adding Element to Group",
+                                            group.name.c_str(),
+                                            ss.str().c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
 
                                     group.elements.push_back( element );
+
+                                    ss_elements
+                                        << elem_sep << element.name;
+                                    elem_sep = ", ";
                                 }
                             }
                             else
@@ -3568,14 +3586,22 @@ NxGen::parseSTCConfigFile
                         else if ( xmlStrcmp( lev2->name,
                                 (const xmlChar*)"condition" ) == 0 )
                         {
+                            std::stringstream ss_cond_elems;
+                            ss_cond_elems << "elements=[";
+
+                            std::string cond_elem_sep = "";
+
                             struct ConditionInfo condition;
 
                             condition.is_set = false;
 
-                            syslog( LOG_INFO,
-                                "[%i] %s Group Condition [%s]",
-                                g_pid, "STC Config", value.c_str() );
-                            usleep(30000); // give syslog a chance...
+                            if ( verbose() )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s Group Condition [%s]",
+                                    g_pid, "STC Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
 
                             for ( xmlNode *lev3 = lev2->children;
                                     lev3 != 0; lev3 = lev3->next )
@@ -4023,22 +4049,29 @@ NxGen::parseSTCConfigFile
                                         }
                                         else
                                         {
-                                            std::string info =
-                                                "STC Config Adding";
-                                            info += " Element";
-                                            info += " to Condition \""
-                                                + condition.name + "\"";
-                                            info += " for Group \""
-                                                + group.name + "\"";
-                                            syslog( LOG_INFO,
-                                                "[%i] %s - %s",
-                                                g_pid, info.c_str(),
-                                                ss.str().c_str() );
-                                            // give syslog a chance
-                                            usleep(30000);
+                                            if ( verbose() )
+                                            {
+                                                std::string info =
+                                                    "STC Config Adding";
+                                                info += " Element";
+                                                info += " to Condition \""
+                                                   + condition.name + "\"";
+                                                info += " for Group \""
+                                                    + group.name + "\"";
+                                                syslog( LOG_INFO,
+                                                    "[%i] %s - %s",
+                                                    g_pid, info.c_str(),
+                                                    ss.str().c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
 
                                             condition.elements.push_back(
                                                 element );
+
+                                            ss_cond_elems << cond_elem_sep
+                                                << ss.str();
+                                            cond_elem_sep = "; ";
                                         }
                                     }
                                     else
@@ -4139,16 +4172,25 @@ NxGen::parseSTCConfigFile
                                     || condition.not_value_strings.size()
                                     || condition.not_values.size() ) )
                             {
-                                syslog( LOG_INFO,
-                                    "[%i] %s \"%s\" %s \"%s\" - %s",
-                                    g_pid,
-                                    "STC Config Adding Condition",
-                                    condition.name.c_str(),
-                                    "to Group", group.name.c_str(),
-                                    ss.str().c_str() );
-                                usleep(30000); // give syslog a chance
+                                if ( verbose() )
+                                {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s \"%s\" %s \"%s\" - %s",
+                                        g_pid,
+                                        "STC Config Adding Condition",
+                                        condition.name.c_str(),
+                                        "to Group", group.name.c_str(),
+                                        ss.str().c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
 
                                 group.conditions.push_back( condition );
+
+                                ss_conditions << cond_sep
+                                    << "\"" << condition.name << "\": "
+                                    << ss.str()
+                                    << " " << ss_cond_elems.str() << "]";
+                                cond_sep = "; ";
                             }
                             else
                             {
@@ -4186,14 +4228,19 @@ NxGen::parseSTCConfigFile
                             && ( group.elements.size()
                                 || group.conditions.size() ) )
                     {
-                        syslog( LOG_INFO,
-                    "[%i] %s \"%s\" %s - %s=[%s] %s=[%s] (%lu %s, %lu %s)",
-                            g_pid, "Adding Group Container",
-                            group.name.c_str(), "to STC Config",
-                            "path", group.path.c_str(),
-                            "type", group.type.c_str(),
-                            group.elements.size(), "elements",
-                            group.conditions.size(), "conditions" );
+                        std::stringstream ss;
+                        ss << "Adding Group Container"
+                            << " \"" << group.name << "\""
+                            << " to STC Config -"
+                            << " path=[" << group.path << "]"
+                            << " type=[" << group.type << "]"
+                            << " ("
+                            << group.elements.size() << " elements, "
+                            << group.conditions.size() << " conditions)"
+                            << ": " << ss_elements.str() << "]"
+                            << " " << ss_conditions.str() << "]";
+                        syslog( LOG_INFO, "[%i] %s",
+                            g_pid, ss.str().c_str() );
                         usleep(30000); // give syslog a chance
 
                         m_config_groups.push_back( group );
