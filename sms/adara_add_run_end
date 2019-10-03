@@ -179,7 +179,7 @@ for arg in "$@" ; do
 		echo -e "\nSetting ADARA Munge Path to:\n\t[${ADARA_MUNGE}]"
 	elif [[ "#$key#" == '#--sms_config#' ]]; then
 		SMS_CONFIG="${value%/}"
-		echo -e "\nSetting SMS Config Directory to:\n\t[${SMS_CONF}]"
+		echo -e "\nSetting SMS Config Directory to:\n\t[${SMS_CONFIG}]"
 	elif [[ "#$key#" == '#--sms_data#' ]]; then
 		SMS_DATA="${value%/}"
 		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
