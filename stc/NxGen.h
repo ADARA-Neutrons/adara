@@ -526,11 +526,14 @@ private:
             if ( max_len == (uint32_t) -1 || max_len == 0 )
                 max_len = 1;
 
-            syslog( LOG_INFO,
-                "[%i] DASlogs String %s size=%lu max_len=%u",
-                g_pid, this->m_device_pv_str.c_str(),
-                value_buffer.size(), max_len );
-            usleep(30000); // give syslog a chance...
+            if ( m_nxgen.verbose() )
+            {
+                syslog( LOG_INFO,
+                    "[%i] DASlogs String %s size=%lu max_len=%u",
+                    g_pid, this->m_device_pv_str.c_str(),
+                    value_buffer.size(), max_len );
+                usleep(30000); // give syslog a chance...
+            }
 
             // Write 2D String Array to NeXus File...
             if ( value_buffer.size() )
@@ -1019,16 +1022,21 @@ private:
                                     m_value_enum_strings_max_len = 1;
                                 }
 
-                                syslog( LOG_ERR,
-                                    "[%i] %s %s: %s for %s %s=%lu %s=%u",
-                                    g_pid, "NxPVInfo::flushBuffers()",
-                                    this->m_device_str.c_str(),
-                                    "Enumerated Type Value Strings",
-                                    this->m_pv_str.c_str(),
-                                    "size", m_value_enum_strings.size(),
-                                    "max_len",
-                                    m_value_enum_strings_max_len );
-                                usleep(30000); // give syslog a chance...
+                                if ( m_nxgen.verbose() )
+                                {
+                                    syslog( LOG_ERR,
+                                      "[%i] %s %s: %s for %s %s=%lu %s=%u",
+                                        g_pid, "NxPVInfo::flushBuffers()",
+                                        this->m_device_str.c_str(),
+                                        "Enumerated Type Value Strings",
+                                        this->m_pv_str.c_str(),
+                                        "size",
+                                        m_value_enum_strings.size(),
+                                        "max_len",
+                                        m_value_enum_strings_max_len );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
 
                                 // Value Strings as 2D String Dataset
                                 std::vector<hsize_t> dims;
