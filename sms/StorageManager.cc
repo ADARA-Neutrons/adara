@@ -2485,7 +2485,9 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 		if ( propId.empty() )
 			propId = "UNKNOWN";
 
-		// Send ComBus Message if Purged and Run Number Known...
+		// *Don't* Send ComBus Message if Purged and Run Number Known...
+		// (This Just Confuses the Web Monitor's "Last Run" Meta-Data...)
+		/*
 		if ( purged > 0 && numParsed == 4 ) {
 			std::string purgeMsg;
 			if ( path_deleted )
@@ -2498,6 +2500,7 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 			clock_gettime(CLOCK_REALTIME, &now);
 			m_combus->sendOriginal(run, propId, purgeMsg, now);
 		}
+		*/
 
 		// If Container Deleted, Remove from Daily Cache Map...!
 		if ( path_deleted ) {
