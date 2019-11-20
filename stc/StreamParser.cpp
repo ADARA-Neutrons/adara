@@ -324,15 +324,15 @@ StreamParser::processStream()
                         // On fatal error, flush buffers to Nexus
                         // before terminating
                         markerComment(
-                            ( m_pulse_info.last_time
+                            ( m_pulse_info.max_time
                                     - m_pulse_info.start_time )
                                 / NANO_PER_SECOND_D,
                             m_pulse_info.start_time
-                                + m_pulse_info.last_time,
+                                + m_pulse_info.max_time,
                             "Stream processing terminated abnormally." );
                         m_run_metrics.run_end_time = nsec_to_timespec(
                             m_pulse_info.start_time
-                                + m_pulse_info.last_time );
+                                + m_pulse_info.max_time );
                         finalizeStreamProcessing();
                     }
 
@@ -585,7 +585,7 @@ StreamParser::rxPacket
             // Run "end time" is defined as time of last pulse
             // (which is nanoseconds epoch offset)
             m_run_metrics.run_end_time = nsec_to_timespec(
-                m_pulse_info.start_time + m_pulse_info.last_time );
+                m_pulse_info.start_time + m_pulse_info.max_time );
 
             finalizeStreamProcessing();
             m_processing_state = DONE_PROCESSING;
@@ -1415,11 +1415,14 @@ StreamParser::processPulseInfo
             / ( pulse_time - m_pulse_info.last_time ) );
         m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
         m_pulse_info.last_time = pulse_time;
+        if ( pulse_time > m_pulse_info.max_time )
+            m_pulse_info.max_time = pulse_time;
     }
     else
     {
         m_pulse_info.start_time = timespec_to_nsec( a_pkt.timestamp() );
         m_pulse_info.last_time = 0;
+        m_pulse_info.max_time = 0;
         m_pulse_info.times.push_back(0);
         m_pulse_info.freqs.push_back(0);
         // Freq stats ignores first point since it can't be calculated
@@ -1489,11 +1492,14 @@ StreamParser::processPulseInfo
             / ( pulse_time - m_pulse_info.last_time ) );
         m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
         m_pulse_info.last_time = pulse_time;
+        if ( pulse_time > m_pulse_info.max_time )
+            m_pulse_info.max_time = pulse_time;
     }
     else
     {
         m_pulse_info.start_time = timespec_to_nsec( a_pkt.timestamp() );
         m_pulse_info.last_time = 0;
+        m_pulse_info.max_time = 0;
         m_pulse_info.times.push_back(0);
         m_pulse_info.freqs.push_back(0);
         // Freq stats ignores first point since it can't be calculated
@@ -3205,12 +3211,12 @@ StreamParser::rxPacket
 
             // On fatal error, flush buffers to Nexus before terminating
             markerComment(
-                ( m_pulse_info.last_time - m_pulse_info.start_time )
+                ( m_pulse_info.max_time - m_pulse_info.start_time )
                     / NANO_PER_SECOND_D,
-                m_pulse_info.start_time + m_pulse_info.last_time,
+                m_pulse_info.start_time + m_pulse_info.max_time,
                 "Stream processing terminated abnormally." );
             m_run_metrics.run_end_time = nsec_to_timespec(
-                m_pulse_info.start_time + m_pulse_info.last_time );
+                m_pulse_info.start_time + m_pulse_info.max_time );
             finalizeStreamProcessing();
         }
 
