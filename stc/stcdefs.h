@@ -26,11 +26,12 @@ namespace STC {
 /// Contains neutron pulse data
 struct PulseInfo
 {
-    PulseInfo() : start_time(0), last_time(0)
+    PulseInfo() : start_time(0), last_time(0), max_time(0)
     {}
 
     uint64_t                start_time;         ///< Time in nanoseconds of first pulse
     uint64_t                last_time;          ///< Time in nanoseconds of last received pulse
+    uint64_t                max_time;           ///< Time in nanoseconds of maximum received pulse
     std::vector<double>     times;              ///< Pulse time buffer (seconds)
     std::vector<double>     freqs;              ///< Pulse frequency buffer (Hz)
     std::vector<double>     charges;            ///< Pulse charge buffer
