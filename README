@@ -22,5 +22,6 @@ EPICS:
 	Building is basically running make in the top-level directory.
 	No need to do make install
 
+Git Conflict Test Entry #1.
 Git Conflict Test Entry #2.
 
