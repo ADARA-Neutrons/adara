@@ -21,6 +21,9 @@ SMS_DATA="/SNSlocal/sms/data"
 # EPICS Time Epoch Offset from 1970-01-01...
 EPICS_EPOCH=631152000
 
+DIR_MAX_TIME=6
+DIR_DELAY=1
+
 DATE="/usr/bin/date"
 DIFF="/usr/bin/diff"
 FIND="/usr/bin/find"
@@ -47,7 +50,8 @@ USAGE()
 	echo "    [--nED|--ned|--ds=1] \\"
 	echo "    [--PVSD|--pvsd|--ds=3] \\"
 	echo "    [--ds=<N>] [--pkt=\"RTDL|VARIABLE|DATA\"] \\"
-	echo "    [--delay=<Hours>] \\"
+	echo "    [--delay=<Hours>(${DIR_DELAY})] \\"
+	echo "    [--max_time=<Hours>(${DIR_MAX_TIME})] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
 	echo "    [--extra_parser_args=\"--showfoo\"]  \\"
 	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
@@ -242,8 +246,6 @@ FILE_TYPE="SMS"
 FILE_PREFIX="f"
 FILE_PACKET=""
 
-DIR_DELAY=1
-
 EXTRA_PARSER_ARGS=""
 
 NextValue=""
@@ -347,6 +349,10 @@ for arg in "$@" ; do
 		DIR_DELAY="${value}"
 		echo -e -n "\nSetting Data Directory Find Delay to: "
 		echo "[${DIR_DELAY} Hours]"
+	elif [[ "#$key#" == '#--max_time#' ]]; then
+		DIR_MAX_TIME="${value}"
+		echo -e -n "\nSetting Data Directory Find Max Time to: "
+		echo "[${DIR_MAX_TIME} Hours]"
 	elif [[ "#$key#" == '#--adara_parser#' ]]; then
 		ADARA_PARSER="${value}"
 		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
@@ -420,10 +426,20 @@ target_str=`date --date="1970-01-01 UTC ${target_secs_delay} seconds"`
 echo -e "\n\"${DIR_DELAY} Hour(s) Earlier\" Target Date String:"
 echo -e "\n\t[${target_str}]"
 
+# Add Directory Max Time (Hours) to Target Seconds...
+target_max_secs=$(( $target_secs + ( 3600 * $DIR_MAX_TIME ) ))
+
+# Convert Target Time to String Format for "Find" Utility...
+target_max_str=`date --date="1970-01-01 UTC ${target_max_secs} seconds"`
+
+echo -e "\n\"${DIR_MAX_TIME} Hour(s) Later\" Target Max Date String:"
+echo -e "\n\t[${target_max_str}]"
+
 echo -e "\nSearching Raw Data Files..."
 
 newer_files=`${FIND} ${SMS_DATA} \
-	-mindepth 3 -maxdepth 3 -newermt "${target_str}" \
+	-mindepth 3 -maxdepth 3 \
+	-newermt "${target_str}" -a \! -newermt "${target_max_str}" \
 	| ${GREP} -v "state-storage" | ${SORT}` 
 
 if [[ -z "${newer_files}" ]]; then
@@ -473,6 +489,9 @@ echo -e "\nFound Potential Local SMS Data Subdirectories:\n\n$data_dirs"
 
 echo -e \
 	"\n(Going Back ${DIR_DELAY} Hour(s) Prior to Desired Target Time...)"
+
+echo -e \
+	"\n(No Later Than ${DIR_MAX_TIME} Hour(s) After Desired Target Time...)"
 
 CHECK_PROCEED
 
