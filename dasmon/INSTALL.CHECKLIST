@@ -16,7 +16,7 @@ from the Git repository in:
 
 i.e.:
 
-   git clone git+ssh://trac.sns.gov/var/repos/ADARA ~/gitsrc
+   git clone git+ssh://trac.sns.gov/var/repos/ADARA ~/gitsrc/ADARA
 
 If you place your clone of the ADARA Git Repository into a different
 base directory in the filesystem, then you will need to update this
