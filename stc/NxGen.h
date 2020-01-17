@@ -129,8 +129,7 @@ private:
             uint16_t a_id,                    ///< [in] ID of detector bank
             uint32_t a_buf_reserve,           ///< [in] Event buffer initial capacity
             uint32_t a_idx_buf_reserve,       ///< [in] Index buffer initial capacity
-            STC::BeamMonitorConfig *a_config, ///< [in] Beam Mon Histo Config (opt)
-            bool a_known_monitor,             ///< [in] Valid Beam Mon Config?
+            STC::BeamMonitorConfig &a_config, ///< [in] Beam Monitor Config
             NxGen &a_nxgen                    ///< [in] Parent NxGen instance
         )
         :
@@ -141,25 +140,10 @@ private:
             m_event_cur_size(0),
             m_nxgen(a_nxgen)
         {
-            // "Known" Monitor - Valid Histo Config or No Configs at All
-            if ( a_known_monitor )
-            {
-                m_name = std::string("monitor")
-                    + boost::lexical_cast<std::string>(a_id);
+            m_name = std::string("monitor")
+                + boost::lexical_cast<std::string>(a_id);
 
-                m_group_type = std::string("NXmonitor");
-            }
-
-            // "Unknown" Monitor - Invalid or Missing Histo Config
-            // (Make it obvious on casual visual inspection that
-            //    this monitor is whack... ;-)
-            else
-            {
-                m_name = std::string("UnknownMonitor")
-                    + boost::lexical_cast<std::string>(a_id);
-
-                m_group_type = std::string("NXcollection");
-            }
+            m_group_type = std::string("NXmonitor");
 
             m_path = m_nxgen.m_entry_path + "/" + m_name;
 
@@ -542,11 +526,14 @@ private:
             if ( max_len == (uint32_t) -1 || max_len == 0 )
                 max_len = 1;
 
-            syslog( LOG_INFO,
-                "[%i] DASlogs String %s size=%lu max_len=%u",
-                g_pid, this->m_device_pv_str.c_str(),
-                value_buffer.size(), max_len );
-            usleep(30000); // give syslog a chance...
+            if ( m_nxgen.verbose() )
+            {
+                syslog( LOG_INFO,
+                    "[%i] DASlogs String %s size=%lu max_len=%u",
+                    g_pid, this->m_device_pv_str.c_str(),
+                    value_buffer.size(), max_len );
+                usleep(30000); // give syslog a chance...
+            }
 
             // Write 2D String Array to NeXus File...
             if ( value_buffer.size() )
@@ -1035,16 +1022,21 @@ private:
                                     m_value_enum_strings_max_len = 1;
                                 }
 
-                                syslog( LOG_ERR,
-                                    "[%i] %s %s: %s for %s %s=%lu %s=%u",
-                                    g_pid, "NxPVInfo::flushBuffers()",
-                                    this->m_device_str.c_str(),
-                                    "Enumerated Type Value Strings",
-                                    this->m_pv_str.c_str(),
-                                    "size", m_value_enum_strings.size(),
-                                    "max_len",
-                                    m_value_enum_strings_max_len );
-                                usleep(30000); // give syslog a chance...
+                                if ( m_nxgen.verbose() )
+                                {
+                                    syslog( LOG_ERR,
+                                      "[%i] %s %s: %s for %s %s=%lu %s=%u",
+                                        g_pid, "NxPVInfo::flushBuffers()",
+                                        this->m_device_str.c_str(),
+                                        "Enumerated Type Value Strings",
+                                        this->m_pv_str.c_str(),
+                                        "size",
+                                        m_value_enum_strings.size(),
+                                        "max_len",
+                                        m_value_enum_strings_max_len );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
 
                                 // Value Strings as 2D String Dataset
                                 std::vector<hsize_t> dims;
@@ -1663,9 +1655,9 @@ private:
             std::string label                           ///< Logging Label
         )
         {
-            // REMOVE ME...
-            //syslog( LOG_INFO, "[%i] Checking for Group \"%s\"...",
-                //g_pid, G->name.c_str() );
+            //syslog( LOG_INFO, "[%i] %s: Checking for Group \"%s\"...",
+                //g_pid, "createSTCConfigGroupMatchingElements()",
+                //G->name.c_str() );
             //usleep(30000); // give syslog a chance...
 
             for ( uint32_t e=0 ; e < elements.size() ; e++ )
@@ -1683,9 +1675,9 @@ private:
                     std::string patt_str = label.c_str();
                     patt_str += "Element Pattern \"" + P + "\"";
 
-                    // REMOVE ME...
-                    //syslog( LOG_INFO, "[%i] %s %s Match",
-                        //g_pid, "Checking for", patt_str.c_str() );
+                    //syslog( LOG_INFO, "[%i] %s: %s %s Match", g_pid,
+                        //"createSTCConfigGroupMatchingElements()",
+                        //"Checking for", patt_str.c_str() );
                     // give syslog a chance...
                     //usleep(30000);
 
@@ -1697,19 +1689,28 @@ private:
                         || boost::regex_search(
                             this->m_internal_connection, subs, expr ) )
                     {
-                        // REMOVE ME...
-                        syslog( LOG_INFO, "[%i] %s %s in %s \"%s\" %s",
-                            g_pid, "Pattern Match for",
-                            this->m_device_pv_str.c_str(),
-                            "Group", G->name.c_str(), patt_str.c_str() );
-                        // give syslog a chance...
-                        usleep(30000);
+                        if ( m_nxgen.verbose() )
+                        {
+                            syslog( LOG_INFO,
+                                "[%i] %s: %s %s in %s \"%s\" %s", g_pid,
+                                "createSTCConfigGroupMatchingElements()",
+                                "Pattern Match for",
+                                this->m_device_pv_str.c_str(),
+                                "Group", G->name.c_str(),
+                                patt_str.c_str() );
+                            // give syslog a chance...
+                            usleep(30000);
+                        }
 
                         std::string group_path;
 
                         // Indexed Groups...
                         if ( G->hasIndex )
                         {
+                            std::stringstream ss_index;
+                            ss_index <<
+                                 "createSTCConfigGroupMatchingElements():";
+
                             std::string indexedName;
 
                             uint32_t index = -1;
@@ -1725,12 +1726,10 @@ private:
                                 if ( sscanf( this->m_internal_name.c_str(),
                                         I.c_str(), &index ) == 1 )
                                 {
-                                    syslog( LOG_INFO,
-                                    "[%i] Index \"%s\" %s \"%s\" as %d",
-                                        g_pid, I.c_str(),
-                                        "Matched Internal Name",
-                                        this->m_internal_name.c_str(),
-                                        index );
+                                    ss_index << " Index \"" << I << "\""
+                                        << " Matched Internal Name \""
+                                        << this->m_internal_name << "\""
+                                        << " as " << index;
 
                                     gotIndex = true;
                                 }
@@ -1740,12 +1739,11 @@ private:
                                             .c_str(),
                                         I.c_str(), &index ) == 1 )
                                 {
-                                    syslog( LOG_INFO,
-                                    "[%i] Index \"%s\" %s \"%s\" as %d",
-                                        g_pid, I.c_str(),
-                                        "Matched Internal Connection",
-                                        this->m_internal_connection
-                                            .c_str(), index );
+                                    ss_index << " Index \"" << I << "\""
+                                        << " Matched Internal"
+                                        << " Connection \""
+                                        << this->m_internal_connection
+                                        << "\"" << " as " << index;
 
                                     gotIndex = true;
                                 }
@@ -1759,8 +1757,9 @@ private:
                                 if ( start == std::string::npos )
                                 {
                                     syslog( LOG_ERR,
-                                        "[%i] %s %s \"%s\" for %s (%s)",
+                                      "[%i] %s %s - %s \"%s\" for %s (%s)",
                                         g_pid, "STC Error:",
+                                        ss_index.str().c_str(),
                                         "Index Not Found in Group Name",
                                         G->name.c_str(),
                                         this->m_device_pv_str.c_str(),
@@ -1781,10 +1780,9 @@ private:
                                         GroupNameIndex.length(),
                                         ss.str() );
 
-                                    // REMOVE ME...
                                     syslog( LOG_INFO,
-                                        "[%i] %s %s as %s \"%s\" %s",
-                                        g_pid,
+                                        "[%i] %s - %s %s as %s \"%s\" %s",
+                                        g_pid, ss_index.str().c_str(),
                                         "Indexed Group Name Found for",
                                         this->m_device_pv_str.c_str(),
                                         "Group", indexedName.c_str(),
@@ -1800,8 +1798,9 @@ private:
                             else
                             {
                                 syslog( LOG_ERR,
-                                    "[%i] %s %s %s in %s \"%s\" %s",
+                                    "[%i] %s %s: %s %s in %s \"%s\" %s",
                                     g_pid, "STC Error:",
+                                  "createSTCConfigGroupMatchingElements()",
                                     "No Index Found for",
                                     this->m_device_pv_str.c_str(),
                                     "Group", G->name.c_str(),
@@ -1831,8 +1830,9 @@ private:
                                         << " for "
                                         << this->m_device_pv_str;
                                     syslog( LOG_ERR,
-                                        "[%i] %s %s, %s=[%s] %s=[%s]",
+                                        "[%i] %s %s: %s, %s=[%s] %s=[%s]",
                                         g_pid, "STC Error:",
+                                  "createSTCConfigGroupMatchingElements()",
                                         ss.str().c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
@@ -1855,8 +1855,10 @@ private:
                                         << " for "
                                         << this->m_device_pv_str;
                                     syslog( LOG_INFO,
-                                        "[%i] %s, %s=[%s] %s=[%s]",
-                                        g_pid, ss.str().c_str(),
+                                        "[%i] %s: %s, %s=[%s] %s=[%s]",
+                                        g_pid,
+                                  "createSTCConfigGroupMatchingElements()",
+                                        ss.str().c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
                                     // give syslog a chance...
@@ -1866,8 +1868,9 @@ private:
                                 else
                                 {
                                     syslog( LOG_INFO,
-                                        "[%i] %s \"%s\", %s=[%s] %s=[%s]",
+                                     "[%i] %s: %s \"%s\", %s=[%s] %s=[%s]",
                                         g_pid,
+                                  "createSTCConfigGroupMatchingElements()",
                                         "Creating Indexed Group",
                                         indexedName.c_str(),
                                         "path", group_path.c_str(),
@@ -1906,8 +1909,9 @@ private:
                                         << " for "
                                         << this->m_device_pv_str;
                                     syslog( LOG_ERR,
-                                        "[%i] %s %s, %s=[%s] %s=[%s]",
+                                        "[%i] %s %s: %s, %s=[%s] %s=[%s]",
                                         g_pid, "STC Error:",
+                                  "createSTCConfigGroupMatchingElements()",
                                         ss.str().c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
@@ -1930,8 +1934,10 @@ private:
                                         << " for "
                                         << this->m_device_pv_str;
                                     syslog( LOG_INFO,
-                                        "[%i] %s, %s=[%s] %s=[%s]",
-                                        g_pid, ss.str().c_str(),
+                                        "[%i] %s: %s, %s=[%s] %s=[%s]",
+                                        g_pid,
+                                  "createSTCConfigGroupMatchingElements()",
+                                        ss.str().c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
                                     // give syslog a chance...
@@ -1941,8 +1947,9 @@ private:
                                 else
                                 {
                                     syslog( LOG_INFO,
-                                        "[%i] %s \"%s\", %s=[%s] %s=[%s]",
+                                     "[%i] %s: %s \"%s\", %s=[%s] %s=[%s]",
                                         g_pid,
+                                  "createSTCConfigGroupMatchingElements()",
                                         "Creating Group", G->name.c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
@@ -1976,8 +1983,10 @@ private:
                                         m_log_path + "/" + "value";
 
                                     syslog( LOG_INFO,
-                                        "[%i] %s %s %s in Group as %s",
-                                        g_pid, "Create Data with",
+                                        "[%i] %s: %s %s %s in Group as %s",
+                                        g_pid,
+                                  "createSTCConfigGroupMatchingElements()",
+                                        "Create Data with",
                                         "Last PV Value from",
                                         pv_value_path.c_str(),
                                         elem_link_path.c_str() );
@@ -2014,8 +2023,9 @@ private:
                                             && this->m_value_changed )
                                     {
                                         syslog( LOG_ERR,
-                                            "[%i] %s %s %s %s - %s %s",
+                                            "[%i] %s %s: %s %s %s - %s %s",
                                             g_pid, "STC Error:",
+                                  "createSTCConfigGroupMatchingElements()",
                                             "More Than 1 PV Value for",
                                             elem_link_path.c_str(),
                                             "to Link to Element Path",
@@ -2028,8 +2038,9 @@ private:
                                 else
                                 {
                                     syslog( LOG_ERR,
-                                        "[%i] %s %s %s - %s - %s %s",
+                                        "[%i] %s %s: %s %s - %s - %s %s",
                                         g_pid, "STC Error:",
+                                  "createSTCConfigGroupMatchingElements()",
                                         "*** NO LAST PV VALUE for",
                                         elem_link_path.c_str(),
                                         "Nothing to Link to Element Path",
@@ -2046,8 +2057,10 @@ private:
                                     m_log_path + "/" + "value";
 
                                 syslog( LOG_INFO,
-                                    "[%i] %s %s to Group as %s",
-                                    g_pid, "Linking PV Value",
+                                    "[%i] %s: %s %s to Group as %s",
+                                    g_pid,
+                                  "createSTCConfigGroupMatchingElements()",
+                                    "Linking PV Value",
                                     pv_value_path.c_str(),
                                     elem_link_path.c_str() );
                                 // give syslog a chance...
@@ -2078,8 +2091,10 @@ private:
                             else
                             {
                                 syslog( LOG_INFO,
-                                    "[%i] %s %s to Group in %s",
-                                    g_pid, "Linking PV Channel",
+                                    "[%i] %s: %s %s to Group in %s",
+                                    g_pid,
+                                  "createSTCConfigGroupMatchingElements()",
+                                    "Linking PV Channel",
                                     m_log_path.c_str(),
                                     elem_link_path.c_str() );
                                 // give syslog a chance...
@@ -2103,7 +2118,8 @@ private:
                                 else
                                 {
                                     syslog( LOG_INFO,
-                                        "[%i] %s %s %s %s - %s", g_pid,
+                                        "[%i] %s: %s %s %s %s - %s", g_pid,
+                                  "createSTCConfigGroupMatchingElements()",
                                         "PV Channel", m_log_path.c_str(),
                                         "Already Has",
                                         "Target Group Link String",
@@ -2125,8 +2141,9 @@ private:
                         else
                         {
                             syslog( LOG_ERR,
-                                "[%i] %s %s %s - %s %s %s - %s %s",
+                                "[%i] %s %s: %s %s - %s %s %s - %s %s",
                                 g_pid, "STC Error:",
+                                "createSTCConfigGroupMatchingElements()",
                                 "*** DUPLICATE Element Link Attempt for",
                                 elem_link_path.c_str(),
                                 "PV/Log Path", it->second.c_str(),
@@ -2155,9 +2172,11 @@ private:
                     units_patt_str += "Element Units Pattern \""
                         + U + "\"";
 
-                    // REMOVE ME...
-                    //syslog( LOG_INFO, "[%i] %s %s Units Match",
-                        //g_pid, "Checking for", units_patt_str.c_str() );
+                    //syslog( LOG_INFO,
+                        //"[%i] %s: %s %s Units Match", g_pid,
+                        //"createSTCConfigGroupMatchingElements()",
+                        //"Checking for",
+                        //units_patt_str.c_str() );
                     // give syslog a chance...
                     //usleep(30000);
 
@@ -2175,17 +2194,21 @@ private:
                             ss << this->valueToString(
                                 this->m_last_value );
 
-                            // REMOVE ME...
-                            syslog( LOG_INFO,
-                                "[%i] %s %s in %s \"%s\" %s, %s \"%s\"",
-                                g_pid, "Pattern Match for",
-                                this->m_device_pv_str.c_str(),
-                                "Group", G->name.c_str(),
-                                units_patt_str.c_str(),
-                                "Capturing Units Value as",
-                                ss.str().c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
+                            if ( m_nxgen.verbose() )
+                            {
+                                syslog( LOG_INFO,
+                               "[%i] %s: %s %s in %s \"%s\" %s, %s \"%s\"",
+                                    g_pid,
+                                  "createSTCConfigGroupMatchingElements()",
+                                    "Pattern Match for",
+                                    this->m_device_pv_str.c_str(),
+                                    "Group", G->name.c_str(),
+                                    units_patt_str.c_str(),
+                                    "Capturing Units Value as",
+                                    ss.str().c_str() );
+                                // give syslog a chance...
+                                usleep(30000);
+                            }
 
                             E->unitsValue = ss.str();
 
@@ -2195,8 +2218,9 @@ private:
                                     && this->m_value_changed )
                             {
                                 syslog( LOG_ERR,
-                                "[%i] %s %s %s in %s \"%s\" %s - %s %s",
+                               "[%i] %s %s: %s %s in %s \"%s\" %s - %s %s",
                                     g_pid, "STC Error:",
+                                  "createSTCConfigGroupMatchingElements()",
                                     "More Than 1 PV Value for",
                                     this->m_device_pv_str.c_str(),
                                     "Group", G->name.c_str(),
@@ -2210,8 +2234,9 @@ private:
                         else
                         {
                             syslog( LOG_ERR,
-                                "[%i] %s %s %s - %s %s...",
+                                "[%i] %s %s: %s %s - %s %s...",
                                 g_pid, "STC Error:",
+                                "createSTCConfigGroupMatchingElements()",
                                 "*** DUPLICATE Element Units Value for",
                                 units_patt_str.c_str(),
                                 "Ignoring",
@@ -2225,11 +2250,11 @@ private:
         }
 
         /// Search STC Config for Associated Groups & Create...
-        void createSTCConfigGroups()
+        void createSTCConfigGroups(void)
         {
-            // REMOVE ME...
-            //syslog( LOG_INFO, "[%i] Checking %s for %s",
-                //g_pid, this->m_device_pv_str.c_str(),
+            //syslog( LOG_INFO, "[%i] %s: Checking %s for %s",
+                //g_pid, "createSTCConfigGroups()",
+                //this->m_device_pv_str.c_str(),
                 //"Config Group Membership..." );
             //usleep(30000); // give syslog a chance...
 
@@ -2242,8 +2267,9 @@ private:
             if ( !(m_nxgen.initialize( true,
                     "NxPVInfo::createSTCConfigGroups()" )) )
             {
-                syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
+                syslog( LOG_ERR, "[%i] %s %s: %s: %s - %s (%s %s)",
                     g_pid, "STC Error:",
+                    "createSTCConfigGroups()",
                     "NxPVInfo::createSTCConfigGroups()",
                     "Failed to Force Initialize NeXus File",
                     "Losing STC Config Meta-Data!!",
@@ -2282,10 +2308,10 @@ private:
                     {
                         std::string &P = C->patterns[p];
 
-                        // REMOVE ME...
                         //syslog( LOG_INFO,
-                            //"[%i] %s \"%s\" Pattern Match (%s)",
-                            //g_pid, "Checking for Conditional",
+                            //"[%i] %s: %s \"%s\" Pattern Match (%s)",
+                            //g_pid, "createSTCConfigGroups()",
+                            //"Checking for Conditional",
                             //C->name.c_str(), P.c_str() );
                         // give syslog a chance...
                         //usleep(30000);
@@ -2298,16 +2324,19 @@ private:
                             || boost::regex_search(
                                 this->m_internal_connection, subs, expr ) )
                         {
-                            // REMOVE ME...
-                            syslog( LOG_INFO,
-                            "[%i] %s %s in %s \"%s\" %s \"%s\" %s \"%s\"",
-                                g_pid, "Pattern Match for",
-                                this->m_device_pv_str.c_str(),
-                                "Group", G->name.c_str(),
-                                "Conditional", C->name.c_str(),
-                                "Pattern", P.c_str());
-                            // give syslog a chance...
-                            usleep(30000);
+                            if ( m_nxgen.verbose() )
+                            {
+                                syslog( LOG_INFO,
+                         "[%i] %s: %s %s in %s \"%s\" %s \"%s\" %s \"%s\"",
+                                    g_pid, "createSTCConfigGroups()",
+                                    "Pattern Match for",
+                                    this->m_device_pv_str.c_str(),
+                                    "Group", G->name.c_str(),
+                                    "Conditional", C->name.c_str(),
+                                    "Pattern", P.c_str());
+                                // give syslog a chance...
+                                usleep(30000);
+                            }
 
                             // Check PV Value Against Condition Values...
                             if ( matchValues( this->m_last_value,
@@ -2328,8 +2357,9 @@ private:
                                 info += "\"" + C->name + "\"";
                                 info += " Set to True for";
                                 syslog( LOG_INFO,
-                                    "[%i] %s %s in %s \"%s\" %s \"%s\"",
-                                    g_pid, info.c_str(),
+                                   "[%i] %s: %s %s in %s \"%s\" %s \"%s\"",
+                                    g_pid, "createSTCConfigGroups()",
+                                    info.c_str(),
                                     this->m_device_pv_str.c_str(),
                                     "Group", G->name.c_str(),
                                     "Conditional Pattern", P.c_str());
@@ -2361,11 +2391,11 @@ private:
             // in StreamParser::finalizeStreamProcessing(), then
             // Now's a Chance to Finally Create a NeXus Data File...! ;-D
             if ( !(m_nxgen.initialize( true,
-                    "NxPVInfo::createSTCConfigConditionalGroups()" )) )
+                    "createSTCConfigConditionalGroups()" )) )
             {
                 syslog( LOG_ERR, "[%i] %s %s: %s - %s (%s %s)",
                     g_pid, "STC Error:",
-                    "NxPVInfo::createSTCConfigConditionalGroups()",
+                    "createSTCConfigConditionalGroups()",
                     "Failed to Force Initialize NeXus File",
                     "Losing STC Conditional Config Groups!!",
                     this->m_device_str.c_str(),
@@ -2378,9 +2408,9 @@ private:
             {
                 // Search for Activated STC Config Conditional Groups
 
-                // REMOVE ME...
-                //syslog( LOG_INFO, "[%i] Checking %s for %s",
-                    //g_pid, this->m_device_pv_str.c_str(),
+                //syslog( LOG_INFO, "[%i] %s: Checking %s for %s",
+                    //g_pid, "createSTCConfigConditionalGroups()",
+                    //this->m_device_pv_str.c_str(),
                     //"STC Config Conditional Group Membership..." );
                 //usleep(30000); // give syslog a chance...
 
@@ -2395,10 +2425,10 @@ private:
                     if ( !(G->conditions.size()) )
                         continue;
 
-                    // REMOVE ME...
                     //syslog( LOG_INFO,
-                        //"[%i] Checking for Conditional Group %s...",
-                        //g_pid, G->name.c_str() );
+                       //"[%i] %s: Checking for Conditional Group %s...",
+                        //g_pid, "createSTCConfigConditionalGroups()",
+                        //G->name.c_str() );
                     //usleep(30000); // give syslog a chance...
 
                     for ( uint32_t c=0 ; c < G->conditions.size() ; c++ )
@@ -2418,7 +2448,7 @@ private:
             catch( TraceException &e )
             {
                 RETHROW_TRACE( e,
-                    "NxPVInfo::createSTCConfigConditionalGroups (pv: "
+                    "createSTCConfigConditionalGroups (pv: "
                     << this->m_device_id << "." << this->m_pv_id
                     << ") failed." )
             }
@@ -2497,8 +2527,7 @@ protected:
     STC::MonitorInfo*   makeMonitorInfo( uint16_t a_id,
                             uint32_t a_buf_reserve,
                             uint32_t a_idx_buf_reserve,
-                            STC::BeamMonitorConfig *a_config,
-                            bool a_known_monitor );
+                            STC::BeamMonitorConfig &a_config );
     void                initializeNxMonitor( NxMonitorInfo *a_mi );
     void                processBeamlineInfo(
                             const STC::BeamlineInfo &a_beamline_info,

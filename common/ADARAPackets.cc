@@ -973,32 +973,50 @@ BeamMonitorConfigPkt::BeamMonitorConfigPkt(const uint8_t *data,
 		uint32_t len) :
 	Packet(data, len), m_fields((const uint32_t *)payload())
 {
-	size_t sectionSize = sizeof(double) + (4 * sizeof(uint32_t));
+	// Size of Beam Monitor Config Section, Including:
+	// U32( ID, TOF Offset, Max TOF, Histo Bin Size ) + Double( Distance )
+	m_sectionSize = ( 4 * sizeof(uint32_t) ) + sizeof(double);
 
-	if ( m_version == 0x00 && m_payload_len !=
-			( sizeof(uint32_t) + ( beamMonCount() * sectionSize ) ) ) {
+	// Expected Payload Size
+	uint32_t expected_payload_len = sizeof(uint32_t); // Beam Monitor Count
+	expected_payload_len += beamMonCount() * m_sectionSize; // Config Sects
+	if ( m_version >= 0x01 ) {
+		// Disembodied Beam Monitor Formats Appended at End of Packet ;-b
+		expected_payload_len += beamMonCount() * sizeof(uint32_t);
+	}
+
+	if ( m_version == 0x00 && m_payload_len != expected_payload_len ) {
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
 		ss << " BeamMonitorConfig V0 packet is incorrect length: "
-			<< m_payload_len;
+			<< m_payload_len << " != " << expected_payload_len;
+		throw invalid_packet(ss.str());
+	}
+	else if ( m_version == 0x01
+			&& m_payload_len != expected_payload_len ) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " BeamMonitorConfig V1 packet is incorrect length: "
+			<< m_payload_len << " != " << expected_payload_len;
 		throw invalid_packet(ss.str());
 	}
 	else if ( m_version > ADARA::PacketType::BEAM_MONITOR_CONFIG_VERSION
-			&& m_payload_len <
-				( sizeof(uint32_t) + ( beamMonCount() * sectionSize ) ) ) {
+			&& m_payload_len < expected_payload_len ) {
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
 		ss << " Newer BeamMonitorConfig packet is too short: "
-			<< m_payload_len;
+			<< m_payload_len << " < " << expected_payload_len;
 		throw invalid_packet(ss.str());
 	}
 }
 
 BeamMonitorConfigPkt::BeamMonitorConfigPkt(
 		const BeamMonitorConfigPkt &pkt ) :
-	Packet(pkt), m_fields((const uint32_t *)payload())
+	Packet(pkt), m_fields((const uint32_t *)payload()),
+		m_sectionSize(pkt.m_sectionSize)
 {}
 
 /* -------------------------------------------------------------------- */

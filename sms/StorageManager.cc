@@ -885,7 +885,7 @@ uint32_t StorageManager::readRunFile(const char *name, bool notify)
 
 	if (len < 1 || len == sizeof(buffer)) {
 		if (notify)
-			ERROR("Run storage has invalid size " << len);
+			ERROR("Run number storage has invalid size " << len);
 		return 0;
 	}
 
@@ -898,7 +898,7 @@ uint32_t StorageManager::readRunFile(const char *name, bool notify)
 		*p = 0;
 	if (*p || errno || run <= 0 || run >= (1L << 32)) {
 		if (notify) {
-			ERROR("Run storage has invalid data '"
+			ERROR("Run number storage has invalid data '"
 				<< buffer << "'");
 		}
 		return 0;
@@ -969,7 +969,7 @@ bool StorageManager::updateNextRun(uint32_t run)
 	 */
 	if (renameat(m_base_fd, m_run_tempname, m_base_fd, m_run_filename)) {
 		int e = errno;
-		ERROR("Renaming run storage failed: " << strerror(e));
+		ERROR("Renaming run number storage failed: " << strerror(e));
 		unlinkat(m_base_fd, m_run_tempname, 0);
 		return true;
 	}
@@ -979,7 +979,7 @@ bool StorageManager::updateNextRun(uint32_t run)
 	 */
 	if (fsync(m_base_fd)) {
 		int e = errno;
-		ERROR("fsync on base dir for run storage failed: "
+		ERROR("fsync on base dir for run number storage failed: "
 			<< strerror(e));
 		return true;
 	}
@@ -998,7 +998,7 @@ bool StorageManager::cleanupRunFiles(void)
 
 	/* We should always have a valid next run file */
 	if (!nextrun) {
-		ERROR("Missing next run information");
+		ERROR("Missing next run number information");
 		return true;
 	}
 
@@ -1014,7 +1014,7 @@ bool StorageManager::cleanupRunFiles(void)
 
 		if (unlinkat(m_base_fd, m_run_tempname, 0) && errno != ENOENT) {
 			int e = errno;
-			ERROR("Unable to clean up temp run storage: "
+			ERROR("Unable to clean up temp run number storage: "
 				<< strerror(e));
 			return true;
 		}
@@ -1029,7 +1029,7 @@ bool StorageManager::cleanupRunFiles(void)
 	 */
 	if (renameat(m_base_fd, m_run_tempname, m_base_fd, m_run_filename)) {
 		int e = errno;
-		ERROR("Renaming run storage failed: " << strerror(e));
+		ERROR("Renaming run number storage failed: " << strerror(e));
 		return true;
 	}
 
@@ -1038,7 +1038,7 @@ bool StorageManager::cleanupRunFiles(void)
 	 */
 	if (fsync(m_base_fd)) {
 		int e = errno;
-		ERROR("fsync on base dir for run storage failed: "
+		ERROR("fsync on base dir for run number storage failed: "
 			<< strerror(e));
 		return true;
 	}
@@ -2485,7 +2485,9 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 		if ( propId.empty() )
 			propId = "UNKNOWN";
 
-		// Send ComBus Message if Purged and Run Number Known...
+		// *Don't* Send ComBus Message if Purged and Run Number Known...
+		// (This Just Confuses the Web Monitor's "Last Run" Meta-Data...)
+		/*
 		if ( purged > 0 && numParsed == 4 ) {
 			std::string purgeMsg;
 			if ( path_deleted )
@@ -2498,6 +2500,7 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 			clock_gettime(CLOCK_REALTIME, &now);
 			m_combus->sendOriginal(run, propId, purgeMsg, now);
 		}
+		*/
 
 		// If Container Deleted, Remove from Daily Cache Map...!
 		if ( path_deleted ) {

@@ -315,6 +315,14 @@ option_default[$num_options]="21"
 option_label[$num_options]="[Number of Chopper TOF Bits]"
 num_options=$(( num_options + 1 ))
 
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="always_send_bmon_config"
+option_pv[$num_options]="SMS:Control:AlwaysSendBMConfig"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Always Send Beam Monitor Config Packets]"
+num_options=$(( num_options + 1 ))
+
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="id"
 option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Id"
@@ -1341,7 +1349,9 @@ if [[ "$command" == "status" \
 			|| "$command" == "run_status" \
 			|| "$command" == "sys_status" ]]; then
 
-		caget -S $WAIT ${PRE}:SMS:Version | sed "s/ (/\n   (/"
+		caget -a -S $WAIT ${PRE}:SMS:Version \
+			| sed -e "s/ 2/   2/" -e "s/SMSD/ SMSD/" -e "s/ (/\n   (/" \
+				-e "s/[[:space:]]*$//"
 
 		echo
 
@@ -1374,31 +1384,40 @@ if [[ "$command" == "status" \
 			|| "$command" == "run_status"
 			|| "$command" == "sample_status" ]]; then
 
-		caget $WAIT ${PRE}:SMS:RunInfo:SendSampleInRunInfo
+		ssiri="${PRE}:SMS:RunInfo:SendSampleInRunInfo"
+		sendSampleInRunInfoOut=`caget $WAIT $ssiri`
+		echo "$sendSampleInRunInfoOut"
 
-		echo
+		sendSampleInRunInfo=`echo "$sendSampleInRunInfoOut" \
+			| grep $ssiri | awk '{print $2}'`
 
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Id
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Name
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Nature
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Formula
-		caget $WAIT ${PRE}:SMS:RunInfo:Sample:Mass
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassUnits
-		caget $WAIT ${PRE}:SMS:RunInfo:Sample:Density
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityUnits
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerId
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerName
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Component
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanIndicator
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanBarcode
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanName
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanMaterials
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Description
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Comments
+		# Omit Sample Meta-Data for Run Status If Not Actually Using... :-D
+		if [[ "$command" != "run_status"
+				|| "$sendSampleInRunInfo" != "false" ]]; then
 
-		echo
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Id
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Name
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Nature
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Formula
+			caget $WAIT ${PRE}:SMS:RunInfo:Sample:Mass
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassString
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassUnits
+			caget $WAIT ${PRE}:SMS:RunInfo:Sample:Density
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityString
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityUnits
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerId
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerName
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Component
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanIndicator
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanBarcode
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanName
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanMaterials
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Description
+			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Comments
+
+			echo
+
+		fi
 
 	fi
 
@@ -1613,6 +1632,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:Control:IgnoreInterleavedGlobalSAWTOOTH
 		caget $WAIT ${PRE}:SMS:Control:BeamMonitorTOFBits
 		caget $WAIT ${PRE}:SMS:Control:ChopperTOFBits
+		caget $WAIT ${PRE}:SMS:Control:AlwaysSendBMConfig
 
 		echo
 

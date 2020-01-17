@@ -11,7 +11,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STC_VERSION "1.12.1"
+#define STC_VERSION "1.12.2"
 extern pid_t g_pid;
 
 #define STC_DOUBLE_EPSILON (0.00000000000001)
@@ -26,11 +26,12 @@ namespace STC {
 /// Contains neutron pulse data
 struct PulseInfo
 {
-    PulseInfo() : start_time(0), last_time(0)
+    PulseInfo() : start_time(0), last_time(0), max_time(0)
     {}
 
     uint64_t                start_time;         ///< Time in nanoseconds of first pulse
     uint64_t                last_time;          ///< Time in nanoseconds of last received pulse
+    uint64_t                max_time;           ///< Time in nanoseconds of maximum received pulse
     std::vector<double>     times;              ///< Pulse time buffer (seconds)
     std::vector<double>     freqs;              ///< Pulse frequency buffer (Hz)
     std::vector<double>     charges;            ///< Pulse charge buffer
@@ -85,7 +86,7 @@ public:
     virtual ~BankInfo()
     {}
 
-    void initializeBank( bool a_end_of_run )
+    void initializeBank( bool a_end_of_run, bool a_verbose )
     {
         // Already Initialized...
         if ( m_initialized )
@@ -99,7 +100,7 @@ public:
                 continue;
 
             // Histo-based Detector Bank
-            if ( (*dbs)->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+            if ( (*dbs)->flags & ADARA::HISTO_FORMAT )
             {
                 // Only Room for *One* Histogram per Detector Bank
                 // (for now)
@@ -151,7 +152,7 @@ public:
                         // Divide the TOF Range "Evenly"...
                         m_tof_bin_size = (*dbs)->tofMax / 2;
 
-                        syslog( LOG_ERR,
+                        syslog( LOG_INFO,
                             "[%i] %s %u %s %u %s: %s %s to %u, %s to %u",
                             g_pid, "Detector Bank", m_id,
                             "State", m_state,
@@ -194,16 +195,41 @@ public:
                         m_tof_bin_size = (*dbs)->tofBin;
                     }
 
-                    // syslog( LOG_ERR,
-                        // "[%i] %s %u %s %u %s: %s=%u %s=%u %s=%u (%u)",
-                        // g_pid, "Detector Bank", m_id,
-                        // "State", m_state,
-                        // "Histogram",
-                        // "num_tof_bins", m_num_tof_bins,
-                        // "tof_bin_size", m_tof_bin_size,
-                        // "num_pids", num_pids,
-                        // num_pids * ( m_num_tof_bins - 1 ) );
-                    // usleep(30000); // give syslog a chance...
+                    // Calculate Per-PixelId Offset Index
+                    //    into Histogram Data Buffer...
+                    // (saves time, and we sorta _Have_ to do this
+                    //    to account for non-contiguous PixelId spaces!)
+
+                    // Determine Min & Max PixelIds for This Bank...
+                    uint32_t minPid, maxPid;
+                    minPid = maxPid = m_logical_pixelids[0];
+                    for (uint32_t p=1 ; p < num_pids ; p++)
+                    {
+                        if ( m_logical_pixelids[p] < minPid )
+                            minPid = m_logical_pixelids[p];
+                        if ( m_logical_pixelids[p] > maxPid )
+                            maxPid = m_logical_pixelids[p];
+                    }
+
+                    // Save Minimum PixelId as Offset into Offset Index!
+                    m_base_pid = minPid;
+
+                    // Determine Required Offset Index Size...
+                    size_t offset_size = maxPid - minPid + 1;
+
+                    std::stringstream ss;
+                    ss << "Detector Bank " << m_id
+                        << " State " << m_state
+                        << " Histogram: "
+                        << m_num_tof_bins << " Time Bin Values, "
+                        << (*dbs)->tofOffset << " to " << (*dbs)->tofMax
+                        << " by " << m_tof_bin_size << ","
+                        << " minPid=" << minPid << " maxPid=" << maxPid
+                        << " offset_size=" << offset_size << " ("
+                        << ( num_pids * ( m_num_tof_bins - 1 ) ) << ")";
+
+                    syslog( LOG_INFO, "[%i] %s", g_pid, ss.str().c_str() );
+                    usleep(30000); // give syslog a chance...
 
                     // Actual Histogram Storage, Non-Inclusive Max TOF Bin
                     m_data_buffer.reserve( num_pids
@@ -211,16 +237,6 @@ public:
 
                     // TOF Bin Values...
                     m_tofbin_buffer.reserve(m_num_tof_bins);
-
-                    syslog( LOG_INFO,
-                        "[%i] %s %u %s %u %s: %u %s, %u to %u by %u",
-                        g_pid, "Detector Bank", m_id,
-                        "State", m_state, "Histogram",
-                        m_num_tof_bins,
-                        "Time Bin Values",
-                        (*dbs)->tofOffset,
-                        (*dbs)->tofMax, m_tof_bin_size );
-                    usleep(30000); // give syslog a chance...
 
                     uint32_t tofbin = (*dbs)->tofOffset;
                     for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
@@ -251,48 +267,11 @@ public:
                         usleep(30000); // give syslog a chance...
                     }
 
-                    // Calculate Per-PixelId Offset Index
-                    //    into Histogram Data Buffer...
-                    // (saves time, and we sorta _Have_ to do this
-                    //    to account for non-contiguous PixelId spaces!)
-
-                    // Determine Min & Max PixelIds for This Bank...
-                    uint32_t minPid, maxPid;
-                    minPid = maxPid = m_logical_pixelids[0];
-                    for (uint32_t p=1 ; p < num_pids ; p++)
-                    {
-                        if ( m_logical_pixelids[p] < minPid )
-                            minPid = m_logical_pixelids[p];
-                        if ( m_logical_pixelids[p] > maxPid )
-                            maxPid = m_logical_pixelids[p];
-                    }
-
-                    // Save Minimum PixelId as Offset into Offset Index!
-                    m_base_pid = minPid;
-
-                    // Determine Required Offset Index Size...
-                    size_t offset_size = maxPid - minPid + 1;
-
-                    syslog( LOG_ERR,
-                        "[%i] %s %u %s %u %s: %s=%u %s=%u %s=%lu (%u)",
-                        g_pid, "Detector Bank", m_id,
-                        "State", m_state, "Histogram",
-                        "minPid", minPid, "maxPid", maxPid,
-                        "offset_size", offset_size,
-                        num_pids * ( m_num_tof_bins - 1 ) );
-                    usleep(30000); // give syslog a chance...
-
                     // Reserve Required Index Size & Initialize Vector...
                     // (I hope there aren't huge gaps in the PixelIds...!)
                     m_histo_pid_offset.reserve( offset_size );
                     for (size_t i=0 ; i < offset_size ; i++)
                         m_histo_pid_offset.push_back( -1 );
-
-                    // syslog( LOG_ERR,
-                        // "[%i] %s %u %s %u %s: Filling in Offsets...",
-                        // g_pid, "Detector Bank", m_id,
-                        // "State", m_state, "Histogram" );
-                    // usleep(30000); // give syslog a chance...
 
                     // Fill In Offsets per PixelId...
                     size_t offset = 0;
@@ -308,7 +287,7 @@ public:
                             m_histo_pid_offset[ index ] = 
                                 offset++ * ( m_num_tof_bins - 1 );
 
-                            // syslog( LOG_ERR,
+                            // syslog( LOG_INFO,
                             // "[%i] %s %u %s %u %s: p=%u offset[%lu]=%d",
                                 // g_pid, "Detector Bank", m_id,
                                 // "State", m_state, "Histogram",
@@ -320,7 +299,7 @@ public:
                         // Duplicate PixelId!  (shouldn't happen...)
                         else
                         {
-                            syslog( LOG_INFO,
+                            syslog( LOG_ERR,
                              "[%i] %s: %s %u %s %u has %s %lu - Ignoring!",
                                 g_pid, "STC Error", "Detector Bank", m_id,
                                 "State", m_state,
@@ -333,11 +312,14 @@ public:
                         }
                     }
 
-                    syslog( LOG_ERR,
-                        "[%i] %s %u %s %u Done with Histogram Init.",
-                        g_pid, "Detector Bank", m_id,
-                        "State", m_state );
-                    usleep(30000); // give syslog a chance...
+                    if ( a_verbose )
+                    {
+                        syslog( LOG_INFO,
+                            "[%i] %s %u %s %u Done with Histogram Init.",
+                            g_pid, "Detector Bank", m_id,
+                            "State", m_state );
+                        usleep(30000); // give syslog a chance...
+                    }
 
                     // Got One, That's All We'll Ever Need... ;-D
                     m_has_histo = true;
@@ -345,7 +327,7 @@ public:
             }
 
             // Event-based Detector Bank
-            if ( (*dbs)->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
+            if ( (*dbs)->flags & ADARA::EVENT_FORMAT )
             {
                 // Only Allocate Event Storage *Once*...
                 if ( !m_has_event )
@@ -409,6 +391,7 @@ public:
 struct BeamMonitorConfig
 {
     uint32_t                id;
+    uint32_t                format;
     uint32_t                tofOffset;
     uint32_t                tofMax;
     uint32_t                tofBin;
@@ -426,7 +409,7 @@ public:
         uint16_t a_id,               ///< [in] ID of detector bank
         uint32_t a_buf_reserve,      ///< [in] Event buffer initial capacity
         uint32_t a_idx_buf_reserve,  ///< [in] Index buffer initial capacity
-        BeamMonitorConfig *a_config  ///< [in] Beam Mon Histo Config (opt)
+        BeamMonitorConfig &a_config  ///< [in] Beam Mon Histo Config
     )
     :
         m_id(a_id),
@@ -437,16 +420,16 @@ public:
         m_config(a_config)
     {
         // Histo-based Monitor
-        if ( m_config != NULL )
+        if ( m_config.format == ADARA::HISTO_FORMAT )
         {
             // Number of Time Bin Values Needed...
-            m_num_tof_bins = ( ( m_config->tofMax - m_config->tofOffset )
-                / m_config->tofBin ) + 1;
+            m_num_tof_bins = ( ( m_config.tofMax - m_config.tofOffset )
+                / m_config.tofBin ) + 1;
 
             // If Max TOF doesn't divide evenly into TOF Bin size,
             // then need "One Extra" Bin Value...
-            if ( ( m_config->tofMax - m_config->tofOffset )
-                    % m_config->tofBin )
+            if ( ( m_config.tofMax - m_config.tofOffset )
+                    % m_config.tofBin )
             {
                 m_num_tof_bins++;
             }
@@ -471,20 +454,20 @@ public:
             syslog( LOG_INFO,
                 "[%i] Beam Monitor %u Histogram: %u %s, %u to %u by %u",
                 g_pid, m_id, m_num_tof_bins, "Time Bin Values",
-                m_config->tofOffset, m_config->tofMax, m_config->tofBin );
+                m_config.tofOffset, m_config.tofMax, m_config.tofBin );
             usleep(30000); // give syslog a chance...
 
-            uint32_t tofbin = m_config->tofOffset;
+            uint32_t tofbin = m_config.tofOffset;
             for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
             {
                 m_data_buffer.push_back(0);
 
                 m_tofbin_buffer.push_back((float)tofbin);
-                tofbin += m_config->tofBin;
+                tofbin += m_config.tofBin;
             }
 
             // Max TOF Bin Value...
-            m_tofbin_buffer.push_back((float)(m_config->tofMax));
+            m_tofbin_buffer.push_back((float)(m_config.tofMax));
         }
 
         // Event-based Monitor
@@ -511,7 +494,7 @@ public:
     std::vector<uint32_t>   m_data_buffer;          ///< Histo data buffer
     std::vector<float>      m_tofbin_buffer;        ///< Histo TOF Bin buffer
 
-    BeamMonitorConfig      *m_config;               ///< Any (Histogram) config info for this monitor
+    BeamMonitorConfig       m_config;               ///< Beam Monitor Config
 };
 
 
@@ -1162,10 +1145,8 @@ public:
                 this->m_value_buffer.begin()
                     + last_pre_pulse_index );
 
-            this->m_abs_time_buffer.erase(
-                this->m_abs_time_buffer.begin(),
-                this->m_abs_time_buffer.begin()
-                    + last_pre_pulse_index );
+            // Don't Bother Erasing Entries from Absolute Time Buffer,
+            // We're Done With It Now, And About to Free the Whole Thing...
 
             this->m_time_buffer.erase(
                 this->m_time_buffer.begin(),
@@ -1181,6 +1162,7 @@ public:
         }
 
         // Done Normalizing This PV's Value Updates.
+        this->m_abs_time_buffer.clear();
         this->m_has_non_normalized = false;
     }
 
@@ -1357,8 +1339,7 @@ public:
     virtual MonitorInfo*    makeMonitorInfo( uint16_t a_id,
                                 uint32_t a_buf_reserve,
                                 uint32_t a_idx_buf_reserve,
-                                STC::BeamMonitorConfig *a_config,
-                                bool a_known_monitor ) = 0;
+                                STC::BeamMonitorConfig &a_config ) = 0;
     virtual void            updateRunInfo(
                                 const RunInfo &a_run_info ) = 0;
     virtual void            processBeamlineInfo(

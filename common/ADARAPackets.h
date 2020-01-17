@@ -520,6 +520,11 @@ private:
 	friend class Parser;
 };
 
+enum DataFormat {
+	EVENT_FORMAT    = 0x0001,
+	HISTO_FORMAT    = 0x0002,
+};
+
 class BeamMonitorConfigPkt : public Packet {
 public:
 	BeamMonitorConfigPkt(const BeamMonitorConfigPkt &pkt);
@@ -528,46 +533,103 @@ public:
 
 	uint32_t bmonId(uint32_t index) const
 	{
-		if ( index < beamMonCount() )
-			return m_fields[(index * 6) + 1];
+		if ( index < beamMonCount() ) {
+			const uint32_t *section =
+				(const uint32_t *) ( ((const char *) m_fields)
+					+ sizeof(uint32_t) + ( index * m_sectionSize ) );
+			return( section[0] );
+		}
 		else
 			return( 0 );
 	}
 
 	uint32_t tofOffset(uint32_t index) const
 	{
-		if ( index < beamMonCount() )
-			return m_fields[(index * 6) + 2];
+		if ( index < beamMonCount() ) {
+			const uint32_t *section =
+				(const uint32_t *) ( ((const char *) m_fields)
+					+ sizeof(uint32_t) + ( index * m_sectionSize ) );
+			return( section[1] );
+		}
 		else
 			return( 0 );
 	}
 
 	uint32_t tofMax(uint32_t index) const
 	{
-		if ( index < beamMonCount() )
-			return m_fields[(index * 6) + 3];
+		if ( index < beamMonCount() ) {
+			const uint32_t *section =
+				(const uint32_t *) ( ((const char *) m_fields)
+					+ sizeof(uint32_t) + ( index * m_sectionSize ) );
+			return( section[2] );
+		}
 		else
 			return( 0 );
 	}
 
 	uint32_t tofBin(uint32_t index) const
 	{
-		if ( index < beamMonCount() )
-			return m_fields[(index * 6) + 4];
+		if ( index < beamMonCount() ) {
+			const uint32_t *section =
+				(const uint32_t *) ( ((const char *) m_fields)
+					+ sizeof(uint32_t) + ( index * m_sectionSize ) );
+			return( section[3] );
+		}
 		else
 			return( 0 );
 	}
 
 	double distance(uint32_t index) const
 	{
-		if ( index < beamMonCount() )
-			return *(const double *) &m_fields[(index * 6) + 5];
+		if ( index < beamMonCount() ) {
+			const uint32_t *section =
+				(const uint32_t *) ( ((const char *) m_fields)
+					+ sizeof(uint32_t) + ( index * m_sectionSize ) );
+			return( *( (const double *) &(section[4]) ) );
+		}
 		else
 			return( 0.0 );
 	}
 
+	// Duh... All the Format Specifications Squirreled Away at the End...
+	// - For Backwards-Compatible Wire Protocol... <sigh/> ;-)
+	// ...It's Ok, Mantid Requires Them to All Be the Same Anyway...! ;-D
+	uint32_t format(uint32_t index) const
+	{
+		if ( m_version >= 0x01 ) {
+			if ( index < beamMonCount() ) {
+				// Trailing "Format Appendix" Section... ;-b
+				const uint32_t *format_section =
+					(const uint32_t *) ( ((const char *) m_fields)
+						+ sizeof(uint32_t)
+						+ ( beamMonCount() * m_sectionSize ) );
+				return( format_section[ index ] );
+			}
+			else
+				return( HISTO_FORMAT );
+		}
+		// With Older Packet Protocol Versions (0x00), We _Only_ Sent the
+		// BeamMonitorConfigPkt When We Were Histogramming the Beam Monitor.
+		// The Default Case was Event Formatting, Where No Packet was Sent.
+		else
+			return( HISTO_FORMAT );
+	}
+
+	void countFormats(uint32_t &numEvent, uint32_t &numHisto) const
+	{
+		numEvent = 0;
+		numHisto = 0;
+		for (uint32_t i=0 ; i < beamMonCount() ; i++) {
+			if ( format(i) == EVENT_FORMAT )
+				numEvent++;
+			else if ( format(i) == HISTO_FORMAT )
+				numHisto++;
+		}
+	}
+
 private:
 	const uint32_t *m_fields;
+	size_t m_sectionSize;
 
 	BeamMonitorConfigPkt(const uint8_t *data, uint32_t len);
 
@@ -585,11 +647,6 @@ public:
 
 	// Throttle Suffix, alphanumeric, no spaces/punctuation...
 	static const size_t THROTTLE_SUFFIX_SIZE = 16;
-
-	enum Flags {
-		EVENT_FORMAT    = 0x0001,
-		HISTO_FORMAT    = 0x0002,
-	};
 
 	uint32_t detBankSetCount(void) const { return m_fields[0]; }
 

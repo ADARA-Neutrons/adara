@@ -51,6 +51,7 @@ Less="/usr/bin/less"
 AWK="/usr/bin/awk"
 SSH="/usr/bin/ssh"
 NC="/usr/bin/nc"
+RM="/usr/bin/rm"
 WC="/usr/bin/wc"
 GREP="/bin/grep"
 SED="/bin/sed"
@@ -179,7 +180,7 @@ for arg in "$@" ; do
 		echo -e "\nSetting ADARA Munge Path to:\n\t[${ADARA_MUNGE}]"
 	elif [[ "#$key#" == '#--sms_config#' ]]; then
 		SMS_CONFIG="${value%/}"
-		echo -e "\nSetting SMS Config Directory to:\n\t[${SMS_CONF}]"
+		echo -e "\nSetting SMS Config Directory to:\n\t[${SMS_CONFIG}]"
 	elif [[ "#$key#" == '#--sms_data#' ]]; then
 		SMS_DATA="${value%/}"
 		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
@@ -583,6 +584,37 @@ RESUBMIT_RUN()
 			echo -e -n "\nERROR Checking FindNeXus to Verify "
 			echo "that Run ${RUN_NUMBER} Completed...!"
 			echo -e "\n\t${FINDNEXUS} -i ${INST} ${RUN_NUMBER}"
+		fi
+
+	fi
+
+	#
+	# Check for "Manual Processing Needed" Marker File...
+	#
+
+	if [[ -f "${rundir}/manual_processing_needed" ]]; then
+
+		# Prompt User to Delete "Manual Processing Needed" Marker File...
+		local _ckdelman
+		CHECK_PROCEED \
+			"Delete the Old \'manual_processing_needed\' Marker File"
+		_ckdelman=$?
+
+		if [[ ${_ckdelman} == 0 ]]; then
+
+			${RM} "${rundir}/manual_processing_needed"
+			ckrm=$?
+
+			if [[ ${ckrm} != 0 ]]; then
+				echo -e -n "\nERROR Deleting \'manual_processing_needed\' "
+				echo "Marker File for Run ${RUN_NUMBER}...!"
+				echo -e "\n\t${RM} \"${rundir}/manual_processing_needed\""
+				echo -e \
+					"\n\t${LS} -l \"${rundir}/manual_processing_needed\"\n"
+				${LS} -l "${rundir}/manual_processing_needed"
+				echo
+			fi
+
 		fi
 
 	fi

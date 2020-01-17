@@ -1220,7 +1220,7 @@ UPDATE_PROPOSAL_METADATA()
 	fi
 
 	local _ipts_old_line=`echo "${ipts_old_line_wnum}" \
-		| ${AWK} -F ":" '{print $2}'`
+		| ${SED} "s/${_ipts_old_line_num}://"`
 	local _ckawkoldline=$?
 
 	if [[ ${_ckawkoldline} != 0 ]]; then
@@ -1639,7 +1639,7 @@ ABSORB_WHITE_SPACE()
 				fi
 
 				local _line=`echo "${_line_wnum}" \
-					| ${AWK} -F ":" '{print $2}'`
+					| ${SED} "s/${_line_num}://"`
 				local _ckawkline=$?
 
 				if [[ ${_ckawkline} != 0 ]]; then
@@ -2252,7 +2252,7 @@ for run in ${RUN_NUMBERS} ; do
 						fi
 
 						culine=`echo "${closing_users_line_wnum}" \
-							| ${AWK} -F ":" '{print $2}'`
+							| ${SED} "s/${culine_num}://"`
 						ckawkculine=$?
 
 						if [[ ${ckawkculine} != 0 ]]; then

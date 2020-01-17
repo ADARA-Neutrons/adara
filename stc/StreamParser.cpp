@@ -122,7 +122,7 @@ StreamParser::~StreamParser()
             delete *dbs;
     }
 
-    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin();
+    for ( map<Identifier, MonitorInfo*>::iterator imi = m_monitors.begin();
             imi != m_monitors.end(); ++imi ) {
         if ( imi->second )
             delete imi->second;
@@ -324,15 +324,15 @@ StreamParser::processStream()
                         // On fatal error, flush buffers to Nexus
                         // before terminating
                         markerComment(
-                            ( m_pulse_info.last_time
+                            ( m_pulse_info.max_time
                                     - m_pulse_info.start_time )
                                 / NANO_PER_SECOND_D,
                             m_pulse_info.start_time
-                                + m_pulse_info.last_time,
+                                + m_pulse_info.max_time,
                             "Stream processing terminated abnormally." );
                         m_run_metrics.run_end_time = nsec_to_timespec(
                             m_pulse_info.start_time
-                                + m_pulse_info.last_time );
+                                + m_pulse_info.max_time );
                         finalizeStreamProcessing();
                     }
 
@@ -585,7 +585,7 @@ StreamParser::rxPacket
             // Run "end time" is defined as time of last pulse
             // (which is nanoseconds epoch offset)
             m_run_metrics.run_end_time = nsec_to_timespec(
-                m_pulse_info.start_time + m_pulse_info.last_time );
+                m_pulse_info.start_time + m_pulse_info.max_time );
 
             finalizeStreamProcessing();
             m_processing_state = DONE_PROCESSING;
@@ -1415,11 +1415,14 @@ StreamParser::processPulseInfo
             / ( pulse_time - m_pulse_info.last_time ) );
         m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
         m_pulse_info.last_time = pulse_time;
+        if ( pulse_time > m_pulse_info.max_time )
+            m_pulse_info.max_time = pulse_time;
     }
     else
     {
         m_pulse_info.start_time = timespec_to_nsec( a_pkt.timestamp() );
         m_pulse_info.last_time = 0;
+        m_pulse_info.max_time = 0;
         m_pulse_info.times.push_back(0);
         m_pulse_info.freqs.push_back(0);
         // Freq stats ignores first point since it can't be calculated
@@ -1489,11 +1492,14 @@ StreamParser::processPulseInfo
             / ( pulse_time - m_pulse_info.last_time ) );
         m_run_metrics.freq_stats.push( m_pulse_info.freqs.back() );
         m_pulse_info.last_time = pulse_time;
+        if ( pulse_time > m_pulse_info.max_time )
+            m_pulse_info.max_time = pulse_time;
     }
     else
     {
         m_pulse_info.start_time = timespec_to_nsec( a_pkt.timestamp() );
         m_pulse_info.last_time = 0;
+        m_pulse_info.max_time = 0;
         m_pulse_info.times.push_back(0);
         m_pulse_info.freqs.push_back(0);
         // Freq stats ignores first point since it can't be calculated
@@ -1603,7 +1609,7 @@ StreamParser::processBankEvents
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
-            bi->initializeBank( false );
+            bi->initializeBank( false, m_verbose );
 
         // Event-based Data Processing
         if ( bi->m_has_event )
@@ -1703,8 +1709,7 @@ StreamParser::processBankEvents
                     continue;
 
                 // Histo-based Detector Bank
-                if ( (*dbs)->flags
-                        & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+                if ( (*dbs)->flags & ADARA::HISTO_FORMAT )
                 {
                     uint32_t tofbin;
                     uint32_t index;
@@ -1855,7 +1860,7 @@ StreamParser::handleBankPulseGap
 {
     // Make Sure Data has been (Late) Initialized...
     if ( !(a_bi.m_initialized) )
-        a_bi.initializeBank( false );
+        a_bi.initializeBank( false, m_verbose );
 
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
@@ -2015,24 +2020,35 @@ StreamParser::processMonitorEvents
     const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
 )
 {
-    map<Identifier,MonitorInfo*>::iterator imi =
+    map<Identifier, MonitorInfo*>::iterator imi =
         m_monitors.find( a_monitor_id );
     if ( imi == m_monitors.end() )
     {
-        bool known_monitor = true;
-        STC::BeamMonitorConfig *config =
-            getBeamMonitorConfig(a_monitor_id, known_monitor);
+        STC::BeamMonitorConfig config;
+        getBeamMonitorConfig( a_monitor_id, config );
+        std::stringstream ss_new;
+        ss_new << "["
+            << "format=" << config.format << " ("
+            << ( ( config.format & ADARA::EVENT_FORMAT ) ?
+                "Event" : "Histo" ) << ")"
+            << " tofOffset=" << config.tofOffset
+            << " tofMax=" << config.tofMax
+            << " tofBin=" << config.tofBin
+            << " distance=" << config.distance
+            << "]";
+        syslog( LOG_INFO, "[%i] %s: Adding New Beam Monitor %u: %s",
+            g_pid, "StreamParser::processMonitorEvents()",
+            a_monitor_id, ss_new.str().c_str() );
         MonitorInfo *mi = makeMonitorInfo( a_monitor_id,
-            m_event_buf_write_thresh, m_anc_buf_write_thresh,
-            config, known_monitor );
+            m_event_buf_write_thresh, m_anc_buf_write_thresh, config );
         imi = m_monitors.insert( m_monitors.begin(),
-            pair<Identifier,MonitorInfo*>(a_monitor_id,mi));
+            pair<Identifier, MonitorInfo*>( a_monitor_id, mi ) );
     }
 
     const uint32_t *epos = a_rpos + a_event_count;
 
     // Histo-based Monitors...
-    if ( imi->second->m_config != NULL )
+    if ( imi->second->m_config.format == ADARA::HISTO_FORMAT )
     {
         // Process Monitor Events (into Histogram)... :-D
 
@@ -2049,12 +2065,12 @@ StreamParser::processMonitorEvents
             // Ignore TOF Less than Minimum Offset
             //    and Greater than or Equal to Maximum TOF...
             //    (Non-Inclusive Max...! ;-D)
-            if ( tof >= imi->second->m_config->tofOffset
-                    && tof < imi->second->m_config->tofMax )
+            if ( tof >= imi->second->m_config.tofOffset
+                    && tof < imi->second->m_config.tofMax )
             {
                 // Calculate index into Histogram based on TOF...
-                tofbin = ( tof - imi->second->m_config->tofOffset )
-                    / imi->second->m_config->tofBin;
+                tofbin = ( tof - imi->second->m_config.tofOffset )
+                    / imi->second->m_config.tofBin;
 
                 // Sanity Test, Just to Be Sure... ;-b
                 // (This should never happen, but the logic is confusing.)
@@ -2183,8 +2199,10 @@ StreamParser::handleMonitorPulseGap
 )
 {
     // Event-based Monitors Only...
-    if ( a_mi.m_config != NULL )
+    if ( a_mi.m_config.format == ADARA::HISTO_FORMAT )
+    {
         return;
+    }
 
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
@@ -2735,110 +2753,218 @@ StreamParser::rxPacket
     const ADARA::BeamMonitorConfigPkt &a_pkt     ///< [in] The ADARA Beam Monitor Config Packet to process
 )
 {
+    map<Identifier, MonitorInfo*>::iterator imi;
+
+    MonitorInfo *mi;
+
     syslog( LOG_INFO,
-        "[%i] Beam Monitor Config Received: %u Histo Monitors",
-        g_pid, a_pkt.beamMonCount() );
+        "[%i] %s: Beam Monitor Config Received: %u Beam Monitors",
+        g_pid, "BeamMonitorConfigPkt", a_pkt.beamMonCount() );
     usleep(30000); // give syslog a chance...
+
+    // Count Number of Histo vs. Event Beam Monitors,
+    // So We Can Clamp to "All" One or the Other... ;-D
+    uint32_t numEvent = 0;
+    uint32_t numHisto = 0;
+    a_pkt.countFormats(numEvent, numHisto);
+
+    // If Mixed Formatting for Beam Monitors, Default to Event Format...
+    // (Because You Can Generate Histo from Events, But Not Vice Versa! ;-)
+    bool forceEvent = false;
+    if ( numEvent > 0 && numHisto > 0 ) {
+        syslog( LOG_ERR,
+            "[%i] %s %s: %s: %s %s=%u %s=%u - %s",
+            g_pid, "STC Error:", "BeamMonitorConfigPkt",
+            "Beam Monitor Config Error",
+            "Mixed Event and Histo Beam Monitor Formats",
+            "numEvent", numEvent, "numHisto", numHisto,
+            "Forcing All Beam Monitors to Event Format!" );
+        forceEvent = true;
+    }
 
     for (uint32_t i=0 ; i < a_pkt.beamMonCount() ; i++) {
 
         STC::BeamMonitorConfig config;
 
         config.id = a_pkt.bmonId(i);
+
+        if ( forceEvent )
+            config.format = ADARA::EVENT_FORMAT;
+        else
+            config.format = a_pkt.format(i);
+
         config.tofOffset = a_pkt.tofOffset(i);
         config.tofMax = a_pkt.tofMax(i);
         config.tofBin = a_pkt.tofBin(i);
+
         config.distance = a_pkt.distance(i);
 
-        syslog( LOG_INFO,
-            "[%i] Beam Monitor %u: distance=%lf histo=(%u to %u by %u).",
-            g_pid, config.id, config.distance,
-            config.tofOffset, config.tofMax, config.tofBin );
+        std::stringstream ss_new;
+        ss_new << "["
+            << "format=" << config.format << " ("
+            << ( ( config.format & ADARA::EVENT_FORMAT ) ?
+                "Event" : "Histo" )
+            << ( forceEvent ? " [FORCED!]" : "" ) << ")"
+            << " tofOffset=" << config.tofOffset
+            << " tofMax=" << config.tofMax
+            << " tofBin=" << config.tofBin
+            << " distance=" << config.distance
+            << "]";
+
+        syslog( LOG_INFO, "[%i] %s: %s %u Config: %s",
+            g_pid, "BeamMonitorConfigPkt",
+            "Beam Monitor", config.id, ss_new.str().c_str() );
         usleep(30000); // give syslog a chance...
 
         // Basic Sanity Check...
-        if ( config.tofOffset >= config.tofMax )
-        {
-            syslog( LOG_ERR,
-                "[%i] %s %s %u Config Error: Offset %u >= Max %u",
-                g_pid, "STC Error:", "Beam Monitor", config.id,
+        if ( config.tofOffset >= config.tofMax ) {
+            syslog( LOG_ERR, "[%i] %s %s: %s %u %s: Offset %u >= Max %u",
+                g_pid, "STC Error:", "BeamMonitorConfigPkt",
+                "Beam Monitor", config.id, "Histogram Config Error",
                 config.tofOffset, config.tofMax );
-            syslog( LOG_ERR,
-                "[%i] %s Reverting to Beam Monitor Event Mode!",
-                g_pid, "STC Error:" );
-            usleep(30000); // give syslog a chance...
-            m_monitor_config.clear();
-            break;
+            if ( config.format == ADARA::HISTO_FORMAT ) {
+                syslog( LOG_ERR,
+                    "[%i] %s %s: Reverting Beam Monitor %u to Event Mode!",
+                    g_pid, "STC Error:", "BeamMonitorConfigPkt",
+                    config.id );
+                usleep(30000); // give syslog a chance...
+                config.format = ADARA::EVENT_FORMAT;
+            } else {
+                syslog( LOG_WARNING,
+                    "[%i] %s: Beam Monitor %u Stays in Event Mode...",
+                    g_pid, "BeamMonitorConfigPkt", config.id );
+                usleep(30000); // give syslog a chance...
+            }
         }
 
         // Make Sure Time Bin is > 0 ! (also checked in SMS... :)
-        if ( config.tofBin < 1 )
-        {
+        if ( config.tofBin < 1 ) {
             syslog( LOG_ERR,
-                "[%i] %s %s %u Histogram Config Issue: Time Bin %u < 1",
-                g_pid, "STC Error:", "Beam Monitor", config.id,
-                config.tofBin );
+                "[%i] %s %s: %s %u %s: Time Bin %u < 1 - Setting to 1.",
+                g_pid, "STC Error:", "BeamMonitorConfigPkt",
+                "Beam Monitor", config.id,
+                "Histogram Config Error", config.tofBin );
             usleep(30000); // give syslog a chance...
             config.tofBin = 1;
         }
 
         m_monitor_config.push_back(config);
+
+        // Go Ahead & Create Beam Monitor Info for
+        // This Expected Beam Monitor's Definition...
+        imi = m_monitors.find( config.id );
+        if ( imi == m_monitors.end() ) {
+            // Add New Monitor...
+            syslog( LOG_INFO, "[%i] %s: Adding New Beam Monitor %u: %s",
+                g_pid, "BeamMonitorConfigPkt",
+                config.id, ss_new.str().c_str() );
+            usleep(30000); // give syslog a chance...
+            mi = makeMonitorInfo( config.id,
+                m_event_buf_write_thresh, m_anc_buf_write_thresh, config );
+            m_monitors.insert( m_monitors.begin(),
+                pair<Identifier, MonitorInfo*>( config.id, mi ) );
+        }
+        else {
+            // Duplicate Beam Monitor Found...?
+            // Compare Fields...
+            if ( imi->second->m_config.format != config.format
+                    || imi->second->m_config.tofOffset != config.tofOffset
+                    || imi->second->m_config.tofMax != config.tofMax
+                    || imi->second->m_config.tofBin != config.tofBin
+                    || !approximatelyEqual(
+                            imi->second->m_config.distance,
+                            config.distance, STC_DOUBLE_EPSILON ) )
+            {
+                std::stringstream ss_orig;
+                ss_orig << "["
+                    << "format=" << imi->second->m_config.format << " ("
+                    << ( ( imi->second->m_config.format
+                            & ADARA::EVENT_FORMAT ) ?
+                        "Event" : "Histo" ) << ")"
+                    << " tofOffset=" << imi->second->m_config.tofOffset
+                    << " tofMax=" << imi->second->m_config.tofMax
+                    << " tofBin=" << imi->second->m_config.tofBin
+                    << " distance=" << imi->second->m_config.distance
+                    << "]";
+                syslog( LOG_ERR,
+                    "[%i] %s %s: %s %u - %s: New=%s != Orig=%s - %s...!",
+                    g_pid, "STC Error:", "BeamMonitorConfigPkt",
+                    "Duplicate Beam Monitor", config.id,
+                    "Doesn't Match Existing Definition",
+                    ss_new.str().c_str(), ss_orig.str().c_str(),
+                    "Ignoring" );
+                usleep(30000); // give syslog a chance...
+            } else {
+                syslog( LOG_ERR, "[%i] %s %s: %s %u - %s: %s - %s...",
+                    g_pid, "STC Error:", "BeamMonitorConfigPkt",
+                    "Duplicate Beam Monitor", config.id,
+                    "Matches Existing Definition", ss_new.str().c_str(),
+                    "Ignoring" );
+                usleep(30000); // give syslog a chance...
+            }
+        }
     }
 
     return false;
 }
 
 
-/*! \brief This method looks up any Histogram Config for a Beam Monitor
+/*! \brief This method looks for Any Beam Monitor Config
  *  \return Pointer to element of the BeamMonitorConfig vector or NULL
  *
- * This method looks for a Beam Monitor Histogramming Config amongst
- * any optionally received prologue information, to define proper
+ * This method looks for a Beam Monitor Config amongst any
+ * optionally received prologue information, e.g. to define proper
  * Histogramming parameters for processing/accumulating Beam Monitor data.
  */
-STC::BeamMonitorConfig *
+void
 StreamParser::getBeamMonitorConfig
 (
-    Identifier a_monitor_id,    ///< [in] Beam Monitor Id (uint32_t)
-    bool & known_monitor        ///< [in] Flag for "Unknown" Monitors...
+    Identifier a_monitor_id,            ///< [in] Beam Monitor Id (uint32_t)
+    STC::BeamMonitorConfig &a_config    ///< [out] Beam Monitor Config
 )
 {
-    STC::BeamMonitorConfig *config = (STC::BeamMonitorConfig *) NULL;
-
-    // Innocent until Presumed Guilty...
-    // (or like, if there isn't any Beam Monitor Config info... :-)
-    known_monitor = true;
-
-    // Any Beam Monitor Histogramming Parameters...? (If not, we're done.)
-    if (m_monitor_config.size() == 0)
-        return(config); // NULL...
-
     // Look for a matching Beam Monitor Id in Any Config...
+    bool found = false;
     for ( vector<STC::BeamMonitorConfig>::iterator bmc =
                 m_monitor_config.begin();
-            bmc != m_monitor_config.end() && config == NULL ; ++bmc )
+            bmc != m_monitor_config.end() && found == false ; ++bmc )
     {
-        if (bmc->id == a_monitor_id)
-            config = &(*bmc);
+        if ( bmc->id == a_monitor_id )
+        {
+            a_config = *bmc;
+            found = true;
+        }
     }
 
-    // If we didn't find one, then there's Trouble... ;-b
-    if (config == NULL)
+    // Beam Monitor Config Not Found - Use Default Config Values...
+    if ( found == false )
     {
-        // "Trouble"...
+        a_config.id = a_monitor_id;
+        a_config.format = ADARA::EVENT_FORMAT;
+        a_config.tofOffset = 0;
+        a_config.tofMax = (uint32_t) -1;
+        a_config.tofBin = (uint32_t) -1; // "One Big Bin"... ;-D
+        a_config.distance = 0.0;
+
+        std::stringstream ss_mon;
+        ss_mon << "["
+            << "format=" << a_config.format << " ("
+            << ( ( a_config.format & ADARA::EVENT_FORMAT ) ?
+                "Event" : "Histo" ) << ")"
+            << " tofOffset=" << a_config.tofOffset
+            << " tofMax=" << a_config.tofMax
+            << " tofBin=" << a_config.tofBin
+            << " distance=" << a_config.distance
+            << "]";
         syslog( LOG_ERR,
-            "[%i] %s %s %d Missing in Histogramming Config! %s",
+            "[%i] %s %s %u %s Beam Monitor Configs[%lu]! %s %s - %s",
             g_pid, "STC Error:", "Beam Monitor", a_monitor_id,
-            "[Unknown Monitor]" );
+            "Missing from", m_monitor_config.size(),
+            "Setting Beam Monitor Config to Defaults",
+            ss_mon.str().c_str(),
+            "Please Add Missing Beam Monitor to Beamline Config!" );
         usleep(30000); // give syslog a chance...
-
-        // Now What?!
-        // - flag this Beam Monitor as "Unknown"
-        //   (still save events, just _Not_ in an official NXmonitor...)
-        known_monitor = false;
     }
-
-    return(config);
 }
 
 
@@ -2895,12 +3021,12 @@ StreamParser::rxPacket
         set->suffix = a_pkt.suffix(i);
 
         std::string format;
-        if ( set->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT
-                && set->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+        if ( set->flags & ADARA::EVENT_FORMAT
+                && set->flags & ADARA::HISTO_FORMAT )
             format = "both";
-        else if ( set->flags & ADARA::DetectorBankSetsPkt::EVENT_FORMAT )
+        else if ( set->flags & ADARA::EVENT_FORMAT )
             format = "event";
-        else if ( set->flags & ADARA::DetectorBankSetsPkt::HISTO_FORMAT )
+        else if ( set->flags & ADARA::HISTO_FORMAT )
             format = "histo";
         else
             format = "[None/Unknown!]";  // "None"... (implies *NO DATA*!)
@@ -2925,7 +3051,7 @@ StreamParser::rxPacket
                 "[%i] %s Restricting Detector Bank Set to Event Mode!",
                 g_pid, "STC Error:" );
             usleep(30000); // give syslog a chance...
-            set->flags &= !(ADARA::DetectorBankSetsPkt::HISTO_FORMAT);
+            set->flags &= !(ADARA::HISTO_FORMAT);
         }
 
         // Make Sure Time Bin is > 0 ! (also checked in SMS... :)
@@ -3085,12 +3211,12 @@ StreamParser::rxPacket
 
             // On fatal error, flush buffers to Nexus before terminating
             markerComment(
-                ( m_pulse_info.last_time - m_pulse_info.start_time )
+                ( m_pulse_info.max_time - m_pulse_info.start_time )
                     / NANO_PER_SECOND_D,
-                m_pulse_info.start_time + m_pulse_info.last_time,
+                m_pulse_info.start_time + m_pulse_info.max_time,
                 "Stream processing terminated abnormally." );
             m_run_metrics.run_end_time = nsec_to_timespec(
-                m_pulse_info.start_time + m_pulse_info.last_time );
+                m_pulse_info.start_time + m_pulse_info.max_time );
             finalizeStreamProcessing();
         }
 
@@ -4580,6 +4706,8 @@ StreamParser::pvValueUpdate
     // Note: if first pulse has not arrived, truncate all PV times to 0.
     double t = 0.0;
 
+    bool save_abs_time = false;
+
     // First Pulse Has Arrived...
     if ( m_pulse_info.start_time )
     {
@@ -4662,6 +4790,7 @@ StreamParser::pvValueUpdate
 
                 // Purge Existing Pre-Pulse PV Data...
                 pvinfo->m_value_buffer.clear();
+                pvinfo->m_abs_time_buffer.clear();
                 pvinfo->m_time_buffer.clear();
                 pvinfo->m_stats.reset();
             }
@@ -4745,6 +4874,7 @@ StreamParser::pvValueUpdate
         }
 
         pvinfo->m_has_non_normalized = true;
+        save_abs_time = true;
         t = -1.0;
     }
 
@@ -4758,7 +4888,7 @@ StreamParser::pvValueUpdate
     pvinfo->m_value_changed = value_changed;
 
     pvinfo->m_value_buffer.push_back(a_value);
-    pvinfo->m_abs_time_buffer.push_back(ts_nano);
+    if ( save_abs_time ) pvinfo->m_abs_time_buffer.push_back(ts_nano);
     pvinfo->m_time_buffer.push_back(t);
 
     if ( t >= 0.0 )
@@ -5649,7 +5779,7 @@ StreamParser::finalizeStreamProcessing()
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(ibi->second->m_initialized) )
-            ibi->second->initializeBank( true );
+            ibi->second->initializeBank( true, m_verbose );
 
         // Detect gaps in bank data and fill event index if present
         if ( ibi->second->m_last_pulse_with_data < m_pulse_count )
@@ -5674,11 +5804,28 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in monitor buffers
 
-    for ( map<Identifier,MonitorInfo*>::iterator imi = m_monitors.begin();
+    for ( map<Identifier, MonitorInfo*>::iterator imi = m_monitors.begin();
             imi != m_monitors.end(); ++imi )
     {
+        std::stringstream ss_mon;
+        ss_mon << "["
+            << "format=" << imi->second->m_config.format << " ("
+            << ( ( imi->second->m_config.format & ADARA::EVENT_FORMAT ) ?
+                "Event" : "Histo" ) << ")"
+            << " tofOffset=" << imi->second->m_config.tofOffset
+            << " tofMax=" << imi->second->m_config.tofMax
+            << " tofBin=" << imi->second->m_config.tofBin
+            << " distance=" << imi->second->m_config.distance
+            << "]";
+        syslog( LOG_INFO,
+            "[%i] %s: Finalizing Beam Monitor %u: %s",
+            g_pid, "StreamParser::finalizeStreamProcessing()",
+            imi->second->m_id, ss_mon.str().c_str() );
+        // give syslog a chance...
+        usleep(30000);
+
         // Event-based Monitors Only...
-        if ( imi->second->m_config == NULL )
+        if ( imi->second->m_config.format == ADARA::EVENT_FORMAT )
         {
             // Detect gaps in monitor data and fill event index if present
             if ( imi->second->m_last_pulse_with_data < m_pulse_count )
@@ -5866,6 +6013,8 @@ StreamParser::collapseDuplicatePVs()
                             // This Duplicate PV's Values have
                             // Now Been Subsumed, So Mark It to Ignore...
                             // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupU32->m_value_buffer.clear();
+                            pvinfoDupU32->m_time_buffer.clear();
                             pvinfoDupU32->m_ignore = true;
 
                             break;
@@ -5932,6 +6081,8 @@ StreamParser::collapseDuplicatePVs()
                             // This Duplicate PV's Values have
                             // Now Been Subsumed, So Mark It to Ignore...
                             // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupDbl->m_value_buffer.clear();
+                            pvinfoDupDbl->m_time_buffer.clear();
                             pvinfoDupDbl->m_ignore = true;
 
                             break;
@@ -5997,6 +6148,8 @@ StreamParser::collapseDuplicatePVs()
                             // This Duplicate PV's Values have
                             // Now Been Subsumed, So Mark It to Ignore...
                             // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupStr->m_value_buffer.clear();
+                            pvinfoDupStr->m_time_buffer.clear();
                             pvinfoDupStr->m_ignore = true;
 
                             break;
@@ -6064,6 +6217,8 @@ StreamParser::collapseDuplicatePVs()
                             // This Duplicate PV's Values have
                             // Now Been Subsumed, So Mark It to Ignore...
                             // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupU32Arr->m_value_buffer.clear();
+                            pvinfoDupU32Arr->m_time_buffer.clear();
                             pvinfoDupU32Arr->m_ignore = true;
 
                             break;
@@ -6131,6 +6286,8 @@ StreamParser::collapseDuplicatePVs()
                             // This Duplicate PV's Values have
                             // Now Been Subsumed, So Mark It to Ignore...
                             // (We Don't Want to Write This PV Any More!)
+                            pvinfoDupDblArr->m_value_buffer.clear();
+                            pvinfoDupDblArr->m_time_buffer.clear();
                             pvinfoDupDblArr->m_ignore = true;
 
                             break;
@@ -6169,9 +6326,9 @@ StreamParser::collapseDuplicatePVs()
 }
 
 
-/*! \brief This method retrieves tha human-readable name of an ADARA packet type.
+/*! \brief This method retrieves the human-readable name of an ADARA packet type.
  *
- * This method retrieves tha human-readable name of an ADARA packet type.
+ * This method retrieves the human-readable name of an ADARA packet type.
  */
 const char*
 StreamParser::getPktName(

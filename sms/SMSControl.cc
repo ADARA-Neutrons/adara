@@ -1383,7 +1383,8 @@ uint32_t SMSControl::registerEventSource(uint32_t srcId, uint32_t hwId)
 			if ( m_noRegisteredEventSources ) {
 				if ( m_noRegisteredEventSourcesCount ) {
 					// Make Sure We Log/Notify This State Change...
-					ERROR("registerEventSource():"
+					ERROR( ( m_recording ? "[RECORDING] " : "" )
+						<< "registerEventSource():"
 						<< " First New Event Source Registered!"
 						<< " Resetting No Registered Event Source Count "
 						<< m_noRegisteredEventSourcesCount << " -> 0");
@@ -1621,7 +1622,8 @@ done:
 	// Check for "No Registered Event Sources" State Change...
 	if ( m_eventSources.none() ) {
 		// Log/Notify on State Change...
-		ERROR("unregisterEventSource():"
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterEventSource():"
 			<< " Last Event Source Unregistered!"
 			<< " Resetting No Registered Event Sources Count to 0.");
 		m_noRegisteredEventSources = true;
@@ -2276,7 +2278,8 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	}
 	else {
 		if ( !m_noRTDLPulses ) {
-			ERROR("pulseEvents(): Missing RTDL for Setting Proton Charge!"
+			ERROR( ( m_recording ? "[RECORDING] " : "" )
+				<< "pulseEvents(): Missing RTDL for Setting Proton Charge!"
 				<< " Use Data Packet Proton Charge, If Available..."
 				<< " Data=" << pkt.pulseCharge()
 				<< " id=0x" << std::hex << pulse->m_id.first
@@ -2291,7 +2294,8 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		// Neutron Event State Bits
 		uint32_t tmp = m_pvNeutronEventStateBits->value();
 		if ( tmp != m_neutronEventStateBits ) {
-			ERROR("pulseEvents(): Number of Neutron Event State Bits"
+			ERROR( ( m_recording ? "[RECORDING] " : "" )
+				<< "pulseEvents(): Number of Neutron Event State Bits"
 				<< " has been Changed from " << m_neutronEventStateBits
 				<< " to " << tmp
 				<< ": STATES are Now "
@@ -2313,7 +2317,8 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		// Beam Monitor TOF Bits
 		tmp = m_pvMonitorTOFBits->value();
 		if ( tmp != m_monitorTOFBits ) {
-			ERROR("pulseEvents(): Number of Beam Monitor TOF Bits"
+			ERROR( ( m_recording ? "[RECORDING] " : "" )
+				<< "pulseEvents(): Number of Beam Monitor TOF Bits"
 				<< " has been Changed from " << m_monitorTOFBits
 				<< " to " << tmp);
 			m_monitorTOFBits = tmp;
@@ -2326,7 +2331,8 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		// Chopper TOF Bits
 		tmp = m_pvChopperTOFBits->value();
 		if ( tmp != m_chopperTOFBits ) {
-			ERROR("pulseEvents(): Number of Chopper TOF Bits"
+			ERROR( ( m_recording ? "[RECORDING] " : "" )
+				<< "pulseEvents(): Number of Chopper TOF Bits"
 				<< " has been Changed from " << m_chopperTOFBits
 				<< " to " << tmp);
 			m_chopperTOFBits = tmp;
@@ -2441,7 +2447,9 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				else {
 					// Rate-Limited Log Unknown Fast Meta-Data PixelId...
 					std::stringstream ss;
-					ss << phys;
+					// Just Use Device ID for RLL Key...
+					uint32_t devId = phys >> 16;
+					ss << std::hex << "0x" << devId;
 					std::string log_info;
 					if ( RateLimitedLogging::checkLog(
 							RLLHistory_SMSControl,
@@ -2450,8 +2458,12 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 						ERROR(log_info
 							<< ( m_recording ? "[RECORDING] " : "" )
 							<< "pulseEvents():"
-							<< " Unknown Fast Meta-Data PixelId "
-							<< std::hex << " phys=0x" << phys << std::dec);
+							<< " Unknown Fast Meta-Data"
+							<< ( ( (phys >> 28) == 5 ) ?
+								" Trigger" : " Analog/ADC" )
+							<< " PixelId phys=0x"
+							<< std::hex << phys << std::dec
+							<< " (Device ID " << ss.str() << ")");
 					}
 				}
 				// No mapping, Error Pixel...

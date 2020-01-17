@@ -114,13 +114,13 @@ int stcLdapLookupUserName( std::string uid, std::string &user_name )
 			g_pid, "STC Error:", "stcLdapConnect()", ldap_err2string(cc) );
 		return( -2 );
 	}
-	syslog( LOG_INFO, "[%i] %s: Searched LDAP Server for filter=[%s]",
-		g_pid, "stcLdapLookupUserName()", filter.c_str() );
 
 	// Display LDAP Search Results
 	int num_entries_returned = ldap_count_entries(stcLdapConn, msg);
-	syslog( LOG_INFO, "[%i] %s: Got %d Entries from LDAP",
-		g_pid, "stcLdapLookupUserName()", num_entries_returned );
+
+	syslog( LOG_INFO, "[%i] %s: %s for %s=[%s], Got %d Entries from LDAP.",
+		g_pid, "stcLdapLookupUserName()", "Searched LDAP Server",
+		"filter", filter.c_str(), num_entries_returned );
 
 	LDAPMessage *entry;
 	for ( entry=ldap_first_entry(stcLdapConn, msg); entry != NULL;
