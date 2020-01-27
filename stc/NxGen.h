@@ -2553,17 +2553,22 @@ protected:
     void                monitorFinalize( STC::MonitorInfo &a_monitor );
     void                runComment( const std::string &a_comment,
                             bool a_force_init = false );
-    void                markerPause( double a_time, uint64_t tOrig,
+    void                markerPause( double a_time,
+                            uint64_t a_ts_nano,
                             const std::string &a_comment  );
-    void                markerResume( double a_time, uint64_t tOrig,
+    void                markerResume( double a_time,
+                            uint64_t a_ts_nano,
                             const std::string &a_comment  );
-    void                markerScanStart( double a_time, uint64_t tOrig,
+    void                markerScanStart( double a_time,
+                            uint64_t a_ts_nano,
                             uint32_t a_scan_index,
                             const std::string &a_comment );
-    void                markerScanStop( double a_time, uint64_t tOrig,
+    void                markerScanStop( double a_time,
+                            uint64_t a_ts_nano,
                             uint32_t a_scan_index,
                             const std::string &a_comment  );
-    void                markerComment( double a_time, uint64_t tOrig,
+    void                markerComment( double a_time,
+                            uint64_t a_ts_nano,
                             const std::string &a_comment );
     void                writeDeviceEnums( STC::Identifier a_devId,
                             std::vector<STC::PVEnumeratedType>

@@ -5056,36 +5056,35 @@ StreamParser::rxPacket
     const ADARA::AnnotationPkt &a_pkt     ///< [in] The ADARA Annotation Packet to process
 )
 {
-    uint64_t tOrig = timespec_to_nsec( a_pkt.timestamp() );
+    uint64_t ts_nano = timespec_to_nsec( a_pkt.timestamp() );
 
     double t = 0.0;
 
     // Note: if first pulse has not arrived, truncate all PV times to 0
     if ( m_pulse_info.start_time )
     {
-        uint64_t t1 = timespec_to_nsec( a_pkt.timestamp() );
         // Truncate negative time offsets to 0
-        if ( t1 > m_pulse_info.start_time )
-            t = ( t1 - m_pulse_info.start_time ) / NANO_PER_SECOND_D;
+        if ( ts_nano > m_pulse_info.start_time )
+            t = ( ts_nano - m_pulse_info.start_time ) / NANO_PER_SECOND_D;
     }
 
     // Switch on event type
     switch ( a_pkt.marker_type() )
     {
     case ADARA::MarkerType::GENERIC:
-        markerComment( t, tOrig, a_pkt.comment() );
+        markerComment( t, ts_nano, a_pkt.comment() );
         break;
     case ADARA::MarkerType::PAUSE:
-        markerPause( t, tOrig, a_pkt.comment() );
+        markerPause( t, ts_nano, a_pkt.comment() );
         break;
     case ADARA::MarkerType::RESUME:
-        markerResume( t, tOrig, a_pkt.comment() );
+        markerResume( t, ts_nano, a_pkt.comment() );
         break;
     case ADARA::MarkerType::SCAN_START:
-        markerScanStart( t, tOrig, a_pkt.scanIndex(), a_pkt.comment() );
+        markerScanStart( t, ts_nano, a_pkt.scanIndex(), a_pkt.comment() );
         break;
     case ADARA::MarkerType::SCAN_STOP:
-        markerScanStop( t, tOrig, a_pkt.scanIndex(), a_pkt.comment() );
+        markerScanStop( t, ts_nano, a_pkt.scanIndex(), a_pkt.comment() );
         break;
     case ADARA::MarkerType::OVERALL_RUN_COMMENT:
         runComment( a_pkt.comment() );

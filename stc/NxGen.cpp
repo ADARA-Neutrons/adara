@@ -2485,7 +2485,7 @@ void
 NxGen::markerPause
 (
     double a_time,              ///< [in] Time associated with marker
-    uint64_t a_tOrig,           ///< [in] Actual Timestamp in Nanoseconds
+    uint64_t a_ts_nano,         ///< [in] Actual Timestamp in Nanoseconds
     const string &a_comment     ///< [in] Comment associated with marker
 )
 {
@@ -2495,7 +2495,7 @@ NxGen::markerPause
         m_pause_value.push_back( 1 ); // Current Nexus scan log calls for 1 to be used for pause
 
         if ( a_comment.size() )
-            markerComment( a_time, a_tOrig, a_comment );
+            markerComment( a_time, a_ts_nano, a_comment );
     }
     catch( TraceException &e )
     {
@@ -2512,7 +2512,7 @@ void
 NxGen::markerResume
 (
     double a_time,              ///< [in] Time associated with marker
-    uint64_t a_tOrig,           ///< [in] Actual Timestamp in Nanoseconds
+    uint64_t a_ts_nano,         ///< [in] Actual Timestamp in Nanoseconds
     const string &a_comment     ///< [in] Comment associated with marker
 )
 {
@@ -2522,7 +2522,7 @@ NxGen::markerResume
         m_pause_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for resume
 
         if ( a_comment.size() )
-            markerComment( a_time, a_tOrig, a_comment );
+            markerComment( a_time, a_ts_nano, a_comment );
     }
     catch( TraceException &e )
     {
@@ -2540,7 +2540,7 @@ void
 NxGen::markerScanStart
 (
     double a_time,                      ///< [in] Time associated with marker
-    uint64_t a_tOrig,                   ///< [in] Actual Timestamp in Nanoseconds
+    uint64_t a_ts_nano,                 ///< [in] Actual Timestamp in Nanoseconds
     uint32_t a_scan_index,              ///< [in] Scan index associated with scan
     const string &a_comment             ///< [in] Comment associated with scan
 )
@@ -2548,11 +2548,11 @@ NxGen::markerScanStart
     try
     {
         m_scan_multimap.insert(
-            std::pair< uint64_t, std::pair<double, uint32_t> >( a_tOrig,
+            std::pair< uint64_t, std::pair<double, uint32_t> >( a_ts_nano,
                 std::pair<double, uint32_t>(a_time, a_scan_index) ) );
 
         if ( a_comment.size() )
-            markerComment( a_time, a_tOrig, a_comment );
+            markerComment( a_time, a_ts_nano, a_comment );
     }
     catch( TraceException &e )
     {
@@ -2570,7 +2570,7 @@ void
 NxGen::markerScanStop
 (
     double a_time,                      ///< [in] Time associated with marker
-    uint64_t a_tOrig,                   ///< [in] Actual Timestamp in Nanoseconds
+    uint64_t a_ts_nano,                 ///< [in] Actual Timestamp in Nanoseconds
     uint32_t UNUSED(a_scan_index),      ///< [in] Scan index associated with scan
     const string &a_comment             ///< [in] Comment associated with scan
 )
@@ -2580,11 +2580,11 @@ NxGen::markerScanStop
         // Current Nexus scan log calls for
         // 0 to be used for all scan stops
         m_scan_multimap.insert(
-            std::pair< uint64_t, std::pair<double, uint32_t> >( a_tOrig,
+            std::pair< uint64_t, std::pair<double, uint32_t> >( a_ts_nano,
                 std::pair<double, uint32_t>(a_time, 0) ) );
 
         if ( a_comment.size() )
-            markerComment( a_time, a_tOrig, a_comment );
+            markerComment( a_time, a_ts_nano, a_comment );
     }
     catch( TraceException &e )
     {
@@ -2601,7 +2601,7 @@ void
 NxGen::markerComment
 (
     double a_time,                      ///< [in] Time associated with marker
-    uint64_t a_tOrig,                   ///< [in] Actual Timestamp in Nanoseconds
+    uint64_t a_ts_nano,                 ///< [in] Actual Timestamp in Nanoseconds
     const std::string &a_comment        ///< [in] Comment to insert
 )
 {
@@ -2612,7 +2612,7 @@ NxGen::markerComment
             // Geez, this got complicated fast... Lol... ;-D
             m_comment_multimap.insert(
                 std::pair< uint64_t, std::pair<double, std::string> >(
-                    a_tOrig,
+                    a_ts_nano,
                     std::pair<double, std::string>(a_time, a_comment) ) );
         }
     }
