@@ -4703,7 +4703,10 @@ StreamParser::pvValueUpdate
     // Now Proceed to Process PV Value Update, Regardless of Errors! ;-D
 
     // Relative time of update in seconds from first pulse of run.
-    // Note: if first pulse has not arrived, truncate all PV times to 0.
+    // Note: If First Pulse has Not Arrived, Save This Value Update
+    // Until Later for Normalization (Set PV Time to -1.0)...
+    // (Will Only Save _Last_ of Pre-Pulse PV Value Data...)
+    // Otherwise, Truncate All Pre-First-Pulse PV Times to 0.
     double t = 0.0;
 
     bool save_abs_time = false;
