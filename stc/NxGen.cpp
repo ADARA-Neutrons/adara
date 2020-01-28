@@ -698,19 +698,6 @@ NxGen::initialize( bool a_force_init, string caller )
         string time = timeToISO8601( now );
         writeString( m_software_path + "/Translation", "date", time );
 
-        // Insert initial "not in scan" value:
-        //     - Current Nexus scan log calls for 0
-        //     to be used for all scan stops
-        //     - Just use 0 for the Starting Non-Normalized Nanosecond
-        //     Time Stamp (guaranteed to be 1st Chronologically...! ;-D)
-        m_scan_multimap.insert(
-            std::pair< uint64_t, std::pair<double, uint32_t> >(
-                0, std::pair<double, uint32_t>(0.0, 0) ) );
-
-        // Insert initial "not paused" value
-        m_pause_time.push_back( 0.0 );
-        m_pause_value.push_back( 0 );
-
         // Set "NeXus Initialized" Flag, We're There! :-D
         m_nexus_init = true;
     }
@@ -2477,152 +2464,6 @@ NxGen::runComment
 }
 
 
-/*! \brief Inserts a pause marker into Nexus file
- *
- * This method inserts a pause marker into the marker logs of the Nexus file.
- */
-void
-NxGen::markerPause
-(
-    double a_time,              ///< [in] Time associated with marker
-    uint64_t a_ts_nano,         ///< [in] Actual Timestamp in Nanoseconds
-    const string &a_comment     ///< [in] Comment associated with marker
-)
-{
-    try
-    {
-        m_pause_time.push_back( a_time );
-        m_pause_value.push_back( 1 ); // Current Nexus scan log calls for 1 to be used for pause
-
-        if ( a_comment.size() )
-            markerComment( a_time, a_ts_nano, a_comment );
-    }
-    catch( TraceException &e )
-    {
-        RETHROW_TRACE( e, "markerPause() failed." )
-    }
-}
-
-
-/*! \brief Inserts a resume marker into Nexus file
- *
- * This method inserts a resume marker into the marker logs of the Nexus file.
- */
-void
-NxGen::markerResume
-(
-    double a_time,              ///< [in] Time associated with marker
-    uint64_t a_ts_nano,         ///< [in] Actual Timestamp in Nanoseconds
-    const string &a_comment     ///< [in] Comment associated with marker
-)
-{
-    try
-    {
-        m_pause_time.push_back( a_time );
-        m_pause_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for resume
-
-        if ( a_comment.size() )
-            markerComment( a_time, a_ts_nano, a_comment );
-    }
-    catch( TraceException &e )
-    {
-        RETHROW_TRACE( e, "markerResume() failed." )
-    }
-}
-
-
-/*! \brief Inserts a scan start marker into Nexus file
- *
- * This method inserts a scan start marker into the marker logs
- * of the Nexus file.
- */
-void
-NxGen::markerScanStart
-(
-    double a_time,                      ///< [in] Time associated with marker
-    uint64_t a_ts_nano,                 ///< [in] Actual Timestamp in Nanoseconds
-    uint32_t a_scan_index,              ///< [in] Scan index associated with scan
-    const string &a_comment             ///< [in] Comment associated with scan
-)
-{
-    try
-    {
-        m_scan_multimap.insert(
-            std::pair< uint64_t, std::pair<double, uint32_t> >( a_ts_nano,
-                std::pair<double, uint32_t>(a_time, a_scan_index) ) );
-
-        if ( a_comment.size() )
-            markerComment( a_time, a_ts_nano, a_comment );
-    }
-    catch( TraceException &e )
-    {
-        RETHROW_TRACE( e, "markerScanStart() failed." )
-    }
-}
-
-
-/*! \brief Inserts a scan stop marker into Nexus file
- *
- * This method inserts a scan stop marker into the marker logs
- * of the Nexus file.
- */
-void
-NxGen::markerScanStop
-(
-    double a_time,                      ///< [in] Time associated with marker
-    uint64_t a_ts_nano,                 ///< [in] Actual Timestamp in Nanoseconds
-    uint32_t UNUSED(a_scan_index),      ///< [in] Scan index associated with scan
-    const string &a_comment             ///< [in] Comment associated with scan
-)
-{
-    try
-    {
-        // Current Nexus scan log calls for
-        // 0 to be used for all scan stops
-        m_scan_multimap.insert(
-            std::pair< uint64_t, std::pair<double, uint32_t> >( a_ts_nano,
-                std::pair<double, uint32_t>(a_time, 0) ) );
-
-        if ( a_comment.size() )
-            markerComment( a_time, a_ts_nano, a_comment );
-    }
-    catch( TraceException &e )
-    {
-        RETHROW_TRACE( e, "markerScanStop() failed." )
-    }
-}
-
-
-/*! \brief Inserts a comment marker into Nexus file
- *
- * This method inserts a comment marker into the marker logs of the Nexus file.
- */
-void
-NxGen::markerComment
-(
-    double a_time,                      ///< [in] Time associated with marker
-    uint64_t a_ts_nano,                 ///< [in] Actual Timestamp in Nanoseconds
-    const std::string &a_comment        ///< [in] Comment to insert
-)
-{
-    try
-    {
-        if ( a_comment.size() )
-        {
-            // Geez, this got complicated fast... Lol... ;-D
-            m_comment_multimap.insert(
-                std::pair< uint64_t, std::pair<double, std::string> >(
-                    a_ts_nano,
-                    std::pair<double, std::string>(a_time, a_comment) ) );
-        }
-    }
-    catch( TraceException &e )
-    {
-        RETHROW_TRACE( e, "markerComment() failed." )
-    }
-}
-
-
 /*! \brief Writes buffered pause data into Nexus file
  *
  * This method flushes buffered pause data to the logs of the Nexus file.
@@ -2630,6 +2471,15 @@ NxGen::markerComment
 void
 NxGen::flushPauseData()
 {
+    if ( m_pause_has_non_normalized )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STC Error:", "NxGen::flushPauseData()",
+            "Pause/Resume Marker Timestamps Require Normalization",
+            "Marker(s) Received Before 1st Pulse...!" );
+        usleep(30000); // give syslog a chance...
+    }
+
     try
     {
         // Create Pause Event Log (with Known Minimum Chunk Size...)
@@ -2661,6 +2511,15 @@ void
 NxGen::flushScanData()
 {
     multimap< uint64_t, pair<double, uint32_t> >::iterator smm;
+
+    if ( m_scan_has_non_normalized )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STC Error:", "NxGen::flushScanData()",
+            "Scan Start/Stop Marker Timestamps Require Normalization",
+            "Marker(s) Received Before 1st Pulse...!" );
+        usleep(30000); // give syslog a chance...
+    }
 
     try
     {
@@ -2705,6 +2564,15 @@ void
 NxGen::flushCommentData()
 {
     multimap< uint64_t, pair<double, string> >::iterator cmm;
+
+    if ( m_comment_has_non_normalized )
+    {
+        syslog( LOG_ERR, "[%i] %s %s: %s - %s",
+            g_pid, "STC Error:", "NxGen::flushCommentData()",
+            "Comment Timestamps Require Normalization",
+            "Comment(s) Received Before 1st Pulse...!" );
+        usleep(30000); // give syslog a chance...
+    }
 
     try
     {

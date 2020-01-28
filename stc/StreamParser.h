@@ -200,6 +200,17 @@ private:
     const char* getPktName( uint32_t a_pkt_type ) const;
     void        updateRunInfo( const RunInfo &a_run_info );
 
+    void        markerPause( double a_time, uint64_t a_ts_nano,
+                    const std::string &a_comment  );
+    void        markerResume( double a_time, uint64_t a_ts_nano,
+                    const std::string &a_comment  );
+    void        markerScanStart( double a_time, uint64_t a_ts_nano,
+                    uint32_t a_scan_index, const std::string &a_comment );
+    void        markerScanStop( double a_time, uint64_t a_ts_nano,
+                    uint32_t a_scan_index, const std::string &a_comment  );
+    void        markerComment( double a_time, uint64_t a_ts_nano,
+                    const std::string &a_comment );
+
     int                                     m_fd;                       ///< Input ADARA stream file descriptor
     ProcessingState                         m_processing_state;         ///< Current (internal) processing state
     uint32_t                                m_pkt_recvd;                ///< Packet received-status bit mask
@@ -233,9 +244,24 @@ private:
     uint16_t                                m_pulse_flag;
 
     struct timespec                         m_default_run_start_time;   ///< Default Run Start Time (No Neutron Pulses)...
+
     bool                                    m_verbose;                  ///< STC Verbosity
 
 protected:
+    std::vector<double>                     m_pause_time;               /// Pause annotation timestamp buffer
+    std::vector<uint16_t>                   m_pause_value;              /// Pause value (on/off) buffer
+    uint64_t                                m_pause_last_time;          ///< Nanosec time (EPICS epoch) of last received Pause/Resume
+    std::vector<uint64_t>                   m_pause_abs_time_buffer;    ///< Buffer that holds absolute (non-normalized) timestamp (nanoseconds) of Pauses/Resumes
+    bool                                    m_pause_has_non_normalized; /// Pause/Resume Marker received before 1st pulse...
+
+    std::multimap<uint64_t, std::pair<double, uint32_t> >
+                                            m_scan_multimap;            /// Scan annotation nsec-to-timestamp/state (on/off) map
+    bool                                    m_scan_has_non_normalized;  /// Scan Marker received before 1st pulse...
+
+    std::multimap<uint64_t, std::pair<double, std::string> >
+                                            m_comment_multimap;         /// Comment annotation nsec-to-timestamp/string map
+    bool                                    m_comment_has_non_normalized; /// Comment annotation received before 1st pulse...
+
     std::vector<PVInfoBase*>                m_pvs_list;                 ///< Collection of all process variable information
     std::map<PVKey,PVInfoBase*>             m_pvs_by_key;               ///< Container of process variable information (by key)
     std::map<std::string,PVKey>             m_pvs_by_name_xref;         ///< Index of process variable information (by name)

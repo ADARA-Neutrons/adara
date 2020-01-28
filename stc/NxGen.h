@@ -2553,23 +2553,6 @@ protected:
     void                monitorFinalize( STC::MonitorInfo &a_monitor );
     void                runComment( const std::string &a_comment,
                             bool a_force_init = false );
-    void                markerPause( double a_time,
-                            uint64_t a_ts_nano,
-                            const std::string &a_comment  );
-    void                markerResume( double a_time,
-                            uint64_t a_ts_nano,
-                            const std::string &a_comment  );
-    void                markerScanStart( double a_time,
-                            uint64_t a_ts_nano,
-                            uint32_t a_scan_index,
-                            const std::string &a_comment );
-    void                markerScanStop( double a_time,
-                            uint64_t a_ts_nano,
-                            uint32_t a_scan_index,
-                            const std::string &a_comment  );
-    void                markerComment( double a_time,
-                            uint64_t a_ts_nano,
-                            const std::string &a_comment );
     void                writeDeviceEnums( STC::Identifier a_devId,
                             std::vector<STC::PVEnumeratedType>
                                 &a_enumVec );
@@ -2732,12 +2715,6 @@ private:
     std::vector<uint32_t>       m_pulse_flags_value;    ///< Buffer of pulse flag values
     uint64_t                    m_pulse_flags_cur_size; ///< Current size of pulse flags dataset
 
-    std::vector<double>         m_pause_time;           /// Pause annotation timestamp buffer
-    std::vector<uint16_t>       m_pause_value;          /// Pause value (on/off) buffer
-    std::multimap<uint64_t, std::pair<double, uint32_t> >
-                                m_scan_multimap;        /// Scan annotation nsec-to-timestamp/state (on/off) map
-    std::multimap<uint64_t, std::pair<double, std::string> >
-                                m_comment_multimap;     /// Comment annotation nsec-to-timestamp/string map
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
     std::string                 m_runComment;           /// Capture the Singular Run Comment for the Nexus file
     bool                        m_nexus_run_comment_init; /// Has the Nexus Run Comment been Initialized yet or not?
