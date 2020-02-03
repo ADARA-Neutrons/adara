@@ -312,7 +312,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 		0-59/10 * * * * /SNS/users/y8y/stuff/exec/pvsd_mon.sh
 		0 8,17 * * * /home/controls/config-dassrv1/confck --quiet
 		0 8,17 * * * /home/controls/share/master/scripts/check_beamline_xml --quiet /home/controls/blXXX/beamline.xml
-		MAILTO=idac_config_change@email.ornl.gov
+		MAILTO=idac_support@email.ornl.gov
 		0 * * * * /usr/local/bin/beamline_xml_mon.sh --quiet
 
 	crontab -l
