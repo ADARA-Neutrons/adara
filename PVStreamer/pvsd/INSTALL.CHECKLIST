@@ -297,15 +297,20 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 4. Administrator Crontab Setup:
 
+	sudo cp ~/gitsrc/ADARA/PVStreamer/pvsd/beamline_xml_mon.sh \
+		/usr/local/bin
+
 	crontab -l
 
 	crontab -e   # Edit "blXXX" to New Beamline Number...! :-D
 
-		MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
+		MAILTO=idac_adara_notify@email.ornl.gov
 		PATH=/home/controls/epics/base/master/bin/linux-x86_64:/home/controls/epics/basev4/master/pvAccessCPP/bin/linux-x86_64/:/home/controls/epics/extensions/master/bin/linux-x86_64:/home/controls/epics/extensions/master/bin:/usr/local/SNS/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/sbin:/usr/sbin
 		0-59/10 * * * * /SNS/users/y8y/stuff/exec/pvsd_mon
 		0 8,17 * * * /home/controls/config-dassrv1/confck --quiet
 		0 8,17 * * * /home/controls/share/master/scripts/check_beamline_xml --quiet /home/controls/blXXX/beamline.xml
+		MAILTO=idac_config_change@email.ornl.gov
+		0 * * * * /usr/local/bin/beamline_xml_mon.sh --quiet
 
 	crontab -l
 
