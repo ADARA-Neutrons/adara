@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <iostream>
+#include <fstream>
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
@@ -149,7 +150,8 @@ public:
 		m_addRunEnd(false), m_hysterical(false),
 		m_posixRead(false), m_showDDP(false), m_lowRate(false),
 		m_terse(false), m_catch(false),
-		m_out(std::cout)
+		m_out(std::cout),
+		m_save_count(0)
 	{ }
 
 	void parse(int argc, char **argv);
@@ -215,6 +217,11 @@ private:
 	bool m_catch;
 
 	std::ostream &m_out;
+
+	std::string m_save_file;
+	std::vector<uint32_t> m_save_pkts;
+	uint32_t m_save_count;
+	std::ofstream m_save_out;
 };
 
 bool MungeParser::rxPacket(const ADARA::Packet &pkt)
@@ -257,6 +264,20 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 	else
 	{
 		m_skip_pkt = false;
+	}
+
+	// Check for Packet Types to Save...
+	if ( m_save_out.is_open() )
+	{
+		for ( uint32_t i=0 ; i < m_save_pkts.size() ; i++ )
+		{
+			if ( pkt.type() == m_save_pkts[i] )
+			{
+				m_save_out.write( (const char *)pkt.packet(),
+					pkt.packet_length() );
+				m_save_count++;
+			}
+		}
 	}
 
 	// Capture "Last Packet's" Pulse Id (Timestamp)...
@@ -1388,6 +1409,11 @@ void MungeParser::parse(int argc, char **argv)
 		("terse,T", "Terse Mode, Produce no output (except as requested)")
 		("catch,C", "Catch Exceptions, Try to parse past bad packets")
 		("addrunend,E", "Add Omitted Run Status Packet to End of Stream")
+		("savepkts,p",
+			po::value<std::vector<uint32_t> >(&m_save_pkts)->multitoken(),
+			"List of Packet Types (UINT32) to Save")
+		("savefile,F", po::value<std::string>(&m_save_file),
+			"Save Certain Packet Types to Given File")
 		("hysterical,H", "Set Hysterical Run Start/End Times")
 		("starttime", po::value<std::string>(&m_starttime),
 			"Hysterical Start Time for Experiment Data")
@@ -1421,6 +1447,39 @@ void MungeParser::parse(int argc, char **argv)
 		}
 
 	m_addRunEnd = vm.count("addrunend");
+
+	// Save Packets Options...
+	if ( m_save_pkts.size() ) {
+		for ( uint32_t i=0 ; i < m_save_pkts.size() ; i++ ) {
+			std::cerr << "Packet Type 0x"
+			<< std::hex << m_save_pkts[i] << std::dec
+			<< " Selected for Saving." << std::endl;
+		}
+		if ( m_save_file.size() ) {
+			std::cerr << "Saving Selected Packet Types to File: "
+				<< m_save_file << std::endl;
+		}
+		else {
+			m_save_file = "save_pkts.adara";
+			std::cerr << "Saving Selected Packet Types to Default File: "
+				<< m_save_file << std::endl;
+		}
+		// Try to Open Save Packet File...
+		m_save_out.open( m_save_file.c_str(),
+			std::ofstream::out | std::ofstream::binary );
+		if ( !m_save_out.good() ) {
+			std::cerr << "Error Opening Save Packets File \""
+				<< m_save_file << "\"...! Disabling Packet Saving...!"
+				<< std::endl;
+			m_save_out.close();
+			m_save_pkts.clear();
+		}
+	}
+	else if ( m_save_file.size() ) {
+		std::cerr << "Warning: Save Packets File Specified "
+			<< "with NO Selected Packet Types! Ignoring..."
+			<< std::endl;
+	}
 
 	m_hysterical = vm.count("hysterical");
 
@@ -1474,6 +1533,15 @@ void MungeParser::parse(int argc, char **argv)
 			std::cerr << argv[0] << ": " << m << std::endl;
 			exit(1);
 		}
+	}
+
+	// Close Any Saved Packets File...
+	if ( m_save_out.is_open() ) {
+		std::cerr << "Closing Saved Packets File \""
+			<< m_save_file << "\""
+			<< " - Saved " << m_save_count << " Packets."
+			<< std::endl;
+		m_save_out.close();
 	}
 
 	// Add Final "RunStatusPkt" to End of Run...
