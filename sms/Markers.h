@@ -28,8 +28,9 @@ public:
 
 	void beforeNewRun( uint32_t runNumber );
 	void runStop(void);
-	void pause(void);
-	void resume(void);
+
+	void pause( struct timespec *ts );
+	void resume( struct timespec *ts );
 
 private:
 	boost::shared_ptr<MarkerPausedPV> m_pausedPV;
@@ -67,13 +68,13 @@ private:
 	MarkerQueue notesCommentQueue;
 	MarkerQueue annotationCommentQueue;
 
-	void startScan(void);
-	void stopScan(void);
-	void annotate(void);
-	void addRunComment(void);
-	void addScanComment(void);
-	void addNotesComment(void);
-	void addAnnotationComment(void);
+	void startScan( struct timespec *ts );
+	void stopScan( struct timespec *ts );
+	void annotate( struct timespec *ts );
+	void addRunComment( struct timespec *ts );
+	void addScanComment( struct timespec *ts );
+	void addNotesComment( struct timespec *ts );
+	void addAnnotationComment( struct timespec *ts );
 
 	void dumpRunNotesComment( bool prologue = false );
 	void dumpQueuedComments( bool prologue = false );
@@ -81,10 +82,6 @@ private:
 	void onPrologue(void);
 
 	void emitPrologue( ADARA::MarkerType::Enum, std::string prefix = "" );
-
-	void emitPacket( ADARA::MarkerType::Enum,
-		std::string prefix = "",
-		StringPVSharedPtr commentPV = StringPVSharedPtr() );
 
 	void emitPacket( const struct timespec &,
 		ADARA::MarkerType::Enum,
