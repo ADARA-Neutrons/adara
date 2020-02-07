@@ -54,7 +54,8 @@ RateLimitedLogging::History RLLHistory_DataSource;
 #define RLL_LOCAL_RTDL_SEQUENCE      21
 #define RLL_RTDL_PULSE_IN_PAST       22
 #define RLL_RTDL_PULSE_IN_FUTURE     23
-#define RLL_HEARTBEAT                24
+#define RLL_ANNOTATION               24
+#define RLL_HEARTBEAT                25
 
 // Pulse Time Sanity Check Constants
 #define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
@@ -2186,7 +2187,6 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 		case ADARA::PacketType::SYNC_TYPE:
 		case ADARA::PacketType::DATA_DONE_TYPE:
-		case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
 			/* We don't care about these packets, just drop them */
 			/* (We still have to call their rxPacket() method
 			 * to increment the Discarded Packet counts tho...! ;-D) */
@@ -2202,6 +2202,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
 		case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
 		case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
+		case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
 			/* We use a 0 pulse id to indicate that we don't have an
 			 * active pulse, and nothing should ever send one to us.
 			 */
@@ -3338,6 +3339,42 @@ bool DataSource::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 	}
 
 	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
+{
+	/* Rate-limited logging of Annotation packets */
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+			RLL_ANNOTATION, m_name, 3, 10, 100, log_info ) ) {
+		std::stringstream ss;
+		ss << " - MarkerType ";
+		switch ( pkt.marker_type() ) {
+			case ADARA::MarkerType::GENERIC:
+				ss << "GENERIC"; break;
+			case ADARA::MarkerType::SCAN_START:
+				ss << "SCAN_START"; break;
+			case ADARA::MarkerType::SCAN_STOP:
+				ss << "SCAN_STOP"; break;
+			case ADARA::MarkerType::PAUSE:
+				ss << "PAUSE"; break;
+			case ADARA::MarkerType::RESUME:
+				ss << "RESUME"; break;
+			case ADARA::MarkerType::OVERALL_RUN_COMMENT:
+				ss << "OVERALL_RUN_COMMENT"; break;
+		}
+		ss << " (" << pkt.marker_type() << ")";
+		ss << ", ScanIndex=" << pkt.scanIndex();
+		ss << ", Comment=[" << pkt.comment() << "]";
+		INFO(log_info
+			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "External Annotation Packet Received from " << m_name
+			<< ss.str());
+	}
+
+	// DO SOMETHING WITH IT... ;-D
+
 	return false;
 }
 
