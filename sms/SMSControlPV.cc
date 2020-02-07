@@ -1851,6 +1851,11 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	if (v > 1)
 		return S_casApp_noSupport;
 
+	// Always Set smsTriggerPV Timestamp for Latest Trigger...! ;-D
+	struct timespec ts;
+	val.getTimeStamp(&ts);
+	m_value->setTimeStamp(&ts);
+
 	if (v) {
 		triggered();
 
@@ -1859,9 +1864,6 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			casEventMask mask = cas->valueEventMask() |
 						cas->logEventMask();
 			smartGDDPointer edge;
-
-			struct timespec ts;
-			val.getTimeStamp(&ts);
 
 			edge = new gddScalar(gddAppType_value, aitEnumEnum16);
 			edge->setTimeStamp(&ts);
