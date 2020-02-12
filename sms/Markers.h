@@ -29,8 +29,27 @@ public:
 	void beforeNewRun( uint32_t runNumber );
 	void runStop(void);
 
-	void pause( struct timespec *ts );
-	void resume( struct timespec *ts );
+	void addAnnotationComment( struct timespec *ts, bool passthru = false,
+		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
+	void startScan( struct timespec *ts, bool passthru = false,
+		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
+	void stopScan( struct timespec *ts, bool passthru = false,
+		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
+	void addScanComment( struct timespec *ts, bool passthru = false,
+		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
+	void pause( struct timespec *ts, bool passthru = false,
+		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
+	void resume( struct timespec *ts, bool passthru = false,
+		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
+	void addNotesComment( struct timespec *ts, bool passthru = false,
+		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
+
+	void annotate( struct timespec *ts, bool passthru = false,
+		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
+		// DEPRECATED
+	void addRunComment( struct timespec *ts, bool passthru = false,
+		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
+		// DEPRECATED
 
 private:
 	boost::shared_ptr<MarkerPausedPV> m_pausedPV;
@@ -52,6 +71,7 @@ private:
 
 	bool m_inRun;
 	bool m_isPaused;
+	bool m_isPausedPT;
 	bool m_notesCommentSet;
 	bool m_notesCommentAutoReset;
 	bool m_useFirstNotesComment;
@@ -68,25 +88,18 @@ private:
 	MarkerQueue notesCommentQueue;
 	MarkerQueue annotationCommentQueue;
 
-	void startScan( struct timespec *ts );
-	void stopScan( struct timespec *ts );
-	void annotate( struct timespec *ts );
-	void addRunComment( struct timespec *ts );
-	void addScanComment( struct timespec *ts );
-	void addNotesComment( struct timespec *ts );
-	void addAnnotationComment( struct timespec *ts );
-
 	void dumpRunNotesComment( bool prologue = false );
 	void dumpQueuedComments( bool prologue = false );
 
 	void onPrologue(void);
 
-	void emitPrologue( ADARA::MarkerType::Enum, std::string prefix = "" );
+	void emitPrologue( ADARA::MarkerType::Enum, std::string comment = "" );
 
 	void emitPacket( const struct timespec &,
 		ADARA::MarkerType::Enum,
+		uint32_t scanIndex,
 		std::string prefix = "",
-		StringPVSharedPtr commentPV = StringPVSharedPtr(),
+		std::string comment = "",
 		bool prologue = false );
 };
 

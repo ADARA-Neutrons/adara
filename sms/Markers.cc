@@ -45,7 +45,9 @@ private:
 
 class MarkerTriggerPV : public smsTriggerPV {
 public:
-	typedef boost::function<void ( struct timespec *ts )> callback;
+	typedef boost::function<void ( struct timespec *ts,
+			bool passthru, uint32_t pt_scanIndex, std::string pt_comment )>
+		callback;
 
 	MarkerTriggerPV( const std::string &name, callback cb ) :
 		smsTriggerPV(name), m_cb(cb) {}
@@ -54,7 +56,7 @@ public:
 	{
 		struct timespec ts;
 		m_value->getTimeStamp( &ts );
-		m_cb( &ts );
+		m_cb( &ts, false, -1, "" );
 	}
 
 private:
@@ -63,7 +65,9 @@ private:
 
 class MarkerCommentPV : public smsStringPV {
 public:
-	typedef boost::function<void ( struct timespec *ts )> callback;
+	typedef boost::function<void ( struct timespec *ts,
+			bool passthru, uint32_t pt_scanIndex, std::string pt_comment )>
+		callback;
 
 	MarkerCommentPV( const std::string &name, callback cb ) :
 		smsStringPV(name), m_cb(cb) {}
@@ -79,7 +83,7 @@ public:
 		// Only Call Callback if String PV Set to Non-Empty Value...
 		// (Otherwise, "unset()" triggers a callback... ;-b)
 		if ( !comment.empty() && comment.compare( "(unset)" ) )
-			m_cb( &ts );
+			m_cb( &ts, false, -1, "" );
 
 		// AutoSave PV Value Change...
 		StorageManager::autoSavePV( m_pv_name, comment, &ts );
@@ -90,7 +94,7 @@ private:
 };
 
 Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
-	m_ctrl(ctrl), m_inRun(false), m_isPaused(false),
+	m_ctrl(ctrl), m_inRun(false), m_isPaused(false), m_isPausedPT(false),
 	m_notesCommentSet(false),
 	m_notesCommentAutoReset(notesCommentAutoReset),
 	m_useFirstNotesComment(false),
@@ -111,27 +115,33 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	ctrl->addPV(m_indexPV);
 
 	m_scanStartPV.reset( new MarkerTriggerPV( prefix + "StartScan",
-			boost::bind( &Markers::startScan, this, _1 ) ) );
+			boost::bind( &Markers::startScan,
+				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_scanStartPV);
 
 	m_scanStopPV.reset( new MarkerTriggerPV( prefix + "StopScan",
-			boost::bind( &Markers::stopScan, this, _1 ) ) );
+			boost::bind( &Markers::stopScan,
+				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_scanStopPV);
 
 	m_annotatePV.reset( new MarkerTriggerPV( prefix + "Annotate",
-			boost::bind( &Markers::annotate, this, _1 ) ) );
+			boost::bind( &Markers::annotate,
+				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_annotatePV);
 
 	m_runCommentPV.reset( new MarkerTriggerPV( prefix + "RunComment",
-			boost::bind( &Markers::addRunComment, this, _1 ) ) );
+			boost::bind( &Markers::addRunComment,
+				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_runCommentPV);
 
 	m_scanCommentPV.reset( new MarkerCommentPV( prefix + "ScanComment",
-			boost::bind( &Markers::addScanComment, this, _1 ) ) );
+			boost::bind( &Markers::addScanComment,
+				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_scanCommentPV);
 
 	m_notesCommentPV.reset( new MarkerCommentPV( prefix + "NotesComment",
-			boost::bind( &Markers::addNotesComment, this, _1 ) ) );
+			boost::bind( &Markers::addNotesComment,
+				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_notesCommentPV);
 
 	m_notesCommentAutoResetPV.reset( new smsBooleanPV(
@@ -140,7 +150,8 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 
 	m_annotationCommentPV.reset(
 		new MarkerCommentPV( prefix + "AnnotationComment",
-			boost::bind( &Markers::addAnnotationComment, this, _1 ) ) );
+			boost::bind( &Markers::addAnnotationComment,
+				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_annotationCommentPV);
 
 	m_connection = StorageManager::onPrologue(
@@ -209,7 +220,8 @@ void Markers::beforeNewRun( uint32_t runNumber )
 		m_ctrl->resumeRecording();
 		// Spew "We've Resumed" Packet
 		std::string comment = "Warning: Run Resumed at New Run Start!";
-		emitPacket( now, ADARA::MarkerType::RESUME, comment );
+		emitPacket( now, ADARA::MarkerType::RESUME, m_scanIndex,
+			"", comment );
 		// _This_ update() _Doesn't_ trigger changed()...!
 		m_pausedPV->update(false, &now);
 		// _Also_ Queue This Resume Comment for _After_ Run Start...
@@ -221,7 +233,8 @@ void Markers::beforeNewRun( uint32_t runNumber )
 
 	if ( m_scanIndex ) {
 		std::string comment = "Warning: Scan Stopped at New Run Start!";
-		emitPacket( now, ADARA::MarkerType::SCAN_STOP, comment );
+		emitPacket( now, ADARA::MarkerType::SCAN_STOP, m_scanIndex,
+			"", comment );
 		// _Also_ Queue This Scan Stop/Comment for _After_ Run Start...
 		std::stringstream ss_scan;
 		ss_scan << m_scanIndex << "|";
@@ -287,8 +300,8 @@ void Markers::runStop(void)
 		// Dump Any Pre-Run Scan Comments Now...
 		dumpQueuedComments();
 		// Spew "We've Resumed" Packet
-		emitPacket( now, ADARA::MarkerType::RESUME,
-			"Warning: Run Resumed at Run Stop!" );
+		emitPacket( now, ADARA::MarkerType::RESUME, m_scanIndex,
+			"", "Warning: Run Resumed at Run Stop!" );
 		// _This_ update() _Doesn't_ trigger changed()...!
 		m_pausedPV->update(false, &now);
 	}
@@ -300,8 +313,8 @@ void Markers::runStop(void)
 	dumpQueuedComments();
 
 	if ( m_scanIndex ) {
-		emitPacket( now, ADARA::MarkerType::SCAN_STOP,
-			"Warning: Scan Stopped at Run Stop!" );
+		emitPacket( now, ADARA::MarkerType::SCAN_STOP, m_scanIndex,
+			"", "Warning: Scan Stopped at Run Stop!" );
 		m_indexPV->update(0, &now);
 		m_scanIndex = 0;
 	}
@@ -309,7 +322,8 @@ void Markers::runStop(void)
 	// Add Run Stop Comment...
 	std::stringstream ss;
 	ss << "Run " << m_runNumber << " Stopped.";
-	emitPacket( now, ADARA::MarkerType::GENERIC, ss.str() );
+	emitPacket( now, ADARA::MarkerType::GENERIC, m_scanIndex,
+		"", ss.str() );
 
 	// Clear All Comment PVs on Run Stop...
 	m_commentPV->unset(); // DEPRECATED
@@ -330,118 +344,211 @@ void Markers::runStop(void)
 	m_notesCommentSet = false;
 }
 
-void Markers::pause( struct timespec *ts )
+void Markers::pause( struct timespec *ts,
+		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
+	std::string comment;
+	uint32_t scanIndex;
+
+	if ( passthru ) {
+		comment = pt_comment;
+		scanIndex = pt_scanIndex;
+	}
+	else {
+		comment = "";
+		scanIndex = m_scanIndex;
+	}
+
 	std::stringstream ss;
 	ss << "Run ";
 	if ( m_inRun ) ss << m_runNumber << " ";
 	ss << "Paused.";
 	DEBUG(ss.str());
-	emitPacket( *ts, ADARA::MarkerType::PAUSE, ss.str() );
-	// Set Paused State _Before_ Pause, for Next Prologue to Skip Queued
-	m_isPaused = true;
-	// NOTE: Triggers New File/Prologue with _Current_ State...!
-	m_ctrl->pauseRecording();
+
+	emitPacket( *ts, ADARA::MarkerType::PAUSE, scanIndex,
+		ss.str(), comment );
+
+	if ( !passthru )
+	{
+		// Set Paused State _Before_ Pause for Next Prologue to Skip Queued
+		m_isPaused = true;
+		// NOTE: Triggers New File/Prologue with _Current_ State...!
+		m_ctrl->pauseRecording();
+	}
+	else
+	{
+		m_isPausedPT = true;
+	}
 
 	// If Not in Run, then _Also_ Queue Message for Later...
 	if ( !m_inRun )
 	{
 		pauseQueue.push_back( std::pair<struct timespec, std::string>( *ts,
-			"[PRE-RUN] " + ss.str() ) );
+			"[PRE-RUN] " + ss.str() + comment ) );
 	}
 }
 
-void Markers::resume( struct timespec *ts )
+void Markers::resume( struct timespec *ts,
+		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
+	std::string comment;
+	uint32_t scanIndex;
+
+	if ( passthru ) {
+		comment = pt_comment;
+		scanIndex = pt_scanIndex;
+	}
+	else {
+		comment = "";
+		scanIndex = m_scanIndex;
+	}
+
 	std::stringstream ss;
 	ss << "Run ";
 	if ( m_inRun ) ss << m_runNumber << " ";
 	ss << "Resumed.";
 	DEBUG(ss.str());
-	// Set Paused State _Before_ Resume, for Next Prologue to Use Queued
-	m_isPaused = false;
-	// NOTE: Triggers New File/Prologue with _Current_ State...!
-	m_ctrl->resumeRecording();
-	emitPacket( *ts, ADARA::MarkerType::RESUME, ss.str() );
+
+	if ( !passthru )
+	{
+		// Set Paused State _Before_ Resume for Next Prologue to Use Queued
+		m_isPaused = false;
+		// NOTE: Triggers New File/Prologue with _Current_ State...!
+		m_ctrl->resumeRecording();
+	}
+	else
+	{
+		m_isPausedPT = false;
+	}
+
+	emitPacket( *ts, ADARA::MarkerType::RESUME, scanIndex,
+		ss.str(), comment );
 
 	// If Not in Run, then _Also_ Queue Message for Later...
 	if ( !m_inRun )
 	{
 		resumeQueue.push_back(
 			std::pair<struct timespec, std::string>( *ts,
-				"[PRE-RUN] " + ss.str() ) );
+				"[PRE-RUN] " + ss.str() + comment ) );
 	}
 }
 
-void Markers::startScan( struct timespec *ts )
+void Markers::startScan( struct timespec *ts,
+		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
-	m_scanIndex = m_indexPV->value();
+	std::string comment;
+	uint32_t scanIndex;
+
+	if ( passthru ) {
+		comment = pt_comment;
+		scanIndex = pt_scanIndex;
+	}
+	else {
+		// NOTE: *Don't* Include "Scan Comment" Here,
+		// Already Added on Scan Comment PV Set...
+		comment = "";
+		m_scanIndex = m_indexPV->value();
+		scanIndex = m_scanIndex;
+	}
+
 	std::stringstream ss;
 	if ( !m_inRun )
 		ss << "[PRE-RUN] ";
-	else if ( m_isPaused )
+	else if ( m_isPaused || m_isPausedPT )
 		ss << "[PAUSED Run " << m_runNumber << "] ";
 	else
 		ss << "[Run " << m_runNumber << "] ";
-	ss << "Scan #" << m_scanIndex << " Started.";
+	ss << "Scan #" << scanIndex << " Started.";
 	DEBUG( ss.str() );
-	// NOTE: *Don't* Include "Scan Comment" Here,
-	// Already Added on Scan Comment PV Set...
-	emitPacket( *ts, ADARA::MarkerType::SCAN_START, ss.str() );
+
+	emitPacket( *ts, ADARA::MarkerType::SCAN_START, scanIndex,
+		ss.str(), comment );
 
 	// If Not in Run, or if Paused, then _Also_ Queue Message for Later...
 	if ( !m_inRun || m_isPaused )
 	{
 		std::stringstream ss_scan;
-		ss_scan << m_scanIndex << "|";
+		ss_scan << scanIndex << "|";
 		scanStartQueue.push_back(
 			std::pair<struct timespec, std::string>( *ts,
 				ss_scan.str() + ss.str() ) );
 	}
 }
 
-void Markers::stopScan( struct timespec *ts )
+void Markers::stopScan( struct timespec *ts,
+		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
+	std::string comment;
+	uint32_t scanIndex;
+
+	if ( passthru ) {
+		comment = pt_comment;
+		scanIndex = pt_scanIndex;
+	}
+	else {
+		// NOTE: *Don't* Include "Scan Comment" Here,
+		// Already Added on Scan Comment PV Set...
+		comment = "";
+		scanIndex = m_scanIndex;
+		m_scanIndex = 0;
+	}
+
 	std::stringstream ss;
 	if ( !m_inRun )
 		ss << "[PRE-RUN] ";
-	else if ( m_isPaused )
+	else if ( m_isPaused || m_isPausedPT )
 		ss << "[PAUSED Run " << m_runNumber << "] ";
 	else
 		ss << "[Run " << m_runNumber << "] ";
-	ss << "Scan #" << m_scanIndex << " Stopped.";
+	ss << "Scan #" << scanIndex << " Stopped.";
 	DEBUG( ss.str() );
-	emitPacket( *ts, ADARA::MarkerType::SCAN_STOP, ss.str() );
+
+	emitPacket( *ts, ADARA::MarkerType::SCAN_STOP, scanIndex,
+		ss.str(), comment );
 
 	// If Not in Run, or if Paused, then _Also_ Queue Message for Later...
 	if ( !m_inRun || m_isPaused )
 	{
 		std::stringstream ss_scan;
-		ss_scan << m_scanIndex << "|";
+		ss_scan << scanIndex << "|";
 		scanStopQueue.push_back(
 			std::pair<struct timespec, std::string>( *ts,
 				ss_scan.str() + ss.str() ) );
 	}
-
-	m_scanIndex = 0;
 }
 
 // DEPRECATED
-void Markers::annotate( struct timespec *ts )
+void Markers::annotate( struct timespec *ts,
+		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
+	std::string comment;
+	uint32_t scanIndex;
+
+	if ( passthru ) {
+		comment = pt_comment;
+		scanIndex = pt_scanIndex;
+	}
+	else {
+		comment = ( (m_commentPV->valid())
+			? (m_commentPV->value()) : ("(No Comment)") );
+
+		// Annotation Comments are one-shot,
+		// Reset once the packet is inserted.
+		m_commentPV->unset();
+
+		scanIndex = m_scanIndex;
+	}
+
 	std::stringstream ss;
 
 	if ( m_inRun && !m_isPaused )
 	{
 		ss << "Run " << m_runNumber << ":";
-		ss << " General Comment - " << m_commentPV->value();
+		ss << " General Comment - " << comment;
 		DEBUG("[DEPRECATED] annotate() " << ss.str());
 
-		emitPacket( *ts, ADARA::MarkerType::GENERIC, "", m_commentPV );
-
-		// Annotation Comments are one-shot,
-		// Reset once the packet is inserted.
-		m_commentPV->unset();
+		emitPacket( *ts, ADARA::MarkerType::GENERIC,
+			scanIndex, "", comment );
 	}
 
 	// Otherwise, Queue Up Annotation Comments Strings for Next Run...
@@ -449,15 +556,10 @@ void Markers::annotate( struct timespec *ts )
 	{
 		if ( !m_inRun )
 			ss << "[PRE-RUN] ";
-		else if ( m_isPaused )
+		else if ( m_isPaused || m_isPausedPT )
 			ss << "[PAUSED Run " << m_runNumber << "] ";
 
-		if ( m_commentPV->valid() ) {
-			ss << m_commentPV->value();
-		}
-		else {
-			ss << "(No Comment)";
-		}
+		ss << comment;
 
 		DEBUG("[DEPRECATED] annotate() General Comment - " << ss.str());
 
@@ -467,8 +569,27 @@ void Markers::annotate( struct timespec *ts )
 }
 
 // DEPRECATED
-void Markers::addRunComment( struct timespec *ts )
+void Markers::addRunComment( struct timespec *ts,
+		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
+	std::string comment;
+	uint32_t scanIndex;
+
+	if ( passthru ) {
+		comment = pt_comment;
+		scanIndex = pt_scanIndex;
+	}
+	else {
+		comment = ( (m_commentPV->valid())
+			? (m_commentPV->value()) : ("(No Comment)") );
+
+		// Run Notes Comments are One-Shot,
+		// Reset once the packet is inserted.
+		m_commentPV->unset();
+
+		scanIndex = m_scanIndex;
+	}
+
 	std::stringstream ss;
 
 	// In a Run, Add Run Comment Now...
@@ -479,11 +600,11 @@ void Markers::addRunComment( struct timespec *ts )
 		// This Is It! :-D
 		if ( !m_notesCommentSet )
 		{
-			ss << " Overall Run Notes - " << m_commentPV->value();
+			ss << " Overall Run Notes - " << comment;
 			DEBUG("[DEPRECATED] addRunComment() " << ss.str());
 
 			emitPacket( *ts, ADARA::MarkerType::OVERALL_RUN_COMMENT,
-				"", m_commentPV );
+				scanIndex, "", comment );
 
 			m_notesCommentSet = true;
 		}
@@ -495,12 +616,8 @@ void Markers::addRunComment( struct timespec *ts )
 			ERROR("[DEPRECATED] addRunComment() " << ss.str());
 
 			emitPacket( *ts, ADARA::MarkerType::GENERIC,
-				"[DISCARDED RUN NOTES] ", m_commentPV );
+				scanIndex, "[DISCARDED RUN NOTES] ", comment );
 		}
-
-		// Run Notes Comments are One-Shot,
-		// Reset once the packet is inserted.
-		m_commentPV->unset();
 	}
 
 	// Otherwise, Save Run Notes Comment String for Next Run...
@@ -513,18 +630,11 @@ void Markers::addRunComment( struct timespec *ts )
 			m_useFirstNotesComment = false;
 			ss << "[PRE-RUN] ";
 		}
-		else if ( m_isPaused ) {
+		else if ( m_isPaused || m_isPausedPT ) {
 			m_useFirstNotesComment = true;
 			ss << "[PAUSED Run " << m_runNumber << "] ";
 		}
 
-		std::string comment;
-		if ( m_commentPV->valid() ) {
-			comment = m_commentPV->value();
-		}
-		else {
-			comment = "(No Comment)";
-		}
 		ss << comment;
 
 		DEBUG("[DEPRECATED] addRunComment() Save Run Notes for Next Run - "
@@ -535,13 +645,27 @@ void Markers::addRunComment( struct timespec *ts )
 	}
 }
 
-void Markers::addScanComment( struct timespec *ts )
+void Markers::addScanComment( struct timespec *ts,
+		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
+	std::string comment;
+	uint32_t scanIndex;
+
+	if ( passthru ) {
+		comment = pt_comment;
+		scanIndex = pt_scanIndex;
+	}
+	else {
+		comment = ( (m_scanCommentPV->valid())
+			? (m_scanCommentPV->value()) : ("(No Comment)") );
+		scanIndex = m_scanIndex;
+	}
+
 	// Already in the Middle of a Scan...
 	// - Prepend "Scan:" Prefix to Comment...
 	std::stringstream ss;
-	if ( m_scanIndex ) {
-		ss << "Scan " << m_scanIndex << ": ";
+	if ( scanIndex ) {
+		ss << "Scan " << scanIndex << ": ";
 	}
 
 	// Before the Scan...
@@ -555,30 +679,25 @@ void Markers::addScanComment( struct timespec *ts )
 	{
 		std::stringstream ss2;
 		ss2 << "Run " << m_runNumber << ":";
-		ss2 << " Scan Comment - " << ss.str() << m_scanCommentPV->value();
+		ss2 << " Scan Comment - " << ss.str() << comment;
 		DEBUG("addScanComment() " << ss2.str());
 
 		emitPacket( *ts, ADARA::MarkerType::GENERIC,
-			ss.str(), m_scanCommentPV );
+			scanIndex, ss.str(), comment );
 	}
 
 	// Otherwise, Queue Up Scan Comments Strings for Next Scan...
 	else
 	{
 		std::stringstream ss_scan;
-		ss_scan << m_scanIndex << "|";
+		ss_scan << scanIndex << "|";
 
 		if ( !m_inRun )
 			ss_scan << "[PRE-RUN] ";
-		else if ( m_isPaused )
+		else if ( m_isPaused || m_isPausedPT )
 			ss_scan << "[PAUSED Run " << m_runNumber << "] ";
 
-		if ( m_scanCommentPV->valid() ) {
-			ss << m_scanCommentPV->value();
-		}
-		else {
-			ss << "(No Comment)";
-		}
+		ss << comment;
 
 		DEBUG("addScanComment()"
 			<< " Queue Scan Comment for Next Scan scanIndex="
@@ -590,8 +709,22 @@ void Markers::addScanComment( struct timespec *ts )
 	}
 }
 
-void Markers::addNotesComment( struct timespec *ts )
+void Markers::addNotesComment( struct timespec *ts,
+		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
+	std::string comment;
+	uint32_t scanIndex;
+
+	if ( passthru ) {
+		comment = pt_comment;
+		scanIndex = pt_scanIndex;
+	}
+	else {
+		comment = ( (m_notesCommentPV->valid())
+			? (m_notesCommentPV->value()) : ("(No Comment)") );
+		scanIndex = m_scanIndex;
+	}
+
 	std::stringstream ss;
 
 	// In a Run, Add Run Comment Now...
@@ -602,11 +735,11 @@ void Markers::addNotesComment( struct timespec *ts )
 		// This Is It! :-D
 		if ( !m_notesCommentSet )
 		{
-			ss << " Overall Run Notes - " << m_notesCommentPV->value();
+			ss << " Overall Run Notes - " << comment;
 			DEBUG("addNotesComment() " << ss.str());
 
 			emitPacket( *ts, ADARA::MarkerType::OVERALL_RUN_COMMENT,
-				"", m_notesCommentPV );
+				scanIndex, "", comment );
 
 			m_notesCommentSet = true;
 		}
@@ -614,11 +747,11 @@ void Markers::addNotesComment( struct timespec *ts )
 		// Extraneous Extra Run Notes, Emit as Generic Comment...
 		else
 		{
-			ss << " [DISCARDED RUN NOTES] - " << m_notesCommentPV->value();
+			ss << " [DISCARDED RUN NOTES] - " << comment;
 			ERROR("addNotesComment() " << ss.str());
 
 			emitPacket( *ts, ADARA::MarkerType::GENERIC,
-				"[DISCARDED RUN NOTES] ", m_notesCommentPV );
+				scanIndex, "[DISCARDED RUN NOTES] ", comment );
 		}
 	}
 
@@ -632,18 +765,11 @@ void Markers::addNotesComment( struct timespec *ts )
 			m_useFirstNotesComment = false;
 			ss << "[PRE-RUN] ";
 		}
-		else if ( m_isPaused ) {
+		else if ( m_isPaused || m_isPausedPT ) {
 			m_useFirstNotesComment = true;
 			ss << "[PAUSED Run " << m_runNumber << "] ";
 		}
 
-		std::string comment;
-		if ( m_notesCommentPV->valid() ) {
-			comment = m_notesCommentPV->value();
-		}
-		else {
-			comment = "(No Comment)";
-		}
 		ss << comment;
 
 		DEBUG("addNotesComment() Save Run Notes for Next Run - "
@@ -654,19 +780,33 @@ void Markers::addNotesComment( struct timespec *ts )
 	}
 }
 
-void Markers::addAnnotationComment( struct timespec *ts )
+void Markers::addAnnotationComment( struct timespec *ts,
+		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
+	std::string comment;
+	uint32_t scanIndex;
+
+	if ( passthru ) {
+		comment = pt_comment;
+		scanIndex = pt_scanIndex;
+	}
+	else {
+		comment = ( (m_annotationCommentPV->valid())
+			? (m_annotationCommentPV->value()) : ("(No Comment)") );
+		scanIndex = m_scanIndex;
+	}
+
 	std::stringstream ss;
 
 	// In a Run, Add Annotation Comment Now...
 	if ( m_inRun && !m_isPaused )
 	{
 		ss << "Run " << m_runNumber << ":";
-		ss << " General Comment - " << m_annotationCommentPV->value();
+		ss << " General Comment - " << comment;
 		DEBUG("addAnnotationComment() " << ss.str());
 
 		emitPacket( *ts, ADARA::MarkerType::GENERIC,
-			"", m_annotationCommentPV );
+			scanIndex, "", comment );
 	}
 
 	// Otherwise, Queue Up Annotation Comments Strings for Next Run...
@@ -674,15 +814,10 @@ void Markers::addAnnotationComment( struct timespec *ts )
 	{
 		if ( !m_inRun )
 			ss << "[PRE-RUN] ";
-		else if ( m_isPaused )
+		else if ( m_isPaused || m_isPausedPT )
 			ss << "[PAUSED Run " << m_runNumber << "] ";
 
-		if ( m_annotationCommentPV->valid() ) {
-			ss << m_annotationCommentPV->value();
-		}
-		else {
-			ss << "(No Comment)";
-		}
+		ss << comment;
 
 		DEBUG("addAnnotationComment() General Comment - " << ss.str());
 
@@ -716,9 +851,8 @@ void Markers::dumpRunNotesComment( bool prologue )
 					<< ": " << first_notes_it->second);
 
 				emitPacket( first_notes_it->first,
-					ADARA::MarkerType::OVERALL_RUN_COMMENT,
-					first_notes_it->second,
-					StringPVSharedPtr(), prologue );
+					ADARA::MarkerType::OVERALL_RUN_COMMENT, m_scanIndex,
+					"", first_notes_it->second, prologue );
 
 				notesCommentQueue.erase( first_notes_it );
 
@@ -742,9 +876,8 @@ void Markers::dumpRunNotesComment( bool prologue )
 					<< ": " << last_notes_it->second);
 
 				emitPacket( last_notes_it->first,
-					ADARA::MarkerType::OVERALL_RUN_COMMENT,
-					last_notes_it->second,
-					StringPVSharedPtr(), prologue );
+					ADARA::MarkerType::OVERALL_RUN_COMMENT, m_scanIndex,
+					"", last_notes_it->second, prologue );
 
 				notesCommentQueue.pop_back();
 
@@ -867,20 +1000,19 @@ void Markers::dumpQueuedComments( bool prologue )
 		}
 
 		// Handle Scan Index Decoding from Saved Comment String... ;-Q
-		uint32_t save_scanIndex = (uint32_t) -1;
 		std::string comment = next_it->second;
+		uint32_t scanIndex = m_scanIndex; // Use as Default if Not a Scan
 		std::stringstream ss_scan;
 		if ( is_scan )
 		{
-			save_scanIndex = m_scanIndex;
 			std::size_t found;
-			if ( (found = next_it->second.find("|")) != std::string::npos )
+			if ( (found = comment.find("|")) != std::string::npos )
 			{
-				m_scanIndex = boost::lexical_cast<uint32_t>(
-					next_it->second.substr( 0, found ) );
-				comment = next_it->second.substr( found + 1 );
+				scanIndex = boost::lexical_cast<uint32_t>(
+					comment.substr( 0, found ) );
+				comment = comment.substr( found + 1 );
 			}
-			ss_scan << "scanIndex=" << m_scanIndex << " ";
+			ss_scan << "scanIndex=" << scanIndex << " ";
 		}
 
 		// Dump Next Comment/Marker...
@@ -896,12 +1028,8 @@ void Markers::dumpQueuedComments( bool prologue )
 		else
 			DEBUG( ss.str() );
 
-		emitPacket( next_it->first, markerType, prefix + comment,
-			StringPVSharedPtr(), prologue );
-
-		// Handle Scan Index Restore... ;-b
-		if ( is_scan )
-			m_scanIndex = save_scanIndex;
+		emitPacket( next_it->first, markerType, scanIndex,
+			prefix, comment, prologue );
 
 		// Increment Given Iterator...
 		if ( next_it == pause_it )
@@ -956,7 +1084,7 @@ void Markers::onPrologue(void)
 		ss << "[NEW RUN FILE CONTINUATION] ";
 		if ( !m_inRun )
 			ss << "[PRE-RUN] ";
-		else if ( m_isPaused )
+		else if ( m_isPaused || m_isPausedPT )
 			ss << "[PAUSED Run " << m_runNumber << "] ";
 		else
 			ss << "[Run " << m_runNumber << "] ";
@@ -980,19 +1108,19 @@ void Markers::onPrologue(void)
 }
 
 void Markers::emitPrologue( ADARA::MarkerType::Enum markerType,
-		std::string prefix )
+		std::string comment )
 {
 	struct timespec now;
 	clock_gettime( CLOCK_REALTIME, &now );
-	emitPacket( now, markerType, prefix, StringPVSharedPtr(), true );
+	emitPacket( now, markerType, m_scanIndex, "", comment, true );
 }
 
 void Markers::emitPacket( const struct timespec &ts,
-		ADARA::MarkerType::Enum markerType,
-		std::string prefix, StringPVSharedPtr commentPV, bool prologue )
+		ADARA::MarkerType::Enum markerType, uint32_t scanIndex,
+		std::string prefix, std::string comment, bool prologue )
 {
 	uint32_t pkt[ 2 + sizeof(ADARA::Header) / sizeof(uint32_t) ];
-	std::string comment = "";
+	std::string full_comment = "";
 	uint32_t pad = 0;
 	struct iovec iov;
 	IoVector iovec;
@@ -1008,7 +1136,7 @@ void Markers::emitPacket( const struct timespec &ts,
 	if ( markerType == ADARA::MarkerType::OVERALL_RUN_COMMENT )
 		pkt[5] = 0;
 	else
-		pkt[5] = m_scanIndex;
+		pkt[5] = scanIndex;
 
 	/* Set the hint flag for clients, but only for scan start/stops */
 	// XXX think this through, maybe get rid of hint
@@ -1027,35 +1155,25 @@ void Markers::emitPacket( const struct timespec &ts,
 	iovec.push_back(iov);
 
 	/* Append the optional comment to the packet */
-	if ( commentPV ) {
-		if ( commentPV->valid() ) {
-			comment = prefix + commentPV->value();
-		}
-		else {
-			comment = prefix + "(No Comment)";
-		}
-	}
-	else if ( !prefix.empty() ) {
-		comment = prefix;
-	}
 
-	/* Append the optional comment to the packet */
-	if ( !comment.empty() ) {
+	full_comment = prefix + comment;
+
+	if ( !full_comment.empty() ) {
 	
 		/* We only allow so much content... */
-		if ( comment.size() > 65535 )
-			comment.resize(65535);
+		if ( full_comment.size() > 65535 )
+			full_comment.resize(65535);
 
-		pkt[0] += ( comment.size() + 3 ) & ~3;
-		pkt[4] |= comment.size();
+		pkt[0] += ( full_comment.size() + 3 ) & ~3;
+		pkt[4] |= full_comment.size();
 
-		iov.iov_base = const_cast<char *>(comment.c_str());
-		iov.iov_len = comment.size();
+		iov.iov_base = const_cast<char *>(full_comment.c_str());
+		iov.iov_len = full_comment.size();
 		iovec.push_back(iov);
 
-		if ( comment.size() % 4 ) {
+		if ( full_comment.size() % 4 ) {
 			iov.iov_base = &pad;
-			iov.iov_len = 4 - ( comment.size() % 4 );
+			iov.iov_len = 4 - ( full_comment.size() % 4 );
 			iovec.push_back(iov);
 		}
 	}
