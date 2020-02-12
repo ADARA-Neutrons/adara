@@ -25,6 +25,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
+#include "Markers.h"
 #include "utils.h"
 
 RateLimitedLogging::History RLLHistory_DataSource;
@@ -3373,7 +3374,35 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 			<< ss.str());
 	}
 
-	// DO SOMETHING WITH IT... ;-D
+	// Pass-Thru Invoke Appropriate Markers Handler Method...
+	boost::shared_ptr<Markers> markers = m_ctrl->getMarkers();
+	struct timespec ts = pkt.timestamp();
+	switch ( pkt.marker_type() ) {
+		case ADARA::MarkerType::GENERIC:
+			markers->addAnnotationComment( &ts, true,
+				pkt.scanIndex(), pkt.comment() );
+			break;
+		case ADARA::MarkerType::SCAN_START:
+			markers->startScan( &ts, true,
+				pkt.scanIndex(), pkt.comment() );
+			break;
+		case ADARA::MarkerType::SCAN_STOP:
+			markers->stopScan( &ts, true,
+				pkt.scanIndex(), pkt.comment() );
+			break;
+		case ADARA::MarkerType::PAUSE:
+			markers->pause( &ts, true,
+				pkt.scanIndex(), pkt.comment() );
+			break;
+		case ADARA::MarkerType::RESUME:
+			markers->resume( &ts, true,
+				pkt.scanIndex(), pkt.comment() );
+			break;
+		case ADARA::MarkerType::OVERALL_RUN_COMMENT:
+			markers->addNotesComment( &ts, true,
+				pkt.scanIndex(), pkt.comment() );
+			break;
+	}
 
 	return false;
 }
