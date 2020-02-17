@@ -3463,7 +3463,7 @@ void DataSource::onSavePrologue(void)
 	pkt[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	pkt[3] = now.tv_nsec;
 
-	pkt[4] = (uint32_t) ADARA::MarkerType::OVERALL_RUN_COMMENT << 16;
+	pkt[4] = (uint32_t) ADARA::MarkerType::GENERIC << 16;
 	pkt[5] = 0;
 
 	iov.iov_base = pkt;
