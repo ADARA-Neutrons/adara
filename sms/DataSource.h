@@ -35,6 +35,7 @@ public:
 		double connect_retry, double connect_timeout,
 		double data_timeout, uint32_t data_timeout_retry,
 		bool ignore_eop, bool ignore_local_sawtooth,
+		bool ignore_annotation_pkts,
 		bool mixed_data_packets,
 		bool check_source_sequence, bool check_pulse_sequence,
 		uint32_t max_pulse_seq_list,
@@ -93,6 +94,7 @@ private:
 	uint32_t m_data_timeout_retry_count;
 	bool m_ignore_eop;
 	bool m_ignore_local_sawtooth;
+	bool m_ignore_annotation_pkts;
 	bool m_mixed_data_packets;
 	bool m_check_source_sequence;
 	bool m_check_pulse_sequence;
@@ -113,6 +115,7 @@ private:
 	boost::shared_ptr<smsUint32PV> m_pvDataTimeoutRetry;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreLocalSAWTOOTH;
+	boost::shared_ptr<smsBooleanPV> m_pvIgnoreAnnotationPkts;
 	boost::shared_ptr<smsBooleanPV> m_pvMixedDataPackets;
 	boost::shared_ptr<smsBooleanPV> m_pvCheckSourceSequence;
 	boost::shared_ptr<smsBooleanPV> m_pvCheckPulseSequence;

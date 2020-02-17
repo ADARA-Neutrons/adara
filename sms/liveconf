@@ -147,6 +147,14 @@ option_label[$num_options]="[Ignore Local SAWTOOTH Times]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
+option_name[$num_options]="ignore_annotation_pkts"
+option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:IgnoreAnnotationPkts"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Ignore External/Replay ADARA Markers/Annotns]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
 option_name[$num_options]="mixed_data_packets"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MixedDataPackets"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
@@ -1533,6 +1541,7 @@ if [[ "$command" == "status" \
 					caget $WAIT ${dsprefix}:DataTimeoutRetry
 					caget $WAIT ${dsprefix}:IgnoreEoP
 					caget $WAIT ${dsprefix}:IgnoreLocalSAWTOOTH
+					caget $WAIT ${dsprefix}:IgnoreAnnotationPkts
 					caget $WAIT ${dsprefix}:MixedDataPackets
 					caget $WAIT ${dsprefix}:CheckSourceSequence
 					caget $WAIT ${dsprefix}:CheckPulseSequence

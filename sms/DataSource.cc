@@ -807,6 +807,7 @@ DataSource::DataSource( const std::string &name,
 			double connect_retry, double connect_timeout,
 			double data_timeout, uint32_t data_timeout_retry,
 			bool ignore_eop, bool ignore_local_sawtooth,
+			bool ignore_annotation_pkts,
 			bool mixed_data_packets,
 			bool check_source_sequence, bool check_pulse_sequence,
 			uint32_t max_pulse_seq_list,
@@ -820,6 +821,7 @@ DataSource::DataSource( const std::string &name,
 	m_data_timeout_retry_count(0),
 	m_ignore_eop(ignore_eop),
 	m_ignore_local_sawtooth(ignore_local_sawtooth),
+	m_ignore_annotation_pkts(ignore_annotation_pkts),
 	m_mixed_data_packets(mixed_data_packets),
 	m_check_source_sequence(check_source_sequence),
 	m_check_pulse_sequence(check_pulse_sequence),
@@ -942,6 +944,10 @@ DataSource::DataSource( const std::string &name,
 		smsBooleanPV(prefix + ":IgnoreLocalSAWTOOTH",
 			/* AutoSave */ true));
 
+	m_pvIgnoreAnnotationPkts = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":IgnoreAnnotationPkts",
+			/* AutoSave */ true));
+
 	m_pvMixedDataPackets = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":MixedDataPackets", /* AutoSave */ true));
 
@@ -1018,6 +1024,7 @@ DataSource::DataSource( const std::string &name,
 	m_ctrl->addPV(m_pvDataTimeoutRetry);
 	m_ctrl->addPV(m_pvIgnoreEoP);
 	m_ctrl->addPV(m_pvIgnoreLocalSAWTOOTH);
+	m_ctrl->addPV(m_pvIgnoreAnnotationPkts);
 	m_ctrl->addPV(m_pvMixedDataPackets);
 	m_ctrl->addPV(m_pvCheckSourceSequence);
 	m_ctrl->addPV(m_pvCheckPulseSequence);
@@ -1055,6 +1062,7 @@ DataSource::DataSource( const std::string &name,
 	m_pvDataTimeoutRetry->update(m_data_timeout_retry, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
 	m_pvIgnoreLocalSAWTOOTH->update(m_ignore_local_sawtooth, &now);
+	m_pvIgnoreAnnotationPkts->update(m_ignore_annotation_pkts, &now);
 	m_pvMixedDataPackets->update(m_mixed_data_packets, &now);
 	m_pvCheckSourceSequence->update(m_check_source_sequence, &now);
 	m_pvCheckPulseSequence->update(m_check_pulse_sequence, &now);
@@ -1157,6 +1165,13 @@ DataSource::DataSource( const std::string &name,
 			bvalue, ts ) ) {
 		m_ignore_local_sawtooth = bvalue;
 		m_pvIgnoreLocalSAWTOOTH->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvIgnoreAnnotationPkts->getName(),
+			bvalue, ts ) ) {
+		m_ignore_annotation_pkts = bvalue;
+		m_pvIgnoreAnnotationPkts->update(bvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV( m_pvMixedDataPackets->getName(),
@@ -3345,6 +3360,9 @@ bool DataSource::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 
 bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 {
+	// Meter Live Control PV Updates...
+	static uint32_t cnt = 0;
+
 	/* Rate-limited logging of Annotation packets */
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
@@ -3374,34 +3392,53 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 			<< ss.str());
 	}
 
-	// Pass-Thru Invoke Appropriate Markers Handler Method...
-	boost::shared_ptr<Markers> markers = m_ctrl->getMarkers();
-	struct timespec ts = pkt.timestamp();
-	switch ( pkt.marker_type() ) {
-		case ADARA::MarkerType::GENERIC:
-			markers->addAnnotationComment( &ts, true,
-				pkt.scanIndex(), pkt.comment() );
-			break;
-		case ADARA::MarkerType::SCAN_START:
-			markers->startScan( &ts, true,
-				pkt.scanIndex(), pkt.comment() );
-			break;
-		case ADARA::MarkerType::SCAN_STOP:
-			markers->stopScan( &ts, true,
-				pkt.scanIndex(), pkt.comment() );
-			break;
-		case ADARA::MarkerType::PAUSE:
-			markers->pause( &ts, true,
-				pkt.scanIndex(), pkt.comment() );
-			break;
-		case ADARA::MarkerType::RESUME:
-			markers->resume( &ts, true,
-				pkt.scanIndex(), pkt.comment() );
-			break;
-		case ADARA::MarkerType::OVERALL_RUN_COMMENT:
-			markers->addNotesComment( &ts, true,
-				pkt.scanIndex(), pkt.comment() );
-			break;
+	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
+	if ( !( ++cnt % 9 ) ) {
+		bool tmpIgnoreAnnotationPkts = m_pvIgnoreAnnotationPkts->value();
+		if ( tmpIgnoreAnnotationPkts != m_ignore_annotation_pkts )
+		{
+			ERROR("rxPacket( AnnotationPkt ):"
+				<< " Updating Value of"
+				<< " Ignore Annotation Packets"
+				<< " for " << m_name
+				<< " from " << m_ignore_annotation_pkts
+				<< " to " << tmpIgnoreAnnotationPkts);
+			m_ignore_annotation_pkts = tmpIgnoreAnnotationPkts;
+		}
+	}
+
+	// Optionally Interpret External or Replayed ADARA Marker/Annotations
+	if ( !m_ignore_annotation_pkts )
+	{
+		// Pass-Thru Invoke Appropriate Markers Handler Method...
+		boost::shared_ptr<Markers> markers = m_ctrl->getMarkers();
+		struct timespec ts = pkt.timestamp();
+		switch ( pkt.marker_type() ) {
+			case ADARA::MarkerType::GENERIC:
+				markers->addAnnotationComment( &ts, true,
+					pkt.scanIndex(), pkt.comment() );
+				break;
+			case ADARA::MarkerType::SCAN_START:
+				markers->startScan( &ts, true,
+					pkt.scanIndex(), pkt.comment() );
+				break;
+			case ADARA::MarkerType::SCAN_STOP:
+				markers->stopScan( &ts, true,
+					pkt.scanIndex(), pkt.comment() );
+				break;
+			case ADARA::MarkerType::PAUSE:
+				markers->pause( &ts, true,
+					pkt.scanIndex(), pkt.comment() );
+				break;
+			case ADARA::MarkerType::RESUME:
+				markers->resume( &ts, true,
+					pkt.scanIndex(), pkt.comment() );
+				break;
+			case ADARA::MarkerType::OVERALL_RUN_COMMENT:
+				markers->addNotesComment( &ts, true,
+					pkt.scanIndex(), pkt.comment() );
+				break;
+		}
 	}
 
 	return false;
