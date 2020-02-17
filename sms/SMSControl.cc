@@ -354,6 +354,7 @@ void SMSControl::addSource(const std::string &name,
 	unsigned int chunk_size;
 	bool ignore_eop;
 	bool ignore_local_sawtooth;
+	bool ignore_annotation_pkts;
 	bool mixed_data_packets;
 	bool check_source_sequence;
 	bool check_pulse_sequence;
@@ -387,6 +388,8 @@ void SMSControl::addSource(const std::string &name,
 	data_timeout_retry = info.get<uint32_t>("data_timeout_retry", 3);
 	ignore_eop = info.get<bool>("ignore_eop", false);
 	ignore_local_sawtooth = info.get<bool>("ignore_local_sawtooth", false);
+	ignore_annotation_pkts =
+		info.get<bool>("ignore_annotation_pkts", true);
 	mixed_data_packets = info.get<bool>("mixed_data_packets", false);
 	check_source_sequence = info.get<bool>("check_source_sequence", true);
 	check_pulse_sequence = info.get<bool>("check_pulse_sequence", true);
@@ -414,6 +417,14 @@ void SMSControl::addSource(const std::string &name,
 		DEBUG("Ignore-Local-SAWTOOTH Flag Set to True for " << name
 			<< " - Ignoring Out-of-Time-Order Pulse Times!");
 	}
+
+	// Should probably let someone know whether or not we're gonna
+	// Ignore Annotation Packets for this Data Source...
+	DEBUG("Ignore-Annotation-Packets Flag Set to "
+		<< ( (ignore_annotation_pkts) ? "True" : "False" )
+		<< " for " << name << " -"
+		<< ( (ignore_annotation_pkts) ? "" : " _Not_" )
+		<< " Ignoring External Marker Replay Driving...!");
 
 	// Should probably let someone know if we're Mixing Data Packets
 	// with Both Neutron Events and Meta-Data Events... ;-D
@@ -462,6 +473,7 @@ void SMSControl::addSource(const std::string &name,
 							 data_timeout_retry,
 							 ignore_eop,
 							 ignore_local_sawtooth,
+							 ignore_annotation_pkts,
 							 mixed_data_packets,
 							 check_source_sequence,
 							 check_pulse_sequence,
