@@ -3420,19 +3420,23 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 				break;
 			case ADARA::MarkerType::SCAN_START:
 				markers->startScan( &ts, true,
-					pkt.scanIndex(), pkt.comment() );
+					pkt.scanIndex(), "" );
+					// Don't Pass Comment, Let Scan Start Re-Generate It...
 				break;
 			case ADARA::MarkerType::SCAN_STOP:
 				markers->stopScan( &ts, true,
-					pkt.scanIndex(), pkt.comment() );
+					pkt.scanIndex(), "" );
+					// Don't Pass Comment, Let Scan Stop Re-Generate It...
 				break;
 			case ADARA::MarkerType::PAUSE:
 				markers->pause( &ts, true,
-					pkt.scanIndex(), pkt.comment() );
+					pkt.scanIndex(), "" );
+					// Don't Pass Comment, Let Pause Re-Generate It...
 				break;
 			case ADARA::MarkerType::RESUME:
 				markers->resume( &ts, true,
-					pkt.scanIndex(), pkt.comment() );
+					pkt.scanIndex(), "" );
+					// Don't Pass Comment, Let Resume Re-Generate It...
 				break;
 			case ADARA::MarkerType::OVERALL_RUN_COMMENT:
 				markers->addNotesComment( &ts, true,
