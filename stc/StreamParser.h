@@ -248,10 +248,8 @@ private:
     bool                                    m_verbose;                  ///< STC Verbosity
 
 protected:
-    std::vector<double>                     m_pause_time;               /// Pause annotation timestamp buffer
-    std::vector<uint16_t>                   m_pause_value;              /// Pause value (on/off) buffer
-    uint64_t                                m_pause_last_time;          ///< Nanosec time (EPICS epoch) of last received Pause/Resume
-    std::vector<uint64_t>                   m_pause_abs_time_buffer;    ///< Buffer that holds absolute (non-normalized) timestamp (nanoseconds) of Pauses/Resumes
+    std::multimap<uint64_t, std::pair<double, uint16_t> >
+                                            m_pause_multimap;           /// Pause/Resume annotation nsec-to-timestamp/state (on/off) map
     bool                                    m_pause_has_non_normalized; /// Pause/Resume Marker received before 1st pulse...
 
     std::multimap<uint64_t, std::pair<double, uint32_t> >

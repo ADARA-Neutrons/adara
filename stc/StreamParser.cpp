@@ -75,7 +75,6 @@ StreamParser::StreamParser
     m_skipped_pkt_count(0),
     m_pulse_flag(0),
     m_verbose(a_verbose),
-    m_pause_last_time(0),
     m_pause_has_non_normalized(false),
     m_scan_has_non_normalized(false),
     m_comment_has_non_normalized(false)
@@ -114,8 +113,9 @@ StreamParser::StreamParser
             0, std::pair<double, uint32_t>(0.0, 0) ) );
 
     // Insert initial "not paused" value
-    m_pause_time.push_back( 0.0 );
-    m_pause_value.push_back( 0 );
+    m_pause_multimap.insert(
+        std::pair< uint64_t, std::pair<double, uint16_t> >(
+            0, std::pair<double, uint32_t>(0.0, 0) ) );
 }
 
 
@@ -5129,8 +5129,10 @@ StreamParser::markerPause
 {
     try
     {
-        m_pause_time.push_back( a_time );
-        m_pause_value.push_back( 1 ); // Current Nexus scan log calls for 1 to be used for pause
+        // Current Nexus Pause log calls for 1 to be Used for Pause
+        m_pause_multimap.insert(
+            std::pair< uint64_t, std::pair<double, uint16_t> >( a_ts_nano,
+                std::pair<double, uint16_t>( a_time, 1 ) ) );
 
         if ( a_comment.size() )
             markerComment( a_time, a_ts_nano, a_comment );
@@ -5156,8 +5158,10 @@ StreamParser::markerResume
 {
     try
     {
-        m_pause_time.push_back( a_time );
-        m_pause_value.push_back( 0 ); // Current Nexus scan log calls for 0 to be used for resume
+        // Current Nexus Pause log calls for 0 to be Used for Resume
+        m_pause_multimap.insert(
+            std::pair< uint64_t, std::pair<double, uint16_t> >( a_ts_nano,
+                std::pair<double, uint16_t>( a_time, 0 ) ) );
 
         if ( a_comment.size() )
             markerComment( a_time, a_ts_nano, a_comment );
@@ -5187,7 +5191,7 @@ StreamParser::markerScanStart
     {
         m_scan_multimap.insert(
             std::pair< uint64_t, std::pair<double, uint32_t> >( a_ts_nano,
-                std::pair<double, uint32_t>(a_time, a_scan_index) ) );
+                std::pair<double, uint32_t>( a_time, a_scan_index ) ) );
 
         if ( a_comment.size() )
             markerComment( a_time, a_ts_nano, a_comment );
@@ -5219,7 +5223,7 @@ StreamParser::markerScanStop
         // 0 to be used for all scan stops
         m_scan_multimap.insert(
             std::pair< uint64_t, std::pair<double, uint32_t> >( a_ts_nano,
-                std::pair<double, uint32_t>(a_time, 0) ) );
+                std::pair<double, uint32_t>( a_time, 0 ) ) );
 
         if ( a_comment.size() )
             markerComment( a_time, a_ts_nano, a_comment );
@@ -5251,7 +5255,8 @@ StreamParser::markerComment
             m_comment_multimap.insert(
                 std::pair< uint64_t, std::pair<double, std::string> >(
                     a_ts_nano,
-                    std::pair<double, std::string>(a_time, a_comment) ) );
+                    std::pair<double, std::string>( a_time, a_comment ) )
+            );
         }
     }
     catch( TraceException &e )

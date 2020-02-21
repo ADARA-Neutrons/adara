@@ -2471,6 +2471,8 @@ NxGen::runComment
 void
 NxGen::flushPauseData()
 {
+    multimap< uint64_t, pair<double, uint16_t> >::iterator pmm;
+
     if ( m_pause_has_non_normalized )
     {
         syslog( LOG_ERR, "[%i] %s %s: %s - %s",
@@ -2485,16 +2487,28 @@ NxGen::flushPauseData()
         // Create Pause Event Log (with Known Minimum Chunk Size...)
         makeGroup( m_daslogs_path + "/pause", "NXlog" );
         makeDataset( m_daslogs_path + "/pause", "time",
-            NeXus::FLOAT64, TIME_SEC_UNITS, m_pause_time.size() );
+            NeXus::FLOAT64, TIME_SEC_UNITS, m_pause_multimap.size() );
         makeDataset( m_daslogs_path + "/pause", "value",
-            NeXus::UINT16, "", m_pause_value.size() );
+            NeXus::UINT16, "", m_pause_multimap.size() );
+
+        // Extract Scan Index and Time Vectors from Multi-Map/Pair Beast!
+        vector<uint16_t> value_vec;
+        vector<double> time_vec;
+        for ( pmm = m_pause_multimap.begin();
+                pmm != m_pause_multimap.end(); ++pmm )
+        {
+            // Create Scan Index Vector
+            value_vec.push_back( pmm->second.second );
+
+            // Create Time Vector
+            time_vec.push_back( pmm->second.first );
+        }
 
         // Write Pause Time and Value Slabs
-        writeSlab( m_daslogs_path + "/pause/time", m_pause_time, 0 );
-        writeSlab( m_daslogs_path + "/pause/value", m_pause_value, 0 );
+        writeSlab( m_daslogs_path + "/pause/value", value_vec, 0 );
+        writeSlab( m_daslogs_path + "/pause/time", time_vec, 0 );
 
-        m_pause_time.clear();
-        m_pause_value.clear();
+        m_pause_multimap.clear();
     }
     catch( TraceException &e )
     {
