@@ -1296,7 +1296,7 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			<< " value=" << v);
 	}
 
-	if (v > 1)
+	if (v > 4)
 		return S_casApp_noSupport;
 
 	m_value->get(cur);
