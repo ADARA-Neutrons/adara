@@ -22,10 +22,10 @@ static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
 #include "StorageManager.h"
+#include "Markers.h"
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
-#include "Markers.h"
 #include "utils.h"
 
 RateLimitedLogging::History RLLHistory_DataSource;
@@ -807,7 +807,7 @@ DataSource::DataSource( const std::string &name,
 			double connect_retry, double connect_timeout,
 			double data_timeout, uint32_t data_timeout_retry,
 			bool ignore_eop, bool ignore_local_sawtooth,
-			bool ignore_annotation_pkts,
+			Markers::PassThru ignore_annotation_pkts,
 			bool mixed_data_packets,
 			bool check_source_sequence, bool check_pulse_sequence,
 			uint32_t max_pulse_seq_list,
@@ -944,8 +944,8 @@ DataSource::DataSource( const std::string &name,
 		smsBooleanPV(prefix + ":IgnoreLocalSAWTOOTH",
 			/* AutoSave */ true));
 
-	m_pvIgnoreAnnotationPkts = boost::shared_ptr<smsBooleanPV>(new
-		smsBooleanPV(prefix + ":IgnoreAnnotationPkts",
+	m_pvIgnoreAnnotationPkts = boost::shared_ptr<smsPassThruPV>(new
+		smsPassThruPV(prefix + ":IgnoreAnnotationPkts",
 			/* AutoSave */ true));
 
 	m_pvMixedDataPackets = boost::shared_ptr<smsBooleanPV>(new
@@ -1169,9 +1169,9 @@ DataSource::DataSource( const std::string &name,
 
 	if ( StorageManager::getAutoSavePV(
 			m_pvIgnoreAnnotationPkts->getName(),
-			bvalue, ts ) ) {
-		m_ignore_annotation_pkts = bvalue;
-		m_pvIgnoreAnnotationPkts->update(bvalue, &ts);
+			uvalue, ts ) ) {
+		m_ignore_annotation_pkts = (Markers::PassThru) uvalue;
+		m_pvIgnoreAnnotationPkts->update(uvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV( m_pvMixedDataPackets->getName(),
@@ -3394,7 +3394,8 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 
 	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
 	if ( !( ++cnt % 9 ) ) {
-		bool tmpIgnoreAnnotationPkts = m_pvIgnoreAnnotationPkts->value();
+		Markers::PassThru tmpIgnoreAnnotationPkts =
+			(Markers::PassThru) m_pvIgnoreAnnotationPkts->value();
 		if ( tmpIgnoreAnnotationPkts != m_ignore_annotation_pkts )
 		{
 			ERROR("rxPacket( AnnotationPkt ):"
@@ -3408,38 +3409,44 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 	}
 
 	// Optionally Interpret External or Replayed ADARA Marker/Annotations
-	if ( !m_ignore_annotation_pkts )
+	if ( m_ignore_annotation_pkts != Markers::IGNORE )
 	{
 		// Pass-Thru Invoke Appropriate Markers Handler Method...
 		boost::shared_ptr<Markers> markers = m_ctrl->getMarkers();
 		struct timespec ts = pkt.timestamp();
 		switch ( pkt.marker_type() ) {
 			case ADARA::MarkerType::GENERIC:
-				markers->addAnnotationComment( &ts, true,
+				markers->addAnnotationComment( &ts,
+					m_ignore_annotation_pkts,
 					pkt.scanIndex(), pkt.comment() );
 				break;
 			case ADARA::MarkerType::SCAN_START:
-				markers->startScan( &ts, true,
+				markers->startScan( &ts,
+					m_ignore_annotation_pkts,
 					pkt.scanIndex(), "" );
 					// Don't Pass Comment, Let Scan Start Re-Generate It...
 				break;
 			case ADARA::MarkerType::SCAN_STOP:
-				markers->stopScan( &ts, true,
+				markers->stopScan( &ts,
+					m_ignore_annotation_pkts,
 					pkt.scanIndex(), "" );
 					// Don't Pass Comment, Let Scan Stop Re-Generate It...
 				break;
 			case ADARA::MarkerType::PAUSE:
-				markers->pause( &ts, true,
+				markers->pause( &ts,
+					m_ignore_annotation_pkts,
 					pkt.scanIndex(), "" );
 					// Don't Pass Comment, Let Pause Re-Generate It...
 				break;
 			case ADARA::MarkerType::RESUME:
-				markers->resume( &ts, true,
+				markers->resume( &ts,
+					m_ignore_annotation_pkts,
 					pkt.scanIndex(), "" );
 					// Don't Pass Comment, Let Resume Re-Generate It...
 				break;
 			case ADARA::MarkerType::OVERALL_RUN_COMMENT:
-				markers->addNotesComment( &ts, true,
+				markers->addNotesComment( &ts,
+					m_ignore_annotation_pkts,
 					pkt.scanIndex(), pkt.comment() );
 				break;
 		}
