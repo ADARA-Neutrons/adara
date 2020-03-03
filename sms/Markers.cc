@@ -46,7 +46,8 @@ private:
 class MarkerTriggerPV : public smsTriggerPV {
 public:
 	typedef boost::function<void ( struct timespec *ts,
-			bool passthru, uint32_t pt_scanIndex, std::string pt_comment )>
+			Markers::PassThru passthru,
+			uint32_t pt_scanIndex, std::string pt_comment )>
 		callback;
 
 	MarkerTriggerPV( const std::string &name, callback cb ) :
@@ -56,7 +57,7 @@ public:
 	{
 		struct timespec ts;
 		m_value->getTimeStamp( &ts );
-		m_cb( &ts, false, -1, "" );
+		m_cb( &ts, Markers::IGNORE, -1, "" );
 	}
 
 private:
@@ -66,7 +67,8 @@ private:
 class MarkerCommentPV : public smsStringPV {
 public:
 	typedef boost::function<void ( struct timespec *ts,
-			bool passthru, uint32_t pt_scanIndex, std::string pt_comment )>
+			Markers::PassThru passthru,
+			uint32_t pt_scanIndex, std::string pt_comment )>
 		callback;
 
 	MarkerCommentPV( const std::string &name, callback cb ) :
@@ -83,7 +85,7 @@ public:
 		// Only Call Callback if String PV Set to Non-Empty Value...
 		// (Otherwise, "unset()" triggers a callback... ;-b)
 		if ( !comment.empty() && comment.compare( "(unset)" ) )
-			m_cb( &ts, false, -1, "" );
+			m_cb( &ts, Markers::IGNORE, -1, "" );
 
 		// AutoSave PV Value Change...
 		StorageManager::autoSavePV( m_pv_name, comment, &ts );
@@ -345,12 +347,12 @@ void Markers::runStop(void)
 }
 
 void Markers::pause( struct timespec *ts,
-		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
+		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
 	uint32_t scanIndex;
 
-	if ( passthru ) {
+	if ( passthru != IGNORE ) {
 		comment = pt_comment;
 		scanIndex = pt_scanIndex;
 	}
@@ -368,7 +370,7 @@ void Markers::pause( struct timespec *ts,
 	emitPacket( *ts, ADARA::MarkerType::PAUSE, scanIndex,
 		ss.str(), comment );
 
-	if ( !passthru )
+	if ( passthru != PASSTHRU )
 	{
 		// Set Paused State _Before_ Pause for Next Prologue to Skip Queued
 		m_isPaused = true;
@@ -389,12 +391,12 @@ void Markers::pause( struct timespec *ts,
 }
 
 void Markers::resume( struct timespec *ts,
-		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
+		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
 	uint32_t scanIndex;
 
-	if ( passthru ) {
+	if ( passthru != IGNORE ) {
 		comment = pt_comment;
 		scanIndex = pt_scanIndex;
 	}
@@ -409,7 +411,7 @@ void Markers::resume( struct timespec *ts,
 	ss << "Resumed.";
 	DEBUG(ss.str());
 
-	if ( !passthru )
+	if ( passthru != PASSTHRU )
 	{
 		// Set Paused State _Before_ Resume for Next Prologue to Use Queued
 		m_isPaused = false;
@@ -434,12 +436,12 @@ void Markers::resume( struct timespec *ts,
 }
 
 void Markers::startScan( struct timespec *ts,
-		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
+		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
 	uint32_t scanIndex;
 
-	if ( passthru ) {
+	if ( passthru != IGNORE ) {
 		comment = pt_comment;
 		scanIndex = pt_scanIndex;
 	}
@@ -476,12 +478,12 @@ void Markers::startScan( struct timespec *ts,
 }
 
 void Markers::stopScan( struct timespec *ts,
-		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
+		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
 	uint32_t scanIndex;
 
-	if ( passthru ) {
+	if ( passthru != IGNORE ) {
 		comment = pt_comment;
 		scanIndex = pt_scanIndex;
 	}
@@ -519,12 +521,12 @@ void Markers::stopScan( struct timespec *ts,
 
 // DEPRECATED
 void Markers::annotate( struct timespec *ts,
-		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
+		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
 	uint32_t scanIndex;
 
-	if ( passthru ) {
+	if ( passthru != IGNORE ) {
 		comment = pt_comment;
 		scanIndex = pt_scanIndex;
 	}
@@ -570,12 +572,12 @@ void Markers::annotate( struct timespec *ts,
 
 // DEPRECATED
 void Markers::addRunComment( struct timespec *ts,
-		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
+		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
 	uint32_t scanIndex;
 
-	if ( passthru ) {
+	if ( passthru != IGNORE ) {
 		comment = pt_comment;
 		scanIndex = pt_scanIndex;
 	}
@@ -646,12 +648,12 @@ void Markers::addRunComment( struct timespec *ts,
 }
 
 void Markers::addScanComment( struct timespec *ts,
-		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
+		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
 	uint32_t scanIndex;
 
-	if ( passthru ) {
+	if ( passthru != IGNORE ) {
 		comment = pt_comment;
 		scanIndex = pt_scanIndex;
 	}
@@ -710,12 +712,12 @@ void Markers::addScanComment( struct timespec *ts,
 }
 
 void Markers::addNotesComment( struct timespec *ts,
-		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
+		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
 	uint32_t scanIndex;
 
-	if ( passthru ) {
+	if ( passthru != IGNORE ) {
 		comment = pt_comment;
 		scanIndex = pt_scanIndex;
 	}
@@ -781,12 +783,12 @@ void Markers::addNotesComment( struct timespec *ts,
 }
 
 void Markers::addAnnotationComment( struct timespec *ts,
-		bool passthru, uint32_t pt_scanIndex, std::string pt_comment )
+		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
 	uint32_t scanIndex;
 
-	if ( passthru ) {
+	if ( passthru != IGNORE ) {
 		comment = pt_comment;
 		scanIndex = pt_scanIndex;
 	}

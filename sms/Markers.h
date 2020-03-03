@@ -23,31 +23,42 @@ public:
 	typedef std::vector< std::pair<struct timespec, std::string> >
 		MarkerQueue;
 
+	enum PassThru { IGNORE, PASSTHRU, EXECUTE };
+
 	Markers( SMSControl *ctrl, bool notesCommentAutoReset );
 	~Markers();
 
 	void beforeNewRun( uint32_t runNumber );
 	void runStop(void);
 
-	void addAnnotationComment( struct timespec *ts, bool passthru = false,
+	void addAnnotationComment( struct timespec *ts,
+		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void startScan( struct timespec *ts, bool passthru = false,
+	void startScan( struct timespec *ts,
+		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void stopScan( struct timespec *ts, bool passthru = false,
+	void stopScan( struct timespec *ts,
+		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void addScanComment( struct timespec *ts, bool passthru = false,
+	void addScanComment( struct timespec *ts,
+		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void pause( struct timespec *ts, bool passthru = false,
+	void pause( struct timespec *ts,
+		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void resume( struct timespec *ts, bool passthru = false,
+	void resume( struct timespec *ts,
+		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void addNotesComment( struct timespec *ts, bool passthru = false,
+	void addNotesComment( struct timespec *ts,
+		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
 
-	void annotate( struct timespec *ts, bool passthru = false,
+	void annotate( struct timespec *ts,
+		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
 		// DEPRECATED
-	void addRunComment( struct timespec *ts, bool passthru = false,
+	void addRunComment( struct timespec *ts,
+		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
 		// DEPRECATED
 
