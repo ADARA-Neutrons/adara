@@ -318,7 +318,7 @@ public:
 	void waiting_for_connect_ack(void);
 
 	bool valid(void);
-	bool value(void);
+	uint32_t value(void);
 
 public:
 	gddAppFuncTableStatus getValue(gdd &value);
@@ -326,6 +326,37 @@ public:
 
 	virtual bool allowUpdate(const gdd &val);
 	virtual void changed(void);
+};
+
+class smsPassThruPV : public smsPV {
+public:
+	smsPassThruPV(const std::string &name, bool auto_save = false);
+
+	caStatus read(const casCtx &ctx, gdd &prototype);
+	caStatus write(const casCtx &ctx, const gdd &value);
+
+	virtual aitEnum bestExternalType(void) const;
+
+	void update(uint16_t val, struct timespec *ts);
+
+	void ignore(void);
+	void passthru(void);
+	void execute(void);
+
+	bool valid(void);
+	uint32_t value(void);
+
+public:
+	gddAppFuncTableStatus getValue(gdd &value);
+	gddAppFuncTableStatus getEnums(gdd &value);
+
+	virtual bool allowUpdate(const gdd &val);
+	virtual void changed(void);
+
+	bool m_first_set;
+
+private:
+	bool m_auto_save;
 };
 
 class smsTriggerPV : public smsPV {
