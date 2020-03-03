@@ -10,6 +10,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 #include <time.h>
 #include <math.h>
 #include <stdint.h>
+#include <ctype.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/make_shared.hpp>
@@ -354,7 +355,8 @@ void SMSControl::addSource(const std::string &name,
 	unsigned int chunk_size;
 	bool ignore_eop;
 	bool ignore_local_sawtooth;
-	bool ignore_annotation_pkts;
+	Markers::PassThru ignore_annotation_pkts;
+	std::string ignore_annotation_pkts_str;
 	bool mixed_data_packets;
 	bool check_source_sequence;
 	bool check_pulse_sequence;
@@ -388,8 +390,8 @@ void SMSControl::addSource(const std::string &name,
 	data_timeout_retry = info.get<uint32_t>("data_timeout_retry", 3);
 	ignore_eop = info.get<bool>("ignore_eop", false);
 	ignore_local_sawtooth = info.get<bool>("ignore_local_sawtooth", false);
-	ignore_annotation_pkts =
-		info.get<bool>("ignore_annotation_pkts", true);
+	ignore_annotation_pkts_str =
+		info.get<std::string>("ignore_annotation_pkts", "ignore");
 	mixed_data_packets = info.get<bool>("mixed_data_packets", false);
 	check_source_sequence = info.get<bool>("check_source_sequence", true);
 	check_pulse_sequence = info.get<bool>("check_pulse_sequence", true);
@@ -420,11 +422,23 @@ void SMSControl::addSource(const std::string &name,
 
 	// Should probably let someone know whether or not we're gonna
 	// Ignore Annotation Packets for this Data Source...
+	for ( uint32_t i=0 ; i < ignore_annotation_pkts_str.size() ; i++ ) {
+		ignore_annotation_pkts_str[i] =
+			tolower( ignore_annotation_pkts_str[i] );
+	}
+	ignore_annotation_pkts =
+		( ignore_annotation_pkts_str.compare( "ignore" ) ?
+			( ignore_annotation_pkts_str.compare( "passthru" ) ?
+				Markers::EXECUTE : Markers::PASSTHRU ) : Markers::IGNORE );
 	DEBUG("Ignore-Annotation-Packets Flag Set to "
-		<< ( (ignore_annotation_pkts) ? "True" : "False" )
+		<< "\"" << ignore_annotation_pkts_str << "\""
+		<<  " (" << ignore_annotation_pkts << ")"
 		<< " for " << name << " -"
-		<< ( (ignore_annotation_pkts) ? "" : " _Not_" )
-		<< " Ignoring External Marker Replay Driving...!");
+		<< ( ( ignore_annotation_pkts == Markers::IGNORE ) ?
+			"Ignoring" :
+			( ( ignore_annotation_pkts == Markers::PASSTHRU ) ?
+				"Passing Through" : "Executing" ) )
+		<< " External Marker Replay Driving...");
 
 	// Should probably let someone know if we're Mixing Data Packets
 	// with Both Neutron Events and Meta-Data Events... ;-D
