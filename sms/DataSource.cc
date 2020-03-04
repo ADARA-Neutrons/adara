@@ -201,6 +201,20 @@ public:
 		// Until we "Prime the Pump"... ;-D
 		m_sourceSeq = (uint32_t) -1;
 
+		// Make Sure Max Pulse Sequence List Size is Reasonable...
+		// (It better at least be 1...?)
+		if ( m_maxPulseSeqList < 1 ) {
+			uint32_t tmpMaxPulseSeqList = 1;
+			ERROR("HWSource::HWSource():"
+				<< " Invalid Setting for"
+				<< " Max Pulse Sequence List (Buffer) Size"
+				<< " for " << m_name
+				<< std::hex << " src=0x" << m_hwId << std::dec
+				<< " Correcting from " << m_maxPulseSeqList
+				<< " to " << tmpMaxPulseSeqList);
+			m_maxPulseSeqList = tmpMaxPulseSeqList;
+		}
+
 		// Pulse Sequence List, Track Per HWSource/Source ID, Per Pulse...
 		// Increases Per Event Packet (Resets Per Pulse)
 		m_pulseSeqList.clear();
@@ -375,13 +389,24 @@ public:
 					m_dataSource->getMaxPulseSeqList();
 				if ( tmpMaxPulseSeqList != m_maxPulseSeqList )
 				{
-					ERROR("HWSource::getPulse():"
-						<< " Updating Value of"
-						<< " Max Pulse Sequence List (Buffer) Size"
-						<< " for " << m_name
-						<< std::hex << " src=0x" << m_hwId << std::dec
-						<< " from " << m_maxPulseSeqList
-						<< " to " << tmpMaxPulseSeqList);
+					if ( tmpMaxPulseSeqList < 1 ) {
+						ERROR("HWSource::HWSource():"
+							<< " Invalid Requested Setting for"
+							<< " Max Pulse Sequence List (Buffer) Size"
+							<< " for " << m_name
+							<< std::hex << " src=0x" << m_hwId << std::dec
+							<< " Correcting from " << tmpMaxPulseSeqList
+							<< " to " << 1);
+						tmpMaxPulseSeqList = 1;
+					} else {
+						ERROR("HWSource::getPulse():"
+							<< " Updating Value of"
+							<< " Max Pulse Sequence List (Buffer) Size"
+							<< " for " << m_name
+							<< std::hex << " src=0x" << m_hwId << std::dec
+							<< " from " << m_maxPulseSeqList
+							<< " to " << tmpMaxPulseSeqList);
+					}
 					m_maxPulseSeqList = tmpMaxPulseSeqList;
 				}
 			}
@@ -389,7 +414,7 @@ public:
 			// Keep Pulse Sequence List Size Small/"Fixed"... ;-D
 			// Once Maximum Pulse Sequence List Size is Reached,
 			// Pop One Pulse Off the End for Every New Pulse in Front!
-			if ( m_pulseSeqList.size() > m_maxPulseSeqList )
+			while ( m_pulseSeqList.size() > m_maxPulseSeqList )
 			{
 				PulseSeqList::iterator old_pulse_it =
 					--(m_pulseSeqList.end());
