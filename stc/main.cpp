@@ -244,6 +244,7 @@ int main( int argc, char** argv )
     g_pid = getpid();
 
     openlog( "stc", 0, LOG_DAEMON );
+    setlogmask( LOG_UPTO( LOG_DEBUG ) );
     syslog( LOG_INFO,
         "[%i] %s. %s Version %s, %s Version %s, %s Version %s, Tag %s",
         g_pid, "Started", "STC", STC_VERSION,
@@ -793,6 +794,8 @@ int main( int argc, char** argv )
 
     syslog( LOG_INFO, "[%i] Process exiting", g_pid );
     usleep(30000); // give syslog a chance...
+
+    closelog();
 
     return sms_code != STC::TS_SUCCESS;
 }
