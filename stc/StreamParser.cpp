@@ -24,8 +24,9 @@ RateLimitedLogging::History RLLHistory_StreamParserH;
 #define RLL_PV_VALUE_UPDATE_SAWTOOTH         1
 #define RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP   2
 #define RLL_PV_VALUE_UPDATE_EARLY            3
-#define RLL_ANNOTATION_NEG_TIME_CLAMP        4
-#define RLL_ANNOTATION_EARLY                 5
+#define RLL_ANNOTATION_SAWTOOTH              4
+#define RLL_ANNOTATION_NEG_TIME_CLAMP        5
+#define RLL_ANNOTATION_EARLY                 6
 
 /// This sets the size of the ADARA parser stream buffer in bytes
 #define ADARA_IN_BUF_SIZE   0x3000000  // For PixelMap!
@@ -5255,24 +5256,33 @@ StreamParser::markerPause
         // (But Still Pass Thru Annotation...!)
         else if ( a_ts_nano < m_last_pause_multimap_it->first )
         {
-            syslog( LOG_ERR,
-          "[%i] %s %s %s 1=[%s] %lu.%09lu (%lu) < %d=[%s] %lu.%09lu (%lu)",
-                g_pid, "STC Error:", "StreamParser::markerPause()",
-                "Pause Annotation SAWTOOTH",
-                a_comment.c_str(),
-                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
-                    - ADARA::EPICS_EPOCH_OFFSET,
-                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano,
-                m_last_pause_multimap_it->second.second,
-                m_last_pause_comment.c_str(),
-                (unsigned long)(m_last_pause_multimap_it->first
-                        / NANO_PER_SECOND_LL)
-                    - ADARA::EPICS_EPOCH_OFFSET,
-                (unsigned long)(m_last_pause_multimap_it->first
-                    % NANO_PER_SECOND_LL),
-                m_last_pause_multimap_it->first );
-            usleep(30000); // give syslog a chance...
+            // For rate-limited logging...
+            std::string log_info;
+            // Rate-limited logging of truncated negative annotation times
+            if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                    RLL_ANNOTATION_SAWTOOTH, "Pause",
+                    60, 10, 100, log_info ) )
+            {
+                syslog( LOG_ERR,
+        "[%i] %s %s%s %s 1=[%s] %lu.%09lu (%lu) < %d=[%s] %lu.%09lu (%lu)",
+                    g_pid, "STC Error:", log_info.c_str(),
+                    "StreamParser::markerPause()",
+                    "Pause Annotation SAWTOOTH",
+                    a_comment.c_str(),
+                    (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                    a_ts_nano,
+                    m_last_pause_multimap_it->second.second,
+                    m_last_pause_comment.c_str(),
+                    (unsigned long)(m_last_pause_multimap_it->first
+                            / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(m_last_pause_multimap_it->first
+                        % NANO_PER_SECOND_LL),
+                    m_last_pause_multimap_it->first );
+                usleep(30000); // give syslog a chance...
+            }
         }
         // REMOVEME
         /*
@@ -5382,24 +5392,33 @@ StreamParser::markerResume
         // (But Still Pass Thru Annotation...!)
         else if ( a_ts_nano < m_last_pause_multimap_it->first )
         {
-            syslog( LOG_ERR,
-          "[%i] %s %s %s 0=[%s] %lu.%09lu (%lu) < %d=[%s] %lu.%09lu (%lu)",
-                g_pid, "STC Error:", "StreamParser::markerResume()",
-                "Resume Annotation SAWTOOTH",
-                a_comment.c_str(),
-                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
-                    - ADARA::EPICS_EPOCH_OFFSET,
-                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano,
-                m_last_pause_multimap_it->second.second,
-                m_last_pause_comment.c_str(),
-                (unsigned long)(m_last_pause_multimap_it->first
-                        / NANO_PER_SECOND_LL)
-                    - ADARA::EPICS_EPOCH_OFFSET,
-                (unsigned long)(m_last_pause_multimap_it->first
-                    % NANO_PER_SECOND_LL),
-                m_last_pause_multimap_it->first );
-            usleep(30000); // give syslog a chance...
+            // For rate-limited logging...
+            std::string log_info;
+            // Rate-limited logging of truncated negative annotation times
+            if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                    RLL_ANNOTATION_SAWTOOTH, "Resume",
+                    60, 10, 100, log_info ) )
+            {
+                syslog( LOG_ERR,
+        "[%i] %s %s%s %s 0=[%s] %lu.%09lu (%lu) < %d=[%s] %lu.%09lu (%lu)",
+                    g_pid, "STC Error:", log_info.c_str(),
+                    "StreamParser::markerResume()",
+                    "Resume Annotation SAWTOOTH",
+                    a_comment.c_str(),
+                    (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                    a_ts_nano,
+                    m_last_pause_multimap_it->second.second,
+                    m_last_pause_comment.c_str(),
+                    (unsigned long)(m_last_pause_multimap_it->first
+                            / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(m_last_pause_multimap_it->first
+                        % NANO_PER_SECOND_LL),
+                    m_last_pause_multimap_it->first );
+                usleep(30000); // give syslog a chance...
+            }
         }
         // REMOVEME
         /*
@@ -5512,24 +5531,33 @@ StreamParser::markerScanStart
         // (But Still Pass Thru Annotation...!)
         else if ( a_ts_nano < m_last_scan_multimap_it->first )
         {
-            syslog( LOG_ERR,
-         "[%i] %s %s %s %u=[%s] %lu.%09lu (%lu) < %u=[%s] %lu.%09lu (%lu)",
-                g_pid, "STC Error:", "StreamParser::markerScanStart()",
-                "Scan Start Annotation SAWTOOTH",
-                a_scan_index, a_comment.c_str(),
-                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
-                    - ADARA::EPICS_EPOCH_OFFSET,
-                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano,
-                m_last_scan_multimap_it->second.second,
-                m_last_scan_comment.c_str(),
-                (unsigned long)(m_last_scan_multimap_it->first
-                        / NANO_PER_SECOND_LL)
-                    - ADARA::EPICS_EPOCH_OFFSET,
-                (unsigned long)(m_last_scan_multimap_it->first
-                    % NANO_PER_SECOND_LL),
-                m_last_scan_multimap_it->first );
-            usleep(30000); // give syslog a chance...
+            // For rate-limited logging...
+            std::string log_info;
+            // Rate-limited logging of truncated negative annotation times
+            if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                    RLL_ANNOTATION_SAWTOOTH, "Start",
+                    60, 10, 100, log_info ) )
+            {
+                syslog( LOG_ERR,
+       "[%i] %s %s%s %s %u=[%s] %lu.%09lu (%lu) < %u=[%s] %lu.%09lu (%lu)",
+                    g_pid, "STC Error:", log_info.c_str(),
+                    "StreamParser::markerScanStart()",
+                    "Scan Start Annotation SAWTOOTH",
+                    a_scan_index, a_comment.c_str(),
+                    (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                    a_ts_nano,
+                    m_last_scan_multimap_it->second.second,
+                    m_last_scan_comment.c_str(),
+                    (unsigned long)(m_last_scan_multimap_it->first
+                            / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(m_last_scan_multimap_it->first
+                        % NANO_PER_SECOND_LL),
+                    m_last_scan_multimap_it->first );
+                usleep(30000); // give syslog a chance...
+            }
         }
         // REMOVEME
         /*
@@ -5640,24 +5668,33 @@ StreamParser::markerScanStop
         // (But Still Pass Thru Annotation...!)
         else if ( a_ts_nano < m_last_scan_multimap_it->first )
         {
-            syslog( LOG_ERR,
-      "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%lu) < %u=[%s] %lu.%09lu (%lu)",
-                g_pid, "STC Error:", "StreamParser::markerScanStop()",
-                "Scan Stop Annotation SAWTOOTH",
-                a_scan_index, a_comment.c_str(),
-                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
-                    - ADARA::EPICS_EPOCH_OFFSET,
-                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano,
-                m_last_scan_multimap_it->second.second,
-                m_last_scan_comment.c_str(),
-                (unsigned long)(m_last_scan_multimap_it->first
-                        / NANO_PER_SECOND_LL)
-                    - ADARA::EPICS_EPOCH_OFFSET,
-                (unsigned long)(m_last_scan_multimap_it->first
-                    % NANO_PER_SECOND_LL),
-                m_last_scan_multimap_it->first );
-            usleep(30000); // give syslog a chance...
+            // For rate-limited logging...
+            std::string log_info;
+            // Rate-limited logging of truncated negative annotation times
+            if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                    RLL_ANNOTATION_SAWTOOTH, "Stop",
+                    60, 10, 100, log_info ) )
+            {
+                syslog( LOG_ERR,
+    "[%i] %s %s%s %s %u(0)=[%s] %lu.%09lu (%lu) < %u=[%s] %lu.%09lu (%lu)",
+                    g_pid, "STC Error:", log_info.c_str(),
+                    "StreamParser::markerScanStop()",
+                    "Scan Stop Annotation SAWTOOTH",
+                    a_scan_index, a_comment.c_str(),
+                    (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                    a_ts_nano,
+                    m_last_scan_multimap_it->second.second,
+                    m_last_scan_comment.c_str(),
+                    (unsigned long)(m_last_scan_multimap_it->first
+                            / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(m_last_scan_multimap_it->first
+                        % NANO_PER_SECOND_LL),
+                    m_last_scan_multimap_it->first );
+                usleep(30000); // give syslog a chance...
+            }
         }
         // REMOVEME
         /*
@@ -5746,23 +5783,32 @@ StreamParser::markerComment
         // (But Still Pass Thru Annotation...!)
         else if ( a_ts_nano < m_last_comment_multimap_it->first )
         {
-            syslog( LOG_ERR,
-               "[%i] %s %s %s [%s] %lu.%09lu (%lu) < [%s] %lu.%09lu (%lu)",
-                g_pid, "STC Error:", "StreamParser::markerComment()",
-                "Comment Annotation SAWTOOTH",
-                a_comment.c_str(),
-                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
-                    - ADARA::EPICS_EPOCH_OFFSET,
-                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano,
-                m_last_comment_multimap_it->second.second.c_str(),
-                (unsigned long)(m_last_comment_multimap_it->first
-                        / NANO_PER_SECOND_LL)
-                    - ADARA::EPICS_EPOCH_OFFSET,
-                (unsigned long)(m_last_comment_multimap_it->first
-                    % NANO_PER_SECOND_LL),
-                m_last_comment_multimap_it->first );
-            usleep(30000); // give syslog a chance...
+            // For rate-limited logging...
+            std::string log_info;
+            // Rate-limited logging of truncated negative annotation times
+            if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                    RLL_ANNOTATION_SAWTOOTH, "Comment",
+                    60, 10, 100, log_info ) )
+            {
+                syslog( LOG_ERR,
+             "[%i] %s %s%s %s [%s] %lu.%09lu (%lu) < [%s] %lu.%09lu (%lu)",
+                    g_pid, "STC Error:", log_info.c_str(),
+                    "StreamParser::markerComment()",
+                    "Comment Annotation SAWTOOTH",
+                    a_comment.c_str(),
+                    (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                    a_ts_nano,
+                    m_last_comment_multimap_it->second.second.c_str(),
+                    (unsigned long)(m_last_comment_multimap_it->first
+                            / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(m_last_comment_multimap_it->first
+                        % NANO_PER_SECOND_LL),
+                    m_last_comment_multimap_it->first );
+                usleep(30000); // give syslog a chance...
+            }
         }
         // REMOVEME
         /*
