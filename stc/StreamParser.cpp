@@ -24,6 +24,8 @@ RateLimitedLogging::History RLLHistory_StreamParserH;
 #define RLL_PV_VALUE_UPDATE_SAWTOOTH         1
 #define RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP   2
 #define RLL_PV_VALUE_UPDATE_EARLY            3
+#define RLL_ANNOTATION_NEG_TIME_CLAMP        4
+#define RLL_ANNOTATION_EARLY                 5
 
 /// This sets the size of the ADARA parser stream buffer in bytes
 #define ADARA_IN_BUF_SIZE   0x3000000  // For PixelMap!
@@ -108,14 +110,19 @@ StreamParser::StreamParser
     //     to be used for all scan stops
     //     - Just use 0 for the Starting Non-Normalized Nanosecond
     //     Time Stamp (guaranteed to be 1st Chronologically...! ;-D)
-    m_scan_multimap.insert(
+    m_last_scan_multimap_it = m_scan_multimap.insert(
         std::pair< uint64_t, std::pair<double, uint32_t> >(
             0, std::pair<double, uint32_t>(0.0, 0) ) );
+    m_last_scan_comment = "";
 
     // Insert initial "not paused" value
-    m_pause_multimap.insert(
+    m_last_pause_multimap_it = m_pause_multimap.insert(
         std::pair< uint64_t, std::pair<double, uint16_t> >(
             0, std::pair<double, uint32_t>(0.0, 0) ) );
+    m_last_pause_comment = "";
+
+    // Initialize last comment iterator
+    m_last_comment_multimap_it = m_comment_multimap.end();
 }
 
 
@@ -5076,16 +5083,88 @@ StreamParser::rxPacket
     const ADARA::AnnotationPkt &a_pkt     ///< [in] The ADARA Annotation Packet to process
 )
 {
-    uint64_t ts_nano = timespec_to_nsec( a_pkt.timestamp() );
+    struct timespec timestamp = a_pkt.timestamp();
+
+    uint64_t ts_nano = timespec_to_nsec( timestamp );
 
     double t = 0.0;
 
-    // Note: if first pulse has not arrived, truncate all PV times to 0
+    // First Pulse Has Arrived...
     if ( m_pulse_info.start_time )
     {
-        // Truncate negative time offsets to 0
+        // Positive Time Update, Normalize PV Time to 1st Pulse...
         if ( ts_nano > m_pulse_info.start_time )
+        {
             t = ( ts_nano - m_pulse_info.start_time ) / NANO_PER_SECOND_D;
+        }
+
+        // Truncate Any Negative Time Offsets to 0...
+        // Always Pass Thru Any Annotation Comments, Tho.
+        else
+        {
+            // For rate-limited logging...
+            std::stringstream ss;
+            ss << "Annot" << a_pkt.marker_type();
+            std::string log_info;
+            // Rate-limited logging of truncated negative annotation times
+            if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                    RLL_ANNOTATION_NEG_TIME_CLAMP, ss.str(),
+                    60, 10, 100, log_info ) )
+            {
+                syslog( LOG_ERR,
+            "[%i] %s %s%s %s %s=%d [%s] %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                    g_pid, "STC Error:", log_info.c_str(),
+                    "StreamParser::rxPacket(AnnotationPkt)",
+                    "Truncate Negative Annotation Timestamp to Zero",
+                    "type", a_pkt.marker_type(),
+                    a_pkt.comment().c_str(),
+                    timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                    timestamp.tv_nsec,
+                    ts_nano,
+                    (unsigned long)(m_pulse_info.start_time
+                            / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(m_pulse_info.start_time
+                        % NANO_PER_SECOND_LL),
+                    m_pulse_info.start_time );
+                usleep(30000); // give syslog a chance...
+            }
+        }
+    }
+
+    // No Pulse Has Arrived as Yet, So Save This Annotation Til Later...
+    // Set Time to -1.0, So We Know It's Not Yet Normalized...
+    else
+    {
+        // For rate-limited logging...
+        std::stringstream ss;
+        ss << "Annot" << a_pkt.marker_type();
+        std::string log_info;
+        // Rate-limited logging of truncated negative annotation times
+        if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                RLL_ANNOTATION_EARLY, ss.str(),
+                60, 10, 100, log_info ) )
+        {
+            syslog( LOG_ERR,
+            "[%i] %s %s%s %s %s=%d [%s] %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                g_pid, "STC Error:", log_info.c_str(),
+                "StreamParser::rxPacket(AnnotationPkt)",
+                "Got Pre-Pulse Annotation Timestamp",
+                "type", a_pkt.marker_type(),
+                a_pkt.comment().c_str(),
+                timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                timestamp.tv_nsec,
+                ts_nano,
+                (unsigned long)(m_pulse_info.start_time
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_pulse_info.start_time
+                    % NANO_PER_SECOND_LL),
+                m_pulse_info.start_time );
+            usleep(30000); // give syslog a chance...
+        }
+
+        t = -1.0;
     }
 
     // Switch on event type
@@ -5127,15 +5206,112 @@ StreamParser::markerPause
     const string &a_comment     ///< [in] Comment associated with marker
 )
 {
+    if ( a_time < 0.0 )
+        m_pause_has_non_normalized = true;
+
+    // Did the Pause/Resume State *Change* with This Annotation...?
+    bool state_changed = false;
+    // We have a Last Pause/Resume State...
+    if ( m_last_pause_multimap_it != m_pause_multimap.end() )
+    {
+        if ( m_last_pause_multimap_it->second.second != 1 )
+            state_changed = true;
+    }
+    // Starting Pause/Resume State is Always "Not Paused"...
+    else state_changed = true;
+    // REMOVEME
+    syslog( LOG_ERR, "[%i] %s %s %s 1=[%s] %lu.%09lu (%lu) %s=%d",
+        g_pid, "STC Error:", "StreamParser::markerPause()",
+        "Note Pause Annotation",
+        a_comment.c_str(),
+        (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+            - ADARA::EPICS_EPOCH_OFFSET,
+        (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+        a_ts_nano,
+        "state_changed", state_changed );
+    usleep(30000); // give syslog a chance...
+
+    // Have We Previously Had A Pause Annotation to Compare Against...?
+    if ( m_last_pause_multimap_it != m_pause_multimap.end() )
+    {
+        // If Timestamp Matches and State has Not Changed,
+        // Assume SMS File Boundary Duplicate - Ignore Annotation...
+        if ( a_ts_nano == m_last_pause_multimap_it->first
+                && !m_last_pause_comment.compare( a_comment )
+                && !state_changed )
+        {
+            syslog( LOG_ERR, "[%i] %s %s %s 1=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerPause()",
+                "Ignoring Duplicate Pause Annotation with Identical Time",
+                a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+        // Log Annotation if Time Stamp Goes into the Past...! ;-D
+        // (But Still Pass Thru Annotation...!)
+        else if ( a_ts_nano < m_last_pause_multimap_it->first )
+        {
+            syslog( LOG_ERR,
+          "[%i] %s %s %s 1=[%s] %lu.%09lu (%lu) < %d=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerPause()",
+                "Pause Annotation SAWTOOTH",
+                a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano,
+                m_last_pause_multimap_it->second.second,
+                m_last_pause_comment.c_str(),
+                (unsigned long)(m_last_pause_multimap_it->first
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_last_pause_multimap_it->first
+                    % NANO_PER_SECOND_LL),
+                m_last_pause_multimap_it->first );
+            usleep(30000); // give syslog a chance...
+        }
+        // REMOVEME
+        /*
+        else
+        {
+            syslog( LOG_ERR,
+        "[%i] %s %s %s 1=[%s] %lu.%09lu (%lu) vs. %d=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerPause()",
+                "Note Distinct Pause Annotation and/or Time",
+                a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano,
+                m_last_pause_multimap_it->second.second,
+                m_last_pause_comment.c_str(),
+                (unsigned long)(m_last_pause_multimap_it->first
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_last_pause_multimap_it->first
+                    % NANO_PER_SECOND_LL),
+                m_last_pause_multimap_it->first );
+            usleep(30000); // give syslog a chance...
+        }
+        */
+    }
+
     try
     {
         // Current Nexus Pause log calls for 1 to be Used for Pause
-        m_pause_multimap.insert(
+        m_last_pause_multimap_it = m_pause_multimap.insert(
             std::pair< uint64_t, std::pair<double, uint16_t> >( a_ts_nano,
                 std::pair<double, uint16_t>( a_time, 1 ) ) );
 
         if ( a_comment.size() )
+        {
+            m_last_pause_comment = a_comment;
             markerComment( a_time, a_ts_nano, a_comment );
+        }
     }
     catch( TraceException &e )
     {
@@ -5156,15 +5332,113 @@ StreamParser::markerResume
     const string &a_comment     ///< [in] Comment associated with marker
 )
 {
+    if ( a_time < 0.0 )
+        m_pause_has_non_normalized = true;
+
+    // Did the Pause/Resume State *Change* with This Annotation...?
+    bool state_changed = false;
+    // We have a Last Pause/Resume State...
+    if ( m_last_pause_multimap_it != m_pause_multimap.end() )
+    {
+        if ( m_last_pause_multimap_it->second.second != 0 )
+            state_changed = true;
+    }
+    // Starting Pause/Resume State is Always "Not Paused"...
+    else state_changed = true;
+    // REMOVEME
+    syslog( LOG_ERR, "[%i] %s %s %s 0=[%s] %lu.%09lu (%lu) %s=%d",
+        g_pid, "STC Error:", "StreamParser::markerResume()",
+        "Note Pause Annotation",
+        a_comment.c_str(),
+        (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+            - ADARA::EPICS_EPOCH_OFFSET,
+        (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+        a_ts_nano,
+        "state_changed", state_changed );
+    usleep(30000); // give syslog a chance...
+
+    // Have We Previously Had A Pause Annotation to Compare Against...?
+    if ( m_last_pause_multimap_it != m_pause_multimap.end() )
+    {
+        // If Timestamp Matches and State has Not Changed,
+        // Assume SMS File Boundary Duplicate - Ignore Annotation...
+        if ( a_ts_nano == m_last_pause_multimap_it->first
+                && !m_last_pause_comment.compare( a_comment )
+                && !state_changed )
+        {
+            // For now, Just Log It...! ;-D
+            syslog( LOG_ERR, "[%i] %s %s %s 0=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerResume()",
+                "Ignoring Duplicate Pause Annotation with Identical Time",
+                a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+        // Log Annotation if Time Stamp Goes into the Past...! ;-D
+        // (But Still Pass Thru Annotation...!)
+        else if ( a_ts_nano < m_last_pause_multimap_it->first )
+        {
+            syslog( LOG_ERR,
+          "[%i] %s %s %s 0=[%s] %lu.%09lu (%lu) < %d=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerResume()",
+                "Resume Annotation SAWTOOTH",
+                a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano,
+                m_last_pause_multimap_it->second.second,
+                m_last_pause_comment.c_str(),
+                (unsigned long)(m_last_pause_multimap_it->first
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_last_pause_multimap_it->first
+                    % NANO_PER_SECOND_LL),
+                m_last_pause_multimap_it->first );
+            usleep(30000); // give syslog a chance...
+        }
+        // REMOVEME
+        /*
+        else
+        {
+            syslog( LOG_ERR,
+        "[%i] %s %s %s 0=[%s] %lu.%09lu (%lu) vs. %d=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerResume()",
+                "Note Distinct Pause Annotation and/or Time",
+                a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano,
+                m_last_pause_multimap_it->second.second,
+                m_last_pause_comment.c_str(),
+                (unsigned long)(m_last_pause_multimap_it->first
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_last_pause_multimap_it->first
+                    % NANO_PER_SECOND_LL),
+                m_last_pause_multimap_it->first );
+            usleep(30000); // give syslog a chance...
+        }
+        */
+    }
+
     try
     {
         // Current Nexus Pause log calls for 0 to be Used for Resume
-        m_pause_multimap.insert(
+        m_last_pause_multimap_it = m_pause_multimap.insert(
             std::pair< uint64_t, std::pair<double, uint16_t> >( a_ts_nano,
                 std::pair<double, uint16_t>( a_time, 0 ) ) );
 
         if ( a_comment.size() )
+        {
+            m_last_pause_comment = a_comment;
             markerComment( a_time, a_ts_nano, a_comment );
+        }
     }
     catch( TraceException &e )
     {
@@ -5187,14 +5461,113 @@ StreamParser::markerScanStart
     const string &a_comment             ///< [in] Comment associated with scan
 )
 {
+    if ( a_time < 0.0 )
+        m_scan_has_non_normalized = true;
+
+    // Did the Scan State *Change* with This Annotation...?
+    bool state_changed = false;
+    // We have a Last Scan State...
+    if ( m_last_scan_multimap_it != m_scan_multimap.end() )
+    {
+        if ( m_last_scan_multimap_it->second.second != a_scan_index )
+            state_changed = true;
+    }
+    // Starting Scan Index is Always "Zero"...
+    else if ( a_scan_index != 0 )
+        state_changed = true;
+    // REMOVEME
+    syslog( LOG_ERR, "[%i] %s %s %s %u=[%s] %lu.%09lu (%lu) %s=%d",
+        g_pid, "STC Error:", "StreamParser::markerScanStart()",
+        "Note Scan Annotation",
+        a_scan_index, a_comment.c_str(),
+        (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+            - ADARA::EPICS_EPOCH_OFFSET,
+        (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+        a_ts_nano,
+        "state_changed", state_changed );
+    usleep(30000); // give syslog a chance...
+
+    // Have We Previously Had A Scan Annotation to Compare Against...?
+    if ( m_last_scan_multimap_it != m_scan_multimap.end() )
+    {
+        // If Timestamp Matches and State has Not Changed,
+        // Assume SMS File Boundary Duplicate - Ignore Annotation...
+        if ( a_ts_nano == m_last_scan_multimap_it->first
+                && !m_last_scan_comment.compare( a_comment )
+                && !state_changed )
+        {
+            // For now, Just Log It...! ;-D
+            syslog( LOG_ERR, "[%i] %s %s %s %u=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerScanStart()",
+                "Ignoring Duplicate Scan Annotation with Identical Time",
+                a_scan_index, a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+        // Log Annotation if Time Stamp Goes into the Past...! ;-D
+        // (But Still Pass Thru Annotation...!)
+        else if ( a_ts_nano < m_last_scan_multimap_it->first )
+        {
+            syslog( LOG_ERR,
+         "[%i] %s %s %s %u=[%s] %lu.%09lu (%lu) < %u=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerScanStart()",
+                "Scan Start Annotation SAWTOOTH",
+                a_scan_index, a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano,
+                m_last_scan_multimap_it->second.second,
+                m_last_scan_comment.c_str(),
+                (unsigned long)(m_last_scan_multimap_it->first
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_last_scan_multimap_it->first
+                    % NANO_PER_SECOND_LL),
+                m_last_scan_multimap_it->first );
+            usleep(30000); // give syslog a chance...
+        }
+        // REMOVEME
+        /*
+        else
+        {
+            syslog( LOG_ERR,
+       "[%i] %s %s %s %u=[%s] %lu.%09lu (%lu) vs. %u=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerScanStart()",
+                "Note Distinct Scan Annotation, Index and/or Time",
+                a_scan_index, a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano,
+                m_last_scan_multimap_it->second.second,
+                m_last_scan_comment.c_str(),
+                (unsigned long)(m_last_scan_multimap_it->first
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_last_scan_multimap_it->first
+                    % NANO_PER_SECOND_LL),
+                m_last_scan_multimap_it->first );
+            usleep(30000); // give syslog a chance...
+        }
+        */
+    }
+
     try
     {
-        m_scan_multimap.insert(
+        m_last_scan_multimap_it = m_scan_multimap.insert(
             std::pair< uint64_t, std::pair<double, uint32_t> >( a_ts_nano,
                 std::pair<double, uint32_t>( a_time, a_scan_index ) ) );
 
         if ( a_comment.size() )
+        {
+            m_last_scan_comment = a_comment;
             markerComment( a_time, a_ts_nano, a_comment );
+        }
     }
     catch( TraceException &e )
     {
@@ -5213,20 +5586,118 @@ StreamParser::markerScanStop
 (
     double a_time,                      ///< [in] Time associated with marker
     uint64_t a_ts_nano,                 ///< [in] Actual Timestamp in Nanoseconds
-    uint32_t UNUSED(a_scan_index),      ///< [in] Scan index associated with scan
+    uint32_t a_scan_index,              ///< [in] Scan index associated with scan
     const string &a_comment             ///< [in] Comment associated with scan
 )
 {
+    if ( a_time < 0.0 )
+        m_scan_has_non_normalized = true;
+
+    // Did the Scan State *Change* with This Annotation...?
+    bool state_changed = false;
+    // We have a Last Scan State...
+    if ( m_last_scan_multimap_it != m_scan_multimap.end() )
+    {
+        // When Stopping a Scan, the Index _Always_ Gets Set to Zero...
+        if ( m_last_scan_multimap_it->second.second != 0 )
+            state_changed = true;
+    }
+    // Starting Scan State is Always "Stopped"...
+    // REMOVEME
+    syslog( LOG_ERR, "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%lu) %s=%d",
+        g_pid, "STC Error:", "StreamParser::markerScanStop()",
+        "Note Scan Annotation",
+        a_scan_index, a_comment.c_str(),
+        (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+            - ADARA::EPICS_EPOCH_OFFSET,
+        (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+        a_ts_nano,
+        "state_changed", state_changed );
+    usleep(30000); // give syslog a chance...
+
+    // Have We Previously Had A Scan Annotation to Compare Against...?
+    if ( m_last_scan_multimap_it != m_scan_multimap.end() )
+    {
+        // If Timestamp Matches and State has Not Changed,
+        // Assume SMS File Boundary Duplicate - Ignore Annotation...
+        if ( a_ts_nano == m_last_scan_multimap_it->first
+                && !m_last_scan_comment.compare( a_comment )
+                && !state_changed )
+        {
+            // For now, Just Log It...! ;-D
+            syslog( LOG_ERR, "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerScanStop()",
+                "Ignoring Duplicate Scan Annotation with Identical Time",
+                a_scan_index, a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+        // Log Annotation if Time Stamp Goes into the Past...! ;-D
+        // (But Still Pass Thru Annotation...!)
+        else if ( a_ts_nano < m_last_scan_multimap_it->first )
+        {
+            syslog( LOG_ERR,
+      "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%lu) < %u=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerScanStop()",
+                "Scan Stop Annotation SAWTOOTH",
+                a_scan_index, a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano,
+                m_last_scan_multimap_it->second.second,
+                m_last_scan_comment.c_str(),
+                (unsigned long)(m_last_scan_multimap_it->first
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_last_scan_multimap_it->first
+                    % NANO_PER_SECOND_LL),
+                m_last_scan_multimap_it->first );
+            usleep(30000); // give syslog a chance...
+        }
+        // REMOVEME
+        /*
+        else
+        {
+            syslog( LOG_ERR,
+    "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%lu) vs. %u=[%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerScanStop()",
+                "Note Distinct Scan Annotation, Index and/or Time",
+                a_scan_index, a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano,
+                m_last_scan_multimap_it->second.second,
+                m_last_scan_comment.c_str(),
+                (unsigned long)(m_last_scan_multimap_it->first
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_last_scan_multimap_it->first
+                    % NANO_PER_SECOND_LL),
+                m_last_scan_multimap_it->first );
+            usleep(30000); // give syslog a chance...
+        }
+        */
+    }
+
     try
     {
-        // Current Nexus scan log calls for
-        // 0 to be used for all scan stops
-        m_scan_multimap.insert(
+        // Current NeXus Scan Log calls for
+        // 0 to be used for All Scan Stops.
+        m_last_scan_multimap_it = m_scan_multimap.insert(
             std::pair< uint64_t, std::pair<double, uint32_t> >( a_ts_nano,
                 std::pair<double, uint32_t>( a_time, 0 ) ) );
 
         if ( a_comment.size() )
+        {
+            m_last_scan_comment = a_comment;
             markerComment( a_time, a_ts_nano, a_comment );
+        }
     }
     catch( TraceException &e )
     {
@@ -5247,12 +5718,83 @@ StreamParser::markerComment
     const std::string &a_comment        ///< [in] Comment to insert
 )
 {
+    if ( a_time < 0.0 )
+        m_comment_has_non_normalized = true;
+
+    // Have We Previously Had A Comment Annotation to Compare Against...?
+    if ( m_last_comment_multimap_it != m_comment_multimap.end() )
+    {
+        // If Timestamp Matches and Comment has Not Changed,
+        // Assume SMS File Boundary Duplicate - Ignore Annotation...
+        if ( a_ts_nano == m_last_comment_multimap_it->first
+                && !m_last_comment_multimap_it->second.second.compare(
+                    a_comment ) )
+        {
+            // For now, Just Log It...! ;-D
+            syslog( LOG_ERR, "[%i] %s %s %s [%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerComment()",
+                "Ignoring Duplicate Annotation with Identical Time",
+                a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano );
+            usleep(30000); // give syslog a chance...
+            return;
+        }
+        // Log Annotation if Time Stamp Goes into the Past...! ;-D
+        // (But Still Pass Thru Annotation...!)
+        else if ( a_ts_nano < m_last_comment_multimap_it->first )
+        {
+            syslog( LOG_ERR,
+               "[%i] %s %s %s [%s] %lu.%09lu (%lu) < [%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerComment()",
+                "Comment Annotation SAWTOOTH",
+                a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano,
+                m_last_comment_multimap_it->second.second.c_str(),
+                (unsigned long)(m_last_comment_multimap_it->first
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_last_comment_multimap_it->first
+                    % NANO_PER_SECOND_LL),
+                m_last_comment_multimap_it->first );
+            usleep(30000); // give syslog a chance...
+        }
+        // REMOVEME
+        /*
+        else
+        {
+            syslog( LOG_ERR,
+             "[%i] %s %s %s [%s] %lu.%09lu (%lu) vs. [%s] %lu.%09lu (%lu)",
+                g_pid, "STC Error:", "StreamParser::markerComment()",
+                "Note Distinct Annotation and/or Time",
+                a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                a_ts_nano,
+                m_last_comment_multimap_it->second.second.c_str(),
+                (unsigned long)(m_last_comment_multimap_it->first
+                        / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(m_last_comment_multimap_it->first
+                    % NANO_PER_SECOND_LL),
+                m_last_comment_multimap_it->first );
+            usleep(30000); // give syslog a chance...
+        }
+        */
+    }
+
     try
     {
         if ( a_comment.size() )
         {
             // Geez, this got complicated fast... Lol... ;-D
-            m_comment_multimap.insert(
+            m_last_comment_multimap_it = m_comment_multimap.insert(
                 std::pair< uint64_t, std::pair<double, std::string> >(
                     a_ts_nano,
                     std::pair<double, std::string>( a_time, a_comment ) )

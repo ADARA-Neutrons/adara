@@ -250,14 +250,22 @@ private:
 protected:
     std::multimap<uint64_t, std::pair<double, uint16_t> >
                                             m_pause_multimap;           /// Pause/Resume annotation nsec-to-timestamp/state (on/off) map
+    std::multimap<uint64_t, std::pair<double, uint16_t> >::iterator
+                                            m_last_pause_multimap_it;   /// Last Inserted Pause/Resume annotation
+    std::string                             m_last_pause_comment;       /// Comment for Last Pause/Resume annotation
     bool                                    m_pause_has_non_normalized; /// Pause/Resume Marker received before 1st pulse...
 
     std::multimap<uint64_t, std::pair<double, uint32_t> >
                                             m_scan_multimap;            /// Scan annotation nsec-to-timestamp/state (on/off) map
+    std::multimap<uint64_t, std::pair<double, uint32_t> >::iterator
+                                            m_last_scan_multimap_it;    /// Last Inserted Scan annotation
+    std::string                             m_last_scan_comment;        /// Comment for Last Scan annotation
     bool                                    m_scan_has_non_normalized;  /// Scan Marker received before 1st pulse...
 
     std::multimap<uint64_t, std::pair<double, std::string> >
                                             m_comment_multimap;         /// Comment annotation nsec-to-timestamp/string map
+    std::multimap<uint64_t, std::pair<double, std::string> >::iterator
+                                            m_last_comment_multimap_it; /// Last Inserted Comment annotation
     bool                                    m_comment_has_non_normalized; /// Comment annotation received before 1st pulse...
 
     std::vector<PVInfoBase*>                m_pvs_list;                 ///< Collection of all process variable information
