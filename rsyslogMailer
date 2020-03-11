@@ -112,7 +112,7 @@ trap "SAVE_ERRORS" SIGTERM
 # kill myself if I wait around for too long... :-b
 KILL_ME_LATER()
 (
-   sleep 3
+   sleep 300
    # echo "Checking Signal to $$..."
    kill -0 $$ || exit 0
    # echo "Killing $$."
