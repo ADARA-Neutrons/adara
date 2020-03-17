@@ -24,7 +24,7 @@ USAGE()
 	echo "usage:  adara_monitor [--alt=\"-mon\"] \\"
 	echo "                      [--adara_summary=<path>] \\"
 	echo "                      [--cache_dir=<CACHE_DIR>] \\"
-	echo "                      [--connect] [--help|-h]"
+	echo "                      [--connect] [--oneshot] [--help|-h]"
 	echo
 
 	echo "where:"
@@ -40,11 +40,14 @@ USAGE()
 	echo
 	echo "      --connect           = \"connect\" to running ADARA Monitor"
 	echo
+	echo "      --oneshot           = only execute summary once, then exit"
+	echo
 	echo "     --help | -h          = display this usage information"
 	echo
 }
 
 do_connect=0
+do_oneshot=0
 
 for arg in "$@" ; do
 	# echo "arg=$arg"
@@ -82,6 +85,9 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--connect#' ]]; then
 		echo -e "\nConnecting to Existing ADARA Monitor..."
 		do_connect=1
+	elif [[ "#$key#" == '#--oneshot#' ]]; then
+		echo -e "\nExecuting ADARA Monitor in OneShot Mode."
+		do_oneshot=1
 	else
 		echo -e "\nError: Unknown Option/Unrecognized File:\n [${key}]"
 		USAGE
@@ -368,6 +374,15 @@ else
 
 	DO_SUMMARY
 
+fi
+
+#
+# OneShot Mode - We're Done Already, Just Exit...
+#
+
+if [[ $do_oneshot == 1 ]]; then
+	echo -e "\nExiting ADARA Monitor in OneShot Mode.\n"
+	exit 0
 fi
 
 #
