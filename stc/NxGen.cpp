@@ -856,9 +856,10 @@ NxGen::finalize
         }
 
         // Flush stream marker data
-        flushPauseData();
-        flushScanData();
-        flushCommentData();
+        flushPauseData( timespec_to_nsec( a_run_metrics.run_start_time ) );
+        flushScanData( timespec_to_nsec( a_run_metrics.run_start_time ) );
+        flushCommentData(
+            timespec_to_nsec( a_run_metrics.run_start_time ) );
 
         // Capture Run Total Duration (for processing bandwidth statistics)
         m_duration = calcDiffSeconds(
@@ -2464,12 +2465,125 @@ NxGen::runComment
 }
 
 
+/*! \brief Normalize Annotation Timestamps Relative to 1st Pulse Start Time
+ *
+ * This method checks for Any Non-Normalized Annotation Timestamps, which
+ * arrived before the 1st Pulse Time was known, and properly normalizes
+ * these Timestamps relative to the 1st Pulse Start Time.
+ */
+template <typename TypeT>
+void
+NxGen::normalizeAnnotationTimestamps
+(
+    uint64_t a_start_time,      ///< 1st Pulse Time (nanosecs)
+    std::string a_label,        ///< Annotation/Markers Label
+    std::multimap<uint64_t, std::pair<double, TypeT> > &a_annot_multimap,  ///< Annotation/Markers Multimap to Normalize
+    bool &a_has_non_normalized  ///< Corresponding Has Non Normalized Flag
+)
+{
+    syslog( LOG_ERR, "[%i] %s %s: Entry for %s %s=%lu %s=%lu %s=%u",
+        g_pid, "STC Error:", "NxGen::normalizeAnnotationTimestamps()",
+        a_label.c_str(), "a_start_time", a_start_time,
+        "a_annot_multimap.size()", a_annot_multimap.size(),
+        "a_has_non_normalized", a_has_non_normalized );
+    usleep(30000); // give syslog a chance...
+
+    // Normalize All Non-Normalized Timestamps...
+
+    typename std::multimap<uint64_t, std::pair<double, TypeT> >::iterator
+        annot_multimap_it;
+
+    for ( annot_multimap_it = a_annot_multimap.begin() ;
+            annot_multimap_it != a_annot_multimap.end() ;
+            ++annot_multimap_it )
+    {
+        // REMOVEME
+        /*
+        stringstream ss;
+        ss << "nano_ts=" <<  annot_multimap_it->first;
+        ss << " time=" <<  annot_multimap_it->second.first;
+        ss << " value=" <<  annot_multimap_it->second.second;
+        if ( annot_multimap_it->second.first < 0.0 )
+            ss << " Not-Yet-Normalized Time...";
+        syslog( LOG_ERR, "[%i] %s %s: %s",
+            g_pid, "STC Error:", "NxGen::normalizeAnnotationTimestamps()",
+            ss.str().c_str() );
+        usleep(30000); // give syslog a chance...
+        */
+
+        // Not-Yet-Normalized Time...
+        if ( annot_multimap_it->second.first < 0.0 )
+        {
+            // Positive Time Update,
+            // Normalize Annotation Time to 1st Pulse...
+            if ( annot_multimap_it->first > a_start_time )
+            {
+                double t = ( annot_multimap_it->first - a_start_time )
+                    / NANO_PER_SECOND_D;
+                annot_multimap_it->second.first = t;
+
+                std::stringstream ss;
+                ss << annot_multimap_it->second.second;
+                syslog( LOG_ERR,
+                    "[%i] %s %s: %s for %s: %s @ %lf (%lu)",
+                    g_pid, "STC Error:",
+                    "NxGen::normalizeAnnotationTimestamps()",
+                    "Positive Time Annotation",
+                    a_label.c_str(), ss.str().c_str(),
+                    annot_multimap_it->second.first,
+                    annot_multimap_it->first );
+                usleep(30000); // give syslog a chance
+            }
+
+            // Truncate Any Negative Time Offsets to 0.
+            // Log Negative Time Truncation as Error.
+            else
+            {
+                std::stringstream ss;
+                ss << "STC Error: ";
+                ss << "NxGen::normalizeAnnotationTimestamps(): ",
+                ss << "Truncate Negative Annotation Time for ";
+                ss << a_label;
+                ss << " to Zero: ";
+                ss << annot_multimap_it->second.second;
+                ss << " @";
+                syslog( LOG_ERR,
+                    "[%i] %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                    g_pid, ss.str().c_str(),
+                    (unsigned long)( annot_multimap_it->first
+                            / NANO_PER_SECOND_LL )
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)( annot_multimap_it->first
+                            % NANO_PER_SECOND_LL ),
+                    annot_multimap_it->first,
+                    (unsigned long)( a_start_time
+                            / NANO_PER_SECOND_LL )
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)( a_start_time
+                            % NANO_PER_SECOND_LL ),
+                    a_start_time );
+                // give syslog a chance...
+                usleep(30000);
+
+                annot_multimap_it->second.first = 0.0;
+            }
+        }
+    }
+
+    // Done Normalizing This Annotation/Markers Log Timestamps.
+    a_has_non_normalized = false;
+}
+
+
 /*! \brief Writes buffered pause data into Nexus file
  *
  * This method flushes buffered pause data to the logs of the Nexus file.
  */
 void
-NxGen::flushPauseData()
+NxGen::flushPauseData
+(
+    uint64_t a_start_time   ///< 1st Pulse Time (nanosecs)
+)
 {
     multimap< uint64_t, pair<double, uint16_t> >::iterator pmm;
 
@@ -2479,6 +2593,17 @@ NxGen::flushPauseData()
             g_pid, "STC Error:", "NxGen::flushPauseData()",
             "Pause/Resume Marker Timestamps Require Normalization",
             "Marker(s) Received Before 1st Pulse...!" );
+        usleep(30000); // give syslog a chance...
+
+        normalizeAnnotationTimestamps( a_start_time,
+            "Pause/Resume Markers", m_pause_multimap,
+            m_pause_has_non_normalized );
+    }
+    else
+    {
+        syslog( LOG_INFO, "[%i] %s: %s",
+            g_pid, "NxGen::flushPauseData()",
+            "Pause/Resume Marker Timestamps Are Already Normalized." );
         usleep(30000); // give syslog a chance...
     }
 
@@ -2522,7 +2647,10 @@ NxGen::flushPauseData()
  * This method flushes buffered scan data to the logs of the Nexus file.
  */
 void
-NxGen::flushScanData()
+NxGen::flushScanData
+(
+    uint64_t a_start_time   ///< 1st Pulse Time (nanosecs)
+)
 {
     multimap< uint64_t, pair<double, uint32_t> >::iterator smm;
 
@@ -2532,6 +2660,17 @@ NxGen::flushScanData()
             g_pid, "STC Error:", "NxGen::flushScanData()",
             "Scan Start/Stop Marker Timestamps Require Normalization",
             "Marker(s) Received Before 1st Pulse...!" );
+        usleep(30000); // give syslog a chance...
+
+        normalizeAnnotationTimestamps( a_start_time,
+            "Scan Start/Stop Markers", m_scan_multimap,
+            m_scan_has_non_normalized );
+    }
+    else
+    {
+        syslog( LOG_INFO, "[%i] %s: %s",
+            g_pid, "NxGen::flushScanData()",
+            "Scan Start/Stop Marker Timestamps Are Already Normalized." );
         usleep(30000); // give syslog a chance...
     }
 
@@ -2575,7 +2714,10 @@ NxGen::flushScanData()
  * This method flushes buffered comment data to the logs of the Nexus file.
  */
 void
-NxGen::flushCommentData()
+NxGen::flushCommentData
+(
+    uint64_t a_start_time   ///< 1st Pulse Time (nanosecs)
+)
 {
     multimap< uint64_t, pair<double, string> >::iterator cmm;
 
@@ -2585,6 +2727,17 @@ NxGen::flushCommentData()
             g_pid, "STC Error:", "NxGen::flushCommentData()",
             "Comment Timestamps Require Normalization",
             "Comment(s) Received Before 1st Pulse...!" );
+        usleep(30000); // give syslog a chance...
+
+        normalizeAnnotationTimestamps( a_start_time,
+            "Comments", m_comment_multimap,
+            m_comment_has_non_normalized );
+    }
+    else
+    {
+        syslog( LOG_INFO, "[%i] s %s: %s",
+            g_pid, "NxGen::flushCommentData()",
+            "Comment Timestamps Are Already Normalized." );
         usleep(30000); // give syslog a chance...
     }
 

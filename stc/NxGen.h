@@ -2562,10 +2562,22 @@ protected:
                             std::vector<struct ElementInfo> &elements );
 
 private:
-    void                flushPauseData(void);
-    void                flushScanData(void);
-    void                flushCommentData(void);
+
+    template <typename TypeT>
+    void                normalizeAnnotationTimestamps(
+                            uint64_t a_start_time,
+                            std::string a_label,
+                            std::multimap<uint64_t,
+                                std::pair<double, TypeT> >
+                                    &a_annot_multimap,
+                            bool &a_has_non_normalized );
+
+    void                flushPauseData( uint64_t a_start_time );
+    void                flushScanData( uint64_t a_start_time );
+    void                flushCommentData( uint64_t a_start_time );
+
     NeXus::NXnumtype    toNxType( STC::PVType a_type ) const;
+
     void                makeGroup( const std::string &a_path,
                             const std::string &a_type );
     void                makeDataset( const std::string &a_path,
@@ -2573,6 +2585,7 @@ private:
                             NeXus::NXnumtype a_type,
                             const std::string a_units = "",
                             unsigned long a_chunk_size = 0 );
+
     template <typename TypeT>
     void                writeMultidimDataset(
                             const std::string &a_path,
@@ -2580,12 +2593,15 @@ private:
                             std::vector<TypeT> &a_data,
                             std::vector<hsize_t> &a_dims,
                             const std::string a_units = "" );
+
     void                parseSTCConfigFile(
                             const std::string &a_config_file );
+
     void                makeLink( const std::string &source_path,
                             const std::string &dest_name );
     void                makeGroupLink( const std::string &source_path,
                             const std::string &dest_name );
+
     void                writeString( const std::string &a_path,
                             const std::string &a_dataset,
                             const std::string &a_value );
