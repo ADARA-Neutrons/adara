@@ -14,6 +14,7 @@
 #include "SMSControlPV.h"
 #include "ReadyAdapter.h"
 #include "TimerAdapter.h"
+#include "Markers.h"
 
 extern "C" {
 struct addrinfo;
@@ -26,6 +27,7 @@ class DataSourceRequiredPV;
 class smsConnectedPV;
 class smsFloat64PV;
 class smsBooleanPV;
+class smsPassThruPV;
 class smsUint32PV;
 
 class DataSource : public ADARA::POSIXParser {
@@ -35,6 +37,7 @@ public:
 		double connect_retry, double connect_timeout,
 		double data_timeout, uint32_t data_timeout_retry,
 		bool ignore_eop, bool ignore_local_sawtooth,
+		Markers::PassThru ignore_annotation_pkts,
 		bool mixed_data_packets,
 		bool check_source_sequence, bool check_pulse_sequence,
 		uint32_t max_pulse_seq_list,
@@ -93,6 +96,7 @@ private:
 	uint32_t m_data_timeout_retry_count;
 	bool m_ignore_eop;
 	bool m_ignore_local_sawtooth;
+	Markers::PassThru m_ignore_annotation_pkts;
 	bool m_mixed_data_packets;
 	bool m_check_source_sequence;
 	bool m_check_pulse_sequence;
@@ -113,6 +117,7 @@ private:
 	boost::shared_ptr<smsUint32PV> m_pvDataTimeoutRetry;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreEoP;
 	boost::shared_ptr<smsBooleanPV> m_pvIgnoreLocalSAWTOOTH;
+	boost::shared_ptr<smsPassThruPV> m_pvIgnoreAnnotationPkts;
 	boost::shared_ptr<smsBooleanPV> m_pvMixedDataPackets;
 	boost::shared_ptr<smsBooleanPV> m_pvCheckSourceSequence;
 	boost::shared_ptr<smsBooleanPV> m_pvCheckPulseSequence;
@@ -206,6 +211,7 @@ private:
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32ArrayPkt &pkt);
 	bool rxPacket(const ADARA::VariableDoubleArrayPkt &pkt);
+	bool rxPacket(const ADARA::AnnotationPkt &pkt);
 	bool rxPacket(const ADARA::HeartbeatPkt &pkt);
 
 	void resetBandwidthStatistics(void);

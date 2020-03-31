@@ -117,6 +117,8 @@ public:
 
 	void updateDataSourceConnectivity(void);
 
+	boost::shared_ptr<Markers> getMarkers(void) { return m_markers; }
+
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
 	static void late_config(const boost::property_tree::ptree &conf);

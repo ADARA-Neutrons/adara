@@ -631,7 +631,7 @@ BeamMonitorConfig::BeamMonitorConfig(
 	if ( StorageManager::getAutoSavePV(
 			m_pvAlwaysSendBMConfig->getName(), bvalue, ts ) ) {
 		m_alwaysSendBMConfig = bvalue;
-		m_pvNumBeamMonitors->update(bvalue, &ts);
+		m_pvAlwaysSendBMConfig->update(bvalue, &ts);
 	}
 
 	// Are We _Only_ Ever Saving Beam Monitor Events...?

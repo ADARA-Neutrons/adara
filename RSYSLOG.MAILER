@@ -15,6 +15,9 @@ that might be of interest to developers and maintainers of the system. :-)
    $ sudo mknod /etc/rsyslog.pipes/criticalMessages p
    $ sudo chgrp snswheel /etc/rsyslog.pipes/criticalMessages
    $ sudo chmod 660 /etc/rsyslog.pipes/criticalMessages
+   $ cp ~/gitsrc/ADARA/big_err_pipe.c /tmp
+   $ cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+   $ /tmp/big_err_pipe
 
 2. Install "rsyslogMailer" cron script (from ADARA Git repository):
 

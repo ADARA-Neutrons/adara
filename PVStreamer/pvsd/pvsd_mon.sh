@@ -6,14 +6,16 @@
 # (and maybe even notify via email or text message on a crash...! :-)
 #
 
+LOG_HOME="/SNS/users/y8y"
+
 host=`hostname`
 #echo "host=$host"
 
 host_short=`echo $host | awk -F '.' '{print $1}'`
 #echo "host_short=$host_short"
 
-LOGFILE="$HOME/pvsd_mon/pvsd_mon.$host_short.log"
-LOGLOGFILE="$HOME/pvsd_mon/pvsd_mon.$host_short-log.log"
+LOGFILE="$LOG_HOME/pvsd_mon/pvsd_mon.$host_short.log"
+LOGLOGFILE="$LOG_HOME/pvsd_mon/pvsd_mon.$host_short-log.log"
 
 PVSD_USER="root"
 PVSD="pvsd"

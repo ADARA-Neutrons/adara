@@ -285,6 +285,12 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	sudo chmod 660 /etc/rsyslog.pipes/criticalMessages
 
+	cp ~/gitsrc/ADARA/big_err_pipe.c /tmp
+
+	cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+
+	/tmp/big_err_pipe
+
 	sudo cp ~/gitsrc/ADARA/rsyslogMailer /usr/local/bin
 
 	sudo vi /etc/crontab

@@ -45,6 +45,7 @@ public:
 	static SharedPtr scan(const std::string &path, bool force = false);
 	static uint64_t purge(const std::string &path, uint64_t goal,
 				std::string &propId, bool &path_deleted);
+	static void purgeBackups(const std::string &path);
 
 	void newFile(void);
 	bool write(IoVector &iovec, uint32_t len, bool notify = true,

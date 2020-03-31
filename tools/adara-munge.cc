@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <iostream>
+#include <fstream>
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
@@ -140,17 +141,25 @@ class MungeParser : public ADARA::POSIXParser {
 public:
 	MungeParser() :
 		ADARA::POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
-		m_lastpkttime_sec(0), m_lastpkttime_nsec(0),
-		m_starttime_sec(0), m_starttime_nsec(0),
-		m_endtime_sec(0), m_endtime_nsec(0),
 		m_run_start_epoch(0), m_run_file_number(0), m_run_number(0),
 		m_case(0),
 		m_skip_pkt(false),
 		m_addRunEnd(false), m_hysterical(false),
+		m_filterafter(false), m_filterbefore(false),
 		m_posixRead(false), m_showDDP(false), m_lowRate(false),
 		m_terse(false), m_catch(false),
-		m_out(std::cout)
-	{ }
+		m_out(std::cout),
+		m_save_count(0)
+	{
+		m_lastpkttime.tv_sec = 0;
+		m_lastpkttime.tv_nsec = 0;
+		m_threshtime.tv_sec = 0;
+		m_threshtime.tv_nsec = 0;
+		m_starttime.tv_sec = 0;
+		m_starttime.tv_nsec = 0;
+		m_endtime.tv_sec = 0;
+		m_endtime.tv_nsec = 0;
+	}
 
 	void parse(int argc, char **argv);
 
@@ -194,12 +203,10 @@ public:
 private:
 
 	uint32_t m_descriptor_count[MAX_DEVICE_ID];
-	uint32_t m_lastpkttime_sec;
-	uint32_t m_lastpkttime_nsec;
-	uint32_t m_starttime_sec;
-	uint32_t m_starttime_nsec;
-	uint32_t m_endtime_sec;
-	uint32_t m_endtime_nsec;
+	struct timespec m_lastpkttime;
+	struct timespec m_threshtime;
+	struct timespec m_starttime;
+	struct timespec m_endtime;
 	uint32_t m_run_start_epoch;
 	uint32_t m_run_file_number;
 	uint32_t m_run_number;
@@ -208,6 +215,8 @@ private:
 	bool m_skip_pkt;
 	bool m_addRunEnd;
 	bool m_hysterical;
+	bool m_filterafter;
+	bool m_filterbefore;
 	bool m_posixRead;
 	bool m_showDDP;
 	bool m_lowRate;
@@ -215,6 +224,11 @@ private:
 	bool m_catch;
 
 	std::ostream &m_out;
+
+	std::string m_save_file;
+	std::vector<uint32_t> m_save_pkts;
+	uint32_t m_save_count;
+	std::ofstream m_save_out;
 };
 
 bool MungeParser::rxPacket(const ADARA::Packet &pkt)
@@ -249,20 +263,41 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 		}
 	}
 
+	// Capture "Last Packet's" Pulse Id (Timestamp)...
+	// - for Adding Run Status End Packet...
+	m_lastpkttime.tv_sec = (uint32_t) (pkt.pulseId() >> 32);
+	m_lastpkttime.tv_nsec = (uint32_t) pkt.pulseId();
+
 	// Pass Packet Through to Output Stream...
 	if ( !m_skip_pkt )
 	{
-		m_out.write( (const char *)pkt.packet(), pkt.packet_length() );
+		if ( ( m_filterafter
+				&& calcDiffSeconds( m_lastpkttime, m_threshtime ) > 0.0  )
+			|| ( m_filterbefore
+				&& calcDiffSeconds( m_lastpkttime, m_threshtime ) < 0.0 )
+			|| ( !m_filterafter && !m_filterbefore ) )
+		{
+			m_out.write( (const char *)pkt.packet(), pkt.packet_length() );
+		}
 	}
 	else
 	{
 		m_skip_pkt = false;
 	}
 
-	// Capture "Last Packet's" Pulse Id (Timestamp)...
-	// - for Adding Run Status End Packet...
-	m_lastpkttime_sec = (uint32_t) (pkt.pulseId() >> 32);
-	m_lastpkttime_nsec = (uint32_t) pkt.pulseId();
+	// Check for Packet Types to Save...
+	if ( m_save_out.is_open() )
+	{
+		for ( uint32_t i=0 ; i < m_save_pkts.size() ; i++ )
+		{
+			if ( pkt.type() == m_save_pkts[i] )
+			{
+				m_save_out.write( (const char *)pkt.packet(),
+					pkt.packet_length() );
+				m_save_count++;
+			}
+		}
+	}
 
 	return ret;
 }
@@ -344,8 +379,8 @@ bool MungeParser::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	}
 
 	// Save Last Packet Time as Potential "End of Run" Timestamp...
-	m_endtime_sec = (uint32_t) (pkt->pulseId() >> 32);
-	m_endtime_nsec = (uint32_t) pkt->pulseId();
+	m_endtime.tv_sec = (uint32_t) (pkt->pulseId() >> 32);
+	m_endtime.tv_nsec = (uint32_t) pkt->pulseId();
 
 	return false;
 }
@@ -374,8 +409,8 @@ bool MungeParser::rxPacket(const ADARA::RTDLPkt &pkt)
 	}
 
 	// Save Last Packet Time as Potential "End of Run" Timestamp...
-	m_endtime_sec = (uint32_t) (pkt.pulseId() >> 32);
-	m_endtime_nsec = (uint32_t) pkt.pulseId();
+	m_endtime.tv_sec = (uint32_t) (pkt.pulseId() >> 32);
+	m_endtime.tv_nsec = (uint32_t) pkt.pulseId();
 
 	return false;
 }
@@ -417,8 +452,8 @@ bool MungeParser::rxPacket(const ADARA::BankedEventPkt &pkt)
 	}
 
 	// Save Last Packet Time as Potential "End of Run" Timestamp...
-	m_endtime_sec = (uint32_t) (pkt.pulseId() >> 32);
-	m_endtime_nsec = (uint32_t) pkt.pulseId();
+	m_endtime.tv_sec = (uint32_t) (pkt.pulseId() >> 32);
+	m_endtime.tv_nsec = (uint32_t) pkt.pulseId();
 
 	return false;
 }
@@ -462,8 +497,8 @@ bool MungeParser::rxPacket(const ADARA::BankedEventStatePkt &pkt)
 	}
 
 	// Save Last Packet Time as Potential "End of Run" Timestamp...
-	m_endtime_sec = (uint32_t) (pkt.pulseId() >> 32);
-	m_endtime_nsec = (uint32_t) pkt.pulseId();
+	m_endtime.tv_sec = (uint32_t) (pkt.pulseId() >> 32);
+	m_endtime.tv_nsec = (uint32_t) pkt.pulseId();
 
 	return false;
 }
@@ -505,8 +540,8 @@ bool MungeParser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 	}
 
 	// Save Last Packet Time as Potential "End of Run" Timestamp...
-	m_endtime_sec = (uint32_t) (pkt.pulseId() >> 32);
-	m_endtime_nsec = (uint32_t) pkt.pulseId();
+	m_endtime.tv_sec = (uint32_t) (pkt.pulseId() >> 32);
+	m_endtime.tv_nsec = (uint32_t) pkt.pulseId();
 
 	return false;
 }
@@ -610,32 +645,32 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 	// - Run Start Time and Run End Time Must Match Historical Data...!
 	else if ( m_hysterical )
 	{
-		if ( m_starttime_sec > 0 && m_starttime_nsec > 0 )
+		if ( m_starttime.tv_sec > 0 && m_starttime.tv_nsec > 0 )
 		{
 			if ( pkt.status() == ADARA::RunStatus::NEW_RUN )
 			{
 				std::cerr << "*** Found Run Status - New Run...!"
 					<< std::endl;
 				uint64_t newPulseId;
-				newPulseId = ((uint64_t) m_starttime_sec) << 32;
-				newPulseId |= m_starttime_nsec;
+				newPulseId = ((uint64_t) m_starttime.tv_sec) << 32;
+				newPulseId |= m_starttime.tv_nsec;
 				ADARA::RunStatusPkt *PKT =
 					const_cast<ADARA::RunStatusPkt*>(&pkt);
 				PKT->setPulseId( newPulseId );
-				PKT->setRunStart( m_starttime_sec );
+				PKT->setRunStart( m_starttime.tv_sec );
 			}
 			else if ( pkt.status() == ADARA::RunStatus::END_RUN )
 			{
 				std::cerr << "*** Found Run Status - End of Run...!"
 					<< std::endl;
 				uint64_t newPulseId;
-				newPulseId = ((uint64_t) m_endtime_sec) << 32;
-				newPulseId |= m_endtime_nsec;
+				newPulseId = ((uint64_t) m_endtime.tv_sec) << 32;
+				newPulseId |= m_endtime.tv_nsec;
 				ADARA::RunStatusPkt *PKT =
 					const_cast<ADARA::RunStatusPkt*>(&pkt);
 				PKT->setPulseId( newPulseId );
 				// *Always* Set to Run Start Time! ;-D
-				PKT->setRunStart( m_starttime_sec );
+				PKT->setRunStart( m_starttime.tv_sec );
 			}
 		}
 		else
@@ -677,8 +712,8 @@ void MungeParser::addRunStatus( uint32_t run_number,
 		},
 	};
 
-	spkt.hdr.ts_sec = m_lastpkttime_sec;
-	spkt.hdr.ts_nsec = m_lastpkttime_nsec;
+	spkt.hdr.ts_sec = m_lastpkttime.tv_sec;
+	spkt.hdr.ts_nsec = m_lastpkttime.tv_nsec;
 
 	spkt.run_number = run_number;
 
@@ -1378,7 +1413,8 @@ void MungeParser::read_file(int fd)
 
 void MungeParser::parse(int argc, char **argv)
 {
-	std::string m_starttime;
+	std::string m_threshtime_str;
+	std::string m_starttime_str;
 
 		po::options_description opts("Allowed options");
 		opts.add_options()
@@ -1388,9 +1424,18 @@ void MungeParser::parse(int argc, char **argv)
 		("terse,T", "Terse Mode, Produce no output (except as requested)")
 		("catch,C", "Catch Exceptions, Try to parse past bad packets")
 		("addrunend,E", "Add Omitted Run Status Packet to End of Stream")
+		("savepkts,p",
+			po::value<std::vector<uint32_t> >(&m_save_pkts)->multitoken(),
+			"List of Packet Types (UINT32) to Save")
+		("savefile,F", po::value<std::string>(&m_save_file),
+			"Save Certain Packet Types to Given File")
 		("hysterical,H", "Set Hysterical Run Start/End Times")
-		("starttime", po::value<std::string>(&m_starttime),
+		("starttime", po::value<std::string>(&m_starttime_str),
 			"Hysterical Start Time for Experiment Data")
+		("filterafter,A", "Filter Data Stream to After Threshold Time")
+		("filterbefore,B", "Filter Data Stream to Before Threshold Time")
+		("threshtime", po::value<std::string>(&m_threshtime_str),
+			"Filter Threshold Time for Data Stream")
 		("case", po::value<uint32_t>(&m_case),
 			"Which Munge Case We Are Executing... (1,2,3...)");
 
@@ -1422,20 +1467,71 @@ void MungeParser::parse(int argc, char **argv)
 
 	m_addRunEnd = vm.count("addrunend");
 
+	// Save Packets Options...
+	if ( m_save_pkts.size() ) {
+		for ( uint32_t i=0 ; i < m_save_pkts.size() ; i++ ) {
+			std::cerr << "Packet Type 0x"
+			<< std::hex << m_save_pkts[i] << std::dec
+			<< " Selected for Saving." << std::endl;
+		}
+		if ( m_save_file.size() ) {
+			std::cerr << "Saving Selected Packet Types to File: "
+				<< m_save_file << std::endl;
+		}
+		else {
+			m_save_file = "save_pkts.adara";
+			std::cerr << "Saving Selected Packet Types to Default File: "
+				<< m_save_file << std::endl;
+		}
+		// Try to Open Save Packet File...
+		m_save_out.open( m_save_file.c_str(),
+			std::ofstream::out | std::ofstream::binary );
+		if ( !m_save_out.good() ) {
+			std::cerr << "Error Opening Save Packets File \""
+				<< m_save_file << "\"...! Disabling Packet Saving...!"
+				<< std::endl;
+			m_save_out.close();
+			m_save_pkts.clear();
+		}
+	}
+	else if ( m_save_file.size() ) {
+		std::cerr << "Warning: Save Packets File Specified "
+			<< "with NO Selected Packet Types! Ignoring..."
+			<< std::endl;
+	}
+
 	m_hysterical = vm.count("hysterical");
 
-	if ( m_starttime.size() ) {
+	if ( m_starttime_str.size() ) {
 		std::cerr << "Hysterical Run Start Time Requested as: "
-			<< m_starttime << std::endl;
-		size_t dot = m_starttime.find(".");
+			<< m_starttime_str << std::endl;
+		size_t dot = m_starttime_str.find(".");
 		if ( dot != std::string::npos ) {
-			m_starttime_sec = boost::lexical_cast<uint32_t>(
-				m_starttime.substr(0, dot) );
-			m_starttime_nsec = boost::lexical_cast<uint32_t>(
-				m_starttime.substr(dot + 1) );
+			m_starttime.tv_sec = boost::lexical_cast<uint32_t>(
+				m_starttime_str.substr(0, dot) );
+			m_starttime.tv_nsec = boost::lexical_cast<uint32_t>(
+				m_starttime_str.substr(dot + 1) );
 			std::cerr << "Hysterical Run Start Time"
-				<< " -> sec=" << m_starttime_sec
-				<< " nsec=" << m_starttime_nsec << std::endl;
+				<< " -> sec=" << m_starttime.tv_sec
+				<< " nsec=" << m_starttime.tv_nsec << std::endl;
+		}
+	}
+
+	m_filterafter = vm.count("filterafter");
+	m_filterbefore = vm.count("filterbefore");
+
+	if ( m_threshtime_str.size() ) {
+		std::cerr << "Filter Threshold Time Requested as: "
+			<< m_threshtime_str << std::endl;
+		size_t dot = m_threshtime_str.find(".");
+		if ( dot != std::string::npos ) {
+			m_threshtime.tv_sec = boost::lexical_cast<uint32_t>(
+				m_threshtime_str.substr(0, dot) );
+			m_threshtime.tv_nsec = boost::lexical_cast<uint32_t>(
+				m_threshtime_str.substr(dot + 1) );
+			std::cerr << "Filter Threshold Time"
+				<< " -> sec=" << m_threshtime.tv_sec
+				<< " nsec=" << m_threshtime.tv_nsec << std::endl;
 		}
 	}
 
@@ -1474,6 +1570,15 @@ void MungeParser::parse(int argc, char **argv)
 			std::cerr << argv[0] << ": " << m << std::endl;
 			exit(1);
 		}
+	}
+
+	// Close Any Saved Packets File...
+	if ( m_save_out.is_open() ) {
+		std::cerr << "Closing Saved Packets File \""
+			<< m_save_file << "\""
+			<< " - Saved " << m_save_count << " Packets."
+			<< std::endl;
+		m_save_out.close();
 	}
 
 	// Add Final "RunStatusPkt" to End of Run...

@@ -11,7 +11,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STC_VERSION "1.12.2"
+#define STC_VERSION "1.12.3"
 extern pid_t g_pid;
 
 #define STC_DOUBLE_EPSILON (0.00000000000001)
@@ -1372,17 +1372,22 @@ public:
                                 STC::MonitorInfo &a_monitor ) = 0;
     virtual void            runComment( const std::string &a_comment,
                                 bool a_force_init = false ) = 0;
-    virtual void            markerPause( double a_time, uint64_t tOrig,
+    virtual void            markerPause( double a_time,
+                                uint64_t a_ts_nano,
                                 const std::string &a_comment ) = 0;
-    virtual void            markerResume( double a_time, uint64_t tOrig,
+    virtual void            markerResume( double a_time,
+                                uint64_t a_ts_nano,
                                 const std::string &a_comment ) = 0;
-    virtual void            markerScanStart( double a_time, uint64_t tOrig,
+    virtual void            markerScanStart( double a_time,
+                                uint64_t a_ts_nano,
                                 uint32_t a_scan_index,
                                 const std::string &a_scan_comment ) = 0;
-    virtual void            markerScanStop( double a_time, uint64_t tOrig,
+    virtual void            markerScanStop( double a_time,
+                                uint64_t a_ts_nano,
                                 uint32_t a_scan_index,
                                 const std::string &a_comment ) = 0;
-    virtual void            markerComment( double a_time, uint64_t tOrig,
+    virtual void            markerComment( double a_time,
+                                uint64_t a_ts_nano,
                                 const std::string &a_comment ) = 0;
     virtual void            writeDeviceEnums( Identifier a_devId,
                                 std::vector<STC::PVEnumeratedType>

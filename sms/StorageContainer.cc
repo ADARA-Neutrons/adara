@@ -822,8 +822,9 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 	DEBUG("Purged " << purged << " Blocks from Container " << path);
 
 	/* If we removed all of the ADARA files, then also remove the
-	 * translation complete marker, proposal id marker,
-	 * and the container directory itself.
+	 * translation complete marker, the proposal id marker,
+	 * any *.BACKUP-pid or *.NEW-pid files from "ADARA Fix" Scripts,
+	 * and finally the container directory itself.
 	 */
 	if (files.empty()) {
 		fs::path base(path), completed(path), proposal_id(path);
@@ -832,11 +833,18 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 
 		path_deleted = true;
 		try {
+			// Remove Run Completed Marker
 			if (run)
 				remove(completed);
+			// Remove Proposal ID Marker
 			if (!propId.empty()) {
 				remove(proposal_id);
 			}
+			// Remove Any Raw Data File "BACKUP" Artifacts from:
+			// - adara_add_run_end
+			// - adara_fix_ipts
+			purgeBackups(path);
+			// Remove Overall Container Directory
 			remove(base);
 
 			DEBUG("Removed container " << base);
@@ -851,6 +859,41 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 	}
 
 	return purged;
+}
+
+void StorageContainer::purgeBackups(const std::string &path)
+{
+	fs::directory_iterator end, it(path);
+	StorageFile::SharedPtr f;
+
+	for (; it != end; ++it) {
+		fs::path file(it->path().filename());
+		fs::file_status status = it->status();
+
+		if (status.type() != fs::regular_file) {
+			WARN("purgeBackups(): Ignoring non-file '"
+				<< it->path() << "'");
+			continue;
+		}
+
+		/* Check for Raw Data "BACKUP" Files, "${datafile}.BACKUP-$$" */
+		size_t backup_ck = file.string().find(".BACKUP-");
+		if (backup_ck != std::string::npos) {
+			DEBUG("purgeBackups(): Found Raw Data BACKUP File - "
+				<< it->path());
+			remove(it->path());
+			continue;
+		}
+
+		/* Check for Raw Data "NEW" Files, "${datafile}.NEW-$$" */
+		size_t new_ck = file.string().find(".NEW-");
+		if (new_ck != std::string::npos) {
+			DEBUG("purgeBackups(): Found Raw Data NEW File - "
+				<< it->path());
+			remove(it->path());
+			continue;
+		}
+	}
 }
 
 uint64_t StorageContainer::openSize(void)

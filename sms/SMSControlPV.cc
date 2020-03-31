@@ -25,8 +25,11 @@ RateLimitedLogging::History RLLHistory_SMSControlPV;
 #define RLL_CONNPV_FAILED             2
 #define RLL_CONNPV_TRYING             3
 #define RLL_CONNPV_WAITING            4
-#define RLL_PV_READ                   5
-#define RLL_PV_WRITE                  6
+#define RLL_PTPV_IGNORE               5
+#define RLL_PTPV_PASSTHRU             6
+#define RLL_PTPV_EXECUTE              7
+#define RLL_PV_READ                   8
+#define RLL_PV_WRITE                  9
 
 /* gcc 4.4.6 on RHEL 6 cannot figure out that gdd::get(T &) will actually
  * initiallize the variable, so it warns. This conflicts with a clean build
@@ -140,6 +143,33 @@ static gddAppFuncTableStatus getConnectedEnums(gdd &in)
 
 	in.setDimension(1);
 	in.setBound(0, 0, 5);
+	in.putRef(str, des);
+
+	return S_cas_success;
+}
+
+/* -------------------------------------------------------------------- */
+
+static gddAppFuncTableStatus getPassThruEnums(gdd &in)
+{
+	aitFixedString *str;
+	fixedStringDestructor *des;
+
+	str = new aitFixedString[3];
+	if (!str)
+		return S_casApp_noMemory;
+
+	des = new fixedStringDestructor;
+	if (!des) {
+		delete [] str;
+		return S_casApp_noMemory;
+	}
+	strncpy(str[0].fixed_string, "Ignore", sizeof(str[0].fixed_string));
+	strncpy(str[1].fixed_string, "PassThru", sizeof(str[1].fixed_string));
+	strncpy(str[2].fixed_string, "Execute", sizeof(str[2].fixed_string));
+
+	in.setDimension(1);
+	in.setBound(0, 0, 3);
 	in.putRef(str, des);
 
 	return S_cas_success;
@@ -1296,7 +1326,7 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			<< " value=" << v);
 	}
 
-	if (v > 1)
+	if (v > 4)
 		return S_casApp_noSupport;
 
 	m_value->get(cur);
@@ -1424,7 +1454,7 @@ bool smsConnectedPV::valid(void)
 	return m_value.valid() && m_value->getStat() != epicsAlarmUDF;
 }
 
-bool smsConnectedPV::value(void)
+uint32_t smsConnectedPV::value(void)
 {
 	aitUint16 v = 0;
 	if (m_value.valid())
@@ -1434,6 +1464,217 @@ bool smsConnectedPV::value(void)
 
 void smsConnectedPV::changed(void)
 {
+}
+
+/* -------------------------------------------------------------------- */
+
+smsPassThruPV::smsPassThruPV(const std::string &name, bool auto_save)
+		: smsPV(name), m_first_set(true), m_auto_save(auto_save)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+
+	/* Default all booleans (and derivatives) to false on startup */
+	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
+	m_value->setTimeStamp(&ts);
+	m_value->put(0);
+}
+
+aitEnum smsPassThruPV::bestExternalType(void) const
+{
+	return aitEnumEnum16;
+}
+
+gddAppFuncTableStatus smsPassThruPV::getValue(gdd &in)
+{
+	if (gddApplicationTypeTable::app_table.smartCopy(&in, m_value.get()))
+		return S_cas_noConvert;
+
+	return S_cas_success;
+}
+
+gddAppFuncTableStatus smsPassThruPV::getEnums(gdd &in)
+{
+	return getPassThruEnums(in);
+}
+
+caStatus smsPassThruPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
+{
+	aitUint16 uninitialized_var(v);
+	m_value->get(v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		DEBUG(log_info << "smsPassThruPV::read() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
+	return m_read_table.read(*this, prototype);
+}
+
+caStatus smsPassThruPV::write(const casCtx &UNUSED(ctx), const gdd &val)
+{
+	aitUint16 uninitialized_var(v), uninitialized_var(cur);
+	smartGDDPointer nval;
+
+	if (!val.isScalar()) {
+		ERROR("smsPassThruPV::write() m_pv_name=" << m_pv_name
+			<< " Value is Not a Scalar!");
+		return S_casApp_noSupport;
+	}
+
+	val.get(v);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
+		DEBUG(log_info << "smsPassThruPV::write() m_pv_name=" << m_pv_name
+			<< " value=" << v);
+	}
+
+	if (v > 2)
+		return S_casApp_noSupport;
+
+	struct timespec ts;
+	val.getTimeStamp(&ts);
+
+	m_value->get(cur);
+	if (v == cur) {
+		if ( m_first_set ) {
+			DEBUG("smsPassThruPV::write() m_pv_name=" << m_pv_name
+				<< " Value Did Not Change, But First Setting"
+				<< " - Call changed()...");
+			m_value->setTimeStamp(&ts);
+			m_first_set = false;
+			changed();
+		}
+		return S_casApp_success;
+	}
+
+	update(v, &ts);
+
+	return S_casApp_success;
+}
+
+bool smsPassThruPV::allowUpdate(const gdd &)
+{
+	return true;
+}
+
+void smsPassThruPV::update(uint16_t val, struct timespec *ts)
+{
+	aitUint16 uninitialized_var(v);
+	gdd *nval;
+
+	m_value->get(v);
+	if (v == val) {
+		if ( m_first_set ) {
+			DEBUG("smsPassThruPV::update() m_pv_name=" << m_pv_name
+				<< " Value Did Not Change, But First Setting"
+				<< " - Call changed()...");
+			m_value->setTimeStamp(ts);
+			m_first_set = false;
+			changed();
+		}
+		else {
+			struct timespec old_ts;
+			m_value->getTimeStamp(&old_ts);
+			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+				DEBUG("smsPassThruPV::update() m_pv_name=" << m_pv_name
+					<< " Value Did Not Change, But Time Earlier"
+					<< " - Likely AutoSave Recovery, Call changed()...");
+				m_value->setTimeStamp(ts);
+				changed();
+			}
+		}
+		return;
+	}
+
+	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
+	nval->put(val);
+	nval->setTimeStamp(ts);
+
+	/* This does the unref/ref for us, so each event posted will
+	 * get its own copy of the value at that time.
+	 */
+	m_value = nval;
+
+	m_first_set = false;
+
+	notify();
+	changed();
+}
+
+void smsPassThruPV::ignore() {
+
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(0, &ts);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PTPV_IGNORE, m_pv_name,
+			60, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsPassThruPV::ignore() m_pv_name="
+			<< m_pv_name << " (0)");
+	}
+}
+
+void smsPassThruPV::passthru() {
+
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(1, &ts);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PTPV_PASSTHRU, m_pv_name,
+			60, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsPassThruPV::passthru() m_pv_name="
+			<< m_pv_name << " (1)");
+	}
+}
+
+void smsPassThruPV::execute() {
+
+	struct timespec ts;
+	clock_gettime(CLOCK_REALTIME, &ts);
+	update(2, &ts);
+
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
+			RLL_PTPV_EXECUTE, m_pv_name,
+			60, 3, 10, log_info ) ) {
+		DEBUG(log_info << "smsPassThruPV::execute() m_pv_name="
+			<< m_pv_name << " (2)");
+	}
+}
+
+bool smsPassThruPV::valid(void)
+{
+	return m_value.valid() && m_value->getStat() != epicsAlarmUDF;
+}
+
+uint32_t smsPassThruPV::value(void)
+{
+	aitUint16 v = 0;
+	if (m_value.valid())
+		m_value->get(v);
+	return v;
+}
+
+void smsPassThruPV::changed(void)
+{
+	if ( m_auto_save && !m_first_set )
+	{
+		// AutoSave PV Value Change...
+		struct timespec ts;
+		m_value->getTimeStamp(&ts);
+		std::stringstream ss;
+		ss << value();
+		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
+	}
 }
 
 /* -------------------------------------------------------------------- */
@@ -1851,6 +2092,11 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	if (v > 1)
 		return S_casApp_noSupport;
 
+	// Always Set smsTriggerPV Timestamp for Latest Trigger...! ;-D
+	struct timespec ts;
+	val.getTimeStamp(&ts);
+	m_value->setTimeStamp(&ts);
+
 	if (v) {
 		triggered();
 
@@ -1859,9 +2105,6 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			casEventMask mask = cas->valueEventMask() |
 						cas->logEventMask();
 			smartGDDPointer edge;
-
-			struct timespec ts;
-			val.getTimeStamp(&ts);
 
 			edge = new gddScalar(gddAppType_value, aitEnumEnum16);
 			edge->setTimeStamp(&ts);

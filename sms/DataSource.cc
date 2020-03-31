@@ -22,6 +22,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
 #include "StorageManager.h"
+#include "Markers.h"
 #include "DataSource.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
@@ -54,7 +55,8 @@ RateLimitedLogging::History RLLHistory_DataSource;
 #define RLL_LOCAL_RTDL_SEQUENCE      21
 #define RLL_RTDL_PULSE_IN_PAST       22
 #define RLL_RTDL_PULSE_IN_FUTURE     23
-#define RLL_HEARTBEAT                24
+#define RLL_ANNOTATION               24
+#define RLL_HEARTBEAT                25
 
 // Pulse Time Sanity Check Constants
 #define FACILITY_START_TIME 512715600 // EPICS Sat Apr  1 00:00:00 EST 2006
@@ -198,6 +200,20 @@ public:
 		// will Never Take, so we can _Ignore_ the First Sequence Value
 		// Until we "Prime the Pump"... ;-D
 		m_sourceSeq = (uint32_t) -1;
+
+		// Make Sure Max Pulse Sequence List Size is Reasonable...
+		// (It better at least be 1...?)
+		if ( m_maxPulseSeqList < 1 ) {
+			uint32_t tmpMaxPulseSeqList = 1;
+			ERROR("HWSource::HWSource():"
+				<< " Invalid Setting for"
+				<< " Max Pulse Sequence List (Buffer) Size"
+				<< " for " << m_name
+				<< std::hex << " src=0x" << m_hwId << std::dec
+				<< " Correcting from " << m_maxPulseSeqList
+				<< " to " << tmpMaxPulseSeqList);
+			m_maxPulseSeqList = tmpMaxPulseSeqList;
+		}
 
 		// Pulse Sequence List, Track Per HWSource/Source ID, Per Pulse...
 		// Increases Per Event Packet (Resets Per Pulse)
@@ -373,13 +389,24 @@ public:
 					m_dataSource->getMaxPulseSeqList();
 				if ( tmpMaxPulseSeqList != m_maxPulseSeqList )
 				{
-					ERROR("HWSource::getPulse():"
-						<< " Updating Value of"
-						<< " Max Pulse Sequence List (Buffer) Size"
-						<< " for " << m_name
-						<< std::hex << " src=0x" << m_hwId << std::dec
-						<< " from " << m_maxPulseSeqList
-						<< " to " << tmpMaxPulseSeqList);
+					if ( tmpMaxPulseSeqList < 1 ) {
+						ERROR("HWSource::HWSource():"
+							<< " Invalid Requested Setting for"
+							<< " Max Pulse Sequence List (Buffer) Size"
+							<< " for " << m_name
+							<< std::hex << " src=0x" << m_hwId << std::dec
+							<< " Correcting from " << tmpMaxPulseSeqList
+							<< " to " << 1);
+						tmpMaxPulseSeqList = 1;
+					} else {
+						ERROR("HWSource::getPulse():"
+							<< " Updating Value of"
+							<< " Max Pulse Sequence List (Buffer) Size"
+							<< " for " << m_name
+							<< std::hex << " src=0x" << m_hwId << std::dec
+							<< " from " << m_maxPulseSeqList
+							<< " to " << tmpMaxPulseSeqList);
+					}
 					m_maxPulseSeqList = tmpMaxPulseSeqList;
 				}
 			}
@@ -387,7 +414,7 @@ public:
 			// Keep Pulse Sequence List Size Small/"Fixed"... ;-D
 			// Once Maximum Pulse Sequence List Size is Reached,
 			// Pop One Pulse Off the End for Every New Pulse in Front!
-			if ( m_pulseSeqList.size() > m_maxPulseSeqList )
+			while ( m_pulseSeqList.size() > m_maxPulseSeqList )
 			{
 				PulseSeqList::iterator old_pulse_it =
 					--(m_pulseSeqList.end());
@@ -805,6 +832,7 @@ DataSource::DataSource( const std::string &name,
 			double connect_retry, double connect_timeout,
 			double data_timeout, uint32_t data_timeout_retry,
 			bool ignore_eop, bool ignore_local_sawtooth,
+			Markers::PassThru ignore_annotation_pkts,
 			bool mixed_data_packets,
 			bool check_source_sequence, bool check_pulse_sequence,
 			uint32_t max_pulse_seq_list,
@@ -818,6 +846,7 @@ DataSource::DataSource( const std::string &name,
 	m_data_timeout_retry_count(0),
 	m_ignore_eop(ignore_eop),
 	m_ignore_local_sawtooth(ignore_local_sawtooth),
+	m_ignore_annotation_pkts(ignore_annotation_pkts),
 	m_mixed_data_packets(mixed_data_packets),
 	m_check_source_sequence(check_source_sequence),
 	m_check_pulse_sequence(check_pulse_sequence),
@@ -940,6 +969,10 @@ DataSource::DataSource( const std::string &name,
 		smsBooleanPV(prefix + ":IgnoreLocalSAWTOOTH",
 			/* AutoSave */ true));
 
+	m_pvIgnoreAnnotationPkts = boost::shared_ptr<smsPassThruPV>(new
+		smsPassThruPV(prefix + ":IgnoreAnnotationPkts",
+			/* AutoSave */ true));
+
 	m_pvMixedDataPackets = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":MixedDataPackets", /* AutoSave */ true));
 
@@ -1016,6 +1049,7 @@ DataSource::DataSource( const std::string &name,
 	m_ctrl->addPV(m_pvDataTimeoutRetry);
 	m_ctrl->addPV(m_pvIgnoreEoP);
 	m_ctrl->addPV(m_pvIgnoreLocalSAWTOOTH);
+	m_ctrl->addPV(m_pvIgnoreAnnotationPkts);
 	m_ctrl->addPV(m_pvMixedDataPackets);
 	m_ctrl->addPV(m_pvCheckSourceSequence);
 	m_ctrl->addPV(m_pvCheckPulseSequence);
@@ -1053,6 +1087,7 @@ DataSource::DataSource( const std::string &name,
 	m_pvDataTimeoutRetry->update(m_data_timeout_retry, &now);
 	m_pvIgnoreEoP->update(m_ignore_eop, &now);
 	m_pvIgnoreLocalSAWTOOTH->update(m_ignore_local_sawtooth, &now);
+	m_pvIgnoreAnnotationPkts->update(m_ignore_annotation_pkts, &now);
 	m_pvMixedDataPackets->update(m_mixed_data_packets, &now);
 	m_pvCheckSourceSequence->update(m_check_source_sequence, &now);
 	m_pvCheckPulseSequence->update(m_check_pulse_sequence, &now);
@@ -1155,6 +1190,13 @@ DataSource::DataSource( const std::string &name,
 			bvalue, ts ) ) {
 		m_ignore_local_sawtooth = bvalue;
 		m_pvIgnoreLocalSAWTOOTH->update(bvalue, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvIgnoreAnnotationPkts->getName(),
+			uvalue, ts ) ) {
+		m_ignore_annotation_pkts = (Markers::PassThru) uvalue;
+		m_pvIgnoreAnnotationPkts->update(uvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV( m_pvMixedDataPackets->getName(),
@@ -2186,7 +2228,6 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 		case ADARA::PacketType::SYNC_TYPE:
 		case ADARA::PacketType::DATA_DONE_TYPE:
-		case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
 			/* We don't care about these packets, just drop them */
 			/* (We still have to call their rxPacket() method
 			 * to increment the Discarded Packet counts tho...! ;-D) */
@@ -2202,6 +2243,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
 		case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
 		case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
+		case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
 			/* We use a 0 pulse id to indicate that we don't have an
 			 * active pulse, and nothing should ever send one to us.
 			 */
@@ -3341,6 +3383,103 @@ bool DataSource::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 	return false;
 }
 
+bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
+{
+	// Meter Live Control PV Updates...
+	static uint32_t cnt = 0;
+
+	/* Rate-limited logging of Annotation packets */
+	std::string log_info;
+	if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
+			RLL_ANNOTATION, m_name, 3, 10, 100, log_info ) ) {
+		std::stringstream ss;
+		ss << " - MarkerType ";
+		switch ( pkt.marker_type() ) {
+			case ADARA::MarkerType::GENERIC:
+				ss << "GENERIC"; break;
+			case ADARA::MarkerType::SCAN_START:
+				ss << "SCAN_START"; break;
+			case ADARA::MarkerType::SCAN_STOP:
+				ss << "SCAN_STOP"; break;
+			case ADARA::MarkerType::PAUSE:
+				ss << "PAUSE"; break;
+			case ADARA::MarkerType::RESUME:
+				ss << "RESUME"; break;
+			case ADARA::MarkerType::OVERALL_RUN_COMMENT:
+				ss << "OVERALL_RUN_COMMENT"; break;
+		}
+		ss << " (" << pkt.marker_type() << ")";
+		ss << ", ScanIndex=" << pkt.scanIndex();
+		ss << ", Comment=[" << pkt.comment() << "]";
+		INFO(log_info
+			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "External Annotation Packet Received from " << m_name
+			<< ss.str());
+	}
+
+	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
+	if ( !( ++cnt % 9 ) ) {
+		Markers::PassThru tmpIgnoreAnnotationPkts =
+			(Markers::PassThru) m_pvIgnoreAnnotationPkts->value();
+		if ( tmpIgnoreAnnotationPkts != m_ignore_annotation_pkts )
+		{
+			ERROR("rxPacket( AnnotationPkt ):"
+				<< " Updating Value of"
+				<< " Ignore Annotation Packets"
+				<< " for " << m_name
+				<< " from " << m_ignore_annotation_pkts
+				<< " to " << tmpIgnoreAnnotationPkts);
+			m_ignore_annotation_pkts = tmpIgnoreAnnotationPkts;
+		}
+	}
+
+	// Optionally Interpret External or Replayed ADARA Marker/Annotations
+	if ( m_ignore_annotation_pkts != Markers::IGNORE )
+	{
+		// Pass-Thru Invoke Appropriate Markers Handler Method...
+		boost::shared_ptr<Markers> markers = m_ctrl->getMarkers();
+		struct timespec ts = pkt.timestamp();
+		switch ( pkt.marker_type() ) {
+			case ADARA::MarkerType::GENERIC:
+				markers->addAnnotationComment( &ts,
+					m_ignore_annotation_pkts,
+					pkt.scanIndex(), pkt.comment() );
+				break;
+			case ADARA::MarkerType::SCAN_START:
+				markers->startScan( &ts,
+					m_ignore_annotation_pkts,
+					pkt.scanIndex(), "" );
+					// Don't Pass Comment, Let Scan Start Re-Generate It...
+				break;
+			case ADARA::MarkerType::SCAN_STOP:
+				markers->stopScan( &ts,
+					m_ignore_annotation_pkts,
+					pkt.scanIndex(), "" );
+					// Don't Pass Comment, Let Scan Stop Re-Generate It...
+				break;
+			case ADARA::MarkerType::PAUSE:
+				markers->pause( &ts,
+					m_ignore_annotation_pkts,
+					pkt.scanIndex(), "" );
+					// Don't Pass Comment, Let Pause Re-Generate It...
+				break;
+			case ADARA::MarkerType::RESUME:
+				markers->resume( &ts,
+					m_ignore_annotation_pkts,
+					pkt.scanIndex(), "" );
+					// Don't Pass Comment, Let Resume Re-Generate It...
+				break;
+			case ADARA::MarkerType::OVERALL_RUN_COMMENT:
+				markers->addNotesComment( &ts,
+					m_ignore_annotation_pkts,
+					pkt.scanIndex(), pkt.comment() );
+				break;
+		}
+	}
+
+	return false;
+}
+
 bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 {
 	/* Rate-limited logging of heartbeat packets */
@@ -3397,7 +3536,7 @@ void DataSource::onSavePrologue(void)
 	pkt[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	pkt[3] = now.tv_nsec;
 
-	pkt[4] = (uint32_t) ADARA::MarkerType::OVERALL_RUN_COMMENT << 16;
+	pkt[4] = (uint32_t) ADARA::MarkerType::GENERIC << 16;
 	pkt[5] = 0;
 
 	iov.iov_base = pkt;
