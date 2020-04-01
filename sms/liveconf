@@ -149,8 +149,8 @@ num_options=$(( num_options + 1 ))
 option_id_type[$num_options]="source"
 option_name[$num_options]="ignore_annotation_pkts"
 option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:IgnoreAnnotationPkts"
-option_value_type[$num_options]="BOOL_VALUE(true/false)"
-option_default[$num_options]="true"
+option_value_type[$num_options]="ENUM(Ignore=0|PassThru=1|Execute=2)"
+option_default[$num_options]="Ignore"
 option_label[$num_options]="[Ignore External/Replay ADARA Markers/Annotns]"
 num_options=$(( num_options + 1 ))
 
