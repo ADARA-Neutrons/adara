@@ -116,6 +116,17 @@ declare -A nHostSTCSkipIdenticalVarValues
 declare -A nHostSTCPurgePrePulseVarValues
 declare -A nHostSTCIgnoreSubsumedVarValues
 declare -A nHostSTCSubsumedAllDupVarValues
+declare -A nHostSTCGotPrePulseAnnotation
+declare -A nHostSTCCommentsRequireNormal
+declare -A nHostSTCPauseRequireNormal
+declare -A nHostSTCScanRequireNormal
+declare -A nHostSTCNormalizeAnnotation
+declare -A nHostSTCPositiveTimeComment
+declare -A nHostSTCPositiveTimePause
+declare -A nHostSTCPositiveTimeScan
+declare -A nHostSTCTruncateNegComment
+declare -A nHostSTCTruncateNegPause
+declare -A nHostSTCTruncateNegScan
 declare -A nHostSTCUnableToInitialize
 declare -A nHostSTCConnectionFailed
 declare -A nHostSTCParserStoppedUnexpect
@@ -283,6 +294,17 @@ PARSE_LOG()
 		nHostSTCPurgePrePulseVarValues[$host]=0
 		nHostSTCIgnoreSubsumedVarValues[$host]=0
 		nHostSTCSubsumedAllDupVarValues[$host]=0
+		nHostSTCGotPrePulseAnnotation[$host]=0
+		nHostSTCCommentsRequireNormal[$host]=0
+		nHostSTCPauseRequireNormal[$host]=0
+		nHostSTCScanRequireNormal[$host]=0
+		nHostSTCNormalizeAnnotation[$host]=0
+		nHostSTCPositiveTimeComment[$host]=0
+		nHostSTCPositiveTimePause[$host]=0
+		nHostSTCPositiveTimeScan[$host]=0
+		nHostSTCTruncateNegComment[$host]=0
+		nHostSTCTruncateNegPause[$host]=0
+		nHostSTCTruncateNegScan[$host]=0
 		nHostSTCUnableToInitialize[$host]=0
 		nHostSTCConnectionFailed[$host]=0
 		nHostSTCParserStoppedUnexpect[$host]=0
@@ -532,6 +554,94 @@ PARSE_LOG()
 			#echo "PV Has Subsumed All Duplicate PV Log Values..."
 			nHostSTCSubsumedAllDupVarValues[$host]=$(( \
 				nHostSTCSubsumedAllDupVarValues[$host] + 1 ))
+
+		# "Got Pre-Pulse Annotation Timestamp" Log
+		elif [[ "$log" =~ \
+				Got${S}Pre-Pulse${S}Annotation${S}Timestamp \
+		]]; then
+			#echo "Got Pre-Pulse Annotation Timestamp..."
+			nHostSTCGotPrePulseAnnotation[$host]=$(( \
+				nHostSTCGotPrePulseAnnotation[$host] + 1 ))
+
+		# "Comment Timestamps Require Normalization" Log
+		elif [[ "$log" =~ \
+				Comment${S}Timestamps${S}Require${S}Normalization \
+		]]; then
+			#echo "Comment Timestamps Require Normalization..."
+			nHostSTCCommentsRequireNormal[$host]=$(( \
+				nHostSTCCommentsRequireNormal[$host] + 1 ))
+
+		# "Pause/Resume Marker Timestamps Require Normalization" Log
+		elif [[ "$log" =~ \
+		Pause/Resume${S}Marker${S}Timestamps${S}Require${S}Normalization \
+		]]; then
+			#echo "Pause/Resume Marker Timestamps Require Normalization..."
+			nHostSTCPauseRequireNormal[$host]=$(( \
+				nHostSTCPauseRequireNormal[$host] + 1 ))
+
+		# "Scan Start/Stop Marker Timestamps Require Normalization" Log
+		elif [[ "$log" =~ \
+   Scan${S}Start/Stop${S}Marker${S}Timestamps${S}Require${S}Normalization \
+		]]; then
+			#echo "Scan Start/Stop Marker Timestamps Require Normalization"
+			nHostSTCScanRequireNormal[$host]=$(( \
+				nHostSTCScanRequireNormal[$host] + 1 ))
+
+		# "NxGen::normalizeAnnotationTimestamps(): Entry" Log
+		elif [[ "$log" =~ \
+				NxGen\:\:normalizeAnnotationTimestamps\(\)\:${S}Entry \
+		]]; then
+			#echo "NxGen::normalizeAnnotationTimestamps(): Entry..."
+			nHostSTCNormalizeAnnotation[$host]=$(( \
+				nHostSTCNormalizeAnnotation[$host] + 1 ))
+
+		# "Positive Time Annotation for Comments" Log
+		elif [[ "$log" =~ \
+				Positive${S}Time${S}Annotation${S}for${S}Comments \
+		]]; then
+			#echo "Positive Time Annotation for Comments..."
+			nHostSTCPositiveTimeComment[$host]=$(( \
+				nHostSTCPositiveTimeComment[$host] + 1 ))
+
+		# "Positive Time Annotation for Pause/Resume Markers" Log
+		elif [[ "$log" =~ \
+				Positive${S}Time${S}Annotation${S}for${S}Pause/Resume \
+		]]; then
+			#echo "Positive Time Annotation for Pause/Resume Markers..."
+			nHostSTCPositiveTimePause[$host]=$(( \
+				nHostSTCPositiveTimePause[$host] + 1 ))
+
+		# "Positive Time Annotation for Scan Start/Stop Markers" Log
+		elif [[ "$log" =~ \
+			Positive${S}Time${S}Annotation${S}for${S}Scan${S}Start/Stop \
+		]]; then
+			#echo "Positive Time Annotation for Scan Start/Stop Markers..."
+			nHostSTCPositiveTimeScan[$host]=$(( \
+				nHostSTCPositiveTimeScan[$host] + 1 ))
+
+		# "Truncate Negative Annotation Time for Comments" Log
+		elif [[ "$log" =~ \
+			Truncate${S}Negative${S}Annotation${S}Time${S}for${S}Comments \
+		]]; then
+			#echo "Truncate Negative Annotation Time for Comments..."
+			nHostSTCTruncateNegComment[$host]=$(( \
+				nHostSTCTruncateNegComment[$host] + 1 ))
+
+		# "Truncate Negative Annotation Time for Pause/Resume" Log
+		elif [[ "$log" =~ \
+		Truncate${S}Negative${S}Annotation${S}Time${S}for${S}Pause/Resume \
+		]]; then
+			#echo "Truncate Negative Annotation Time for Pause/Resume..."
+			nHostSTCTruncateNegPause[$host]=$(( \
+				nHostSTCTruncateNegPause[$host] + 1 ))
+
+		# "Truncate Negative Annotation Time for Scan Start/Stop" Log
+		elif [[ "$log" =~ \
+  Truncate${S}Negative${S}Annotation${S}Time${S}for${S}Scan${S}Start/Stop \
+		]]; then
+			#echo "Truncate Negative Annotation Time for Scan Start/Stop."
+			nHostSTCTruncateNegScan[$host]=$(( \
+				nHostSTCTruncateNegScan[$host] + 1 ))
 
 		# "Unable to Initialize NeXus File - Retry Later..." Log
 		elif [[ "$log" =~ \
@@ -1497,6 +1607,20 @@ for h in ${HostList} ; do
 		echo -n "   ** ${nHostSTCLDAPSearchFailed[$h]} "
 		echo "STC \"stcLdapConnect(): LDAP Search Failed\" Logs"
 	fi
+	if [[ ${nHostSTCTruncateNegScan[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCTruncateNegScan[$h]} "
+		echo \
+	"STC \"Truncate Negative Annotation Time for Scan Start/Stop\" Logs"
+	fi
+	if [[ ${nHostSTCTruncateNegPause[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCTruncateNegPause[$h]} "
+		echo \
+	"STC \"Truncate Negative Annotation Time for Pause/Resume\" Logs"
+	fi
+	if [[ ${nHostSTCTruncateNegComment[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCTruncateNegComment[$h]} "
+		echo "STC \"Truncate Negative Annotation Time for Comments\" Logs"
+	fi
 	if [[ ${nHostSTCNoNeutronPulsesInStream[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTCNoNeutronPulsesInStream[$h]} "
 		echo "STC \"No Neutron Pulses Received in Stream\" Logs"
@@ -1519,6 +1643,39 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTCPurgePrePulseVarValues[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTCPurgePrePulseVarValues[$h]} "
 		echo "STC \"Purging Pre-First-Pulse Values\" Logs"
+	fi
+	if [[ ${nHostSTCGotPrePulseAnnotation[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCGotPrePulseAnnotation[$h]} "
+		echo "STC \"Got Pre-Pulse Annotation Timestamp\" Logs"
+	fi
+	if [[ ${nHostSTCScanRequireNormal[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCScanRequireNormal[$h]} "
+		echo \
+		"STC \"Scan Start/Stop Timestamps Require Normalization\" Logs"
+	fi
+	if [[ ${nHostSTCPauseRequireNormal[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCPauseRequireNormal[$h]} "
+		echo "STC \"Pause/Resume Timestamps Require Normalization\" Logs"
+	fi
+	if [[ ${nHostSTCCommentsRequireNormal[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCCommentsRequireNormal[$h]} "
+		echo "STC \"Comment Timestamps Require Normalization\" Logs"
+	fi
+	if [[ ${nHostSTCNormalizeAnnotation[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCNormalizeAnnotation[$h]} "
+		echo "STC \"NxGen::normalizeAnnotationTimestamps(): Entry\" Logs"
+	fi
+	if [[ ${nHostSTCPositiveTimeScan[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCPositiveTimeScan[$h]} "
+		echo "STC \"Positive Time Annotation for Scan Start/Stop\" Logs"
+	fi
+	if [[ ${nHostSTCPositiveTimePause[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCPositiveTimePause[$h]} "
+		echo "STC \"Positive Time Annotation for Pause/Resume\" Logs"
+	fi
+	if [[ ${nHostSTCPositiveTimeComment[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCPositiveTimeComment[$h]} "
+		echo "STC \"Positive Time Annotation for Comments\" Logs"
 	fi
 	if [[ ${nHostSTCPrePulseVarValue[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTCPrePulseVarValue[$h]} "
