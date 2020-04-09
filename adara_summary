@@ -127,6 +127,8 @@ declare -A nHostSTCPositiveTimeScan
 declare -A nHostSTCTruncateNegComment
 declare -A nHostSTCTruncateNegPause
 declare -A nHostSTCTruncateNegScan
+declare -A nHostSTCNotePauseAnnotation
+declare -A nHostSTCNoteScanAnnotation
 declare -A nHostSTCUnableToInitialize
 declare -A nHostSTCConnectionFailed
 declare -A nHostSTCParserStoppedUnexpect
@@ -305,6 +307,8 @@ PARSE_LOG()
 		nHostSTCTruncateNegComment[$host]=0
 		nHostSTCTruncateNegPause[$host]=0
 		nHostSTCTruncateNegScan[$host]=0
+		nHostSTCNotePauseAnnotation[$host]=0
+		nHostSTCNoteScanAnnotation[$host]=0
 		nHostSTCUnableToInitialize[$host]=0
 		nHostSTCConnectionFailed[$host]=0
 		nHostSTCParserStoppedUnexpect[$host]=0
@@ -642,6 +646,18 @@ PARSE_LOG()
 			#echo "Truncate Negative Annotation Time for Scan Start/Stop."
 			nHostSTCTruncateNegScan[$host]=$(( \
 				nHostSTCTruncateNegScan[$host] + 1 ))
+
+		# "Note Pause Annotation" Log
+		elif [[ "$log" =~ Note${S}Pause${S}Annotation ]]; then
+			#echo "Note Pause Annotation..."
+			nHostSTCNotePauseAnnotation[$host]=$(( \
+				nHostSTCNotePauseAnnotation[$host] + 1 ))
+
+		# "Note Scan Annotation" Log
+		elif [[ "$log" =~ Note${S}Scan${S}Annotation ]]; then
+			#echo "Note Scan Annotation..."
+			nHostSTCNoteScanAnnotation[$host]=$(( \
+				nHostSTCNoteScanAnnotation[$host] + 1 ))
 
 		# "Unable to Initialize NeXus File - Retry Later..." Log
 		elif [[ "$log" =~ \
@@ -1676,6 +1692,14 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTCPositiveTimeComment[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTCPositiveTimeComment[$h]} "
 		echo "STC \"Positive Time Annotation for Comments\" Logs"
+	fi
+	if [[ ${nHostSTCNoteScanAnnotation[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCNoteScanAnnotation[$h]} "
+		echo "STC \"Note Scan Annotation\" Logs"
+	fi
+	if [[ ${nHostSTCNotePauseAnnotation[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCNotePauseAnnotation[$h]} "
+		echo "STC \"Note Pause Annotation\" Logs"
 	fi
 	if [[ ${nHostSTCPrePulseVarValue[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTCPrePulseVarValue[$h]} "
