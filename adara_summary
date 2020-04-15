@@ -1996,28 +1996,28 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDDataSourceTimedOut[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDDataSourceTimedOutREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDDataSourceTimedOutREC[$h]}"
+			REC=" [REC=${nHostSMSDDataSourceTimedOutREC[$h]}]"
 		else REC=""; fi
 		echo -n "   *** ${nHostSMSDDataSourceTimedOut[$h]} "
 		echo "SMSD \"Timed out waiting for data (Past Retry!)\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDMissingRingPeriod[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDMissingRingPeriodREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDMissingRingPeriodREC[$h]}"
+			REC=" [REC=${nHostSMSDMissingRingPeriodREC[$h]}]"
 		else REC=""; fi
 		echo -n "   *** ${nHostSMSDMissingRingPeriod[$h]} "
 		echo "SMSD \"Missing ring period\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDRunAwayDataSource[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDRunAwayDataSourceREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDRunAwayDataSourceREC[$h]}"
+			REC=" [REC=${nHostSMSDRunAwayDataSourceREC[$h]}]"
 		else REC=""; fi
 		echo -n "   *** ${nHostSMSDRunAwayDataSource[$h]} "
 		echo "SMSD \"Run-Away Data Source\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDPulseBufferOverflow[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDPulseBufferOverflowREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDPulseBufferOverflowREC[$h]}"
+			REC=" [REC=${nHostSMSDPulseBufferOverflowREC[$h]}]"
 		else REC=""; fi
 		echo -n "   *** ${nHostSMSDPulseBufferOverflow[$h]} "
 		echo "SMSD \"Internal Pulse Buffer Overflow\" Logs${REC}"
@@ -2029,35 +2029,35 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDBogusRTDLDistantPast[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDBogusRTDLDistantPastREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDBogusRTDLDistantPastREC[$h]}"
+			REC=" [REC=${nHostSMSDBogusRTDLDistantPastREC[$h]}]"
 		else REC=""; fi
 		echo -n "   *** ${nHostSMSDBogusRTDLDistantPast[$h]} "
 		echo "SMSD \"Bogus Pulse Time from Distant Past\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDBogusRTDLDistantFuture[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDBogusRTDLDistantFutureREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDBogusRTDLDistantFutureREC[$h]}"
+			REC=" [REC=${nHostSMSDBogusRTDLDistantFutureREC[$h]}]"
 		else REC=""; fi
 		echo -n "   *** ${nHostSMSDBogusRTDLDistantFuture[$h]} "
 		echo "SMSD \"Bogus Pulse Time from Distant Future\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDRTDLOutOfOrderWithRawData[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDRTDLOutOfOrderWithRawDataREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDRTDLOutOfOrderWithRawDataREC[$h]}"
+			REC=" [REC=${nHostSMSDRTDLOutOfOrderWithRawDataREC[$h]}]"
 		else REC=""; fi
 		echo -n "   *** ${nHostSMSDRTDLOutOfOrderWithRawData[$h]} "
 		echo "SMSD \"RTDL Out of Order with Raw Data\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDLocalSAWTOOTHRTDL[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDLocalSAWTOOTHRTDLREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDLocalSAWTOOTHRTDLREC[$h]}"
+			REC=" [REC=${nHostSMSDLocalSAWTOOTHRTDLREC[$h]}]"
 		else REC=""; fi
 		echo -n "   *** ${nHostSMSDLocalSAWTOOTHRTDL[$h]} "
 		echo "SMSD \"Local SAWTOOTH RTDL\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDLocalSAWTOOTHData[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDLocalSAWTOOTHDataREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDLocalSAWTOOTHDataREC[$h]}"
+			REC=" [REC=${nHostSMSDLocalSAWTOOTHDataREC[$h]}]"
 		else REC=""; fi
 		echo -n "   *** ${nHostSMSDLocalSAWTOOTHData[$h]} "
 		echo "SMSD \"Local SAWTOOTH RawData\" Logs${REC}"
@@ -2072,56 +2072,56 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDLocalDuplicatePulse[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDLocalDuplicatePulseREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDLocalDuplicatePulseREC[$h]}"
+			REC=" [REC=${nHostSMSDLocalDuplicatePulseREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ** ${nHostSMSDLocalDuplicatePulse[$h]} "
 		echo "SMSD \"Local Duplicate pulse\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDDataSourceReadDelay[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDDataSourceReadDelayREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDDataSourceReadDelayREC[$h]}"
+			REC=" [REC=${nHostSMSDDataSourceReadDelayREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ** ${nHostSMSDDataSourceReadDelay[$h]} "
 		echo "SMSD \"Read Delay Threshold Exceeded\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDMissingRTDLFromDSP[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDMissingRTDLFromDSPREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDMissingRTDLFromDSPREC[$h]}"
+			REC=" [REC=${nHostSMSDMissingRTDLFromDSPREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ** ${nHostSMSDMissingRTDLFromDSP[$h]} "
 		echo "SMSD \"MISSING RTDL from DSP?\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDDataSourceTimedOutRetry[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDDataSourceTimedOutRetryREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDDataSourceTimedOutRetryREC[$h]}"
+			REC=" [REC=${nHostSMSDDataSourceTimedOutRetryREC[$h]}]"
 		else REC=""; fi
 		echo -n "   * ${nHostSMSDDataSourceTimedOutRetry[$h]} "
 		echo "SMSD \"Timed out waiting for data (Retry)\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDNoRTDLForPulse[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDNoRTDLForPulseREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDNoRTDLForPulseREC[$h]}"
+			REC=" [REC=${nHostSMSDNoRTDLForPulseREC[$h]}]"
 		else REC=""; fi
 		echo -n "   * ${nHostSMSDNoRTDLForPulse[$h]} "
 		echo "SMSD \"NO RTDL for Pulse\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDMissingRTDLForProtonCharge[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDMissingRTDLForProtonChargeREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDMissingRTDLForProtonChargeREC[$h]}"
+			REC=" [REC=${nHostSMSDMissingRTDLForProtonChargeREC[$h]}]"
 		else REC=""; fi
 		echo -n "   * ${nHostSMSDMissingRTDLForProtonCharge[$h]} "
 		echo "SMSD \"Missing RTDL for Setting Proton Charge\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDBogusRingPeriodZero[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDBogusRingPeriodZeroREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDBogusRingPeriodZeroREC[$h]}"
+			REC=" [REC=${nHostSMSDBogusRingPeriodZeroREC[$h]}]"
 		else REC=""; fi
 		echo -n "   * ${nHostSMSDBogusRingPeriodZero[$h]} "
 		echo "SMSD \"Bogus Ring Period of Zero\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDNewChopperId[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDNewChopperIdREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDNewChopperIdREC[$h]}"
+			REC=" [REC=${nHostSMSDNewChopperIdREC[$h]}]"
 		else REC=""; fi
 		echo -n "   * ${nHostSMSDNewChopperId[$h]} "
 		echo "SMSD \"New Chopper id=\" Logs${REC}"
@@ -2133,28 +2133,28 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDIdentifiedIntermittent[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDIdentifiedIntermittentREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDIdentifiedIntermittentREC[$h]}"
+			REC=" [REC=${nHostSMSDIdentifiedIntermittentREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDIdentifiedIntermittent[$h]} "
 		echo "SMSD \"Identified Intermittent Data Source\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDIntermittentRecovered[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDIntermittentRecoveredREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDIntermittentRecoveredREC[$h]}"
+			REC=" [REC=${nHostSMSDIntermittentRecoveredREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDIntermittentRecovered[$h]} "
 		echo "SMSD \"Intermittent Data Source Recovered\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDSetHWSourceIntermittent[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDSetHWSourceIntermittentREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDSetHWSourceIntermittentREC[$h]}"
+			REC=" [REC=${nHostSMSDSetHWSourceIntermittentREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDSetHWSourceIntermittent[$h]} "
 		echo "SMSD \"Setting HwSource Intermittent State\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDFoundHWSourceIntermittent[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDFoundHWSourceIntermittentREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDFoundHWSourceIntermittentREC[$h]}"
+			REC=" [REC=${nHostSMSDFoundHWSourceIntermittentREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDFoundHWSourceIntermittent[$h]} "
 		echo "SMSD \"setIntermittent(): Found HwSource\" Logs${REC}"
@@ -2181,28 +2181,28 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDNoMorePulsesForCorrect[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDNoMorePulsesForCorrectREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDNoMorePulsesForCorrectREC[$h]}"
+			REC=" [REC=${nHostSMSDNoMorePulsesForCorrectREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDNoMorePulsesForCorrect[$h]} "
 		echo "SMSD \"No More Pulses for PCharge/Veto Correction\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDChopperEventSync[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDChopperEventSyncREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDChopperEventSyncREC[$h]}"
+			REC=" [REC=${nHostSMSDChopperEventSyncREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDChopperEventSync[$h]} "
 		echo "SMSD \"Chopper Event Synchronization Error\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDChopperGlitchEvent[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDChopperGlitchEventREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDChopperGlitchEventREC[$h]}"
+			REC=" [REC=${nHostSMSDChopperGlitchEventREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDChopperGlitchEvent[$h]} "
 		echo "SMSD \"Chopper Glitch Event Error\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDCorrectPChargeVeto[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDCorrectPChargeVetoREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDCorrectPChargeVetoREC[$h]}"
+			REC=" [REC=${nHostSMSDCorrectPChargeVetoREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDCorrectPChargeVeto[$h]} "
 		echo "SMSD \"correctPChargeVeto()\" Logs${REC}"
@@ -2213,28 +2213,28 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSMSDGlobalSAWTOOTH[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDGlobalSAWTOOTHREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDGlobalSAWTOOTHREC[$h]}"
+			REC=" [REC=${nHostSMSDGlobalSAWTOOTHREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDGlobalSAWTOOTH[$h]} "
 		echo "SMSD \"Global SAWTOOTH Pulse\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDPulseNoRegEvent[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDPulseNoRegEventREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDPulseNoRegEventREC[$h]}"
+			REC=" [REC=${nHostSMSDPulseNoRegEventREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDPulseNoRegEvent[$h]} "
 		echo "SMSD \"Pulse with No Registered Event Sources\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDFirstNewEventSource[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDFirstNewEventSourceREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDFirstNewEventSourceREC[$h]}"
+			REC=" [REC=${nHostSMSDFirstNewEventSourceREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDFirstNewEventSource[$h]} "
 		echo "SMSD \"First New Event Source Registered\" Logs${REC}"
 	fi
 	if [[ ${nHostSMSDLastEventSource[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDLastEventSourceREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostSMSDLastEventSourceREC[$h]}"
+			REC=" [REC=${nHostSMSDLastEventSourceREC[$h]}]"
 		else REC=""; fi
 		echo -n "   ${nHostSMSDLastEventSource[$h]} "
 		echo "SMSD \"Last Event Source Unregistered\" Logs${REC}"
@@ -2302,7 +2302,7 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostPVSDOversizePkt[$h]} -gt 0 ]]; then
 		if [[ ${nHostPVSDOversizePktREC[$h]} -gt 0 ]]; then
-			REC=" REC=${nHostPVSDOversizePktREC[$h]}"
+			REC=" [REC=${nHostPVSDOversizePktREC[$h]}]"
 		else REC=""; fi
 		echo -n "   *** ${nHostPVSDOversizePkt[$h]} "
 		echo "PVSD \"OversizePkt\" Logs${REC}"
