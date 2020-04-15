@@ -274,6 +274,8 @@ nUnknownSTC=0
 nUnknownApp=0
 nUnknownLogs=0
 
+nRecording=0
+
 nDASMOND=0
 nSMSD=0
 nPVSD=0
@@ -869,6 +871,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDRunAwayDataSourceREC[$host]=$(( \
 					nHostSMSDRunAwayDataSourceREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Identified Intermittent Data Source" Log
@@ -880,6 +883,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDIdentifiedIntermittentREC[$host]=$(( \
 					nHostSMSDIdentifiedIntermittentREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Intermittent Data Source Recovered" Log
@@ -891,6 +895,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDIntermittentRecoveredREC[$host]=$(( \
 					nHostSMSDIntermittentRecoveredREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Setting HwSource Intermittent State" Log
@@ -902,6 +907,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDSetHWSourceIntermittentREC[$host]=$(( \
 					nHostSMSDSetHWSourceIntermittentREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "setIntermittent(): Found HwSource" Log
@@ -913,6 +919,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDSetHWSourceIntermittentREC[$host]=$(( \
 					nHostSMSDSetHWSourceIntermittentREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Missing ring period" Log
@@ -923,6 +930,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDMissingRingPeriodREC[$host]=$(( \
 					nHostSMSDMissingRingPeriodREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Bogus Ring Period of Zero" Log
@@ -933,6 +941,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDBogusRingPeriodZeroREC[$host]=$(( \
 					nHostSMSDBogusRingPeriodZeroREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "System Uninitialized" Log
@@ -988,6 +997,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDDataSourceReadDelayREC[$host]=$(( \
 					nHostSMSDDataSourceReadDelayREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "DataSource - WARNING: Timed out waiting for data from..." Log
@@ -1000,6 +1010,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDDataSourceTimedOutRetryREC[$host]=$(( \
 					nHostSMSDDataSourceTimedOutRetryREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "DataSource - Timed out waiting for data from..." Log
@@ -1011,6 +1022,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDDataSourceTimedOutREC[$host]=$(( \
 					nHostSMSDDataSourceTimedOutREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Bogus RTDL/RawData Pulse Time from Distant Past" Log
@@ -1023,6 +1035,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDBogusRTDLDistantPastREC[$host]=$(( \
 					nHostSMSDBogusRTDLDistantPastREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Bogus RTDL/RawData Pulse Time from Distant Future" Log
@@ -1035,6 +1048,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDBogusRTDLDistantFutureREC[$host]=$(( \
 					nHostSMSDBogusRTDLDistantFutureREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "NO RTDL for Pulse" Log
@@ -1045,6 +1059,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDNoRTDLForPulseREC[$host]=$(( \
 					nHostSMSDNoRTDLForPulseREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "RTDL Out of Order with Raw Data" Log
@@ -1056,6 +1071,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDRTDLOutOfOrderWithRawDataREC[$host]=$(( \
 					nHostSMSDRTDLOutOfOrderWithRawDataREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Missing RTDL for Setting Proton Charge" Log
@@ -1067,6 +1083,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDMissingRTDLForProtonChargeREC[$host]=$(( \
 					nHostSMSDMissingRTDLForProtonChargeREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "No More Pulses for Proton Charge/Veto Flags Correction" Log
@@ -1079,6 +1096,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDNoMorePulsesForCorrectREC[$host]=$(( \
 					nHostSMSDNoMorePulsesForCorrectREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "MISSING RTDL from DSP?" Log
@@ -1089,6 +1107,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDMissingRTDLFromDSPREC[$host]=$(( \
 					nHostSMSDMissingRTDLFromDSPREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "New Chopper id=" Log
@@ -1099,6 +1118,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDNewChopperIdREC[$host]=$(( \
 					nHostSMSDNewChopperIdREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Chopper <N> Event Synchronization Error" Log
@@ -1111,6 +1131,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDChopperEventSyncREC[$host]=$(( \
 					nHostSMSDChopperEventSyncREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Chopper <N> Glitch Event Error" Log
@@ -1123,6 +1144,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDChopperGlitchEventREC[$host]=$(( \
 					nHostSMSDChopperGlitchEventREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "correctPChargeVeto()" Log
@@ -1133,6 +1155,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDCorrectPChargeVetoREC[$host]=$(( \
 					nHostSMSDCorrectPChargeVetoREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Local Duplicate pulse" Log
@@ -1143,6 +1166,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDLocalDuplicatePulseREC[$host]=$(( \
 					nHostSMSDLocalDuplicatePulseREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "dumpPulseInvariants()" Log
@@ -1159,6 +1183,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDLocalSAWTOOTHRTDLREC[$host]=$(( \
 					nHostSMSDLocalSAWTOOTHRTDLREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Local SAWTOOTH RawData" Log
@@ -1169,6 +1194,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDLocalSAWTOOTHDataREC[$host]=$(( \
 					nHostSMSDLocalSAWTOOTHDataREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Global SAWTOOTH Pulse" Log
@@ -1179,6 +1205,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDGlobalSAWTOOTHREC[$host]=$(( \
 					nHostSMSDGlobalSAWTOOTHREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Internal Pulse Buffer Overflow" Log
@@ -1189,6 +1216,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDPulseBufferOverflowREC[$host]=$(( \
 					nHostSMSDPulseBufferOverflowREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Pulse with No Registered Event Sources" Log
@@ -1201,6 +1229,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDPulseNoRegEventREC[$host]=$(( \
 					nHostSMSDPulseNoRegEventREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "First New Event Source Registered" Log
@@ -1213,6 +1242,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDFirstNewEventSourceREC[$host]=$(( \
 					nHostSMSDFirstNewEventSourceREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Last Event Source Unregistered" Log
@@ -1225,6 +1255,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDLastEventSourceREC[$host]=$(( \
 					nHostSMSDLastEventSourceREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# "Connection Failed to STC at..." Log
@@ -1326,6 +1357,7 @@ PARSE_LOG()
 			if [[ "$log" =~ RECORDING ]]; then
 				nHostSMSDOversizePktREC[$host]=$(( \
 					nHostSMSDOversizePktREC[$host] + 1 ))
+				nRecording=$(( nRecording + 1 ))
 			fi
 
 		# Unknown Log Message
@@ -2407,6 +2439,10 @@ if [[ $nSTC -gt 0 ]]; then
 fi
 if [[ $nSMSD -gt 0 ]]; then
 	echo $newline "${separator}$nSMSD SMSD Logs"
+	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
+fi
+if [[ $nRecording -gt 0 ]]; then
+	echo $newline "${separator}$nRecording Recording Logs"
 	if [[ ${Terse} == 1 ]]; then separator=", " ; fi
 fi
 if [[ $nPVSD -gt 0 ]]; then
