@@ -374,7 +374,7 @@ public:
 	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
 
-	virtual void triggered(void) = 0;
+	virtual void triggered(struct timespec *ts) = 0;
 };
 
 class smsFloat64PV : public smsPV {
