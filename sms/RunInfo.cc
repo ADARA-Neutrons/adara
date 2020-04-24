@@ -35,7 +35,7 @@ public:
 
 	bool allowUpdate(const gdd &) { return m_unlocked; }
 
-	void triggered(void) { m_master->reset(); }
+	void triggered(struct timespec *ts) { m_master->reset(ts); }
 
 private:
 	RunInfo *m_master;
@@ -719,16 +719,16 @@ void RunInfo::unlock(void)
 	m_resetPV->unlock();
 }
 
-void RunInfo::reset(void)
+void RunInfo::reset( struct timespec *ts )
 {
 	RunInfoMap::iterator it;
 
 	for (it = m_required.begin(); it != m_required.end(); it++)
-		it->second->unset();
+		it->second->unset( false, ts );
 	for (it = m_optional.begin(); it != m_optional.end(); it++)
-		it->second->unset();
+		it->second->unset( false, ts );
 	for (it = m_sample.begin(); it != m_sample.end(); it++)
-		it->second->unset();
+		it->second->unset( false, ts );
 }
 
 bool RunInfo::valid(std::string &reason)
