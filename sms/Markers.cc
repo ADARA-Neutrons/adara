@@ -53,11 +53,9 @@ public:
 	MarkerTriggerPV( const std::string &name, callback cb ) :
 		smsTriggerPV(name), m_cb(cb) {}
 
-	void triggered(void)
+	void triggered( struct timespec *ts )
 	{
-		struct timespec ts;
-		m_value->getTimeStamp( &ts );
-		m_cb( &ts, Markers::IGNORE, -1, "" );
+		m_cb( ts, Markers::IGNORE, -1, "" );
 	}
 
 private:
@@ -305,7 +303,7 @@ void Markers::runStop(void)
 		emitPacket( now, ADARA::MarkerType::RESUME, m_scanIndex,
 			"", "Warning: Run Resumed at Run Stop!" );
 		// _This_ update() _Doesn't_ trigger changed()...!
-		m_pausedPV->update(false, &now);
+		m_pausedPV->update( false, &now );
 	}
 
 	// (Possibly Redundant _Second_ Queued Dump Attempt, Ok if Empty Now.)
@@ -317,7 +315,7 @@ void Markers::runStop(void)
 	if ( m_scanIndex ) {
 		emitPacket( now, ADARA::MarkerType::SCAN_STOP, m_scanIndex,
 			"", "Warning: Scan Stopped at Run Stop!" );
-		m_indexPV->update(0, &now);
+		m_indexPV->update( 0, &now );
 		m_scanIndex = 0;
 	}
 
@@ -328,15 +326,15 @@ void Markers::runStop(void)
 		"", ss.str() );
 
 	// Clear All Comment PVs on Run Stop...
-	m_commentPV->unset(); // DEPRECATED
-	m_scanCommentPV->unset();
-	m_annotationCommentPV->unset();
+	m_commentPV->unset( false, &now ); // DEPRECATED
+	m_scanCommentPV->unset( false, &now );
+	m_annotationCommentPV->unset( false, &now );
 
 	// Optionally Auto-Reset the Run Notes Between Runs
 	// (Don't Always Reset, Often Convenient to Re-Use... ;-)
 	m_notesCommentAutoReset = m_notesCommentAutoResetPV->value();
 	if ( m_notesCommentAutoReset ) {
-		m_notesCommentPV->unset();
+		m_notesCommentPV->unset( false, &now );
 	}
 
 	// No Longer in a Run Now...
@@ -536,7 +534,7 @@ void Markers::annotate( struct timespec *ts,
 
 		// Annotation Comments are one-shot,
 		// Reset once the packet is inserted.
-		m_commentPV->unset();
+		m_commentPV->unset( false, ts );
 
 		scanIndex = m_scanIndex;
 	}
@@ -587,7 +585,7 @@ void Markers::addRunComment( struct timespec *ts,
 
 		// Run Notes Comments are One-Shot,
 		// Reset once the packet is inserted.
-		m_commentPV->unset();
+		m_commentPV->unset( false, ts );
 
 		scanIndex = m_scanIndex;
 	}
