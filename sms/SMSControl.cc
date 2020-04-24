@@ -135,10 +135,11 @@ public:
 	CleanShutdownPV(const std::string &name) :
 		smsTriggerPV(name) {}
 
-	void triggered(void)
+	void triggered(struct timespec *ts)
 	{
 		DEBUG("CleanShutdownPV " << m_pv_name << " Triggered."
-			<< " Cleanly Shutting Down SMS Daemon.");
+			<< " Cleanly Shutting Down SMS Daemon."
+			<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 		exit(0);
 	}
 };
