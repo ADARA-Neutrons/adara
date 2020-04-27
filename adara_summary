@@ -106,6 +106,8 @@ declare -A nHostSTCMoreThanOnePVValue
 declare -A nHostSTCMoreThanOnePVValuePIDs
 declare -A nHostSTCPVIDReNumbered
 declare -A nHostSTCNoMatchingUnitsPV
+declare -A nHostSTCMissingBeamMonConfig
+declare -A nHostSTCMissingBeamMonConfigIDs
 declare -A nHostSTCPrePulseVarValue
 declare -A nHostSTCVarValueSawtooth
 declare -A nHostSTCVarValueTruncateNegTime
@@ -318,6 +320,8 @@ PARSE_LOG()
 		nHostSTCMoreThanOnePVValuePIDs[$host]=""
 		nHostSTCPVIDReNumbered[$host]=0
 		nHostSTCNoMatchingUnitsPV[$host]=0
+		nHostSTCMissingBeamMonConfig[$host]=0
+		nHostSTCMissingBeamMonConfigIDs[$host]=""
 		nHostSTCPrePulseVarValue[$host]=0
 		nHostSTCVarValueSawtooth[$host]=0
 		nHostSTCVarValueTruncateNegTime[$host]=0
@@ -510,8 +514,9 @@ PARSE_LOG()
 		known=1
 
 		# Strip Off STC PID and Error Prefix...
-		if [[ "$log" =~ ${base_app}:${S}STC${S}Error: ]]; then
-			pid=`echo "$log" | awk '{print $5}'`
+		if [[ "$log" =~ \
+				${base_app}:${S}\[[0-9]+\]${S}STC${S}Error: ]]; then
+			pid=`echo "$log" | awk '{print $3}'`
 			log=`echo "$log" | \
 			awk '{for(i=6;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
@@ -552,6 +557,16 @@ PARSE_LOG()
 			#echo "No Matching Units PV Found..."
 			nHostSTCNoMatchingUnitsPV[$host]=$(( \
 				nHostSTCNoMatchingUnitsPV[$host] + 1 ))
+
+		# "Missing from Beam Monitor Configs..." Log
+		elif [[ "$log" =~ \
+				Missing${S}from${S}Beam${S}Monitor${S}Configs ]]; then
+			#echo "Missing from Beam Monitor Configs..."
+			nHostSTCMissingBeamMonConfig[$host]=$(( \
+				nHostSTCMissingBeamMonConfig[$host] + 1 ))
+			bmon=`echo "$log" | awk '{print $3}'`
+			nHostSTCMissingBeamMonConfigIDs[$host]="\
+				${nHostSTCMissingBeamMonConfigIDs[$host]}${bmon}\n"
 
 		# "Got Pre-Pulse Variable Value Update" Log
 		elif [[ "$log" =~ \
@@ -1863,6 +1878,13 @@ for h in ${HostList} ; do
 		pidlist=`echo -e "${nHostSTCMoreThanOnePVValuePIDs[$h]//	/}" \
 			| sed -e '/^$/d' -e 's/[][]//g' | sort -u -n`
 		echo "        PIDs: "${pidlist}
+	fi
+	if [[ ${nHostSTCMissingBeamMonConfig[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCMissingBeamMonConfig[$h]} "
+		echo "STC \"Missing from Beam Monitor Configs\" Logs"
+		bmonlist=`echo -e "${nHostSTCMissingBeamMonConfigIDs[$h]//	/}" \
+			| sort -u -n`
+		echo "        BMonIDs:"${bmonlist}
 	fi
 	if [[ ${nHostSTCUnableToInitialize[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTCUnableToInitialize[$h]} "
