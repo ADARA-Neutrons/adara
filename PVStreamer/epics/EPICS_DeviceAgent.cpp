@@ -1229,6 +1229,53 @@ DeviceAgent::monitorThread()
                         syslog( LOG_ERR, ss.str().c_str() );
                         usleep(33333); // give syslog a chance...
 
+                        // Be Sure to Set Device Active Status If Known!
+                        if ( m_dev_desc->m_active_pv )
+                        {
+                            string pvStr = "PV <"
+                                + m_dev_desc->m_active_pv->m_name + "> ("
+                                + m_dev_desc->m_active_pv->m_connection
+                                    + ")";
+
+                            if ( m_dev_desc->m_active_pv->m_is_active
+                                == DEVICE_IS_ACTIVE )
+                            {
+                                syslog( LOG_ERR,
+                                    "%s: %s [%s] %s to %s, %s %s",
+                                    "DeviceAgent::monitorThread()",
+                                    "Setting HUNG Device",
+                                    dev_name.c_str(),
+                                    "Active Status", "Active",
+                                    "Based on Active Status",
+                                    pvStr.c_str() );
+                                m_dev_desc->m_active = true;
+                            }
+                            else if ( m_dev_desc->m_active_pv->m_is_active
+                                == DEVICE_IS_INACTIVE )
+                            {
+                                syslog( LOG_ERR,
+                                    "%s: %s [%s] %s to %s, %s %s",
+                                    "DeviceAgent::monitorThread()",
+                                    "Setting HUNG Device",
+                                    dev_name.c_str(),
+                                    "Active Status", "Inactive",
+                                    "Based on Active Status",
+                                    pvStr.c_str() );
+                                m_dev_desc->m_active = false;
+                            }
+                            else
+                            {
+                                syslog( LOG_ERR,
+                                    "%s: %s [%s] %s, %s %s",
+                                    "DeviceAgent::monitorThread()",
+                                    "Cannot Set HUNG Device",
+                                    dev_name.c_str(),
+                                    "Active Status",
+                                    "Active Status Unknown for ",
+                                    pvStr.c_str() );
+                            }
+                        }
+
                         if ( m_dev_record.get() )
                         {
                             m_stream_api.getCfgMgr().undefineDevice(
