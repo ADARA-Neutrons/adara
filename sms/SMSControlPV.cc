@@ -574,10 +574,11 @@ caStatus smsStringPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
+		char *str = (char *) m_value->dataPointer();
 		struct timespec ts;
 		m_value->getTimeStamp(&ts);
 		DEBUG(log_info << "smsStringPV::read() m_pv_name=" << m_pv_name
-			<< " value=" << m_value.get()
+			<< " value=[" << str << "]"
 			<< " ts=" << ts.tv_sec << "." << ts.tv_nsec);
 	}
 	return m_read_table.read(*this, prototype);
