@@ -391,6 +391,7 @@ void smsRunNumberPV::update(uint32_t run, struct timespec *ts)
 				<< ts->tv_sec << "." << ts->tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(ts);
+		notify();
 		return;
 	}
 
@@ -518,6 +519,7 @@ void smsRecordingPV::update(bool recording, struct timespec *ts)
 				<< ts->tv_sec << "." << ts->tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(ts);
+		notify();
 		return;
 	}
 
@@ -687,6 +689,7 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " ts=" << ts.tv_sec << "." << ts.tv_nsec);
 			m_value->setTimeStamp(&ts);
 			m_first_set = false;
+			notify();
 			changed();
 		}
 		else {
@@ -698,6 +701,7 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			}
 			// Still Update TimeStamp
 			m_value->setTimeStamp(&ts);
+			notify();
 		}
 		return S_casApp_success;
 	}
@@ -753,6 +757,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 				<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
+			notify();
 			changed();
 		}
 		else {
@@ -764,6 +769,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 				m_value->setTimeStamp(ts);
+				notify();
 				changed();
 			}
 			else {
@@ -773,6 +779,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 						<< ts->tv_sec << "." << ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
+				notify();
 			}
 		}
 		return;
@@ -816,6 +823,7 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 				<< new_ts.tv_sec << "." << new_ts.tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(&new_ts);
+		notify();
 		return;
 	}
 
@@ -836,6 +844,7 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 					<< " ts=" << new_ts.tv_sec << "." << new_ts.tv_nsec);
 				m_value->setTimeStamp(&new_ts);
 				m_first_set = false;
+				notify();
 				changed();
 			}
 			else {
@@ -849,6 +858,7 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 						<< " ts=" << new_ts.tv_sec
 							<< "." << new_ts.tv_nsec);
 					m_value->setTimeStamp(&new_ts);
+					notify();
 					changed();
 				}
 				else {
@@ -858,6 +868,7 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 							<< new_ts.tv_sec << "." << new_ts.tv_nsec);
 					// Still Update TimeStamp
 					m_value->setTimeStamp(&new_ts);
+					notify();
 				}
 			}
 			return;
@@ -1005,6 +1016,7 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " ts=" << ts.tv_sec << "." << ts.tv_nsec);
 			m_value->setTimeStamp(&ts);
 			m_first_set = false;
+			notify();
 			changed();
 		}
 		else {
@@ -1016,6 +1028,7 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			}
 			// Still Update TimeStamp
 			m_value->setTimeStamp(&ts);
+			notify();
 		}
 		return S_casApp_success;
 	}
@@ -1049,6 +1062,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 				<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
+			notify();
 			if ( !m_no_changed_on_update || force_changed )
 				changed();
 		}
@@ -1067,6 +1081,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 					<< " force_changed=" << force_changed << ")"
 					<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 				m_value->setTimeStamp(ts);
+				notify();
 				if ( !m_no_changed_on_update || force_changed )
 					changed();
 			}
@@ -1077,6 +1092,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 						<< ts->tv_sec << "." << ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
+				notify();
 			}
 		}
 		return;
@@ -1161,6 +1177,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 				<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
+			notify();
 			changed();
 		}
 		else {
@@ -1172,6 +1189,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 				m_value->setTimeStamp(ts);
+				notify();
 				changed();
 			}
 			else {
@@ -1181,6 +1199,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 						<< ts->tv_sec << "." << ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
+				notify();
 			}
 		}
 		return;
@@ -1302,7 +1321,6 @@ caStatus smsErrorPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Updates Not Allowed, Ignore Value."
 				<< " Don't Update ts=" << ts.tv_sec << "." << ts.tv_nsec);
 		}
-		notify();
 		return S_casApp_success;
 	}
 
@@ -1316,6 +1334,7 @@ caStatus smsErrorPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		}
 		// Still Update TimeStamp
 		m_value->setTimeStamp(&ts);
+		notify();
 		return S_casApp_success;
 	}
 
@@ -1357,6 +1376,7 @@ void smsErrorPV::update(bool val, bool major, struct timespec *ts)
 				<< ts->tv_sec << "." << ts->tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(ts);
+		notify();
 		return;
 	}
 
@@ -1487,6 +1507,7 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		}
 		// Still Update TimeStamp
 		m_value->setTimeStamp(&ts);
+		notify();
 		return S_casApp_success;
 	}
 
@@ -1513,6 +1534,7 @@ void smsConnectedPV::update(uint16_t val, struct timespec *ts)
 				<< ts->tv_sec << "." << ts->tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(ts);
+		notify();
 		return;
 	}
 
@@ -1718,6 +1740,7 @@ caStatus smsPassThruPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " ts=" << ts.tv_sec << "." << ts.tv_nsec);
 			m_value->setTimeStamp(&ts);
 			m_first_set = false;
+			notify();
 			changed();
 		}
 		else {
@@ -1729,6 +1752,7 @@ caStatus smsPassThruPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			}
 			// Still Update TimeStamp
 			m_value->setTimeStamp(&ts);
+			notify();
 		}
 		return S_casApp_success;
 	}
@@ -1757,6 +1781,7 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 				<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
+			notify();
 			changed();
 		}
 		else {
@@ -1768,6 +1793,7 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 				m_value->setTimeStamp(ts);
+				notify();
 				changed();
 			}
 			else {
@@ -1777,6 +1803,7 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 						<< ts->tv_sec << "." << ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
+				notify();
 			}
 		}
 		return;
@@ -2018,6 +2045,7 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " ts=" << ts.tv_sec << "." << ts.tv_nsec);
 			m_value->setTimeStamp(&ts);
 			m_first_set = false;
+			notify();
 			changed();
 		}
 		else {
@@ -2029,6 +2057,7 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			}
 			// Still Update TimeStamp
 			m_value->setTimeStamp(&ts);
+			notify();
 		}
 		return S_casApp_success;
 	}
@@ -2057,6 +2086,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts)
 				<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
+			notify();
 			changed();
 		}
 		else {
@@ -2068,6 +2098,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts)
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 				m_value->setTimeStamp(ts);
+				notify();
 				changed();
 			}
 			else {
@@ -2077,6 +2108,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts)
 						<< ts->tv_sec << "." << ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
+				notify();
 			}
 		}
 		return;
@@ -2199,6 +2231,7 @@ caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		}
 		// Still Update TimeStamp
 		m_value->setTimeStamp(&ts);
+		notify();
 		return S_casApp_success;
 	}
 
@@ -2225,6 +2258,7 @@ void smsInt32PV::update(int32_t val, struct timespec *ts)
 				<< ts->tv_sec << "." << ts->tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(ts);
+		notify();
 		return;
 	}
 
@@ -2528,6 +2562,7 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " ts=" << ts.tv_sec << "." << ts.tv_nsec);
 			m_value->setTimeStamp(&ts);
 			m_first_set = false;
+			notify();
 			changed();
 		}
 		else {
@@ -2539,6 +2574,7 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			}
 			// Still Update TimeStamp
 			m_value->setTimeStamp(&ts);
+			notify();
 		}
 		return S_casApp_success;
 	}
@@ -2567,6 +2603,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 				<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
+			notify();
 			changed();
 		}
 		else {
@@ -2578,6 +2615,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
 				m_value->setTimeStamp(ts);
+				notify();
 				changed();
 			}
 			else {
@@ -2587,6 +2625,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 						<< ts->tv_sec << "." << ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
+				notify();
 			}
 		}
 		return;
