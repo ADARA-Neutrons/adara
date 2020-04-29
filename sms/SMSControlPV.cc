@@ -1321,6 +1321,7 @@ caStatus smsErrorPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Updates Not Allowed, Ignore Value."
 				<< " Don't Update ts=" << ts.tv_sec << "." << ts.tv_nsec);
 		}
+		notify();
 		return S_casApp_success;
 	}
 
