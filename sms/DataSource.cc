@@ -1502,7 +1502,7 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 	m_hwSources.clear();
 
 	// Update Number of HWSources PV...
-	m_pvNumHWSources->update( 0, &now );
+	m_pvNumHWSources->update( 0, &now, true /* no_log */ );
 
 	if ( isSourceDown )
 		m_ctrl->sourceDown( m_smsSourceId, stateChanged );
@@ -2495,7 +2495,8 @@ boost::shared_ptr<HWSource> DataSource::getHWSource( uint32_t hwId )
 		// Update Number of HWSources PV...
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME_COARSE, &now);
-		m_pvNumHWSources->update(m_hwSources.size(), &now);
+		m_pvNumHWSources->update(m_hwSources.size(), &now,
+			true /* no_log */);
 	}
 
 	return( it->second );
@@ -2982,8 +2983,10 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		}
 
 		// Update Number of HWSources PV...
-		if ( changed )
-			m_pvNumHWSources->update(m_hwSources.size(), &now);
+		if ( changed ) {
+			m_pvNumHWSources->update(m_hwSources.size(), &now,
+				true /* no_log */);
+		}
 	}
 
 	// Count Pulse in Various Statistics...
@@ -3088,13 +3091,17 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 
 	// Update Bandwidth Count Per Second PVs...
 	m_pvPulseBandwidthSecond->update(
-		(uint32_t)( ((double) m_pulse_count_second) / elapsed ), &now);
+		(uint32_t)( ((double) m_pulse_count_second) / elapsed ), &now,
+		true /* no_log */ );
 	m_pvEventBandwidthSecond->update(
-		(uint32_t)( ((double) m_event_count_second) / elapsed ), &now);
+		(uint32_t)( ((double) m_event_count_second) / elapsed ), &now,
+		true /* no_log */ );
 	m_pvMetaBandwidthSecond->update(
-		(uint32_t)( ((double) m_meta_count_second) / elapsed ), &now);
+		(uint32_t)( ((double) m_meta_count_second) / elapsed ), &now,
+		true /* no_log */ );
 	m_pvErrBandwidthSecond->update(
-		(uint32_t)( ((double) m_err_count_second) / elapsed ), &now);
+		(uint32_t)( ((double) m_err_count_second) / elapsed ), &now,
+		true /* no_log */ );
 
 	// Reset Counters for Next Second...
 	m_pulse_count_second = 0;
@@ -3119,13 +3126,16 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 			}
 			it->second->m_pvHWSourceEventBandwidthSecond->update(
 				(uint32_t)( ((double) it->second->m_event_count_second)
-					/ elapsed ), &now);
+					/ elapsed ), &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceMetaBandwidthSecond->update(
 				(uint32_t)( ((double) it->second->m_meta_count_second)
-					/ elapsed ), &now);
+					/ elapsed ), &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceErrBandwidthSecond->update(
 				(uint32_t)( ((double) it->second->m_err_count_second)
-					/ elapsed ), &now);
+					/ elapsed ), &now,
+				true /* no_log */ );
 		}
 		it->second->m_event_count_second = 0;
 		it->second->m_meta_count_second = 0;
@@ -3146,10 +3156,14 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 	}
 
 	// Update Bandwidth Count Per Minute PVs...
-	m_pvPulseBandwidthMinute->update(m_pulse_count_minute, &now);
-	m_pvEventBandwidthMinute->update(m_event_count_minute, &now);
-	m_pvMetaBandwidthMinute->update(m_meta_count_minute, &now);
-	m_pvErrBandwidthMinute->update(m_err_count_minute, &now);
+	m_pvPulseBandwidthMinute->update(m_pulse_count_minute, &now,
+		true /* no_log */ );
+	m_pvEventBandwidthMinute->update(m_event_count_minute, &now,
+		true /* no_log */ );
+	m_pvMetaBandwidthMinute->update(m_meta_count_minute, &now,
+		true /* no_log */ );
+	m_pvErrBandwidthMinute->update(m_err_count_minute, &now,
+		true /* no_log */ );
 
 	// Reset Counters for Next Minute...
 	m_pulse_count_minute = 0;
@@ -3170,11 +3184,14 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 					<< " Err=" << it->second->m_err_count_minute );
 			}
 			it->second->m_pvHWSourceEventBandwidthMinute->update(
-				it->second->m_event_count_minute, &now);
+				it->second->m_event_count_minute, &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceMetaBandwidthMinute->update(
-				it->second->m_meta_count_minute, &now);
+				it->second->m_meta_count_minute, &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceErrBandwidthMinute->update(
-				it->second->m_err_count_minute, &now);
+				it->second->m_err_count_minute, &now,
+				true /* no_log */ );
 		}
 		it->second->m_event_count_minute = 0;
 		it->second->m_meta_count_minute = 0;
@@ -3195,10 +3212,14 @@ void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 	}
 
 	// Update Bandwidth Count Per Ten Minutes PVs...
-	m_pvPulseBandwidthTenMin->update(m_pulse_count_tenmin, &now);
-	m_pvEventBandwidthTenMin->update(m_event_count_tenmin, &now);
-	m_pvMetaBandwidthTenMin->update(m_meta_count_tenmin, &now);
-	m_pvErrBandwidthTenMin->update(m_err_count_tenmin, &now);
+	m_pvPulseBandwidthTenMin->update(m_pulse_count_tenmin, &now,
+		true /* no_log */ );
+	m_pvEventBandwidthTenMin->update(m_event_count_tenmin, &now,
+		true /* no_log */ );
+	m_pvMetaBandwidthTenMin->update(m_meta_count_tenmin, &now,
+		true /* no_log */ );
+	m_pvErrBandwidthTenMin->update(m_err_count_tenmin, &now,
+		true /* no_log */ );
 
 	// Reset Counters for Next Ten Minutes...
 	m_pulse_count_tenmin = 0;
@@ -3219,11 +3240,14 @@ void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 					<< " Err=" << it->second->m_err_count_tenmin );
 			}
 			it->second->m_pvHWSourceEventBandwidthTenMin->update(
-				it->second->m_event_count_tenmin, &now);
+				it->second->m_event_count_tenmin, &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceMetaBandwidthTenMin->update(
-				it->second->m_meta_count_tenmin, &now);
+				it->second->m_meta_count_tenmin, &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceErrBandwidthTenMin->update(
-				it->second->m_err_count_tenmin, &now);
+				it->second->m_err_count_tenmin, &now,
+				true /* no_log */ );
 		}
 		it->second->m_event_count_tenmin = 0;
 		it->second->m_meta_count_tenmin = 0;
