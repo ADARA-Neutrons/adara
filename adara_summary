@@ -1400,10 +1400,10 @@ PARSE_LOG()
 		if [[ "$log" =~ ^PVSD.+is${S}Alive${S}at${S} ]]; then
 			#echo "PVSD is Alive at..."
 			nHostPVSDAlive[$host]=$(( nHostPVSDAlive[$host] + 1 ))
-			np=`echo "$log" | awk -F "[ ()]" '{print $12}'`
+			np=`echo "$log" | awk -F "[ ()]" '{print $13}'`
 			#echo "npartial=$np"
 			nHostPVSDPartial[$host]=$(( nHostPVSDPartial[$host] + np ))
-			nh=`echo "$log" | awk -F "[ ()]" '{print $14}'`
+			nh=`echo "$log" | awk -F "[ ()]" '{print $15}'`
 			#echo "nhung=$nh"
 			nHostPVSDHung[$host]=$(( nHostPVSDHung[$host] + nh ))
 
