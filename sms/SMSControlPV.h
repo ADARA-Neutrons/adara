@@ -251,7 +251,7 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(uint32_t val, struct timespec *ts);
+	void update(uint32_t val, struct timespec *ts, bool no_log = false);
 	bool valid(void);
 	uint32_t value(void);
 

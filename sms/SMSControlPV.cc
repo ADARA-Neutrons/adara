@@ -2073,7 +2073,7 @@ bool smsUint32PV::allowUpdate(const gdd &)
 	return true;
 }
 
-void smsUint32PV::update(uint32_t val, struct timespec *ts)
+void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 {
 	aitUint32 uninitialized_var(v);
 	gdd *nval;
@@ -2081,10 +2081,12 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts)
 	m_value->get(v);
 	if (v == val) {
 		if ( m_first_set ) {
-			DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
-				<< " Value Did Not Change, But First Setting"
-				<< " - Call changed()..."
-				<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
+			if ( !no_log ) {
+				DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
+					<< " Value Did Not Change, But First Setting"
+					<< " - Call changed()..."
+					<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
+			}
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
 			notify();
@@ -2094,19 +2096,23 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts)
 			struct timespec old_ts;
 			m_value->getTimeStamp(&old_ts);
 			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
-				DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
-					<< " Value Did Not Change, But Time Earlier"
-					<< " - Likely AutoSave Recovery, Call changed()..."
-					<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
+				if ( !no_log ) {
+					DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
+						<< " Value Did Not Change, But Time Earlier"
+						<< " - Likely AutoSave Recovery, Call changed()..."
+						<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
+				}
 				m_value->setTimeStamp(ts);
 				notify();
 				changed();
 			}
 			else {
-				DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
-					<< " Value Did Not Change - Ignore..."
-					<< " Still Update ts="
-						<< ts->tv_sec << "." << ts->tv_nsec);
+				if ( !no_log ) {
+					DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
+						<< " Value Did Not Change - Ignore..."
+						<< " Still Update ts="
+							<< ts->tv_sec << "." << ts->tv_nsec);
+				}
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
 				notify();
