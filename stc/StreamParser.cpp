@@ -2275,6 +2275,12 @@ StreamParser::rxPacket
 
     if ( doc )
     {
+        syslog( LOG_INFO,
+            "[%i] %s %s: Proceed to Parse RunInfo XML - %lu Bytes, [%s]",
+            g_pid, "STC Error:", "rxPacket(RunInfoPkt)",
+            a_pkt.info().length(), a_pkt.info().c_str() );
+        usleep(30000); // give syslog a chance...
+
         // Temporary RunInfo Holder...
         // (to Enable Duplicate RunInfoPkt Comparisons... ;-D)
         RunInfo tmp_run_info;
@@ -2664,6 +2670,15 @@ StreamParser::rxPacket
 
             updateRunInfo( tmp_run_info );
         }
+    }
+
+    else
+    {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Error Parsing RunInfo XML - %lu Bytes, [%s]",
+            g_pid, "STC Error:", "rxPacket(RunInfoPkt)",
+            a_pkt.info().length(), a_pkt.info().c_str() );
+        usleep(30000); // give syslog a chance...
     }
 
     if ( m_strict )
