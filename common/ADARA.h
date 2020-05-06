@@ -205,6 +205,7 @@ namespace MarkerType {
 		PAUSE,
 		RESUME,
 		OVERALL_RUN_COMMENT,
+		SYSTEM,
 	};
 }
 
