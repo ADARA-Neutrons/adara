@@ -5204,6 +5204,18 @@ StreamParser::rxPacket
     case ADARA::MarkerType::OVERALL_RUN_COMMENT:
         runComment( a_pkt.comment() );
         break;
+    case ADARA::MarkerType::SYSTEM:
+        // Just Log System Comments, Don't Insert Into NeXus...
+        syslog( LOG_INFO, "[%i] %s %s %lu.%09lu (%lu) [%s]",
+            g_pid, "StreamParser::rxPacket(AnnotationPkt)",
+            "System Annotation Comment",
+            (unsigned long)(ts_nano / NANO_PER_SECOND_LL)
+                - ADARA::EPICS_EPOCH_OFFSET,
+            (unsigned long)(ts_nano % NANO_PER_SECOND_LL),
+            ts_nano,
+            a_pkt.comment().c_str() );
+        usleep(30000); // give syslog a chance...
+        break;
     }
 
     return false;
