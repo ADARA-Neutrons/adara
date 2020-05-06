@@ -2469,18 +2469,6 @@ private:
         bool            m_finalized;    ///< Flag to Indicate PV Log has been Finalized
     };
 
-    // Nexus Marker types should correspond to ADARA marker types, but we want to
-    // keep them as separate definitions to insulate Nexus from any changes made to
-    // the ADARA protocol (and vice versa).
-    enum MarkerType
-    {
-        MT_COMMENT    = 0,
-        MT_SCAN_START = 1,
-        MT_SCAN_STOP  = 2,
-        MT_PAUSE      = 3,
-        MT_RESUME     = 4
-    };
-
 public:
 
     NxGen(
