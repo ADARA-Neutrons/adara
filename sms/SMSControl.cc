@@ -935,7 +935,7 @@ void SMSControl::addPV(PVSharedPtr pv)
 	m_pv_map[pv->getName()] = pv;
 }
 
-bool SMSControl::setRecording( bool v )
+bool SMSControl::setRecording( bool v, struct timespec *ts )
 {
 	/* We return true if we accepted the setting, and false if not.
 	 * It is not an error for a caller to try to stop recording if
@@ -1125,10 +1125,8 @@ bool SMSControl::setRecording( bool v )
 		}
 
 		// Run Started, Update Run Number and Recording PV Values...
-		struct timespec now;
-		clock_gettime(CLOCK_REALTIME, &now);
-		m_pvRunNumber->update(m_currentRunNumber, &now);
-		m_pvRecording->update(v, &now);
+		m_pvRunNumber->update(m_currentRunNumber, ts);
+		m_pvRecording->update(v, ts);
 	}
 
 	// Stop the Current Recording...
@@ -1231,10 +1229,8 @@ bool SMSControl::setRecording( bool v )
 		}
 
 		// Run Stopped, Update Run Number and Recording PV Values...
-		struct timespec now;
-		clock_gettime(CLOCK_REALTIME, &now);
-		m_pvRunNumber->update(0, &now);
-		m_pvRecording->update(v, &now);
+		m_pvRunNumber->update(0, ts);
+		m_pvRecording->update(v, ts);
 	}
 
 	// Save Recording State

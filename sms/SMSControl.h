@@ -342,7 +342,7 @@ private:
 	void addSources(const boost::property_tree::ptree &conf);
 	void addSource(const std::string &name,
 				const boost::property_tree::ptree &info, bool enabled);
-	bool setRecording(bool val);
+	bool setRecording(bool val, struct timespec *ts);
 
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);
 	void correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse);

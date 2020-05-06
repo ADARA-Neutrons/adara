@@ -476,11 +476,12 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 
 	val.get(v);
 
+	struct timespec ts;
+	val.getTimeStamp(&ts);
+
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_WRITE, m_pv_name, 60, 3, 15, log_info ) ) {
-		struct timespec ts;
-		val.getTimeStamp(&ts);
 		DEBUG(log_info << "smsRecordingPV::write() m_pv_name=" << m_pv_name
 			<< " value=" << v << " ts=" << ts.tv_sec << "." << ts.tv_nsec);
 	}
@@ -492,7 +493,10 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		return S_casApp_noSupport;
 	}
 
-	if (m_ctrl->setRecording(v)) {
+	if (m_ctrl->setRecording(v, &ts)) {
+		// Note: SMSControl::setRecording() calls
+		// smsRecordingPV::update() on success,
+		// which handles the notify() and changed()... :-D
 		return S_casApp_success;
 	}
 
