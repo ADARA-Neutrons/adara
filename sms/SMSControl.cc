@@ -139,7 +139,8 @@ public:
 	{
 		DEBUG("CleanShutdownPV " << m_pv_name << " Triggered."
 			<< " Cleanly Shutting Down SMS Daemon."
-			<< " ts=" << ts->tv_sec << "." << ts->tv_nsec);
+			<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
 		exit(0);
 	}
 };
