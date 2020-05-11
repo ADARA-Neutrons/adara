@@ -52,6 +52,8 @@ public:
 	void addNotesComment( struct timespec *ts,
 		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
+	void addSystemComment( struct timespec *ts,
+		uint32_t scanIndex = -1, std::string comment = "" );
 
 	void annotate( struct timespec *ts,
 		PassThru passthru = IGNORE,
@@ -98,6 +100,7 @@ private:
 	MarkerQueue scanCommentQueue;
 	MarkerQueue notesCommentQueue;
 	MarkerQueue annotationCommentQueue;
+	MarkerQueue systemCommentQueue;
 
 	void dumpRunNotesComment( bool prologue = false );
 	void dumpQueuedComments( bool prologue = false );

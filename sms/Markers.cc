@@ -363,7 +363,9 @@ void Markers::pause( struct timespec *ts,
 	ss << "Run ";
 	if ( m_inRun ) ss << m_runNumber << " ";
 	ss << "Paused.";
-	DEBUG(ss.str());
+	DEBUG(ss.str()
+		<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+		<< "." << ts->tv_nsec);
 
 	emitPacket( *ts, ADARA::MarkerType::PAUSE, scanIndex,
 		ss.str(), comment );
@@ -407,7 +409,9 @@ void Markers::resume( struct timespec *ts,
 	ss << "Run ";
 	if ( m_inRun ) ss << m_runNumber << " ";
 	ss << "Resumed.";
-	DEBUG(ss.str());
+	DEBUG(ss.str()
+		<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+		<< "." << ts->tv_nsec);
 
 	if ( passthru != PASSTHRU )
 	{
@@ -459,7 +463,9 @@ void Markers::startScan( struct timespec *ts,
 	else
 		ss << "[Run " << m_runNumber << "] ";
 	ss << "Scan #" << scanIndex << " Started.";
-	DEBUG( ss.str() );
+	DEBUG( ss.str()
+		<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+		<< "." << ts->tv_nsec );
 
 	emitPacket( *ts, ADARA::MarkerType::SCAN_START, scanIndex,
 		ss.str(), comment );
@@ -501,7 +507,9 @@ void Markers::stopScan( struct timespec *ts,
 	else
 		ss << "[Run " << m_runNumber << "] ";
 	ss << "Scan #" << scanIndex << " Stopped.";
-	DEBUG( ss.str() );
+	DEBUG( ss.str()
+		<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+		<< "." << ts->tv_nsec );
 
 	emitPacket( *ts, ADARA::MarkerType::SCAN_STOP, scanIndex,
 		ss.str(), comment );
@@ -545,13 +553,15 @@ void Markers::annotate( struct timespec *ts,
 	{
 		ss << "Run " << m_runNumber << ":";
 		ss << " General Comment - " << comment;
-		DEBUG("[DEPRECATED] annotate() " << ss.str());
+		DEBUG("[DEPRECATED] annotate() " << ss.str()
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
 
 		emitPacket( *ts, ADARA::MarkerType::GENERIC,
 			scanIndex, "", comment );
 	}
 
-	// Otherwise, Queue Up Annotation Comments Strings for Next Run...
+	// Otherwise, Queue Up Annotation Comment Strings for Next Run...
 	else
 	{
 		if ( !m_inRun )
@@ -561,7 +571,9 @@ void Markers::annotate( struct timespec *ts,
 
 		ss << comment;
 
-		DEBUG("[DEPRECATED] annotate() General Comment - " << ss.str());
+		DEBUG("[DEPRECATED] annotate() General Comment - " << ss.str()
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
 
 		annotationCommentQueue.push_back(
 			std::pair<struct timespec, std::string>( *ts, ss.str() ) );
@@ -601,7 +613,9 @@ void Markers::addRunComment( struct timespec *ts,
 		if ( !m_notesCommentSet )
 		{
 			ss << " Overall Run Notes - " << comment;
-			DEBUG("[DEPRECATED] addRunComment() " << ss.str());
+			DEBUG("[DEPRECATED] addRunComment() " << ss.str()
+				<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+				<< "." << ts->tv_nsec);
 
 			emitPacket( *ts, ADARA::MarkerType::OVERALL_RUN_COMMENT,
 				scanIndex, "", comment );
@@ -613,7 +627,9 @@ void Markers::addRunComment( struct timespec *ts,
 		else
 		{
 			ss << " [DISCARDED RUN NOTES] - " << m_commentPV->value();
-			ERROR("[DEPRECATED] addRunComment() " << ss.str());
+			ERROR("[DEPRECATED] addRunComment() " << ss.str()
+				<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+				<< "." << ts->tv_nsec);
 
 			emitPacket( *ts, ADARA::MarkerType::GENERIC,
 				scanIndex, "[DISCARDED RUN NOTES] ", comment );
@@ -638,7 +654,8 @@ void Markers::addRunComment( struct timespec *ts,
 		ss << comment;
 
 		DEBUG("[DEPRECATED] addRunComment() Save Run Notes for Next Run - "
-			<< ss.str());
+			<< ss.str() << " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
 
 		notesCommentQueue.push_back(
 			std::pair<struct timespec, std::string>( *ts, comment ) );
@@ -680,13 +697,15 @@ void Markers::addScanComment( struct timespec *ts,
 		std::stringstream ss2;
 		ss2 << "Run " << m_runNumber << ":";
 		ss2 << " Scan Comment - " << ss.str() << comment;
-		DEBUG("addScanComment() " << ss2.str());
+		DEBUG("addScanComment() " << ss2.str()
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
 
 		emitPacket( *ts, ADARA::MarkerType::GENERIC,
 			scanIndex, ss.str(), comment );
 	}
 
-	// Otherwise, Queue Up Scan Comments Strings for Next Scan...
+	// Otherwise, Queue Up Scan Comment Strings for Next Scan...
 	else
 	{
 		std::stringstream ss_scan;
@@ -701,7 +720,9 @@ void Markers::addScanComment( struct timespec *ts,
 
 		DEBUG("addScanComment()"
 			<< " Queue Scan Comment for Next Scan scanIndex="
-			<< ss_scan.str() << ss.str());
+			<< ss_scan.str() << ss.str()
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
 
 		scanCommentQueue.push_back(
 			std::pair<struct timespec, std::string>( *ts,
@@ -736,7 +757,9 @@ void Markers::addNotesComment( struct timespec *ts,
 		if ( !m_notesCommentSet )
 		{
 			ss << " Overall Run Notes - " << comment;
-			DEBUG("addNotesComment() " << ss.str());
+			DEBUG("addNotesComment() " << ss.str()
+				<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+				<< "." << ts->tv_nsec);
 
 			emitPacket( *ts, ADARA::MarkerType::OVERALL_RUN_COMMENT,
 				scanIndex, "", comment );
@@ -748,7 +771,9 @@ void Markers::addNotesComment( struct timespec *ts,
 		else
 		{
 			ss << " [DISCARDED RUN NOTES] - " << comment;
-			ERROR("addNotesComment() " << ss.str());
+			ERROR("addNotesComment() " << ss.str()
+				<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+				<< "." << ts->tv_nsec);
 
 			emitPacket( *ts, ADARA::MarkerType::GENERIC,
 				scanIndex, "[DISCARDED RUN NOTES] ", comment );
@@ -773,7 +798,8 @@ void Markers::addNotesComment( struct timespec *ts,
 		ss << comment;
 
 		DEBUG("addNotesComment() Save Run Notes for Next Run - "
-			<< ss.str());
+			<< ss.str() << " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
 
 		notesCommentQueue.push_back(
 			std::pair<struct timespec, std::string>( *ts, comment ) );
@@ -803,13 +829,15 @@ void Markers::addAnnotationComment( struct timespec *ts,
 	{
 		ss << "Run " << m_runNumber << ":";
 		ss << " General Comment - " << comment;
-		DEBUG("addAnnotationComment() " << ss.str());
+		DEBUG("addAnnotationComment() " << ss.str()
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
 
 		emitPacket( *ts, ADARA::MarkerType::GENERIC,
 			scanIndex, "", comment );
 	}
 
-	// Otherwise, Queue Up Annotation Comments Strings for Next Run...
+	// Otherwise, Queue Up Annotation Comment Strings for Next Run...
 	else
 	{
 		if ( !m_inRun )
@@ -819,9 +847,48 @@ void Markers::addAnnotationComment( struct timespec *ts,
 
 		ss << comment;
 
-		DEBUG("addAnnotationComment() General Comment - " << ss.str());
+		DEBUG("addAnnotationComment() General Comment - " << ss.str()
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
 
 		annotationCommentQueue.push_back(
+			std::pair<struct timespec, std::string>( *ts, ss.str() ) );
+	}
+}
+
+void Markers::addSystemComment( struct timespec *ts,
+		uint32_t scanIndex, std::string comment )
+{
+	std::stringstream ss;
+
+	// In a Run, Add System Comment Now...
+	if ( m_inRun && !m_isPaused )
+	{
+		ss << "Run " << m_runNumber << ":";
+		ss << " System Comment - " << comment;
+		DEBUG("addSystemComment() " << ss.str()
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
+
+		emitPacket( *ts, ADARA::MarkerType::SYSTEM,
+			scanIndex, "", comment );
+	}
+
+	// Otherwise, Queue Up System Comment Strings for Next Run...
+	else
+	{
+		if ( !m_inRun )
+			ss << "[PRE-RUN] ";
+		else if ( m_isPaused || m_isPausedPT )
+			ss << "[PAUSED Run " << m_runNumber << "] ";
+
+		ss << comment;
+
+		DEBUG("addSystemComment() System Comment - " << ss.str()
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << ts->tv_nsec);
+
+		systemCommentQueue.push_back(
 			std::pair<struct timespec, std::string>( *ts, ss.str() ) );
 	}
 }
@@ -845,8 +912,9 @@ void Markers::dumpRunNotesComment( bool prologue )
 			{
 				DEBUG("dumpRunNotesComment()"
 					<< " Run " << m_runNumber << ":"
-					<< " Found First Run Notes Comment - "
+					<< " Found First Run Notes Comment at "
 					<< first_notes_it->first.tv_sec
+						- ADARA::EPICS_EPOCH_OFFSET
 					<< "." << first_notes_it->first.tv_nsec
 					<< ": " << first_notes_it->second);
 
@@ -870,8 +938,9 @@ void Markers::dumpRunNotesComment( bool prologue )
 			{
 				DEBUG("dumpRunNotesComment()"
 					<< " Run " << m_runNumber << ":"
-					<< " Found Last Run Notes Comment - "
+					<< " Found Last Run Notes Comment at "
 					<< last_notes_it->first.tv_sec
+						- ADARA::EPICS_EPOCH_OFFSET
 					<< "." << last_notes_it->first.tv_nsec
 					<< ": " << last_notes_it->second);
 
@@ -903,6 +972,7 @@ void Markers::dumpQueuedComments( bool prologue )
 	MarkerQueue::iterator scan_comment_it = scanCommentQueue.begin();
 	MarkerQueue::iterator notes_it = notesCommentQueue.begin();
 	MarkerQueue::iterator annotation_it = annotationCommentQueue.begin();
+	MarkerQueue::iterator system_it = systemCommentQueue.begin();
 
 	// Dump Queued Markers in Proper Time Order
 	while ( pause_it != pauseQueue.end()
@@ -911,7 +981,8 @@ void Markers::dumpQueuedComments( bool prologue )
 			|| scan_stop_it != scanStopQueue.end()
 			|| scan_comment_it != scanCommentQueue.end()
 			|| notes_it != notesCommentQueue.end()
-			|| annotation_it != annotationCommentQueue.end() )
+			|| annotation_it != annotationCommentQueue.end()
+			|| system_it != systemCommentQueue.end() )
 	{
 		MarkerQueue::iterator next_it;
 		ADARA::MarkerType::Enum markerType = ADARA::MarkerType::GENERIC;
@@ -999,6 +1070,17 @@ void Markers::dumpQueuedComments( bool prologue )
 			next = t;
 		}
 
+		if ( system_it != systemCommentQueue.end()
+				&& (t=timespec_to_nsec( system_it->first )) < next ) {
+			next_it = system_it;
+			markerType = ADARA::MarkerType::SYSTEM;
+			prefix = "";
+			desc = "Dump Next System Comment/Marker";
+			is_error = false;
+			is_scan = false;
+			next = t;
+		}
+
 		// Handle Scan Index Decoding from Saved Comment String... ;-Q
 		std::string comment = next_it->second;
 		uint32_t scanIndex = m_scanIndex; // Use as Default if Not a Scan
@@ -1019,8 +1101,9 @@ void Markers::dumpQueuedComments( bool prologue )
 		std::stringstream ss;
 		ss << "dumpQueuedComments()"
 			<< " Run " << m_runNumber << ": "
-			<< desc << " MarkerType=" << markerType << " - "
-			<< next_it->first.tv_sec << "." << next_it->first.tv_nsec
+			<< desc << " MarkerType=" << markerType << " at "
+			<< next_it->first.tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << next_it->first.tv_nsec
 			<< ": " << ss_scan.str() << prefix << comment;
 
 		if ( is_error )
@@ -1046,6 +1129,8 @@ void Markers::dumpQueuedComments( bool prologue )
 			notes_it++;
 		else if ( next_it == annotation_it )
 			annotation_it++;
+		else if ( next_it == system_it )
+			system_it++;
 	}
 
 	// Clear Out Queued Pauses
@@ -1068,6 +1153,9 @@ void Markers::dumpQueuedComments( bool prologue )
 
 	// Clear Out Queued Annotation Comments
 	annotationCommentQueue.clear();
+
+	// Clear Out Queued System Comments
+	systemCommentQueue.clear();
 }
 
 void Markers::onPrologue(void)
