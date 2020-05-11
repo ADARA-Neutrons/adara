@@ -516,7 +516,7 @@ bool LiveClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	 */
 	if (hdr) {
 		ERROR("LiveClient " << m_clientName << " sent us an Oversize Packet"
-			<< " at " << hdr->timestamp().tv_sec
+			<< " at " << hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET
 			<< "." << hdr->timestamp().tv_nsec
 			<< " of type 0x" << std::hex << hdr->type() << std::dec
 			<< " payload_length=" << hdr->payload_length()
