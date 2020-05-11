@@ -1679,7 +1679,7 @@ void StorageManager::autoSavePV( std::string pv_name, std::string pv_value,
 		ERROR("autoSavePV(): No Valid AutoSave File Descriptor!"
 			<< " *** Ignoring PV Write-Thru Value Save for " << pv_name
 			<< " = [" << pv_value << "]"
-			<< " at " << pv_time->tv_sec << "."
+			<< " at [Wallclock] " << pv_time->tv_sec << "."
 			<< std::setfill('0') << std::setw(9) << pv_time->tv_nsec);
 	}
 
@@ -1692,7 +1692,7 @@ void StorageManager::autoSavePV( std::string pv_name, std::string pv_value,
 	ss << pv_time->tv_sec << "."
 		<< std::setfill('0') << std::setw(9) << pv_time->tv_nsec;
 	ss << " " << pv_name << " " << pv_value_out << std::endl;
-	INFO("autoSavePV(): AutoSaving PV Value - " << ss.str());
+	INFO("autoSavePV(): AutoSaving PV Value - [Wallclock] " << ss.str());
 
 	// Write PV AutoSave Entry to File...
 	int rc = write( m_autoSaveFd, ss.str().c_str(), ss.str().length() );
