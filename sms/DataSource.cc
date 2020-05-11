@@ -2299,6 +2299,7 @@ bool DataSource::rxOversizePkt( const ADARA::PacketHeader *hdr,
 				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Oversized packet"
 				<< " at " << hdr->timestamp().tv_sec
+					- ADARA::EPICS_EPOCH_OFFSET
 				<< "." << hdr->timestamp().tv_nsec
 				<< " of type 0x" << std::hex << hdr->type() << std::dec
 				<< " payload_length=" << hdr->payload_length()
@@ -3431,6 +3432,8 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 				ss << "RESUME"; break;
 			case ADARA::MarkerType::OVERALL_RUN_COMMENT:
 				ss << "OVERALL_RUN_COMMENT"; break;
+			case ADARA::MarkerType::SYSTEM:
+				ss << "SYSTEM"; break;
 		}
 		ss << " (" << pkt.marker_type() << ")";
 		ss << ", ScanIndex=" << pkt.scanIndex();
@@ -3438,7 +3441,10 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 		INFO(log_info
 			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "External Annotation Packet Received from " << m_name
-			<< ss.str());
+			<< ss.str()
+			<< " at " << pkt.timestamp().tv_sec
+				- ADARA::EPICS_EPOCH_OFFSET
+			<< "." << pkt.timestamp().tv_nsec);
 	}
 
 	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
@@ -3497,6 +3503,17 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 				markers->addNotesComment( &ts,
 					m_ignore_annotation_pkts,
 					pkt.scanIndex(), pkt.comment() );
+				break;
+			case ADARA::MarkerType::SYSTEM:
+				// Always Pass Thru System Comments...
+				markers->addSystemComment( &ts,
+					pkt.scanIndex(), pkt.comment() );
+				// Optionally Execute External System Commands...
+				if ( !m_ignore_annotation_pkts )
+				{
+					DEBUG("DataSource::rxPacket(AnnotationPkt):"
+						<< " INSERT EXTERNAL RUN CONTROL HERE...");
+				}
 				break;
 		}
 	}
@@ -3560,7 +3577,7 @@ void DataSource::onSavePrologue(void)
 	pkt[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	pkt[3] = now.tv_nsec;
 
-	pkt[4] = (uint32_t) ADARA::MarkerType::GENERIC << 16;
+	pkt[4] = (uint32_t) ADARA::MarkerType::SYSTEM << 16;
 	pkt[5] = 0;
 
 	iov.iov_base = pkt;
