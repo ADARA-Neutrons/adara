@@ -372,7 +372,8 @@ caStatus smsRunNumberPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsRunNumberPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	return m_read_table.read(*this, prototype);
@@ -391,7 +392,8 @@ void smsRunNumberPV::update(uint32_t run, struct timespec *ts)
 			<< " Value Did Not Change - Ignore..."
 			<< " Still Update ts="
 			<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts->tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(ts);
 		notify();
@@ -463,7 +465,8 @@ caStatus smsRecordingPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsRecordingPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	return m_read_table.read(*this, prototype);
@@ -490,7 +493,8 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		DEBUG(log_info << "smsRecordingPV::write() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	if (v > 1) {
@@ -528,7 +532,8 @@ void smsRecordingPV::update(bool recording, struct timespec *ts)
 			<< " Value Did Not Change - Ignore..."
 			<< " Still Update ts="
 			<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts->tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(ts);
 		notify();
@@ -594,7 +599,8 @@ caStatus smsStringPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsStringPV::read() m_pv_name=" << m_pv_name
 			<< " value=[" << str << "]"
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 	return m_read_table.read(*this, prototype);
 }
@@ -617,7 +623,8 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< "smsStringPV::write() m_pv_name=" << m_pv_name
 				<< " Null String, Unset Value"
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 		}
 		unset(false, &ts);
 		return S_cas_success;
@@ -652,7 +659,8 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< "smsStringPV::write() m_pv_name=" << m_pv_name
 				<< " Writing No Elements, Unset Value"
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 		}
 		unset(false, &ts);
 		return S_cas_success;
@@ -671,7 +679,8 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Updates Not Allowed, Ignore Value."
 				<< " Don't Update ts="
 				<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 		}
 		notify();
 		return S_casApp_success;
@@ -694,7 +703,8 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			<< " new_value=[" << new_str << "]"
 			<< " old_value=[" << old_str << "]"
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 		do_log = true;
 	}
 
@@ -705,7 +715,8 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " String Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 			m_value->setTimeStamp(&ts);
 			m_first_set = false;
 			notify();
@@ -717,7 +728,8 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					<< " String Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts.tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec);
 			}
 			// Still Update TimeStamp
 			m_value->setTimeStamp(&ts);
@@ -755,7 +767,8 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 		DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
 			<< " Setting to Empty String, Unset Value"
 			<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts->tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 		unset( false, ts );
 		return;
 	}
@@ -776,7 +789,8 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 				<< " String Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts->tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
 			notify();
@@ -790,7 +804,8 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 					<< " String Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts->tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts->tv_nsec);
 				m_value->setTimeStamp(ts);
 				notify();
 				changed();
@@ -800,7 +815,8 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 					<< " String Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts->tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
 				notify();
@@ -845,7 +861,8 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 			<< " Keep value=[" << str << "]"
 			<< " Still Update ts="
 			<< new_ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << new_ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< new_ts.tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(&new_ts);
 		notify();
@@ -867,7 +884,8 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 					<< " String Value Did Not Change, But First Setting"
 					<< " - Call changed()..."
 					<< " ts=" << new_ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << new_ts.tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< new_ts.tv_nsec);
 				m_value->setTimeStamp(&new_ts);
 				m_first_set = false;
 				notify();
@@ -883,7 +901,8 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 						<< " Call changed()..."
 						<< " ts=" << new_ts.tv_sec
 							- ADARA::EPICS_EPOCH_OFFSET
-						<< "." << new_ts.tv_nsec);
+						<< "." << std::setfill('0') << std::setw(9)
+						<< new_ts.tv_nsec);
 					m_value->setTimeStamp(&new_ts);
 					notify();
 					changed();
@@ -893,7 +912,8 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 						<< " String Value Did Not Change - Ignore..."
 						<< " Still Update ts="
 						<< new_ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-						<< "." << new_ts.tv_nsec);
+						<< "." << std::setfill('0') << std::setw(9)
+						<< new_ts.tv_nsec);
 					// Still Update TimeStamp
 					m_value->setTimeStamp(&new_ts);
 					notify();
@@ -907,14 +927,16 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 				<< " new_value=[" << new_str << "]"
 				<< " old_value=[" << old_str << "]"
 				<< " ts=" << new_ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << new_ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< new_ts.tv_nsec);
 		}
 	}
 	else {
 		DEBUG("smsStringPV::unset() Init m_pv_name=" << m_pv_name
 			<< " to value=[" << new_str << "]"
 			<< " ts=" << new_ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << new_ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< new_ts.tv_nsec);
 	}
 
 	m_value = new gddAtomic(gddAppType_value, aitEnumUint8, 1, MAX_LENGTH);
@@ -1001,7 +1023,8 @@ caStatus smsBooleanPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsBooleanPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	return m_read_table.read(*this, prototype);
@@ -1030,7 +1053,8 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		DEBUG(log_info << "smsBooleanPV::write() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 		do_log = true;
 	}
 
@@ -1048,7 +1072,8 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 			m_value->setTimeStamp(&ts);
 			m_first_set = false;
 			notify();
@@ -1060,7 +1085,8 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts.tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec);
 			}
 			// Still Update TimeStamp
 			m_value->setTimeStamp(&ts);
@@ -1096,7 +1122,8 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 				<< " (m_no_changed_on_update=" << m_no_changed_on_update
 				<< " force_changed=" << force_changed << ")"
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts->tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
 			notify();
@@ -1117,7 +1144,8 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 						<< m_no_changed_on_update
 					<< " force_changed=" << force_changed << ")"
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts->tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts->tv_nsec);
 				m_value->setTimeStamp(ts);
 				notify();
 				if ( !m_no_changed_on_update || force_changed )
@@ -1128,7 +1156,8 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts->tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
 				notify();
@@ -1214,7 +1243,8 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 				<< " Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts->tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
 			notify();
@@ -1228,7 +1258,8 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts->tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts->tv_nsec);
 				m_value->setTimeStamp(ts);
 				notify();
 				changed();
@@ -1238,7 +1269,8 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts->tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
 				notify();
@@ -1314,7 +1346,8 @@ caStatus smsErrorPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsErrorPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	return m_read_table.read(*this, prototype);
@@ -1343,7 +1376,8 @@ caStatus smsErrorPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		DEBUG(log_info << "smsErrorPV::write() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 		do_log = true;
 	}
 
@@ -1367,7 +1401,8 @@ caStatus smsErrorPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Updates Not Allowed, Ignore Value."
 				<< " Don't Update ts="
 				<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 		}
 		notify();
 		return S_casApp_success;
@@ -1380,7 +1415,8 @@ caStatus smsErrorPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Value Did Not Change - Ignore..."
 				<< " Still Update ts="
 				<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 		}
 		// Still Update TimeStamp
 		m_value->setTimeStamp(&ts);
@@ -1424,7 +1460,8 @@ void smsErrorPV::update(bool val, bool major, struct timespec *ts)
 			<< " Value Did Not Change - Ignore..."
 			<< " Still Update ts="
 			<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts->tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(ts);
 		notify();
@@ -1513,7 +1550,8 @@ caStatus smsConnectedPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsConnectedPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	return m_read_table.read(*this, prototype);
@@ -1542,7 +1580,8 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		DEBUG(log_info << "smsConnectedPV::write() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 		do_log = true;
 	}
 
@@ -1560,7 +1599,8 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Value Did Not Change - Ignore..."
 				<< " Still Update ts="
 				<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 		}
 		// Still Update TimeStamp
 		m_value->setTimeStamp(&ts);
@@ -1589,7 +1629,8 @@ void smsConnectedPV::update(uint16_t val, struct timespec *ts)
 			<< " Value Did Not Change - Ignore..."
 			<< " Still Update ts="
 			<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts->tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(ts);
 		notify();
@@ -1753,7 +1794,8 @@ caStatus smsPassThruPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsPassThruPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	return m_read_table.read(*this, prototype);
@@ -1782,7 +1824,8 @@ caStatus smsPassThruPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		DEBUG(log_info << "smsPassThruPV::write() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 		do_log = true;
 	}
 
@@ -1800,7 +1843,8 @@ caStatus smsPassThruPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 			m_value->setTimeStamp(&ts);
 			m_first_set = false;
 			notify();
@@ -1812,7 +1856,8 @@ caStatus smsPassThruPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts.tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec);
 			}
 			// Still Update TimeStamp
 			m_value->setTimeStamp(&ts);
@@ -1843,7 +1888,8 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 				<< " Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts->tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
 			notify();
@@ -1857,7 +1903,8 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts->tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts->tv_nsec);
 				m_value->setTimeStamp(ts);
 				notify();
 				changed();
@@ -1867,7 +1914,8 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 						<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-						<< "." << ts->tv_nsec);
+						<< "." << std::setfill('0') << std::setw(9)
+						<< ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
 				notify();
@@ -2074,7 +2122,8 @@ caStatus smsUint32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsUint32PV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	return m_read_table.read(*this, prototype);
@@ -2103,7 +2152,8 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		DEBUG(log_info << "smsUint32PV::write() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 		do_log = true;
 	}
 
@@ -2114,7 +2164,8 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 			m_value->setTimeStamp(&ts);
 			m_first_set = false;
 			notify();
@@ -2126,7 +2177,8 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts.tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec);
 			}
 			// Still Update TimeStamp
 			m_value->setTimeStamp(&ts);
@@ -2158,7 +2210,8 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 					<< " Value Did Not Change, But First Setting"
 					<< " - Call changed()..."
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts->tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts->tv_nsec);
 			}
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
@@ -2174,7 +2227,8 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 						<< " Value Did Not Change, But Time Earlier"
 						<< " - Likely AutoSave Recovery, Call changed()..."
 						<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-						<< "." << ts->tv_nsec);
+						<< "." << std::setfill('0') << std::setw(9)
+						<< ts->tv_nsec);
 				}
 				m_value->setTimeStamp(ts);
 				notify();
@@ -2186,7 +2240,8 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 						<< " Value Did Not Change - Ignore..."
 						<< " Still Update ts="
 						<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-						<< "." << ts->tv_nsec);
+						<< "." << std::setfill('0') << std::setw(9)
+						<< ts->tv_nsec);
 				}
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
@@ -2275,7 +2330,8 @@ caStatus smsInt32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsInt32PV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	return m_read_table.read(*this, prototype);
@@ -2304,7 +2360,8 @@ caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		DEBUG(log_info << "smsInt32PV::write() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 		do_log = true;
 	}
 
@@ -2315,7 +2372,8 @@ caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Value Did Not Change - Ignore..."
 				<< " Still Update ts="
 				<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 		}
 		// Still Update TimeStamp
 		m_value->setTimeStamp(&ts);
@@ -2344,7 +2402,8 @@ void smsInt32PV::update(int32_t val, struct timespec *ts)
 			<< " Value Did Not Change - Ignore..."
 			<< " Still Update ts="
 			<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts->tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 		// Still Update TimeStamp
 		m_value->setTimeStamp(ts);
 		notify();
@@ -2427,7 +2486,8 @@ caStatus smsTriggerPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsTriggerPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	return m_read_table.read(*this, prototype);
@@ -2454,7 +2514,8 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		DEBUG(log_info << "smsTriggerPV::write() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	if (v > 1) {
@@ -2617,7 +2678,8 @@ caStatus smsFloat64PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 		DEBUG(log_info << "smsFloat64PV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 	}
 
 	return m_read_table.read(*this, prototype);
@@ -2646,7 +2708,8 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		DEBUG(log_info << "smsFloat64PV::write() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts.tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec);
 		do_log = true;
 	}
 
@@ -2657,7 +2720,8 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts.tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec);
 			m_value->setTimeStamp(&ts);
 			m_first_set = false;
 			notify();
@@ -2669,7 +2733,8 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts.tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec);
 			}
 			// Still Update TimeStamp
 			m_value->setTimeStamp(&ts);
@@ -2700,7 +2765,8 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 				<< " Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-				<< "." << ts->tv_nsec);
+				<< "." << std::setfill('0') << std::setw(9)
+				<< ts->tv_nsec);
 			m_value->setTimeStamp(ts);
 			m_first_set = false;
 			notify();
@@ -2714,7 +2780,8 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts->tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts->tv_nsec);
 				m_value->setTimeStamp(ts);
 				notify();
 				changed();
@@ -2724,7 +2791,8 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-					<< "." << ts->tv_nsec);
+					<< "." << std::setfill('0') << std::setw(9)
+					<< ts->tv_nsec);
 				// Still Update TimeStamp
 				m_value->setTimeStamp(ts);
 				notify();
