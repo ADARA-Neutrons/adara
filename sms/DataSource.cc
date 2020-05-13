@@ -3527,7 +3527,7 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 						<< " at " << pkt.timestamp().tv_sec
 							- ADARA::EPICS_EPOCH_OFFSET
 						<< "." << std::setfill('0') << std::setw(9)
-						<< pkt.timestamp().tv_nsec);
+						<< pkt.timestamp().tv_nsec );
 					m_ctrl->externalRunControl( &ts,
 						pkt.scanIndex(), pkt.comment() );
 				}
