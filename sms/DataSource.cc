@@ -1518,13 +1518,15 @@ void DataSource::dumpLastReadStats(std::string who)
 		<< " len=" << m_last_pkt_len
 		<< " last_start_read_time="
 		<< Parser::last_start_read_time.tv_sec << "."
-		<< Parser::last_start_read_time.tv_nsec
+		<< std::setfill('0') << std::setw(9)
+		<< Parser::last_start_read_time.tv_nsec << std::setw(0)
 		<< " last_bytes_read=" << Parser::last_bytes_read
 		<< " last_read_errno=" << Parser::last_read_errno
 		<< " (" << strerror( Parser::last_read_errno ) << ")"
 		<< " last_end_read_time="
 		<< Parser::last_end_read_time.tv_sec << "."
-		<< Parser::last_end_read_time.tv_nsec
+		<< std::setfill('0') << std::setw(9)
+		<< Parser::last_end_read_time.tv_nsec << std::setw(0)
 		<< " last_pkts_parsed=" << Parser::last_pkts_parsed
 		<< " last_total_bytes=" << Parser::last_total_bytes
 		<< " last_total_packets=" << Parser::last_total_packets
@@ -1538,13 +1540,15 @@ void DataSource::dumpLastReadStats(std::string who)
 		<< " ;"
 		<< " last_last_start_read_time="
 		<< Parser::last_last_start_read_time.tv_sec << "."
-		<< Parser::last_last_start_read_time.tv_nsec
+		<< std::setfill('0') << std::setw(9)
+		<< Parser::last_last_start_read_time.tv_nsec << std::setw(0)
 		<< " last_last_bytes_read=" << Parser::last_last_bytes_read
 		<< " last_last_read_errno=" << Parser::last_last_read_errno
 		<< " (" << strerror( Parser::last_last_read_errno ) << ")"
 		<< " last_last_end_read_time="
 		<< Parser::last_last_end_read_time.tv_sec << "."
-		<< Parser::last_last_end_read_time.tv_nsec
+		<< std::setfill('0') << std::setw(9)
+		<< Parser::last_last_end_read_time.tv_nsec << std::setw(0)
 		<< " last_last_pkts_parsed=" << Parser::last_last_pkts_parsed
 		<< " last_last_total_bytes=" << Parser::last_last_total_bytes
 		<< " last_last_total_packets=" << Parser::last_last_total_packets
@@ -2300,7 +2304,8 @@ bool DataSource::rxOversizePkt( const ADARA::PacketHeader *hdr,
 				<< "Oversized packet"
 				<< " at " << hdr->timestamp().tv_sec
 					- ADARA::EPICS_EPOCH_OFFSET
-				<< "." << hdr->timestamp().tv_nsec
+				<< "." << std::setfill('0') << std::setw(9)
+				<< hdr->timestamp().tv_nsec << std::setw(0)
 				<< " of type 0x" << std::hex << hdr->type() << std::dec
 				<< " payload_length=" << hdr->payload_length()
 				<< " from " << m_name);
@@ -3444,7 +3449,8 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 			<< ss.str()
 			<< " at " << pkt.timestamp().tv_sec
 				- ADARA::EPICS_EPOCH_OFFSET
-			<< "." << pkt.timestamp().tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< pkt.timestamp().tv_nsec);
 	}
 
 	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
@@ -3509,10 +3515,21 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 				markers->addSystemComment( &ts,
 					pkt.scanIndex(), pkt.comment() );
 				// Optionally Execute External System Commands...
-				if ( !m_ignore_annotation_pkts )
+				if ( m_ignore_annotation_pkts == Markers::EXECUTE )
 				{
-					DEBUG("DataSource::rxPacket(AnnotationPkt):"
-						<< " INSERT EXTERNAL RUN CONTROL HERE...");
+					DEBUG( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+						<< "DataSource::rxPacket(AnnotationPkt):"
+						<< " External RunControl Packet Received"
+						<< " from " << m_name
+						<< " - Execute:"
+						<< " Command=[" << pkt.comment() << "]"
+						<< " scanIndex=" << pkt.scanIndex()
+						<< " at " << pkt.timestamp().tv_sec
+							- ADARA::EPICS_EPOCH_OFFSET
+						<< "." << std::setfill('0') << std::setw(9)
+						<< pkt.timestamp().tv_nsec);
+					m_ctrl->externalRunControl( &ts,
+						pkt.scanIndex(), pkt.comment() );
 				}
 				break;
 		}
