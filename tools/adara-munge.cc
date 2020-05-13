@@ -822,7 +822,7 @@ void MungeParser::addRunStart( struct timespec *ts )
 
 	apkt.hdr.payload_len += cmd_size;
 
-	apkt.marker_type |= cmd_size;
+	apkt.marker_type |= strlen( command );
 
 	size_t apkt_size = sizeof(ADARA::Header) + apkt.hdr.payload_len;
 
@@ -872,7 +872,7 @@ void MungeParser::addRunStop( struct timespec *ts )
 
 	apkt.hdr.payload_len += cmd_size;
 
-	apkt.marker_type |= cmd_size;
+	apkt.marker_type |= strlen( command );
 
 	size_t apkt_size = sizeof(ADARA::Header) + apkt.hdr.payload_len;
 
