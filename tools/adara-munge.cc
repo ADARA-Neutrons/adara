@@ -1,5 +1,6 @@
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <errno.h>
 #include <iostream>
 #include <fstream>
@@ -144,7 +145,9 @@ public:
 		m_run_start_epoch(0), m_run_file_number(0), m_run_number(0),
 		m_case(0),
 		m_skip_pkt(false),
-		m_addRunEnd(false), m_hysterical(false),
+		m_addRunEnd(false),
+		m_genStart(false), m_genStop(false),
+		m_hysterical(false),
 		m_filterafter(false), m_filterbefore(false),
 		m_posixRead(false), m_showDDP(false), m_lowRate(false),
 		m_terse(false), m_catch(false),
@@ -155,6 +158,10 @@ public:
 		m_lastpkttime.tv_nsec = 0;
 		m_threshtime.tv_sec = 0;
 		m_threshtime.tv_nsec = 0;
+		m_runstart.tv_sec = 0;
+		m_runstart.tv_nsec = 0;
+		m_runstop.tv_sec = 0;
+		m_runstop.tv_nsec = 0;
 		m_starttime.tv_sec = 0;
 		m_starttime.tv_nsec = 0;
 		m_endtime.tv_sec = 0;
@@ -198,6 +205,10 @@ public:
 	void addRunStatus( uint32_t m_run_number, uint32_t m_run_start_epoch,
 		uint32_t m_run_file_number, ADARA::RunStatus::Enum status );
 
+	void addRunStart( struct timespec *ts );
+
+	void addRunStop( struct timespec *ts );
+
 	using ADARA::POSIXParser::rxPacket;
 
 private:
@@ -205,6 +216,8 @@ private:
 	uint32_t m_descriptor_count[MAX_DEVICE_ID];
 	struct timespec m_lastpkttime;
 	struct timespec m_threshtime;
+	struct timespec m_runstart;
+	struct timespec m_runstop;
 	struct timespec m_starttime;
 	struct timespec m_endtime;
 	uint32_t m_run_start_epoch;
@@ -214,6 +227,8 @@ private:
 
 	bool m_skip_pkt;
 	bool m_addRunEnd;
+	bool m_genStart;
+	bool m_genStop;
 	bool m_hysterical;
 	bool m_filterafter;
 	bool m_filterbefore;
@@ -594,50 +609,87 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 
 	// Capture Run Start Epoch/File Information for
 	// Adding Omitted RunStatusPkt for End of Run...!
-	if ( m_addRunEnd )
+	if ( m_addRunEnd || m_genStart || m_genStop )
 	{
-		std::cerr << "[Add Run End Mode]" << std::endl;
+		if ( m_addRunEnd )
+			std::cerr << "[Add Run End Mode]" << std::endl;
 
 		// RunStatusPkt from Start of Run/File...
-		// - Capture Run Number, Run Start Epoch Time & File Number...
 		if ( pkt.status() == ADARA::RunStatus::NEW_RUN
 				|| pkt.status() == ADARA::RunStatus::RUN_BOF )
 		{
-			m_run_number = pkt.runNumber();
-			m_run_start_epoch = pkt.runStart();
-			m_run_file_number = pkt.fileNumber();
+			// For Add Run End:
+			// - Capture Run Number, Run Start Epoch Time & File Number...
+			if ( m_addRunEnd )
+			{
+				m_run_number = pkt.runNumber();
+				m_run_start_epoch = pkt.runStart();
+				m_run_file_number = pkt.fileNumber();
 
-			std::cerr << "Captured Run Status Meta-Data:"
-				<< std::endl
-				<< "- Run Number = " << m_run_number << std::endl
-				<< "- Run Start Epoch = " << m_run_start_epoch << std::endl
-				<< "- Run File Number = " << m_run_file_number
-				<< std::endl;
+				std::cerr << "Captured Run Status Meta-Data:"
+					<< std::endl
+					<< "- Run Number = " << m_run_number << std::endl
+					<< "- Run Start Epoch = " << m_run_start_epoch
+						<< std::endl
+					<< "- Run File Number = " << m_run_file_number
+						<< std::endl;
+			}
+
+			// For Generate Run Start:
+			// - Capture Run Start Time
+			if ( m_genStart )
+			{
+				std::cerr << "[Generate Run Start Mode]" << std::endl;
+
+				// Capture "Run Start" Timestamp (Pulse Id) from RunStatus
+				// - for Generating "Start Run" System Annot Packet...
+				m_runstart.tv_sec = (uint32_t) (pkt.pulseId() >> 32);
+				m_runstart.tv_nsec = (uint32_t) pkt.pulseId();
+			}
 		}
 
 		// Hmmm... This Run File _Already Has_ a RunStatusPkt
 		// for End of File...
 		else if ( pkt.status() == ADARA::RunStatus::RUN_EOF )
 		{
-			std::cerr
-				<< "*** Warning: Run File Already Has Run Status Packet"
-				<< " - End of File (Run Continues)..."
-				<< " Skipping This Run Status Packet...!"
-				<< std::endl;
+			if ( m_addRunEnd )
+			{
+				std::cerr
+					<< "*** Warning:"
+					<< " Run File Already Has Run Status Packet"
+					<< " - End of File (Run Continues)..."
+					<< " Skipping This Run Status Packet...!"
+					<< std::endl;
 
-			m_skip_pkt = true;
+				m_skip_pkt = true;
+			}
 		}
 
 		// Hmmm... This Run Already _Has_ a RunStatusPkt for End of Run...!
 		else if ( pkt.status() == ADARA::RunStatus::END_RUN )
 		{
-			std::cerr
-				<< "*** Error: Run File Already Has Run Status"
-				<< " - End of Run...!"
-				<< " Deactivating \"Add End of Run\" Option..."
-				<< std::endl;
+			if ( m_addRunEnd )
+			{
+				std::cerr
+					<< "*** Error: Run File Already Has Run Status"
+					<< " - End of Run...!"
+					<< " Deactivating \"Add End of Run\" Option..."
+					<< std::endl;
 
-			m_addRunEnd = false;
+				m_addRunEnd = false;
+			}
+
+			// For Generate Run Stop:
+			// - Capture Run Stop Time
+			if ( m_genStop )
+			{
+				std::cerr << "[Generate Run Stop Mode]" << std::endl;
+
+				// Capture "Run Stop" Timestamp (Pulse Id) from RunStatus
+				// - for Generating "Stop Run" System Annot Packet...
+				m_runstop.tv_sec = (uint32_t) (pkt.pulseId() >> 32);
+				m_runstop.tv_nsec = (uint32_t) pkt.pulseId();
+			}
 		}
 	}
 
@@ -732,6 +784,113 @@ void MungeParser::addRunStatus( uint32_t run_number,
 #endif
 
 	m_out.write( (const char *)&spkt, sizeof(spkt) );
+}
+
+struct annotation_packet {
+	ADARA::Header   hdr;
+	uint32_t    marker_type;
+	uint32_t    scan_index;
+	char	    comment[1024];
+} __attribute__((packed));
+
+void MungeParser::addRunStart( struct timespec *ts )
+{
+	struct annotation_packet apkt = {
+		hdr : {
+			payload_len : 2 * sizeof(uint32_t),
+			pkt_format : ADARA_PKT_TYPE(
+				ADARA::PacketType::STREAM_ANNOTATION_TYPE,
+				ADARA::PacketType::STREAM_ANNOTATION_VERSION ),
+		},
+	};
+
+	apkt.hdr.ts_sec = ts->tv_sec;
+	apkt.hdr.ts_nsec = ts->tv_nsec;
+
+	apkt.marker_type = (uint32_t) ADARA::MarkerType::SYSTEM << 16;
+
+	apkt.scan_index = 0;
+
+	char *command = (char *) "Start Run";
+
+	// Zero Pad End of String
+	memset( apkt.comment, 0, sizeof(apkt.comment) );
+
+	sprintf( apkt.comment, "%s", command );
+
+	size_t cmd_size = ( ( strlen( command ) + 3 ) & ~3 );
+
+	apkt.hdr.payload_len += cmd_size;
+
+	apkt.marker_type |= cmd_size;
+
+	size_t apkt_size = sizeof(ADARA::Header) + apkt.hdr.payload_len;
+
+	std::cerr << "   apkt.comment=[" << apkt.comment << "]"
+		<< " apkt_size=" << apkt_size << std::endl;
+
+	// Save System Annot Packet to Output File (if present)
+	if ( m_save_out.is_open() )
+	{
+		m_save_out.write( (const char *)&apkt, apkt_size );
+		m_save_count++;
+	}
+
+	// Else Just Munge the Regular Output Stream...
+	else
+	{
+		m_out.write( (const char *)&apkt, apkt_size );
+	}
+}
+
+void MungeParser::addRunStop( struct timespec *ts )
+{
+	struct annotation_packet apkt = {
+		hdr : {
+			payload_len : 2 * sizeof(uint32_t),
+			pkt_format : ADARA_PKT_TYPE(
+				ADARA::PacketType::STREAM_ANNOTATION_TYPE,
+				ADARA::PacketType::STREAM_ANNOTATION_VERSION ),
+		},
+	};
+
+	apkt.hdr.ts_sec = ts->tv_sec;
+	apkt.hdr.ts_nsec = ts->tv_nsec;
+
+	apkt.marker_type = (uint32_t) ADARA::MarkerType::SYSTEM << 16;
+
+	apkt.scan_index = 0;
+
+	char *command = (char *) "Stop Run";
+
+	// Zero Pad End of String
+	memset( apkt.comment, 0, sizeof(apkt.comment) );
+
+	sprintf( apkt.comment, "%s", command );
+
+	size_t cmd_size = ( ( strlen( command ) + 3 ) & ~3 );
+
+	apkt.hdr.payload_len += cmd_size;
+
+	apkt.marker_type |= cmd_size;
+
+	size_t apkt_size = sizeof(ADARA::Header) + apkt.hdr.payload_len;
+
+	std::cerr << "   apkt.comment=[" << apkt.comment << "]"
+		<< " apkt_size=" << apkt_size << std::endl;
+
+	// Save System Annot Packet to Output File (if present)
+	if ( m_save_out.is_open() )
+	{
+		m_save_out.write( (const char *)&apkt, apkt_size );
+		m_save_count++;
+	}
+
+	// Else Just Munge the Regular Output Stream...
+	else
+	{
+		m_out.write( (const char *)&apkt, apkt_size );
+	}
 }
 
 bool MungeParser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
@@ -1424,6 +1583,8 @@ void MungeParser::parse(int argc, char **argv)
 		("terse,T", "Terse Mode, Produce no output (except as requested)")
 		("catch,C", "Catch Exceptions, Try to parse past bad packets")
 		("addrunend,E", "Add Omitted Run Status Packet to End of Stream")
+		("genstart,S", "Generate Run Start System Annot Matching Stream")
+		("genstop,T", "Generate Run Stop System Annot Matching Stream")
 		("savepkts,p",
 			po::value<std::vector<uint32_t> >(&m_save_pkts)->multitoken(),
 			"List of Packet Types (UINT32) to Save")
@@ -1467,8 +1628,11 @@ void MungeParser::parse(int argc, char **argv)
 
 	m_addRunEnd = vm.count("addrunend");
 
+	m_genStart = vm.count("genstart");
+	m_genStop = vm.count("genstop");
+
 	// Save Packets Options...
-	if ( m_save_pkts.size() ) {
+	if ( m_save_pkts.size() || m_genStart || m_genStop ) {
 		for ( uint32_t i=0 ; i < m_save_pkts.size() ; i++ ) {
 			std::cerr << "Packet Type 0x"
 			<< std::hex << m_save_pkts[i] << std::dec
@@ -1494,7 +1658,7 @@ void MungeParser::parse(int argc, char **argv)
 			m_save_pkts.clear();
 		}
 	}
-	else if ( m_save_file.size() ) {
+	else if ( m_save_file.size() && !m_genStart && !m_genStop ) {
 		std::cerr << "Warning: Save Packets File Specified "
 			<< "with NO Selected Packet Types! Ignoring..."
 			<< std::endl;
@@ -1572,15 +1736,6 @@ void MungeParser::parse(int argc, char **argv)
 		}
 	}
 
-	// Close Any Saved Packets File...
-	if ( m_save_out.is_open() ) {
-		std::cerr << "Closing Saved Packets File \""
-			<< m_save_file << "\""
-			<< " - Saved " << m_save_count << " Packets."
-			<< std::endl;
-		m_save_out.close();
-	}
-
 	// Add Final "RunStatusPkt" to End of Run...
 	if ( m_addRunEnd )
 	{
@@ -1612,6 +1767,61 @@ void MungeParser::parse(int argc, char **argv)
 				<< "Can't Add Final Run Status Packet..."
 				<< std::endl;
 		}
+	}
+
+	// Generate "Run Start" as Found...
+	if ( m_genStart )
+	{
+		// Got Run Start Time, Generate System Annot Packet...
+		if ( m_runstart.tv_sec > 0 && m_runstart.tv_nsec > 0 )
+		{
+			std::cerr
+				<< "Generating Run Start System Annot Packet"
+				<< " -> sec=" << m_runstart.tv_sec
+				<< " nsec=" << m_runstart.tv_nsec << std::endl;
+
+			addRunStart( &m_runstart );
+		}
+
+		// Didn't Find a Run Start Time...
+		else
+		{
+			std::cerr
+				<< "No Run Start Timestamp Found!"
+				<< " Can't Generate System Annot Packet..." << std::endl;
+		}
+	}
+
+	// Generate "Run Stop" as Found...
+	if ( m_genStop )
+	{
+		// Got Run Stop Time, Generate System Annot Packet...
+		if ( m_runstop.tv_sec > 0 && m_runstop.tv_nsec > 0 )
+		{
+			std::cerr
+				<< "Generating Run Stop System Annot Packet"
+				<< " -> sec=" << m_runstop.tv_sec
+				<< " nsec=" << m_runstop.tv_nsec << std::endl;
+
+			addRunStop( &m_runstop );
+		}
+
+		// Didn't Find a Run Stop Time...
+		else
+		{
+			std::cerr
+				<< "No Run Stop Timestamp Found!"
+				<< " Can't Generate System Annot Packet..." << std::endl;
+		}
+	}
+
+	// Close Any Saved Packets File...
+	if ( m_save_out.is_open() ) {
+		std::cerr << "Closing Saved Packets File \""
+			<< m_save_file << "\""
+			<< " - Saved " << m_save_count << " Packets."
+			<< std::endl;
+		m_save_out.close();
 	}
 }
 
