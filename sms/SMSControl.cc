@@ -1278,17 +1278,64 @@ void SMSControl::resumeRecording(void)
 void SMSControl::externalRunControl( struct timespec *ts,
 		uint32_t scanIndex, std::string command )
 {
-	DEBUG( ( m_recording ? "[RECORDING] " : "" )
-		<< "SMSControl::externalRunControl():"
-		<< " External RunControl Command Received,"
-		<< " Command=[" << command << "]"
+	std::stringstream ss;
+	ss << " Command=[" << command << "]"
 		<< " scanIndex=" << scanIndex
 		<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 		<< "." << std::setfill('0') << std::setw(9)
-		<< ts->tv_nsec);
+		<< ts->tv_nsec;
 
 	// Parse & Execute Various Commands...
-	// XXX START HERE XXX
+
+	bool status;
+
+	// Start Run
+	if ( !command.compare("Start Run") )
+	{
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "SMSControl::externalRunControl():"
+			<< " External RunControl \"Run Start\" Command Received,"
+			<< ss.str() );
+
+		status = setRecording( true, ts );
+
+		if ( !status )
+		{
+			ERROR( ( m_recording ? "[RECORDING] " : "" )
+				<< "SMSControl::externalRunControl():"
+				<< " External RunControl \"Run Start\" Command Failed!"
+				<< ss.str() );
+		}
+	}
+
+	// Stop Run
+	else if ( !command.compare("Stop Run") )
+	{
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "SMSControl::externalRunControl():"
+			<< " External RunControl \"Run Stop\" Command Received,"
+			<< ss.str() );
+
+		status = setRecording( false, ts );
+
+		if ( !status )
+		{
+			ERROR( ( m_recording ? "[RECORDING] " : "" )
+				<< "SMSControl::externalRunControl():"
+				<< " External RunControl \"Run Stop\" Command Failed!"
+				<< ss.str() );
+		}
+	}
+
+	// Unknown Command (or Just a System Annotation Comment... :-)
+	else
+	{
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "SMSControl::externalRunControl():"
+			<< " Unknown External RunControl Command"
+			<< " (Or System Comment) Received - Ignoring"
+			<< ss.str() );
+	}
 }
 
 // Update RunInfo Validity for Run Control...
