@@ -140,7 +140,8 @@ public:
 		DEBUG("CleanShutdownPV " << m_pv_name << " Triggered."
 			<< " Cleanly Shutting Down SMS Daemon."
 			<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-			<< "." << ts->tv_nsec);
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 		exit(0);
 	}
 };
@@ -1272,6 +1273,22 @@ void SMSControl::resumeRecording(void)
 		INFO("Resuming Data Collection (Not Currently Recording)");
 
 	StorageManager::resumeRecording();
+}
+
+void SMSControl::externalRunControl( struct timespec *ts,
+		uint32_t scanIndex, std::string command )
+{
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "SMSControl::externalRunControl():"
+		<< " External RunControl Command Received,"
+		<< " Command=[" << command << "]"
+		<< " scanIndex=" << scanIndex
+		<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+		<< "." << std::setfill('0') << std::setw(9)
+		<< ts->tv_nsec);
+
+	// Parse & Execute Various Commands...
+	// XXX START HERE XXX
 }
 
 // Update RunInfo Validity for Run Control...

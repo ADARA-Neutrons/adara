@@ -112,6 +112,9 @@ public:
 	void pauseRecording(void);
 	void resumeRecording(void);
 
+	void externalRunControl( struct timespec *ts,
+			uint32_t scanIndex, std::string command );
+
 	void updateValidRunInfo(bool isValid, std::string why,
 			bool changedValid);
 
