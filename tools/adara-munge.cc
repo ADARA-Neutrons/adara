@@ -637,7 +637,7 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 
 			// For Generate Run Start:
 			// - Capture Run Start Time
-			if ( m_genStart )
+			if ( m_genStart && pkt.status() == ADARA::RunStatus::NEW_RUN )
 			{
 				std::cerr << "[Generate Run Start Mode]" << std::endl;
 
