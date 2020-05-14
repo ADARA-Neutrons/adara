@@ -1574,6 +1574,8 @@ void MungeParser::parse(int argc, char **argv)
 {
 	std::string m_threshtime_str;
 	std::string m_starttime_str;
+	std::string m_runstart_str;
+	std::string m_runstop_str;
 
 		po::options_description opts("Allowed options");
 		opts.add_options()
@@ -1584,7 +1586,11 @@ void MungeParser::parse(int argc, char **argv)
 		("catch,C", "Catch Exceptions, Try to parse past bad packets")
 		("addrunend,E", "Add Omitted Run Status Packet to End of Stream")
 		("genstart,S", "Generate Run Start System Annot Matching Stream")
+		("runstart", po::value<std::string>(&m_runstart_str),
+			"Manually Entered Run Start Time")
 		("genstop,T", "Generate Run Stop System Annot Matching Stream")
+		("runstop", po::value<std::string>(&m_runstop_str),
+			"Manually Entered Run Stop Time")
 		("savepkts,p",
 			po::value<std::vector<uint32_t> >(&m_save_pkts)->multitoken(),
 			"List of Packet Types (UINT32) to Save")
@@ -1629,7 +1635,38 @@ void MungeParser::parse(int argc, char **argv)
 	m_addRunEnd = vm.count("addrunend");
 
 	m_genStart = vm.count("genstart");
+
+	if ( m_runstart_str.size() ) {
+		std::cerr << "Manually Entered Run Start Time Set as: "
+			<< m_runstart_str << std::endl;
+		size_t dot = m_runstart_str.find(".");
+		if ( dot != std::string::npos ) {
+			m_runstart.tv_sec = boost::lexical_cast<uint32_t>(
+				m_runstart_str.substr(0, dot) );
+			m_runstart.tv_nsec = boost::lexical_cast<uint32_t>(
+				m_runstart_str.substr(dot + 1) );
+			std::cerr << "Manually Entered Run Start Time"
+				<< " -> sec=" << m_runstart.tv_sec
+				<< " nsec=" << m_runstart.tv_nsec << std::endl;
+		}
+	}
+
 	m_genStop = vm.count("genstop");
+
+	if ( m_runstop_str.size() ) {
+		std::cerr << "Manually Entered Run Stop Time Set as: "
+			<< m_runstop_str << std::endl;
+		size_t dot = m_runstop_str.find(".");
+		if ( dot != std::string::npos ) {
+			m_runstop.tv_sec = boost::lexical_cast<uint32_t>(
+				m_runstop_str.substr(0, dot) );
+			m_runstop.tv_nsec = boost::lexical_cast<uint32_t>(
+				m_runstop_str.substr(dot + 1) );
+			std::cerr << "Manually Entered Run Stop Time"
+				<< " -> sec=" << m_runstop.tv_sec
+				<< " nsec=" << m_runstop.tv_nsec << std::endl;
+		}
+	}
 
 	// Save Packets Options...
 	if ( m_save_pkts.size() || m_genStart || m_genStop ) {
