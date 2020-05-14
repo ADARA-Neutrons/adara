@@ -15,7 +15,7 @@ for nexus in $@ ; do
 
 	# Extract Run Number from NeXus File Base Name
 	run_number=`basename "${nexus}" | sed "s/.nxs.h5//" \
-		| awk -F "_" '{print $2}'`
+		| awk -F "_" '{print $NF}'`
 	echo -e "\nRun Number = ${run_number}"
 
 	# Extract Run Start Time from Frequency Log
