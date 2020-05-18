@@ -225,6 +225,19 @@ CLEAR_PREVIOUS_CACHE()
 
 DO_CONNECT()
 {
+	# Flag Inconsistent Command Line Parameters...! ;-D
+
+	if [[ -n "${ALTOPT}" ]]; then
+		echo -e "\nError: Inconsistent Command Line Options Specified...!"
+		echo -e "\n\t-> Can't \"Connect\" with Alt Option [${ALTOPT}]..."
+		echo -e "\nADARA Summary Can Only Connect to Latest Summary Logs,"
+		echo "Using Whatever Alt Options Were Last Specified."
+		echo -e "\nExiting...\n"
+		exit -9
+	fi
+
+	# Find Most Recent ADARA Log Analyzer Summary...
+
 	local _summaryCk=`/bin/ls -t "${CACHE_DIR}"/AdaraMonitorSummary.*.log \
 		| ${HEAD} -1`
 
