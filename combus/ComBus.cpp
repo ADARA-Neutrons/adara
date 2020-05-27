@@ -284,7 +284,7 @@ Connection::Connection( std::string &a_domain,
     m_log_info_prefix(a_log_info_prefix),
     m_log_err_prefix(a_log_err_prefix),
     m_connection(0), m_session(0),
-    m_reconnect_thread(0), m_status_thread(0)
+    m_reconnect_thread(0), m_reconn_retry(2), m_status_thread(0)
 {
     exceptionLog("ComBus Connection() Entry", INFO_LOG);
 
@@ -591,9 +591,12 @@ Connection::waitForConnect( unsigned short a_timeout ) const
   *
   * This method is a (re)connection thread that attempts to establish a new
   * connection to the AMQP broker at a varying period. Initial retry period
-  * is 2 seconds, but after each failed attempt, the retry period is
-  * increased to a max of 10 seconds. Once a connection is established,
-  * this thread exits.
+  * is 2 seconds (m_reconn_retry), but after each failed attempt,
+  * the retry period is increased to a max of 10 seconds.
+  * (The retry period can also be set explicitly/externally via the
+  * getReconnRetry() and setReconnRetry() methods, e.g. for extended
+  * back-off and retry.)
+  * Once a connection is established, this thread exits.
   *
   * This thread is started on-demand by the connectionStatusNotifyThread()
   * thread. A condition var (m_status_cond) and m_status_mutex is used
@@ -605,7 +608,6 @@ Connection::reconnectThread()
 {
     exceptionLog("Entry reconnectThread().", INFO_LOG);
 
-    unsigned short retry_period = 2;
     boost::unique_lock<boost::mutex> lock( m_status_mutex,
         boost::defer_lock );
     bool unlocked = true; // because boost can't take a joke... ;-b
@@ -720,8 +722,8 @@ Connection::reconnectThread()
                 ERR_LOG);
 
             // Failed to connect
-            if ( retry_period < 10 )
-                retry_period += 2;
+            if ( m_reconn_retry < 10 )
+                m_reconn_retry += 2;
         }
 
         exceptionLog(
@@ -735,6 +737,7 @@ Connection::reconnectThread()
                 ERR_LOG );
 
             lock.unlock();
+            unlocked = true;
 
             exceptionLog( "reconnectThread(): After Unlock...",
                 ERR_LOG );
@@ -742,16 +745,25 @@ Connection::reconnectThread()
 
         std::stringstream ss;
         ss << "reconnectThread(): Sleeping for"
-            << " retry_period=" << retry_period;
+            << " reconn_retry=" << m_reconn_retry;
         exceptionLog( ss.str(), ERR_LOG );
 
         // TODO Replace with a timed cond var wait so destructor
         // can interrupt this thread
-        sleep( retry_period );
+        // For Now, Wait in 1 Second Sleeps
+        // - to allow finer-grained control of Reconn Retry Wait Time
+        // - another way to potentially sneak in and interrupt thread,
+        // like if we've stopped running and are shutting down... :-D
+        uint32_t cnt = 0;
+        while ( m_running && cnt++ < m_reconn_retry )
+        {
+            sleep( 1 );
+        }
 
         std::stringstream ss2;
         ss2 << "reconnectThread(): After Retry Sleep..."
-            << " (retry_period=" << retry_period << ")";
+            << " (reconn_retry=" << m_reconn_retry
+            << ", cnt=" << cnt << ")";
         exceptionLog( ss2.str(), ERR_LOG );
     }
 
@@ -916,6 +928,13 @@ Connection::disconnect()
         // Wake up status notify thread
         m_status_cond.notify_one();
     }
+
+    else
+    {
+        exceptionLog(
+            "disconnect(): Already Disconnected from ComBus/ActiveMQ...!",
+            ERR_LOG);
+    }
 }
 
 
@@ -1026,13 +1045,25 @@ Connection::broadcast( MessageBase &a_msg )
             ss << "broadcast(): Error Broadcasting Message!"
                 << " domain=[" << m_domain << "]"
                 << " broker_uri=[" << m_broker_uri << "]"
-                << " broker_user=[" << m_broker_user << "]";
+                << " broker_user=[" << m_broker_user << "]"
+                << " topic=[" << a_msg.getTopic() << "]";
             exceptionLog(ss.str(), ERR_LOG);
 
             // An exception indicates a loss of connection
             delete cmsmsg;
             disconnect();
         }
+    }
+
+    else
+    {
+        std::stringstream ss;
+        ss << "broadcast(): Disconnected! Can't Broadcast Message...!"
+            << " domain=[" << m_domain << "]"
+            << " broker_uri=[" << m_broker_uri << "]"
+            << " broker_user=[" << m_broker_user << "]"
+            << " topic=[" << a_msg.getTopic() << "]";
+        exceptionLog(ss.str(), ERR_LOG);
     }
 
     return res;
@@ -1126,6 +1157,16 @@ Connection::send( MessageBase &a_msg, const std::string &a_dest_proc_id,
         }
     }
 
+    else
+    {
+        std::stringstream ss;
+        ss << "send(): Disconnected! Can't Send Message...!"
+            << " domain=[" << m_domain << "]"
+            << " broker_uri=[" << m_broker_uri << "]"
+            << " broker_user=[" << m_broker_user << "]";
+        exceptionLog(ss.str(), ERR_LOG);
+    }
+
     return res;
 }
 
@@ -1174,6 +1215,13 @@ Connection::postWorkflow( MessageBase &a_msg )
             delete cmsmsg;
             disconnect();
         }
+    }
+
+    else
+    {
+        exceptionLog(
+         "postWorkflow(): Disconnected! Can't Post Data Ready Message...!",
+            ERR_LOG);
     }
 
     return res;

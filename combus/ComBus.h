@@ -131,6 +131,10 @@ public:
 
     bool                postWorkflow( MessageBase &a_msg );
 
+    uint32_t            getReconnRetry() { return m_reconn_retry; }
+    void                setReconnRetry( uint32_t a_reconn_retry )
+                            { m_reconn_retry = a_reconn_retry; }
+
     void                exceptionLog( std::string a_msg,
                             ADARA::ComBus::LogStatus a_status );
 
@@ -214,6 +218,7 @@ private:
     ProducerMap                             m_producer_topics;  ///< AMQP topic-producer map
     std::map<ITopicListener*,Translator*>   m_listeners;        ///< Topic listeners (subscribers)
     boost::thread                          *m_reconnect_thread; ///< AMQP connection maintenance thread
+    uint32_t                                m_reconn_retry;     ///< Retry period for Reconnect Thread (seconds)
     boost::thread                          *m_status_thread;    ///< Status / watchdog thread
     boost::mutex                            m_status_mutex;     ///< Connection status/maint mutex
     boost::condition_variable               m_status_cond;      ///< Connection status cond var
