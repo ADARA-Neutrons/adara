@@ -2066,24 +2066,58 @@ private:
                                 // give syslog a chance...
                                 usleep(30000);
 
-                                m_nxgen.makeLink(
-                                    pv_value_path, elem_link_path );
+                                // Make Sure Target Group/Dataset Exists
+                                // Before Trying to Link to It...! ;-D
+                                bool exists = false;
+                                m_nxgen.checkDataset(
+                                    m_log_path, "value", exists );
 
-                                std::pair<std::string, std::string>
-                                    path_link_pair(
-                                        elem_link_path, pv_value_path );
-
-                                E->createdLinks.insert( path_link_pair );
-
-                                // IF We Have a Chance of Capturing a
-                                // Units Value from some PV(s), then
-                                // Save ElementInfo Link Path Now for
-                                // Setting the Units Attribute Later...!
-                                // (_After_ We've Gone Thru All the PVs!)
-                                if ( E->unitsPatterns.size()
-                                        || E->units.size() )
+                                // Group/Dataset Exists, Proceed...
+                                if ( exists )
                                 {
-                                    E->unitsPaths.insert( path_link_pair );
+                                    m_nxgen.makeLink(
+                                        pv_value_path, elem_link_path );
+
+                                    std::pair<std::string, std::string>
+                                        path_link_pair(
+                                            elem_link_path,
+                                                pv_value_path );
+
+                                    E->createdLinks.insert(
+                                        path_link_pair );
+
+                                    // IF We Have a Chance of Capturing a
+                                    // Units Value from some PV(s), then
+                                    // Save ElementInfo Link Path Now for
+                                    // Setting the Units Attribute Later..!
+                                    // (_After_ We've Gone Thru All the
+                                    // PVs!)
+                                    if ( E->unitsPatterns.size()
+                                            || E->units.size() )
+                                    {
+                                        E->unitsPaths.insert(
+                                            path_link_pair );
+                                    }
+                                }
+
+                                // Group/Dataset *Doesn't* Exist...!
+                                // Don't Try to Link...!
+                                else
+                                {
+                                    syslog( LOG_ERR,
+                                     "[%i] %s %s: %s %s to Group as %s %s",
+                                        g_pid, "STC Error:",
+                                  "createSTCConfigGroupMatchingElements()",
+                                        "Can't Link PV Value",
+                                        pv_value_path.c_str(),
+                                        elem_link_path.c_str(),
+                                        "- PV Log/Value Does Not Exist!" );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    // Don't Call This A "Match" Yet,
+                                    // Let's Give Someone Else A Try...
+                                    continue;
                                 }
                             }
 
@@ -2100,40 +2134,74 @@ private:
                                 // give syslog a chance...
                                 usleep(30000);
 
-                                // Only Create "Target" String for
-                                // Group Links if we haven't already
-                                // done so... ;-D
-                                if ( !m_has_link )
-                                {
-                                    // Manually Create "Target" String for
-                                    // Group Link (as per makeGroupLink)
-                                    m_nxgen.writeString( m_log_path,
-                                        "target", m_log_path );
+                                // Make Sure Target Group/Dataset Exists
+                                // Before Trying to Link to It...! ;-D
+                                bool exists = false;
+                                m_nxgen.checkDataset(
+                                    m_log_path, "", exists );
 
-                                    // Mark This PV as Having Created the
-                                    // "Target" String for Group Links!
-                                    // (so we only do it _Once_!)
-                                    m_has_link = true;
-                                }
-                                else
+                                // Group/Dataset Exists, Proceed...
+                                if ( exists )
                                 {
-                                    syslog( LOG_INFO,
+                                    // Only Create "Target" String for
+                                    // Group Links if we haven't already
+                                    // done so... ;-D
+                                    if ( !m_has_link )
+                                    {
+                                        // Manually Create "Target" String
+                                        // for Group Link (as per
+                                        // makeGroupLink)
+                                        m_nxgen.writeString( m_log_path,
+                                            "target", m_log_path );
+
+                                        // Mark This PV as Having Created
+                                        // the "Target" String for Group
+                                        // Links! (so we only do it
+                                        // _Once_!)
+                                        m_has_link = true;
+                                    }
+                                    else
+                                    {
+                                        syslog( LOG_INFO,
                                         "[%i] %s: %s %s %s %s - %s", g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                        "PV Channel", m_log_path.c_str(),
-                                        "Already Has",
-                                        "Target Group Link String",
-                                        "Skipping..." );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                            "PV Channel",
+                                            m_log_path.c_str(),
+                                            "Already Has",
+                                            "Target Group Link String",
+                                            "Skipping..." );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+
+                                    m_nxgen.makeGroupLink(
+                                        m_log_path, elem_link_path );
+
+                                    E->createdLinks.insert(
+                                        std::pair<std::string,
+                                                std::string>(
+                                            elem_link_path, m_log_path ) );
                                 }
 
-                                m_nxgen.makeGroupLink(
-                                    m_log_path, elem_link_path );
+                                // Group/Dataset *Doesn't* Exist...!
+                                // Don't Try to Link...!
+                                else
+                                {
+                                    syslog( LOG_ERR,
+                                     "[%i] %s %s: %s %s to Group as %s %s",
+                                        g_pid, "STC Error:",
+                                  "createSTCConfigGroupMatchingElements()",
+                                        "Can't Link PV Channel",
+                                        m_log_path.c_str(),
+                                        elem_link_path.c_str(),
+                                        "- PV Log Does Not Exist!" );
+                                    // give syslog a chance...
+                                    usleep(30000);
 
-                                E->createdLinks.insert(
-                                    std::pair<std::string, std::string>(
-                                        elem_link_path, m_log_path ) );
+                                    // Don't Call This A "Match" Yet,
+                                    // Let's Give Someone Else A Try...
+                                    continue;
+                                }
                             }
                         }
 
