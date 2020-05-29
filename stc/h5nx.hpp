@@ -65,15 +65,15 @@ public:
     //create/write a STRING attribute IFF doesn't already exist
     int H5NXcheck_attribute_string( const std::string &dataset_path,
         const std::string &attr_name, const std::string &attr_value,
-		std::string &existing_attr_value, bool &wasSet );
+        std::string &existing_attr_value, bool &wasSet );
 
     //create/write a STRING dataset
     int H5NXmake_dataset_string( const std::string &group_path,
         const std::string &dataset_name, const std::string &data );
 
-	//check for existence of dataset
-	int H5NXcheck_dataset_path( const std::string &group_path,
-		const std::string &dataset_name, bool &exists );
+    //check for existence of dataset
+    int H5NXcheck_dataset_path( const std::string &group_path,
+        const std::string &dataset_name, bool &exists );
 
     //create/write a SCALAR NUMERICAL attribute
     template <typename NumT>
@@ -101,10 +101,10 @@ public:
     template <typename NumT>
     int H5NXmake_dataset_vector( const std::string &group_path,
         const std::string &dataset_name,
-		const std::vector<NumT> &vec, 
+        const std::vector<NumT> &vec, 
         int rank, 
         const std::vector< hsize_t> &dim_vec);
-	int H5NXmake_dataset_vector( const std::string &group_path,
+    int H5NXmake_dataset_vector( const std::string &group_path,
         const std::string &dataset_name,
         const std::vector<std::string> &vec,
         int rank,
@@ -124,7 +124,7 @@ public:
                                    hsize_t chunk );
 
     int H5NXget_dataset_dims( const std::string &dataset_path,
-		int &rank, std::vector<hsize_t> &dim_vec );
+        int &rank, std::vector<hsize_t> &dim_vec );
     hsize_t H5NXget_vector_size( int rank, std::vector<hsize_t> &dim_vec );
 
     /////////////////////////////////////////////
@@ -147,7 +147,7 @@ public:
         const std::string &destination_name );
     int H5NXmove_link( const std::string &current_name,
         const std::string &destination_name );
-		// (a.k.a. "Rename A Link/Dataset"...)
+        // (a.k.a. "Rename A Link/Dataset"...)
 
     //call H5Fflush: causes all buffers associated with a file
     //to be immediately flushed to disk
