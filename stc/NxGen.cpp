@@ -4421,13 +4421,15 @@ NxGen::writeString
 
 /*! \brief Checks existence of a Nexus dataset location
  *
- * This method tries to open a dataset path, to see if it exists.
+ * This method tries to open a Dataset path, to see if it exists.
+ * Note: It First tries to open the enclosing Group path,
+ * and then if the Dataset path is Non-Empty, it next checks that.
  */
 void
 NxGen::checkDataset
 (
     const string &a_path,       ///< [in] Path in Nexus file to write string
-    const string &a_dataset,    ///< [in] Name of dataset at specified path to receive string value
+    const string &a_dataset,    ///< [in] Name of dataset at specified path to receive string value (can be empty string)
     bool &a_exists              ///< [out] Does the dataset exist?
 )
 {
