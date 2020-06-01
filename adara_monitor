@@ -24,7 +24,7 @@ USAGE()
 	echo "usage:  adara_monitor [--alt=\"-mon\"] \\"
 	echo "                      [--adara_summary=<path>] \\"
 	echo "                      [--cache_dir=<CACHE_DIR>] \\"
-	echo "                      [--connect] [--connect_pid=<pid>] \\"
+	echo "                      [--connect] [--connect_pid=<PID>] \\"
 	echo "                      [--oneshot] [--help|-h]"
 	echo
 
@@ -41,7 +41,7 @@ USAGE()
 	echo
 	echo "      --connect           = \"connect\" to running ADARA Monitor"
 	echo
-	echo "   --connect_pid=<pid>    = connect to Specific ADARA Monitor PID"
+	echo "   --connect_pid=<PID>    = connect to Specific ADARA Monitor PID"
 	echo
 	echo "      --oneshot           = only execute summary once, then exit"
 	echo
