@@ -105,6 +105,9 @@ declare -A nHostSTCLDAPSearchFailed
 declare -A nHostSTCMoreThanOnePVValue
 declare -A nHostSTCMoreThanOnePVValuePIDs
 declare -A nHostSTCPVIDReNumbered
+declare -A nHostSTCOpenGroupFailed
+declare -A nHostSTCCantLinkPVChannel
+declare -A nHostSTCCantLinkPVValue
 declare -A nHostSTCNoMatchingUnitsPV
 declare -A nHostSTCMissingBeamMonConfig
 declare -A nHostSTCMissingBeamMonConfigIDs
@@ -319,6 +322,9 @@ PARSE_LOG()
 		nHostSTCMoreThanOnePVValue[$host]=0
 		nHostSTCMoreThanOnePVValuePIDs[$host]=""
 		nHostSTCPVIDReNumbered[$host]=0
+		nHostSTCOpenGroupFailed[$host]=0
+		nHostSTCCantLinkPVChannel[$host]=0
+		nHostSTCCantLinkPVValue[$host]=0
 		nHostSTCNoMatchingUnitsPV[$host]=0
 		nHostSTCMissingBeamMonConfig[$host]=0
 		nHostSTCMissingBeamMonConfigIDs[$host]=""
@@ -551,6 +557,30 @@ PARSE_LOG()
 			#echo "PV ID Re-Numbered..."
 			nHostSTCPVIDReNumbered[$host]=$(( \
 				nHostSTCPVIDReNumbered[$host] + 1 ))
+
+		# "Error in H5Gopen2() for <Path> - Open Group Failed..." Log
+		elif [[ "$log" =~ \
+				Error${S}in${S}H5Gopen2\(\).*Open${S}Group${S}Failed \
+		]]; then
+			#echo "Error in H5Gopen2() for <Path> - Open Group Failed..."
+			nHostSTCOpenGroupFailed[$host]=$(( \
+				nHostSTCOpenGroupFailed[$host] + 1 ))
+
+		# "*STCConfigGroup*(): Can't Link PV Channel" Log
+		elif [[ "$log" =~ \
+			STCConfigGroup.*\(\):${S}Can.t${S}Link${S}PV${S}Channel \
+		]]; then
+			#echo "*STCConfigGroup*(): Can't Link PV Channel"
+			nHostSTCCantLinkPVChannel[$host]=$(( \
+				nHostSTCCantLinkPVChannel[$host] + 1 ))
+
+		# "*STCConfigGroup*(): Can't Link PV Value" Log
+		elif [[ "$log" =~ \
+			STCConfigGroup.*\(\):${S}Can.t${S}Link${S}PV${S}Value \
+		]]; then
+			#echo "*STCConfigGroup*(): Can't Link PV Value"
+			nHostSTCCantLinkPVValue[$host]=$(( \
+				nHostSTCCantLinkPVValue[$host] + 1 ))
 
 		# "No Matching Units PV Found..." Log
 		elif [[ "$log" =~ No${S}Matching${S}Units${S}PV${S}Found ]]; then
@@ -1817,6 +1847,18 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTCParserStoppedUnexpect[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTCParserStoppedUnexpect[$h]} "
 		echo "STC \"ADARA parser stopped unexpectedly\" Logs"
+	fi
+	if [[ ${nHostSTCOpenGroupFailed[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCOpenGroupFailed[$h]} "
+		echo "STC \"Error in H5Gopen2()... Open Group Failed\" Logs"
+	fi
+	if [[ ${nHostSTCCantLinkPVChannel[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCCantLinkPVChannel[$h]} "
+		echo "STC \"STCConfigGroup(): Can't Link PV Channel\" Logs"
+	fi
+	if [[ ${nHostSTCCantLinkPVValue[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCCantLinkPVValue[$h]} "
+		echo "STC \"STCConfigGroup(): Can't Link PV Value\" Logs"
 	fi
 	if [[ ${nHostSTCPVIDReNumbered[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTCPVIDReNumbered[$h]} "
