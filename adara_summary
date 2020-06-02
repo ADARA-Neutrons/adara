@@ -157,6 +157,7 @@ declare -A nHostSTCComBusBroadcastError
 declare -A nHostSTCComBusConnTimeout
 declare -A nHostSTCComBusDisconnectError
 declare -A nHostSTCComBusReconnectThread
+declare -A nHostSTCParseRunInfoXML
 declare -A nHostSTCUpdatingRunInfo
 declare -A nHostSTCDetBankSetConfigErr
 declare -A nHostSTCDetBankSetRestrictEv
@@ -385,6 +386,7 @@ PARSE_LOG()
 		nHostSTCComBusConnTimeout[$host]=0
 		nHostSTCComBusDisconnectError[$host]=0
 		nHostSTCComBusReconnectThread[$host]=0
+		nHostSTCParseRunInfoXML[$host]=0
 		nHostSTCUpdatingRunInfo[$host]=0
 		nHostSTCDetBankSetConfigErr[$host]=0
 		nHostSTCDetBankSetRestrictEv[$host]=0
@@ -947,6 +949,12 @@ PARSE_LOG()
 			#echo "ComBus Reconnect Thread..."
 			nHostSTCComBusReconnectThread[$host]=$(( \
 				nHostSTCComBusReconnectThread[$host] + 1 ))
+
+		# "Proceed to Parse RunInfo XML" Log (Debug)
+		elif [[ "$log" =~ Proceed${S}to${S}Parse${S}RunInfo${S}XML ]]; then
+			#echo "Proceed to Parse RunInfo XML..."
+			nHostSTCParseRunInfoXML[$host]=$(( \
+				nHostSTCParseRunInfoXML[$host] + 1 ))
 
 		# "Updating RunInfo" Log
 		elif [[ "$log" =~ Updating${S}RunInfo ]]; then
@@ -2172,6 +2180,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTCUpdatingRunInfo[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTCUpdatingRunInfo[$h]} "
 		echo "STC \"Updating RunInfo\" Logs"
+	fi
+	if [[ ${nHostSTCParseRunInfoXML[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCParseRunInfoXML[$h]} "
+		echo "STC \"Proceed to Parse RunInfo XML\" Logs"
 	fi
 	if [[ ${nHostSTCDetBankSetConfigErr[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTCDetBankSetConfigErr[$h]} "
