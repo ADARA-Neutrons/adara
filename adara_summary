@@ -157,6 +157,10 @@ declare -A nHostSTCComBusBroadcastError
 declare -A nHostSTCComBusConnTimeout
 declare -A nHostSTCComBusDisconnectError
 declare -A nHostSTCComBusReconnectThread
+declare -A nHostSTCComBusBcastDisconn
+declare -A nHostSTCTerminalBcastFail
+declare -A nHostSTCComBusPostWorkflowDisconn
+declare -A nHostSTCTerminalWorkflowFail
 declare -A nHostSTCParseRunInfoXML
 declare -A nHostSTCUpdatingRunInfo
 declare -A nHostSTCDetBankSetConfigErr
@@ -386,6 +390,10 @@ PARSE_LOG()
 		nHostSTCComBusConnTimeout[$host]=0
 		nHostSTCComBusDisconnectError[$host]=0
 		nHostSTCComBusReconnectThread[$host]=0
+		nHostSTCComBusBcastDisconn[$host]=0
+		nHostSTCTerminalBcastFail[$host]=0
+		nHostSTCComBusPostWorkflowDisconn[$host]=0
+		nHostSTCTerminalWorkflowFail[$host]=0
 		nHostSTCParseRunInfoXML[$host]=0
 		nHostSTCUpdatingRunInfo[$host]=0
 		nHostSTCDetBankSetConfigErr[$host]=0
@@ -949,6 +957,36 @@ PARSE_LOG()
 			#echo "ComBus Reconnect Thread..."
 			nHostSTCComBusReconnectThread[$host]=$(( \
 				nHostSTCComBusReconnectThread[$host] + 1 ))
+
+		# "(ComBus) broadcast(): Disconnected" Logs
+		elif [[ "$log" =~ \
+				ComBus:${S}broadcast\(\):${S}Disconnected ]]; then
+			#echo "ComBus Broadcast Disconnected..."
+			nHostSTCComBusBcastDisconn[$host]=$(( \
+				nHostSTCComBusBcastDisconn[$host] + 1 ))
+
+		# "Failed to Broadcast Terminal Message" Logs
+		elif [[ "$log" =~ \
+				Failed${S}to${S}Broadcast${S}Terminal${S}Message \
+		]]; then
+			#echo "Failed to Broadcast Terminal Message..."
+			nHostSTCTerminalBcastFail[$host]=$(( \
+				nHostSTCTerminalBcastFail[$host] + 1 ))
+
+		# "(ComBus) postWorkflow(): Disconnected" Logs
+		elif [[ "$log" =~ \
+				ComBus:${S}postWorkflow\(\):${S}Disconnected ]]; then
+			#echo "ComBus Post-Workflow Disconnected..."
+			nHostSTCComBusPostWorkflowDisconn[$host]=$(( \
+				nHostSTCComBusPostWorkflowDisconn[$host] + 1 ))
+
+		# "Failed to Send Terminal Workflow Message" Logs
+		elif [[ "$log" =~ \
+				Failed${S}to${S}Send${S}Terminal${S}Workflow${S}Message \
+		]]; then
+			#echo "Failed to Send Terminal Workflow Message..."
+			nHostSTCTerminalWorkflowFail[$host]=$(( \
+				nHostSTCTerminalWorkflowFail[$host] + 1 ))
 
 		# "Proceed to Parse RunInfo XML" Log (Debug)
 		elif [[ "$log" =~ Proceed${S}to${S}Parse${S}RunInfo${S}XML ]]; then
@@ -1975,6 +2013,22 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTCActiveMQException[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTCActiveMQException[$h]} "
 		echo "STC \"ActiveMQ Exception Listener Called\" Logs"
+	fi
+	if [[ ${nHostSTCTerminalWorkflowFail[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCTerminalWorkflowFail[$h]} "
+		echo "STC \"Failed to Send Terminal Workflow Message\" Logs"
+	fi
+	if [[ ${nHostSTCComBusPostWorkflowDisconn[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCComBusPostWorkflowDisconn[$h]} "
+		echo "STC \"ComBus Can't Post-Workflow - Disconnected\" Logs"
+	fi
+	if [[ ${nHostSTCTerminalBcastFail[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCTerminalBcastFail[$h]} "
+		echo "STC \"Failed to Broadcast Terminal Message\" Logs"
+	fi
+	if [[ ${nHostSTCComBusBcastDisconn[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCComBusBcastDisconn[$h]} "
+		echo "STC \"ComBus Can't Broadcast - Disconnected\" Logs"
 	fi
 	if [[ ${nHostSTCComBusBroadcastError[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTCComBusBroadcastError[$h]} "
