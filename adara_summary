@@ -108,6 +108,8 @@ declare -A nHostSTCPVIDReNumbered
 declare -A nHostSTCOpenGroupFailed
 declare -A nHostSTCCantLinkPVChannel
 declare -A nHostSTCCantLinkPVValue
+declare -A nHostSTCDupElemLinkAttempt
+declare -A nHostSTCDupElemUnitsValue
 declare -A nHostSTCNoMatchingUnitsPV
 declare -A nHostSTCMissingBeamMonConfig
 declare -A nHostSTCMissingBeamMonConfigIDs
@@ -325,6 +327,8 @@ PARSE_LOG()
 		nHostSTCOpenGroupFailed[$host]=0
 		nHostSTCCantLinkPVChannel[$host]=0
 		nHostSTCCantLinkPVValue[$host]=0
+		nHostSTCDupElemLinkAttempt[$host]=0
+		nHostSTCDupElemUnitsValue[$host]=0
 		nHostSTCNoMatchingUnitsPV[$host]=0
 		nHostSTCMissingBeamMonConfig[$host]=0
 		nHostSTCMissingBeamMonConfigIDs[$host]=""
@@ -581,6 +585,18 @@ PARSE_LOG()
 			#echo "*STCConfigGroup*(): Can't Link PV Value"
 			nHostSTCCantLinkPVValue[$host]=$(( \
 				nHostSTCCantLinkPVValue[$host] + 1 ))
+
+		# "DUPLICATE Element Link Attempt" Log
+		elif [[ "$log" =~ DUPLICATE${S}Element${S}Link${S}Attempt ]]; then
+			#echo "DUPLICATE Element Link Attempt..."
+			nHostSTCDupElemLinkAttempt[$host]=$(( \
+				nHostSTCDupElemLinkAttempt[$host] + 1 ))
+
+		# "DUPLICATE Element Units Value" Log
+		elif [[ "$log" =~ DUPLICATE${S}Element${S}Units${S}Value ]]; then
+			#echo "DUPLICATE Element Units Value..."
+			nHostSTCDupElemUnitsValue[$host]=$(( \
+				nHostSTCDupElemUnitsValue[$host] + 1 ))
 
 		# "No Matching Units PV Found..." Log
 		elif [[ "$log" =~ No${S}Matching${S}Units${S}PV${S}Found ]]; then
@@ -1883,6 +1899,14 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTCOversizePkt[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTCOversizePkt[$h]} "
 		echo "STC \"OversizePkt\" Logs"
+	fi
+	if [[ ${nHostSTCDupElemLinkAttempt[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCDupElemLinkAttempt[$h]} "
+		echo "STC \"DUPLICATE Element Link Attempt\" Logs"
+	fi
+	if [[ ${nHostSTCDupElemUnitsValue[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCDupElemUnitsValue[$h]} "
+		echo "STC \"DUPLICATE Element Units Value\" Logs"
 	fi
 	if [[ ${nHostSTCFoundDupVar[$h]} -gt 0 ]]; then
 		echo -n "   ** ${nHostSTCFoundDupVar[$h]} "
