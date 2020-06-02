@@ -114,7 +114,7 @@ declare -A nHostSTCNoMatchingUnitsPV
 declare -A nHostSTCMissingBeamMonConfig
 declare -A nHostSTCMissingBeamMonConfigIDs
 declare -A nHostSTCPrePulseVarValue
-declare -A nHostSTCVarValueSawtooth
+declare -A nHostSTCVarValueSAWTOOTH
 declare -A nHostSTCVarValueTruncateNegTime
 declare -A nHostSTCNormalizeVarValueTimes
 declare -A nHostSTCFoundDupVar
@@ -128,12 +128,21 @@ declare -A nHostSTCCommentsRequireNormal
 declare -A nHostSTCPauseRequireNormal
 declare -A nHostSTCScanRequireNormal
 declare -A nHostSTCNormalizeAnnotation
+declare -A nHostSTCNormalizeAnnotNano
+declare -A nHostSTCIgnoreDupPauseAnnot
+declare -A nHostSTCIgnoreDupScanAnnot
+declare -A nHostSTCIgnoreDupAnnot
 declare -A nHostSTCPositiveTimeComment
 declare -A nHostSTCPositiveTimePause
 declare -A nHostSTCPositiveTimeScan
 declare -A nHostSTCTruncateNegComment
 declare -A nHostSTCTruncateNegPause
 declare -A nHostSTCTruncateNegScan
+declare -A nHostSTCPauseAnnotSAWTOOTH
+declare -A nHostSTCResumeAnnotSAWTOOTH
+declare -A nHostSTCScanStartAnnotSAWTOOTH
+declare -A nHostSTCScanStopAnnotSAWTOOTH
+declare -A nHostSTCCommentAnnotSAWTOOTH
 declare -A nHostSTCNotePauseAnnotation
 declare -A nHostSTCNoteScanAnnotation
 declare -A nHostSTCUnableToInitialize
@@ -333,7 +342,7 @@ PARSE_LOG()
 		nHostSTCMissingBeamMonConfig[$host]=0
 		nHostSTCMissingBeamMonConfigIDs[$host]=""
 		nHostSTCPrePulseVarValue[$host]=0
-		nHostSTCVarValueSawtooth[$host]=0
+		nHostSTCVarValueSAWTOOTH[$host]=0
 		nHostSTCVarValueTruncateNegTime[$host]=0
 		nHostSTCNormalizeVarValueTimes[$host]=0
 		nHostSTCFoundDupVar[$host]=0
@@ -347,12 +356,21 @@ PARSE_LOG()
 		nHostSTCPauseRequireNormal[$host]=0
 		nHostSTCScanRequireNormal[$host]=0
 		nHostSTCNormalizeAnnotation[$host]=0
+		nHostSTCNormalizeAnnotNano[$host]=0
+		nHostSTCIgnoreDupPauseAnnot[$host]=0
+		nHostSTCIgnoreDupScanAnnot[$host]=0
+		nHostSTCIgnoreDupAnnot[$host]=0
 		nHostSTCPositiveTimeComment[$host]=0
 		nHostSTCPositiveTimePause[$host]=0
 		nHostSTCPositiveTimeScan[$host]=0
 		nHostSTCTruncateNegComment[$host]=0
 		nHostSTCTruncateNegPause[$host]=0
 		nHostSTCTruncateNegScan[$host]=0
+		nHostSTCPauseAnnotSAWTOOTH[$host]=0
+		nHostSTCResumeAnnotSAWTOOTH[$host]=0
+		nHostSTCScanStartAnnotSAWTOOTH[$host]=0
+		nHostSTCScanStopAnnotSAWTOOTH[$host]=0
+		nHostSTCCommentAnnotSAWTOOTH[$host]=0
 		nHostSTCNotePauseAnnotation[$host]=0
 		nHostSTCNoteScanAnnotation[$host]=0
 		nHostSTCUnableToInitialize[$host]=0
@@ -624,14 +642,14 @@ PARSE_LOG()
 		# "Variable Value Update SAWTOOTH" Log
 		elif [[ "$log" =~ Variable${S}Value${S}Update${S}SAWTOOTH ]]; then
 			#echo "Variable Value Update SAWTOOTH..."
-			nHostSTCVarValueSawtooth[$host]=$(( \
-				nHostSTCVarValueSawtooth[$host] + 1 ))
+			nHostSTCVarValueSAWTOOTH[$host]=$(( \
+				nHostSTCVarValueSAWTOOTH[$host] + 1 ))
 
 		# "Truncate Negative Variable Value Update Time" Log
 		elif [[ "$log" =~ \
 			Truncate${S}Negative${S}Variable${S}Value${S}Update${S}Time \
 		]]; then
-			#echo "Variable Value Update SAWTOOTH..."
+			#echo "Truncate Negative Variable Value Update Time..."
 			nHostSTCVarValueTruncateNegTime[$host]=$(( \
 				nHostSTCVarValueTruncateNegTime[$host] + 1 ))
 
@@ -722,6 +740,38 @@ PARSE_LOG()
 			nHostSTCNormalizeAnnotation[$host]=$(( \
 				nHostSTCNormalizeAnnotation[$host] + 1 ))
 
+		# "NxGen::normalizeAnnotationTimestamps(): nano_ts" Log
+		elif [[ "$log" =~ \
+				NxGen\:\:normalizeAnnotationTimestamps\(\)\:${S}nano_ts \
+		]]; then
+			#echo "NxGen::normalizeAnnotationTimestamps(): nano_ts..."
+			nHostSTCNormalizeAnnotNano[$host]=$(( \
+				nHostSTCNormalizeAnnotNano[$host] + 1 ))
+
+		# "Ignoring Duplicate Pause Annotation with Identical Time" Log
+		elif [[ "$log" =~ \
+			Ignoring${S}Duplicate${S}Pause${S}Annotation${S}with${S}Identical${S}Time \
+		]]; then
+			#echo "Ignoring Duplicate Pause Annotation with Identical Time"
+			nHostSTCIgnoreDupPauseAnnot[$host]=$(( \
+				nHostSTCIgnoreDupPauseAnnot[$host] + 1 ))
+
+		# "Ignoring Duplicate Scan Annotation with Identical Time" Log
+		elif [[ "$log" =~ \
+			Ignoring${S}Duplicate${S}Scan${S}Annotation${S}with${S}Identical${S}Time \
+		]]; then
+			#echo "Ignoring Duplicate Scan Annotation with Identical Time"
+			nHostSTCIgnoreDupScanAnnot[$host]=$(( \
+				nHostSTCIgnoreDupScanAnnot[$host] + 1 ))
+
+		# "Ignoring Duplicate Annotation with Identical Time" Log
+		elif [[ "$log" =~ \
+			Ignoring${S}Duplicate${S}Annotation${S}with${S}Identical${S}Time \
+		]]; then
+			#echo "Ignoring Duplicate Annotation with Identical Time"
+			nHostSTCIgnoreDupAnnot[$host]=$(( \
+				nHostSTCIgnoreDupAnnot[$host] + 1 ))
+
 		# "Positive Time Annotation for Comments" Log
 		elif [[ "$log" =~ \
 				Positive${S}Time${S}Annotation${S}for${S}Comments \
@@ -769,6 +819,36 @@ PARSE_LOG()
 			#echo "Truncate Negative Annotation Time for Scan Start/Stop."
 			nHostSTCTruncateNegScan[$host]=$(( \
 				nHostSTCTruncateNegScan[$host] + 1 ))
+
+		# "Pause Annotation SAWTOOTH" Log
+		elif [[ "$log" =~ Pause${S}Annotation${S}SAWTOOTH ]]; then
+			#echo "Pause Annotation SAWTOOTH..."
+			nHostSTCPauseAnnotSAWTOOTH[$host]=$(( \
+				nHostSTCPauseAnnotSAWTOOTH[$host] + 1 ))
+
+		# "Resume Annotation SAWTOOTH" Log
+		elif [[ "$log" =~ Resume${S}Annotation${S}SAWTOOTH ]]; then
+			#echo "Resume Annotation SAWTOOTH..."
+			nHostSTCResumeAnnotSAWTOOTH[$host]=$(( \
+				nHostSTCResumeAnnotSAWTOOTH[$host] + 1 ))
+
+		# "Scan Start Annotation SAWTOOTH" Log
+		elif [[ "$log" =~ Scan${S}Start${S}Annotation${S}SAWTOOTH ]]; then
+			#echo "Scan Start Annotation SAWTOOTH..."
+			nHostSTCScanStartAnnotSAWTOOTH[$host]=$(( \
+				nHostSTCScanStartAnnotSAWTOOTH[$host] + 1 ))
+
+		# "Scan Stop Annotation SAWTOOTH" Log
+		elif [[ "$log" =~ Scan${S}Stop${S}Annotation${S}SAWTOOTH ]]; then
+			#echo "Scan Stop Annotation SAWTOOTH..."
+			nHostSTCScanStopAnnotSAWTOOTH[$host]=$(( \
+				nHostSTCScanStopAnnotSAWTOOTH[$host] + 1 ))
+
+		# "Comment Annotation SAWTOOTH" Log
+		elif [[ "$log" =~ Comment${S}Annotation${S}SAWTOOTH ]]; then
+			#echo "Comment Annotation SAWTOOTH..."
+			nHostSTCommentAnnotSAWTOOTH[$host]=$(( \
+				nHostSTCCommentAnnotSAWTOOTH[$host] + 1 ))
 
 		# "Note Pause Annotation" Log
 		elif [[ "$log" =~ Note${S}Pause${S}Annotation ]]; then
@@ -1930,6 +2010,26 @@ for h in ${HostList} ; do
 		echo -n "   ** ${nHostSTCTruncateNegComment[$h]} "
 		echo "STC \"Truncate Negative Annotation Time for Comments\" Logs"
 	fi
+	if [[ ${nHostSTCPauseAnnotSAWTOOTH[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCPauseAnnotSAWTOOTH[$h]} "
+		echo "STC \"Pause Annotation SAWTOOTH\" Logs"
+	fi
+	if [[ ${nHostSTCResumeAnnotSAWTOOTH[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCResumeAnnotSAWTOOTH[$h]} "
+		echo "STC \"Resume Annotation SAWTOOTH\" Logs"
+	fi
+	if [[ ${nHostSTCScanStartAnnotSAWTOOTH[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCScanStartAnnotSAWTOOTH[$h]} "
+		echo "STC \"Scan Start Annotation SAWTOOTH\" Logs"
+	fi
+	if [[ ${nHostSTCScanStopAnnotSAWTOOTH[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCScanStopAnnotSAWTOOTH[$h]} "
+		echo "STC \"Scan Stop Annotation SAWTOOTH\" Logs"
+	fi
+	if [[ ${nHostSTCCommentAnnotSAWTOOTH[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCCommentAnnotSAWTOOTH[$h]} "
+		echo "STC \"Comment Annotation SAWTOOTH\" Logs"
+	fi
 	if [[ ${nHostSTCNoNeutronPulsesInStream[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTCNoNeutronPulsesInStream[$h]} "
 		echo "STC \"No Neutron Pulses Received in Stream\" Logs"
@@ -1981,6 +2081,22 @@ for h in ${HostList} ; do
 		echo -n "   * ${nHostSTCNormalizeAnnotation[$h]} "
 		echo "STC \"NxGen::normalizeAnnotationTimestamps(): Entry\" Logs"
 	fi
+	if [[ ${nHostSTCNormalizeAnnotNano[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCNormalizeAnnotNano[$h]} "
+		echo "STC \"NxGen::normalizeAnnotationTimestamps(): nano_ts\" Logs"
+	fi
+	if [[ ${nHostSTCIgnoreDupPauseAnnot[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCIgnoreDupPauseAnnot[$h]} "
+		echo "STC \"Ignoring Dup Pause Annot with Identical Time\" Logs"
+	fi
+	if [[ ${nHostSTCIgnoreDupScanAnnot[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCIgnoreDupScanAnnot[$h]} "
+		echo "STC \"Ignoring Dup Scan Annot with Identical Time\" Logs"
+	fi
+	if [[ ${nHostSTCIgnoreDupAnnot[$h]} -gt 0 ]]; then
+		echo -n "   * ${nHostSTCIgnoreDupAnnot[$h]} "
+		echo "STC \"Ignoring Dup Annot with Identical Time\" Logs"
+	fi
 	if [[ ${nHostSTCPositiveTimeScan[$h]} -gt 0 ]]; then
 		echo -n "   * ${nHostSTCPositiveTimeScan[$h]} "
 		echo "STC \"Positive Time Annotation for Scan Start/Stop\" Logs"
@@ -2005,8 +2121,8 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSTCPrePulseVarValue[$h]} "
 		echo "STC \"Pre-Pulse Variable Value Update\" Logs"
 	fi
-	if [[ ${nHostSTCVarValueSawtooth[$h]} -gt 0 ]]; then
-		echo -n "   ${nHostSTCVarValueSawtooth[$h]} "
+	if [[ ${nHostSTCVarValueSAWTOOTH[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSTCVarValueSAWTOOTH[$h]} "
 		echo "STC \"Variable Value Update SAWTOOTH\" Logs"
 	fi
 	if [[ ${nHostSTCVarValueTruncateNegTime[$h]} -gt 0 ]]; then
