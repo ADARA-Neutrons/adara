@@ -1265,6 +1265,10 @@ Connection::makeMessage( const cms::TextMessage &a_msg )
     {
         ComBus::Connection::getInst().exceptionLog(
             "makeMessage(): Error Making Message!", ERR_LOG);
+        std::stringstream sstr( a_msg.getText() );
+        ComBus::Connection::getInst().exceptionLog(
+            "makeMessage(): a_msg.getText()=[" + sstr.str() + "]",
+            ERR_LOG);
     }
 
     return msg;
