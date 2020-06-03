@@ -154,6 +154,7 @@ declare -A nHostSTCNoNeutronPulsesInStream
 declare -A nHostSTCEmptyFinalPulseInfo
 declare -A nHostSTCActiveMQException
 declare -A nHostSTCComBusBroadcastError
+declare -A nHostSTCComBusPostWorkflowError
 declare -A nHostSTCComBusConnTimeout
 declare -A nHostSTCComBusDisconnectError
 declare -A nHostSTCComBusReconnectThread
@@ -387,6 +388,7 @@ PARSE_LOG()
 		nHostSTCEmptyFinalPulseInfo[$host]=0
 		nHostSTCActiveMQException[$host]=0
 		nHostSTCComBusBroadcastError[$host]=0
+		nHostSTCComBusPostWorkflowError[$host]=0
 		nHostSTCComBusConnTimeout[$host]=0
 		nHostSTCComBusDisconnectError[$host]=0
 		nHostSTCComBusReconnectThread[$host]=0
@@ -936,6 +938,14 @@ PARSE_LOG()
 			#echo "ComBus Error Broadcasting Message..."
 			nHostSTCComBusBroadcastError[$host]=$(( \
 				nHostSTCComBusBroadcastError[$host] + 1 ))
+
+		# "(ComBus) postWorkflow(): Error Posting Data Ready Message" Log
+		elif [[ "$log" =~ \
+				postWorkflow\(\):${S}Error${S}Posting${S}Data${S}Ready${S}Message \
+		]]; then
+			#echo "ComBus postWorkflow(): Error Posting Data Ready Message"
+			nHostSTCComBusPostWorkflowError[$host]=$(( \
+				nHostSTCComBusPostWorkflowError[$host] + 1 ))
 
 		# "ComBus Connection Timeout for Domain" Log
 		elif [[ "$log" =~ \
@@ -2033,6 +2043,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSTCComBusBroadcastError[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTCComBusBroadcastError[$h]} "
 		echo "STC \"ComBus Error Broadcasting Message\" Logs"
+	fi
+	if [[ ${nHostSTCComBusPostWorkflowError[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSTCComBusPostWorkflowError[$h]} "
+		echo "STC \"ComBus postWorkflow(): Error Posting Data Ready\" Logs"
 	fi
 	if [[ ${nHostSTCDuplicatePulse[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSTCDuplicatePulse[$h]} "
