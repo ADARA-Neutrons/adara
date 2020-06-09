@@ -135,10 +135,13 @@ public:
 	CleanShutdownPV(const std::string &name) :
 		smsTriggerPV(name) {}
 
-	void triggered(void)
+	void triggered(struct timespec *ts)
 	{
 		DEBUG("CleanShutdownPV " << m_pv_name << " Triggered."
-			<< " Cleanly Shutting Down SMS Daemon.");
+			<< " Cleanly Shutting Down SMS Daemon."
+			<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 		exit(0);
 	}
 };
@@ -934,7 +937,7 @@ void SMSControl::addPV(PVSharedPtr pv)
 	m_pv_map[pv->getName()] = pv;
 }
 
-bool SMSControl::setRecording( bool v )
+bool SMSControl::setRecording( bool v, struct timespec *ts )
 {
 	/* We return true if we accepted the setting, and false if not.
 	 * It is not an error for a caller to try to stop recording if
@@ -1124,10 +1127,8 @@ bool SMSControl::setRecording( bool v )
 		}
 
 		// Run Started, Update Run Number and Recording PV Values...
-		struct timespec now;
-		clock_gettime(CLOCK_REALTIME, &now);
-		m_pvRunNumber->update(m_currentRunNumber, &now);
-		m_pvRecording->update(v, &now);
+		m_pvRunNumber->update(m_currentRunNumber, ts);
+		m_pvRecording->update(v, ts);
 	}
 
 	// Stop the Current Recording...
@@ -1230,10 +1231,8 @@ bool SMSControl::setRecording( bool v )
 		}
 
 		// Run Stopped, Update Run Number and Recording PV Values...
-		struct timespec now;
-		clock_gettime(CLOCK_REALTIME, &now);
-		m_pvRunNumber->update(0, &now);
-		m_pvRecording->update(v, &now);
+		m_pvRunNumber->update(0, ts);
+		m_pvRecording->update(v, ts);
 	}
 
 	// Save Recording State
@@ -1274,6 +1273,69 @@ void SMSControl::resumeRecording(void)
 		INFO("Resuming Data Collection (Not Currently Recording)");
 
 	StorageManager::resumeRecording();
+}
+
+void SMSControl::externalRunControl( struct timespec *ts,
+		uint32_t scanIndex, std::string command )
+{
+	std::stringstream ss;
+	ss << " Command=[" << command << "]"
+		<< " scanIndex=" << scanIndex
+		<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+		<< "." << std::setfill('0') << std::setw(9)
+		<< ts->tv_nsec;
+
+	// Parse & Execute Various Commands...
+
+	bool status;
+
+	// Start Run
+	if ( !command.compare("Start Run") )
+	{
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "SMSControl::externalRunControl():"
+			<< " External RunControl \"Run Start\" Command Received,"
+			<< ss.str() );
+
+		status = setRecording( true, ts );
+
+		if ( !status )
+		{
+			ERROR( ( m_recording ? "[RECORDING] " : "" )
+				<< "SMSControl::externalRunControl():"
+				<< " External RunControl \"Run Start\" Command Failed!"
+				<< ss.str() );
+		}
+	}
+
+	// Stop Run
+	else if ( !command.compare("Stop Run") )
+	{
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "SMSControl::externalRunControl():"
+			<< " External RunControl \"Run Stop\" Command Received,"
+			<< ss.str() );
+
+		status = setRecording( false, ts );
+
+		if ( !status )
+		{
+			ERROR( ( m_recording ? "[RECORDING] " : "" )
+				<< "SMSControl::externalRunControl():"
+				<< " External RunControl \"Run Stop\" Command Failed!"
+				<< ss.str() );
+		}
+	}
+
+	// Unknown Command (or Just a System Annotation Comment... :-)
+	else
+	{
+		DEBUG( ( m_recording ? "[RECORDING] " : "" )
+			<< "SMSControl::externalRunControl():"
+			<< " Unknown External RunControl Command"
+			<< " (Or System Comment) Received - Ignoring"
+			<< ss.str() );
+	}
 }
 
 // Update RunInfo Validity for Run Control...

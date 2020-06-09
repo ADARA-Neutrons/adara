@@ -639,6 +639,10 @@ RESUBMIT_RUN()
 		CHECK_PROCEED
 	fi
 
+	echo -e -n "\nRunning: ${ADARA_CAT} ${SEND_PAUSED_DATA} "
+	echo "--run=\"${run}\" --dir=\"${rundir}\" \\"
+	echo -e "\t| ${NC} ${STC_HOST} ${STC_PORT}"
+
 	${ADARA_CAT} ${SEND_PAUSED_DATA} --run="${run}" --dir="${rundir}" \
 		| ${NC} ${STC_HOST} ${STC_PORT}
 	ckstc=$?
@@ -1475,6 +1479,18 @@ UPDATE_PROPOSAL_METADATA()
 		echo -e "\t   Old Value: [${update_old_value}]"
 		echo -e "\t-> New Value: [${_new_value}]"
 
+		# Check for Evil Special Character Ampersand '&' in New Value Str
+		# (In SED, this will resolve as the 1st Match Target, and will
+		# screw up the Substitution, so we Need to Replace '&' with '^A',
+		# and then add an Extra Substitution afterward to put them back.)
+		local _has_special=0
+		if [[ "${_new_value}" =~ \& ]]; then
+			echo -e "\nSanitizing New Value String for Ampersands (&):"
+			_new_value=`echo "${_new_value}" | sed "s/&//g"`
+			echo -e "\tSanitized New Value: [${_new_value}]"
+			_has_special=1
+		fi
+
 		_ipts_new_line=`echo "${_ipts_new_line}" \
 			| ${SED} "s@${update_old_value}@${_new_value}@"`
 		cksedvalue=$?
@@ -1519,6 +1535,11 @@ UPDATE_PROPOSAL_METADATA()
 	subst="${_ipts_old_line_num}s@${_ipts_old_line}@${_ipts_new_line}@"
 
 	SUBST_EXPRS="$SUBST_EXPRS -e \"${subst}\""
+
+	# As Needed, Restore Encoded Special Characters Back to Real Ones...
+	if [[ ${_has_special} == 1 ]]; then
+		SUBST_EXPRS="$SUBST_EXPRS -e \"${_ipts_old_line_num}s@@\&@g\""
+	fi
 
 	#
 	# Done with This Proposal Meta-Data Update.
@@ -1791,6 +1812,40 @@ ABSORB_WHITE_SPACE()
 	fi
 }
 
+# Sanitize Against Special Characters that XML (RunInfo) Doesn't Grok...
+XML_ENCODE_TO()
+{
+	local _str="$1"
+
+	# Replace Any Ampersands ('&') with "&amp;"
+	if [[ "${_str}" =~ \& ]]; then
+		_str=`echo "${_str}" | sed "s/&/\&amp;/g"`
+	fi
+
+	# Replace Any Quotes ('"') with "&quot;"
+	if [[ "${_str}" =~ \" ]]; then
+		_str=`echo "${_str}" | sed "s/\"/\&quot;/g"`
+	fi
+
+	# Replace Any Apostrophes (') with "&apos;"
+	if [[ "${_str}" =~ \' ]]; then
+		_str=`echo "${_str}" | sed "s/'/\&apos;/g"`
+	fi
+
+	# Replace Any Less Than ('<') with "&lt;"
+	if [[ "${_str}" =~ \< ]]; then
+		_str=`echo "${_str}" | sed "s/</\&lt;/g"`
+	fi
+
+	# Replace Any Greater Than ('>') with "&gt;"
+	if [[ "${_str}" =~ \> ]]; then
+		_str=`echo "${_str}" | sed "s/>/\&gt;/g"`
+	fi
+
+	# Print Out the Sanitized String Results...
+	echo "${_str}"
+}
+
 #
 # Process Each Run Number in Turn...
 #
@@ -2028,6 +2083,14 @@ for run in ${RUN_NUMBERS} ; do
 		#
 
 		if [[ -n "${TITLE_NEW}" ]]; then
+
+			# Protect Against Special Character Nasties...
+			sanitized=`XML_ENCODE_TO "${TITLE_NEW}"`
+			if [[ "${sanitized}" != "${TITLE_NEW}" ]]; then
+				TITLE_NEW="${sanitized}"
+				echo -e "\nSanitized Proposal Title for XML Formatting:"
+				echo -e "\t[${TITLE_NEW}]"
+			fi
 
 			UPDATE_PROPOSAL_METADATA "proposal_title" "Proposal Title" \
 				"${TITLE_NEW}" "TITLE_OLD"

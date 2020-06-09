@@ -35,7 +35,7 @@ public:
 	void unlock(void);
 
 	bool valid(std::string &reason);
-	void reset(void);
+	void reset(struct timespec *ts);
 
 	void setRunNumber(uint32_t run) {
 		m_packetValid = false;

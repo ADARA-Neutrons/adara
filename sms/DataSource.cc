@@ -1502,7 +1502,7 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 	m_hwSources.clear();
 
 	// Update Number of HWSources PV...
-	m_pvNumHWSources->update( 0, &now );
+	m_pvNumHWSources->update( 0, &now, true /* no_log */ );
 
 	if ( isSourceDown )
 		m_ctrl->sourceDown( m_smsSourceId, stateChanged );
@@ -1518,13 +1518,15 @@ void DataSource::dumpLastReadStats(std::string who)
 		<< " len=" << m_last_pkt_len
 		<< " last_start_read_time="
 		<< Parser::last_start_read_time.tv_sec << "."
-		<< Parser::last_start_read_time.tv_nsec
+		<< std::setfill('0') << std::setw(9)
+		<< Parser::last_start_read_time.tv_nsec << std::setw(0)
 		<< " last_bytes_read=" << Parser::last_bytes_read
 		<< " last_read_errno=" << Parser::last_read_errno
 		<< " (" << strerror( Parser::last_read_errno ) << ")"
 		<< " last_end_read_time="
 		<< Parser::last_end_read_time.tv_sec << "."
-		<< Parser::last_end_read_time.tv_nsec
+		<< std::setfill('0') << std::setw(9)
+		<< Parser::last_end_read_time.tv_nsec << std::setw(0)
 		<< " last_pkts_parsed=" << Parser::last_pkts_parsed
 		<< " last_total_bytes=" << Parser::last_total_bytes
 		<< " last_total_packets=" << Parser::last_total_packets
@@ -1538,13 +1540,15 @@ void DataSource::dumpLastReadStats(std::string who)
 		<< " ;"
 		<< " last_last_start_read_time="
 		<< Parser::last_last_start_read_time.tv_sec << "."
-		<< Parser::last_last_start_read_time.tv_nsec
+		<< std::setfill('0') << std::setw(9)
+		<< Parser::last_last_start_read_time.tv_nsec << std::setw(0)
 		<< " last_last_bytes_read=" << Parser::last_last_bytes_read
 		<< " last_last_read_errno=" << Parser::last_last_read_errno
 		<< " (" << strerror( Parser::last_last_read_errno ) << ")"
 		<< " last_last_end_read_time="
 		<< Parser::last_last_end_read_time.tv_sec << "."
-		<< Parser::last_last_end_read_time.tv_nsec
+		<< std::setfill('0') << std::setw(9)
+		<< Parser::last_last_end_read_time.tv_nsec << std::setw(0)
 		<< " last_last_pkts_parsed=" << Parser::last_last_pkts_parsed
 		<< " last_last_total_bytes=" << Parser::last_last_total_bytes
 		<< " last_last_total_packets=" << Parser::last_last_total_packets
@@ -2299,7 +2303,9 @@ bool DataSource::rxOversizePkt( const ADARA::PacketHeader *hdr,
 				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Oversized packet"
 				<< " at " << hdr->timestamp().tv_sec
-				<< "." << hdr->timestamp().tv_nsec
+					- ADARA::EPICS_EPOCH_OFFSET
+				<< "." << std::setfill('0') << std::setw(9)
+				<< hdr->timestamp().tv_nsec << std::setw(0)
 				<< " of type 0x" << std::hex << hdr->type() << std::dec
 				<< " payload_length=" << hdr->payload_length()
 				<< " from " << m_name);
@@ -2495,7 +2501,8 @@ boost::shared_ptr<HWSource> DataSource::getHWSource( uint32_t hwId )
 		// Update Number of HWSources PV...
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME_COARSE, &now);
-		m_pvNumHWSources->update(m_hwSources.size(), &now);
+		m_pvNumHWSources->update(m_hwSources.size(), &now,
+			true /* no_log */);
 	}
 
 	return( it->second );
@@ -2982,8 +2989,10 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 		}
 
 		// Update Number of HWSources PV...
-		if ( changed )
-			m_pvNumHWSources->update(m_hwSources.size(), &now);
+		if ( changed ) {
+			m_pvNumHWSources->update(m_hwSources.size(), &now,
+				true /* no_log */);
+		}
 	}
 
 	// Count Pulse in Various Statistics...
@@ -3088,13 +3097,17 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 
 	// Update Bandwidth Count Per Second PVs...
 	m_pvPulseBandwidthSecond->update(
-		(uint32_t)( ((double) m_pulse_count_second) / elapsed ), &now);
+		(uint32_t)( ((double) m_pulse_count_second) / elapsed ), &now,
+		true /* no_log */ );
 	m_pvEventBandwidthSecond->update(
-		(uint32_t)( ((double) m_event_count_second) / elapsed ), &now);
+		(uint32_t)( ((double) m_event_count_second) / elapsed ), &now,
+		true /* no_log */ );
 	m_pvMetaBandwidthSecond->update(
-		(uint32_t)( ((double) m_meta_count_second) / elapsed ), &now);
+		(uint32_t)( ((double) m_meta_count_second) / elapsed ), &now,
+		true /* no_log */ );
 	m_pvErrBandwidthSecond->update(
-		(uint32_t)( ((double) m_err_count_second) / elapsed ), &now);
+		(uint32_t)( ((double) m_err_count_second) / elapsed ), &now,
+		true /* no_log */ );
 
 	// Reset Counters for Next Second...
 	m_pulse_count_second = 0;
@@ -3119,13 +3132,16 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 			}
 			it->second->m_pvHWSourceEventBandwidthSecond->update(
 				(uint32_t)( ((double) it->second->m_event_count_second)
-					/ elapsed ), &now);
+					/ elapsed ), &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceMetaBandwidthSecond->update(
 				(uint32_t)( ((double) it->second->m_meta_count_second)
-					/ elapsed ), &now);
+					/ elapsed ), &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceErrBandwidthSecond->update(
 				(uint32_t)( ((double) it->second->m_err_count_second)
-					/ elapsed ), &now);
+					/ elapsed ), &now,
+				true /* no_log */ );
 		}
 		it->second->m_event_count_second = 0;
 		it->second->m_meta_count_second = 0;
@@ -3146,10 +3162,14 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 	}
 
 	// Update Bandwidth Count Per Minute PVs...
-	m_pvPulseBandwidthMinute->update(m_pulse_count_minute, &now);
-	m_pvEventBandwidthMinute->update(m_event_count_minute, &now);
-	m_pvMetaBandwidthMinute->update(m_meta_count_minute, &now);
-	m_pvErrBandwidthMinute->update(m_err_count_minute, &now);
+	m_pvPulseBandwidthMinute->update(m_pulse_count_minute, &now,
+		true /* no_log */ );
+	m_pvEventBandwidthMinute->update(m_event_count_minute, &now,
+		true /* no_log */ );
+	m_pvMetaBandwidthMinute->update(m_meta_count_minute, &now,
+		true /* no_log */ );
+	m_pvErrBandwidthMinute->update(m_err_count_minute, &now,
+		true /* no_log */ );
 
 	// Reset Counters for Next Minute...
 	m_pulse_count_minute = 0;
@@ -3170,11 +3190,14 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 					<< " Err=" << it->second->m_err_count_minute );
 			}
 			it->second->m_pvHWSourceEventBandwidthMinute->update(
-				it->second->m_event_count_minute, &now);
+				it->second->m_event_count_minute, &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceMetaBandwidthMinute->update(
-				it->second->m_meta_count_minute, &now);
+				it->second->m_meta_count_minute, &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceErrBandwidthMinute->update(
-				it->second->m_err_count_minute, &now);
+				it->second->m_err_count_minute, &now,
+				true /* no_log */ );
 		}
 		it->second->m_event_count_minute = 0;
 		it->second->m_meta_count_minute = 0;
@@ -3195,10 +3218,14 @@ void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 	}
 
 	// Update Bandwidth Count Per Ten Minutes PVs...
-	m_pvPulseBandwidthTenMin->update(m_pulse_count_tenmin, &now);
-	m_pvEventBandwidthTenMin->update(m_event_count_tenmin, &now);
-	m_pvMetaBandwidthTenMin->update(m_meta_count_tenmin, &now);
-	m_pvErrBandwidthTenMin->update(m_err_count_tenmin, &now);
+	m_pvPulseBandwidthTenMin->update(m_pulse_count_tenmin, &now,
+		true /* no_log */ );
+	m_pvEventBandwidthTenMin->update(m_event_count_tenmin, &now,
+		true /* no_log */ );
+	m_pvMetaBandwidthTenMin->update(m_meta_count_tenmin, &now,
+		true /* no_log */ );
+	m_pvErrBandwidthTenMin->update(m_err_count_tenmin, &now,
+		true /* no_log */ );
 
 	// Reset Counters for Next Ten Minutes...
 	m_pulse_count_tenmin = 0;
@@ -3219,11 +3246,14 @@ void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 					<< " Err=" << it->second->m_err_count_tenmin );
 			}
 			it->second->m_pvHWSourceEventBandwidthTenMin->update(
-				it->second->m_event_count_tenmin, &now);
+				it->second->m_event_count_tenmin, &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceMetaBandwidthTenMin->update(
-				it->second->m_meta_count_tenmin, &now);
+				it->second->m_meta_count_tenmin, &now,
+				true /* no_log */ );
 			it->second->m_pvHWSourceErrBandwidthTenMin->update(
-				it->second->m_err_count_tenmin, &now);
+				it->second->m_err_count_tenmin, &now,
+				true /* no_log */ );
 		}
 		it->second->m_event_count_tenmin = 0;
 		it->second->m_meta_count_tenmin = 0;
@@ -3407,6 +3437,8 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 				ss << "RESUME"; break;
 			case ADARA::MarkerType::OVERALL_RUN_COMMENT:
 				ss << "OVERALL_RUN_COMMENT"; break;
+			case ADARA::MarkerType::SYSTEM:
+				ss << "SYSTEM"; break;
 		}
 		ss << " (" << pkt.marker_type() << ")";
 		ss << ", ScanIndex=" << pkt.scanIndex();
@@ -3414,7 +3446,11 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 		INFO(log_info
 			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "External Annotation Packet Received from " << m_name
-			<< ss.str());
+			<< ss.str()
+			<< " at " << pkt.timestamp().tv_sec
+				- ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< pkt.timestamp().tv_nsec);
 	}
 
 	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
@@ -3473,6 +3509,28 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 				markers->addNotesComment( &ts,
 					m_ignore_annotation_pkts,
 					pkt.scanIndex(), pkt.comment() );
+				break;
+			case ADARA::MarkerType::SYSTEM:
+				// Always Pass Thru System Comments...
+				markers->addSystemComment( &ts,
+					pkt.scanIndex(), pkt.comment() );
+				// Optionally Execute External System Commands...
+				if ( m_ignore_annotation_pkts == Markers::EXECUTE )
+				{
+					DEBUG( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+						<< "DataSource::rxPacket(AnnotationPkt):"
+						<< " External RunControl Packet Received"
+						<< " from " << m_name
+						<< " - Execute:"
+						<< " Command=[" << pkt.comment() << "]"
+						<< " scanIndex=" << pkt.scanIndex()
+						<< " at " << pkt.timestamp().tv_sec
+							- ADARA::EPICS_EPOCH_OFFSET
+						<< "." << std::setfill('0') << std::setw(9)
+						<< pkt.timestamp().tv_nsec );
+					m_ctrl->externalRunControl( &ts,
+						pkt.scanIndex(), pkt.comment() );
+				}
 				break;
 		}
 	}
@@ -3536,7 +3594,7 @@ void DataSource::onSavePrologue(void)
 	pkt[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	pkt[3] = now.tv_nsec;
 
-	pkt[4] = (uint32_t) ADARA::MarkerType::GENERIC << 16;
+	pkt[4] = (uint32_t) ADARA::MarkerType::SYSTEM << 16;
 	pkt[5] = 0;
 
 	iov.iov_base = pkt;

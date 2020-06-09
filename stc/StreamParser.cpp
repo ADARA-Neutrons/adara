@@ -2275,6 +2275,12 @@ StreamParser::rxPacket
 
     if ( doc )
     {
+        syslog( LOG_INFO,
+            "[%i] %s: Proceed to Parse RunInfo XML - %lu Bytes, [%s]",
+            g_pid, "rxPacket(RunInfoPkt)",
+            a_pkt.info().length(), a_pkt.info().c_str() );
+        usleep(30000); // give syslog a chance...
+
         // Temporary RunInfo Holder...
         // (to Enable Duplicate RunInfoPkt Comparisons... ;-D)
         RunInfo tmp_run_info;
@@ -2664,6 +2670,15 @@ StreamParser::rxPacket
 
             updateRunInfo( tmp_run_info );
         }
+    }
+
+    else
+    {
+        syslog( LOG_ERR,
+            "[%i] %s %s: Error Parsing RunInfo XML - %lu Bytes, [%s]",
+            g_pid, "STC Error:", "rxPacket(RunInfoPkt)",
+            a_pkt.info().length(), a_pkt.info().c_str() );
+        usleep(30000); // give syslog a chance...
     }
 
     if ( m_strict )
@@ -5188,6 +5203,18 @@ StreamParser::rxPacket
         break;
     case ADARA::MarkerType::OVERALL_RUN_COMMENT:
         runComment( a_pkt.comment() );
+        break;
+    case ADARA::MarkerType::SYSTEM:
+        // Just Log System Comments, Don't Insert Into NeXus...
+        syslog( LOG_INFO, "[%i] %s %s %lu.%09lu (%lu) [%s]",
+            g_pid, "StreamParser::rxPacket(AnnotationPkt)",
+            "System Annotation Comment",
+            (unsigned long)(ts_nano / NANO_PER_SECOND_LL)
+                - ADARA::EPICS_EPOCH_OFFSET,
+            (unsigned long)(ts_nano % NANO_PER_SECOND_LL),
+            ts_nano,
+            a_pkt.comment().c_str() );
+        usleep(30000); // give syslog a chance...
         break;
     }
 

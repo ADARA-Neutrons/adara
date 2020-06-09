@@ -148,6 +148,8 @@ static const char *markerType(ADARA::MarkerType::Enum type)
 		return "Resume";
 	case ADARA::MarkerType::OVERALL_RUN_COMMENT:
 		return "Overall Comment";
+	case ADARA::MarkerType::SYSTEM:
+		return "System";
 	}
 
 	return "UndefinedType";

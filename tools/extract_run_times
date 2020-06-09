@@ -1,0 +1,77 @@
+#!/bin/bash -i
+#
+# Script to Extract Run Start/Stop Times from a NeXus File
+#
+
+if [[ $# == 0 ]]; then
+	echo -e "\nusage: extract_run_times [NeXus1] [[NeXus2]...]\n"
+	exit -1
+fi
+
+for nexus in $@ ; do
+
+	echo -e "\nExtracting Run Start/End Times from NeXus File:"
+	echo -e "   ${nexus}"
+
+	# Extract Run Number from NeXus File Base Name
+	run_number=`basename "${nexus}" | sed "s/.nxs.h5//" \
+		| awk -F "_" '{print $NF}'`
+	echo -e "\nRun Number = ${run_number}"
+
+	# Extract Run Start Time from Frequency Log
+	timestr=`nxls "${nexus}" -p /entry/DASlogs/frequency/time -v`
+	#echo -e "\ntimestr=[${timestr}]"
+
+	# Extract Run Start Seconds
+	sec=`echo "${timestr}" | grep "offset_seconds" | awk '{print $5}'`
+
+	# Extract Run Start Nanoseconds
+	nsec=`echo "${timestr}" | grep "offset_nanoseconds" | awk '{print $5}'`
+
+	# Assemble Print Proper Zero-Padded Run Start Time
+	# from Seconds and Nanoseconds
+	runstart=`printf "%d.%09d" ${sec} ${nsec}`
+
+	# Print Run Start Time
+	echo -e "\nRun Start Time = ${runstart}"
+	echo
+
+	# Generate Run Start System Annot Matching Stream File
+	# (No Input File Required, Set Manually,
+	#    Therefore Redirect Input from Dev Null...)
+	adara-munge --genstart --runstart "${runstart}" \
+		--savefile "start-run-${run_number}.adara" < /dev/null
+	echo
+
+	ls -l "start-run-${run_number}.adara"
+	echo
+
+	adara-parser "start-run-${run_number}.adara"
+
+	# Extract Last Pulse Time from Frequency Log
+	lasttime=`nxls "${nexus}" -p /entry/DASlogs/frequency/time -v -l -s \
+		| grep -v "^$" | tail -1 | sed "s/ //g"`
+	echo -e "\nLast Pulse Time = ${lasttime}"
+
+	runstop=`echo "${runstart} + ${lasttime}" | bc`
+
+	# Print Run Stop Time
+	echo -e "\nRun Stop Time = ${runstop}"
+	echo
+
+	# Generate Run Stop System Annot Matching Stream File
+	# (No Input File Required, Set Manually,
+	#    Therefore Redirect Input from Dev Null...)
+	adara-munge --genstop --runstop "${runstop}" \
+		--savefile "stop-run-${run_number}.adara" < /dev/null
+	echo
+
+	ls -l "stop-run-${run_number}.adara"
+	echo
+
+	adara-parser "stop-run-${run_number}.adara"
+
+done
+
+echo
+

@@ -24,7 +24,8 @@ USAGE()
 	echo "usage:  adara_monitor [--alt=\"-mon\"] \\"
 	echo "                      [--adara_summary=<path>] \\"
 	echo "                      [--cache_dir=<CACHE_DIR>] \\"
-	echo "                      [--connect] [--oneshot] [--help|-h]"
+	echo "                      [--connect] [--connect_pid=<PID>] \\"
+	echo "                      [--oneshot] [--help|-h]"
 	echo
 
 	echo "where:"
@@ -40,11 +41,15 @@ USAGE()
 	echo
 	echo "      --connect           = \"connect\" to running ADARA Monitor"
 	echo
+	echo "   --connect_pid=<PID>    = connect to Specific ADARA Monitor PID"
+	echo
 	echo "      --oneshot           = only execute summary once, then exit"
 	echo
 	echo "     --help | -h          = display this usage information"
 	echo
 }
+
+CONNECT_PID=""
 
 do_connect=0
 do_oneshot=0
@@ -85,6 +90,17 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--connect#' ]]; then
 		echo -e "\nConnecting to Existing ADARA Monitor..."
 		do_connect=1
+	elif [[ "#$key#" == '#--connect_pid#' ]]; then
+		if [[ -n "$value" ]]; then
+			CONNECT_PID="$value"
+			echo -e -n "\nConnecting to Existing ADARA Monitor"
+			echo -e " with PID ${CONNECT_PID}."
+			do_connect=1
+		else
+			echo -e "\nError: No Connect PID Specified!\n\t[$value]"
+			USAGE
+			exit -5
+		fi
 	elif [[ "#$key#" == '#--oneshot#' ]]; then
 		echo -e "\nExecuting ADARA Monitor in OneShot Mode."
 		do_oneshot=1
@@ -225,8 +241,33 @@ CLEAR_PREVIOUS_CACHE()
 
 DO_CONNECT()
 {
-	local _summaryCk=`/bin/ls -t "${CACHE_DIR}"/AdaraMonitorSummary.*.log \
-		| ${HEAD} -1`
+	# Flag Inconsistent Command Line Parameters...! ;-D
+
+	if [[ -n "${ALTOPT}" ]]; then
+		echo -e "\nError: Inconsistent Command Line Options Specified...!"
+		echo -e "\n\t-> Can't \"Connect\" with Alt Option [${ALTOPT}]..."
+		echo -e "\nADARA Summary Can Only Connect to Latest Summary Logs,"
+		echo "Using Whatever Alt Options Were Last Specified."
+		echo -e "\nExiting...\n"
+		exit -9
+	fi
+
+	local _summaryCk=""
+
+	# Find ADARA Log Analyzer Summary for Specific PID...
+
+	if [[ -n ${CONNECT_PID} ]]; then
+
+		_summaryCk="${CACHE_DIR}/AdaraMonitorSummary.${CONNECT_PID}.log"
+
+	# Find Most Recent ADARA Log Analyzer Summary...
+
+	else
+
+		_summaryCk=`/bin/ls -t "${CACHE_DIR}"/AdaraMonitorSummary.*.log \
+			| ${HEAD} -1`
+	
+	fi
 
 	if [[ $? != 0 || -z "${_summaryCk}" ]]; then
 		echo -e "\nError Connecting to Existing ADARA Monitor...!\n"

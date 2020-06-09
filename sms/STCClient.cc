@@ -521,8 +521,9 @@ bool STCClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	std::stringstream ss;
 	if (hdr) {
 		ss << "Received Unexpected Oversize Packet"
-			<< " at " << hdr->timestamp().tv_sec
-			<< "." << hdr->timestamp().tv_nsec
+			<< " at " << hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< hdr->timestamp().tv_nsec << std::setw(0)
 			<< " of type 0x" << std::hex << hdr->type() << std::dec
 			<< " payload_length=" << hdr->payload_length()
 			<< " max=" << MAX_PACKET_SIZE;

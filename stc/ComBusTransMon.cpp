@@ -57,7 +57,7 @@ ComBusTransMon::~ComBusTransMon()
     if ( m_terminal_msg )
         delete m_terminal_msg;
 
-    syslog( LOG_INFO, "[%i] ComBusTransMon exiting", g_pid );
+    syslog( LOG_INFO, "[%i] ComBusTransMon Exiting", g_pid );
 }
 
 
@@ -118,8 +118,14 @@ ComBusTransMon::success( bool a_moved, const string &a_nexus_file )
 
     m_send_to_workflow = a_moved;
 
+    stringstream ss;
+    ss << m_stream_parser->getFacilityName()
+        << " " << m_stream_parser->getBeamShortName()
+        << " Run: " << m_stream_parser->getRunNumber()
+        << " PropId: " << m_stream_parser->getProposalID();
     syslog( LOG_INFO,
-        "[%i] ComBus translation success message sent", g_pid );
+        "[%i] ComBus Translation Success Message to be Sent for %s",
+        g_pid, ss.str().c_str() );
 }
 
 
@@ -145,8 +151,14 @@ ComBusTransMon::failure( STC::TranslationStatusCode a_code,
         m_stream_parser->getRunNumber(),
         a_code, a_reason, m_host );
 
+    stringstream ss;
+    ss << m_stream_parser->getFacilityName()
+        << " " << m_stream_parser->getBeamShortName()
+        << " Run: " << m_stream_parser->getRunNumber()
+        << " PropId: " << m_stream_parser->getProposalID();
     syslog( LOG_INFO,
-        "[%i] ComBus translation failed message sent", g_pid );
+        "[%i] ComBus Translation Failed Message to be Sent for %s",
+        g_pid, ss.str().c_str() );
 }
 
 
@@ -166,6 +178,12 @@ ComBusTransMon::failure( STC::TranslationStatusCode a_code,
 void
 ComBusTransMon::commThread()
 {
+    bool terminal_workflow_retry = false;
+    bool terminal_bcast_retry = false;
+    bool terminal_first = true;
+
+    uint32_t reconn_retry = 5;
+
     unsigned long hb = 0;
 
     syslog( LOG_INFO, "[%i] ComBus thread started", g_pid );
@@ -178,21 +196,111 @@ ComBusTransMon::commThread()
 
         if ( m_combus )
         {
-            if ( m_terminal_msg )
+            // Try to Send Terminal Message (Bcast and Workflow)
+            // As Soon As Terminal Message is Present,
+            // Or As Needed for Retry (Only Every 60 Seconds!)
+            if ( m_terminal_msg
+                && ( terminal_first
+                    || ( ( terminal_bcast_retry || terminal_workflow_retry )
+                        && !( hb % reconn_retry ) ) ) )
             {
-                m_combus->broadcast( *m_terminal_msg );
+                // Logging Information on Experiment...
+                stringstream ss;
+                ss << m_stream_parser->getFacilityName()
+                    << " " << m_stream_parser->getBeamShortName()
+                    << " Run: " << m_stream_parser->getRunNumber()
+                    << " PropId: " << m_stream_parser->getProposalID();
+
+                if ( terminal_first || terminal_bcast_retry )
+                {
+                    if ( !m_combus->broadcast( *m_terminal_msg ) )
+                    {
+                        syslog( LOG_ERR,
+                            "[%i] STC Error: %s %s %s %s %s %s %s %s %s %s",
+                            g_pid, "Failed to Broadcast Terminal Message",
+                            "for Domain", m_domain.c_str(),
+                            "to URI", m_broker_uri.c_str(),
+                            "as User", m_broker_user.c_str(),
+                            "for", ss.str().c_str(),
+                            " - Will Retry..." );
+                        usleep(30000); // give syslog a chance...
+
+                        terminal_bcast_retry = true;
+                    }
+                    else
+                    {
+                        syslog( LOG_INFO,
+                            "[%i] %s %s %s %s %s %s %s %s %s",
+                            g_pid, "Terminal Message Broadcast Successful",
+                            "for Domain", m_domain.c_str(),
+                            "to URI", m_broker_uri.c_str(),
+                            "as User", m_broker_user.c_str(),
+                            "for", ss.str().c_str() );
+                        usleep(30000); // give syslog a chance...
+
+                        terminal_bcast_retry = false;
+                    }
+                }
 
                 // Only notify workflow if file was moved to catalog path
-                if ( m_send_to_workflow )
-                    m_combus->postWorkflow( *m_terminal_msg );
+                if ( m_send_to_workflow
+                        && ( terminal_first || terminal_workflow_retry ) )
+                {
+                    if ( !m_combus->postWorkflow( *m_terminal_msg ) )
+                    {
+                        syslog( LOG_ERR,
+                            "[%i] STC Error: %s %s %s %s %s %s %s %s %s %s",
+                            g_pid,
+                            "Failed to Send Terminal Workflow Message",
+                            "for Domain", m_domain.c_str(),
+                            "to URI", m_broker_uri.c_str(),
+                            "as User", m_broker_user.c_str(),
+                            "for", ss.str().c_str(),
+                            " - Will Retry..." );
+                        usleep(30000); // give syslog a chance...
+
+                        terminal_workflow_retry = true;
+                    }
+                    else
+                    {
+                        syslog( LOG_INFO,
+                            "[%i] %s %s %s %s %s %s %s %s %s",
+                            g_pid,
+                            "Terminal Workflow Message Send Successful",
+                            "for Domain", m_domain.c_str(),
+                            "to URI", m_broker_uri.c_str(),
+                            "as User", m_broker_user.c_str(),
+                            "for", ss.str().c_str() );
+                        usleep(30000); // give syslog a chance...
+
+                        terminal_workflow_retry = false;
+                    }
+                }
 
                 // Automatically stop comm thread when terminal message sent
-                break;
+                if ( !terminal_bcast_retry && !terminal_workflow_retry )
+                    break;
+
+                // Not our first rodeo... ;-D
+                terminal_first = false;
+
+                // Back Off Reconnect Retry Time (up to 3 mins...)
+                if ( (reconn_retry = m_combus->getReconnRetry()) < 180 )
+                {
+                    m_combus->setReconnRetry( reconn_retry += 30 );
+
+                    // Reset Heartbeat for New Reconnect Retry Time...
+                    hb = 0;
+
+                    syslog( LOG_INFO,
+                        "[%i] Backing Off Reconnect Retry Period to %u",
+                        g_pid, reconn_retry );
+                }
             }
             else
             {
-                // Send status every 5 seconds
-                if ( !( hb % 5 ) )
+                // Send status every 5 seconds (longer in back-off retry)
+                if ( !( hb % reconn_retry ) )
                     m_combus->status( ADARA::ComBus::STATUS_OK );
             }
 

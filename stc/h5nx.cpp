@@ -106,7 +106,8 @@ int H5nx::H5NXopen_file( const std::string &file_name )
                 "H5Fopen", "file_name", file_name.c_str() );
             usleep(30000); // give syslog a chance...
             H5NXdumperr(
-                "H5nx::H5NXopen_file(): H5Fopen() Open File");
+                "H5nx::H5NXopen_file(): H5Fopen() Open File "
+                + file_name);
             return FAIL;
         }
 
@@ -136,7 +137,8 @@ int H5nx::H5NXopen_file( const std::string &file_name )
                 "H5Fopen", "file_name", file_name.c_str() );
             usleep(30000); // give syslog a chance...
             H5NXdumperr(
-                "H5nx::H5NXopen_file(): H5Fopen() Open File");
+                "H5nx::H5NXopen_file(): H5Fopen() Open File "
+                + file_name);
             return FAIL;
         }
     }
@@ -263,7 +265,8 @@ int H5nx::H5NXcreate_file( const std::string &file_name )
                 "H5Fcreate", "file_name", file_name.c_str() );
             usleep(30000); // give syslog a chance...
             H5NXdumperr(
-                "H5nx::H5NXcreate_file(): H5Fcreate() Create File");
+                "H5nx::H5NXcreate_file(): H5Fcreate() Create File "
+                + file_name);
             return FAIL;
         }
 
@@ -293,7 +296,8 @@ int H5nx::H5NXcreate_file( const std::string &file_name )
                 "H5Fcreate", "file_name", file_name.c_str() );
             usleep(30000); // give syslog a chance...
             H5NXdumperr(
-                "H5nx::H5NXcreate_file(): H5Fcreate() Create File");
+                "H5nx::H5NXcreate_file(): H5Fcreate() Create File "
+                + file_name);
             return FAIL;
         }
     }
@@ -330,7 +334,8 @@ int H5nx::H5NXmake_group( const std::string &group_name,
             g_pid, "STC Error", "H5nx::H5NXmake_group",
             "H5Gcreate2", "group_name", group_name.c_str() );
         usleep(30000); // give syslog a chance...
-        H5NXdumperr("H5nx::H5NXmake_group(): H5Gcreate2() Create Group");
+        H5NXdumperr("H5nx::H5NXmake_group(): H5Gcreate2() Create Group "
+            + group_name);
         return FAIL;
     }
 
@@ -361,7 +366,8 @@ int H5nx::H5NXmake_group( const std::string &group_name,
             "strlen", (long) strlen( class_name.c_str() ) );
         usleep(30000); // give syslog a chance...
         H5NXdumperr(
-            "H5nx::H5NXmake_group(): H5Tset_size() Class Name Size");
+            "H5nx::H5NXmake_group(): H5Tset_size() Class Name Size "
+            + class_name);
         return FAIL;
     }
 
@@ -384,7 +390,8 @@ int H5nx::H5NXmake_group( const std::string &group_name,
             "class_name", class_name.c_str(), "Write NX_class Attribute" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr(
-            "H5nx::H5NXmake_group(): H5Awrite() Write NX_class Attribute");
+            "H5nx::H5NXmake_group(): H5Awrite() Write NX_class Attribute "
+            + class_name);
         return FAIL;
     }
 
@@ -513,7 +520,8 @@ int H5nx::H5NXmake_attribute_string( const std::string &dataset_path,
             "Open Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr(
-            "H5nx::H5NXmake_attribute_string(): H5Dopen2() Open Dataset");
+            "H5nx::H5NXmake_attribute_string(): H5Dopen2() Open Dataset "
+            + dataset_path);
         return FAIL;
     }
 
@@ -574,7 +582,8 @@ int H5nx::H5NXmake_attribute_string( const std::string &dataset_path,
             "Create Attribute" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_attribute_string():"
-            + std::string(" H5Acreate() Create Attribute"));
+            + std::string(" H5Acreate() Create Attribute ")
+            + attr_name);
         return FAIL;
     }
 
@@ -586,7 +595,8 @@ int H5nx::H5NXmake_attribute_string( const std::string &dataset_path,
             "Write Attribute" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_attribute_string():"
-            + std::string(" H5Awrite() Write Attribute"));
+            + std::string(" H5Awrite() Write Attribute ")
+            + attr_value);
         return FAIL;
     }
 
@@ -658,7 +668,8 @@ int H5nx::H5NXcheck_attribute_string( const std::string &dataset_path,
             "Open Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr(
-            "H5nx::H5NXcheck_attribute_string(): H5Dopen2() Open Dataset");
+            "H5nx::H5NXcheck_attribute_string(): H5Dopen2() Open Dataset "
+            + dataset_path);
         return FAIL;
     }
 
@@ -671,7 +682,8 @@ int H5nx::H5NXcheck_attribute_string( const std::string &dataset_path,
             "Check Attr Exists" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr(
-     "H5nx::H5NXcheck_attribute_string(): H5Aexists() Check Attr Exists");
+     "H5nx::H5NXcheck_attribute_string(): H5Aexists() Check Attr Exists "
+            + attr_name);
         return FAIL;
     }
 
@@ -687,7 +699,8 @@ int H5nx::H5NXcheck_attribute_string( const std::string &dataset_path,
                 "Open Attribute" );
             usleep(30000); // give syslog a chance...
             H5NXdumperr("H5nx::H5NXcheck_attribute_string():"
-                + std::string(" H5Acreate() Open Attribute"));
+                + std::string(" H5Acreate() Open Attribute ")
+                + attr_name);
             return FAIL;
         }
 
@@ -822,7 +835,8 @@ int H5nx::H5NXcheck_attribute_string( const std::string &dataset_path,
                 "Create Attribute" );
             usleep(30000); // give syslog a chance...
             H5NXdumperr("H5nx::H5NXcheck_attribute_string():"
-                + std::string(" H5Acreate() Create Attribute"));
+                + std::string(" H5Acreate() Create Attribute ")
+                + attr_name);
             return FAIL;
         }
 
@@ -834,7 +848,8 @@ int H5nx::H5NXcheck_attribute_string( const std::string &dataset_path,
                 "Write Attribute" );
             usleep(30000); // give syslog a chance...
             H5NXdumperr("H5nx::H5NXcheck_attribute_string():"
-                + std::string(" H5Awrite() Write Attribute"));
+                + std::string(" H5Awrite() Write Attribute ")
+                + attr_value);
             return FAIL;
         }
 
@@ -959,7 +974,8 @@ int H5nx::H5NXmake_dataset_string( const std::string &group_path,
             "Create Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_dataset_string(): H5Dcreate2()"
-            + std::string(" Create Dataset"));
+            + std::string(" Create Dataset ")
+            + absolute_dataset_name);
         return FAIL;
     }
 
@@ -1017,14 +1033,50 @@ int H5nx::H5NXmake_dataset_string( const std::string &group_path,
 int H5nx::H5NXcheck_dataset_path( const std::string &group_path,
         const std::string &dataset_name, bool &exists )
 {
+    hid_t   gid;  // group ID
     hid_t   did;  // dataset ID
 
+    // Try to Open the Enclosing Group First...
+    if ( (gid = H5Gopen2( this->m_fid, group_path.c_str(),
+            H5P_DEFAULT)) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() for %s - %s",
+            g_pid, "STC Error", "H5nx::H5NXcheck_dataset_path", "H5Gopen2",
+            group_path.c_str(),
+            "Open Group Failed - Group Doesn't Exist...?" );
+        usleep(30000); // give syslog a chance...
+        exists = false;
+        return SUCCEED;
+    }
+    else {
+        exists = true;
+    }
+
+    // If Successful, Try to Close It... ;-D
+    if ( H5Gclose( gid ) < 0 )
+    {
+        syslog( LOG_ERR, "[%i] %s in %s(): Error in %s() for %s - %s",
+            g_pid, "STC Error", "H5nx::H5NXcheck_dataset_path",
+            "H5Gclose", group_path.c_str(), "Failed to Close Group" );
+        usleep(30000); // give syslog a chance...
+        H5NXdumperr( "H5nx::H5NXcheck_dataset_path(): H5Gclose()"
+            + std::string(" Failed to Close Group ") + group_path );
+        return FAIL;
+    }
+
+    // If No Dataset Name, We're Done! Just Check Group Existence...
+    if ( dataset_name.size() == 0 ) {
+        return SUCCEED;
+    }
+
+    // Now Check Dataset Path in Group...
     std::string absolute_dataset_name = group_path + "/" + dataset_name;
 
     // Try to Open the Dataset Path...
     if ( (did = H5Dopen2( this->m_fid, absolute_dataset_name.c_str(),
             H5P_DEFAULT )) < 0 )
     {
+        // Don't Log Here, This is the Expected Outcome... ;-D
         exists = false;
         return SUCCEED;
     }
@@ -1040,7 +1092,8 @@ int H5nx::H5NXcheck_dataset_path( const std::string &group_path,
             "H5Dclose", "Close Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr(
-            "H5nx::H5NXcheck_dataset_path(): H5Dclose() Close Dataset");
+            "H5nx::H5NXcheck_dataset_path(): H5Dclose() Close Dataset "
+            + absolute_dataset_name );
         return FAIL;
     }
 
@@ -1137,7 +1190,8 @@ int H5nx::H5NXmake_attribute_scalar( const std::string &dataset_path,
             "Open Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr(
-            "H5nx::H5NXmake_attribute_scalar(): H5Dopen2() Open Dataset");
+            "H5nx::H5NXmake_attribute_scalar(): H5Dopen2() Open Dataset "
+            + dataset_path);
         return FAIL;
     }
 
@@ -1179,7 +1233,8 @@ int H5nx::H5NXmake_attribute_scalar( const std::string &dataset_path,
             "Create Attribute" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_attribute_scalar(): H5Acreate()"
-            + std::string(" Create Attribute"));
+            + std::string(" Create Attribute ")
+            + attr_name);
         return FAIL;
     }
 
@@ -1275,7 +1330,8 @@ int H5nx::H5NXwrite_attribute_scalar( const std::string &dataset_path,
             "Open Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr(
-            "H5nx::H5NXwrite_attribute_scalar(): H5Dopen2() Open Dataset");
+            "H5nx::H5NXwrite_attribute_scalar(): H5Dopen2() Open Dataset "
+            + dataset_path);
         return FAIL;
     }
 
@@ -1287,7 +1343,8 @@ int H5nx::H5NXwrite_attribute_scalar( const std::string &dataset_path,
             "Open Attribute" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXwrite_attribute_scalar(): H5Aopen()"
-            + std::string(" Open Attribute"));
+            + std::string(" Open Attribute ")
+            + attr_name);
         return FAIL;
     }
 
@@ -1367,7 +1424,8 @@ int H5nx::H5NXread_attribute_scalar( const std::string &dataset_path,
             "Open Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr(
-            "H5nx::H5NXread_attribute_scalar(): H5Dopen2() Open Dataset");
+            "H5nx::H5NXread_attribute_scalar(): H5Dopen2() Open Dataset "
+            + dataset_path);
         return FAIL;
     }
 
@@ -1379,7 +1437,8 @@ int H5nx::H5NXread_attribute_scalar( const std::string &dataset_path,
             "Open Attribute" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXread_attribute_scalar(): H5Aopen()"
-            + std::string(" Open Attribute"));
+            + std::string(" Open Attribute ")
+            + attr_name);
         return FAIL;
     }
 
@@ -1494,7 +1553,8 @@ int H5nx::H5NXmake_dataset_scalar( const std::string &group_path,
             "Create Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_dataset_scalar(): H5Dcreate2()"
-            + std::string(" Create Dataset"));
+            + std::string(" Create Dataset ")
+            + absolute_dataset_name);
         return FAIL;
     }
 
@@ -1578,7 +1638,8 @@ int H5nx::H5NXwrite_dataset_scalar( const std::string &dataset_path,
             "Open Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXwrite_dataset_scalar(): H5Dopen2()"
-            + std::string(" Open Dataset"));
+            + std::string(" Open Dataset ")
+            + dataset_path);
         return FAIL;
     }
 
@@ -1657,7 +1718,8 @@ int H5nx::H5NXread_dataset_scalar( const std::string &dataset_path,
             "Open Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXread_dataset_scalar(): H5Dopen2()"
-            + std::string(" Open Dataset"));
+            + std::string(" Open Dataset ")
+            + dataset_path);
         return FAIL;
     }
 
@@ -1775,7 +1837,8 @@ int H5nx::H5NXmake_dataset_vector( const string &group_path,
             "Create Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_dataset_vector(): H5Dcreate2()"
-            + std::string(" Create Dataset"));
+            + std::string(" Create Dataset ")
+            + dataset_path);
         return FAIL;
     }
 
@@ -1903,7 +1966,8 @@ int H5nx::H5NXmake_dataset_vector( const string &group_path,
             "Create Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_dataset_vector(): H5Dcreate2()"
-            + std::string(" Create Dataset"));
+            + std::string(" Create Dataset ")
+            + dataset_path);
         return FAIL;
     }
 
@@ -2070,7 +2134,8 @@ int H5nx::H5NXcreate_dataset_extend( const std::string &group_path,
             "Create Modified Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXcreate_dataset_extend(): H5Dcreate2()"
-            + std::string(" Create Modified Dataset"));
+            + std::string(" Create Modified Dataset ")
+            + path);
         return FAIL;
     }
 
@@ -2119,7 +2184,8 @@ int H5nx::H5NXget_dataset_dims( const std::string &dataset_path,
             "dataset_path", dataset_path.c_str(), "Open Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXget_dataset_dims(): H5Dopen2()"
-            + std::string(" Open Dataset"));
+            + std::string(" Open Dataset ")
+            + dataset_path);
         return FAIL;
     }
 
@@ -2270,7 +2336,8 @@ int H5nx::H5NXwrite_slab( const std::string &dataset_path,
             g_pid, "STC Error", "H5nx::H5NXwrite_slab", "H5Dopen2",
             "dataset_path", dataset_path.c_str(), "Open Dataset" );
         usleep(30000); // give syslog a chance...
-        H5NXdumperr("H5nx::H5NXwrite_slab(): H5Dopen2() Open Dataset");
+        H5NXdumperr("H5nx::H5NXwrite_slab(): H5Dopen2() Open Dataset "
+            + dataset_path);
         return FAIL;
     }
 
@@ -2480,7 +2547,8 @@ int H5nx::H5NXread_slab( const std::string &dataset_path,
             g_pid, "STC Error", "H5nx::H5NXread_slab", "H5Dopen2",
             "dataset_path", dataset_path.c_str(), "Open Dataset" );
         usleep(30000); // give syslog a chance...
-        H5NXdumperr("H5nx::H5NXread_slab(): H5Dopen2() Open Dataset");
+        H5NXdumperr("H5nx::H5NXread_slab(): H5Dopen2() Open Dataset "
+            + dataset_path);
         return FAIL;
     }
 
@@ -2751,7 +2819,8 @@ int H5nx::write_root_metadata( const char *file_name )
             "Set File Name Size" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::write_root_metadata(): H5Tset_size()"
-            + std::string(" Set File Name Size"));
+            + std::string(" Set File Name Size ")
+            + file_name);
         return FAIL;
     }
 
@@ -2775,7 +2844,8 @@ int H5nx::write_root_metadata( const char *file_name )
             "Write File Name Attribute" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::write_root_metadata(): H5Awrite()"
-            + std::string(" Write File Name Attribute"));
+            + std::string(" Write File Name Attribute ")
+            + file_name);
         return FAIL;
     }
 
@@ -3083,7 +3153,9 @@ int H5nx::H5NXmake_link( const std::string &current_name,
             "H5Lcreate_hard", "Create Hard Dataset Link" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_link(): H5Lcreate_hard()"
-            + std::string(" Create Hard Dataset Link"));
+            + std::string(" Create Hard Dataset Link ")
+            + current_name + std::string(" -> ")
+            + destination_name);
         return FAIL;
     }
 
@@ -3104,7 +3176,8 @@ int H5nx::H5NXmake_link( const std::string &current_name,
             "H5Dopen2", "Open Linked Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_link(): H5Dopen2()"
-            + std::string(" Open Linked Dataset"));
+            + std::string(" Open Linked Dataset ")
+            + current_name);
         return FAIL;
     }
 
@@ -3199,7 +3272,8 @@ int H5nx::H5NXmake_link( const std::string &current_name,
             "Write Linked Target Attribute" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_link(): H5Awrite()"
-            + std::string(" Write Linked Target Attribute"));
+            + std::string(" Write Linked Target Attribute ")
+            + current_name);
         return FAIL;
     }
 
@@ -3267,7 +3341,9 @@ int H5nx::H5NXmake_group_link( const std::string &current_name,
             "H5Lcreate_hard", "Create Hard Group Link" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmake_group_link(): H5Lcreate_hard()"
-            + std::string(" Create Hard Group Link"));
+            + std::string(" Create Hard Group Link ")
+            + current_name + std::string(" -> ")
+            + destination_name);
         return FAIL;
     }
 
@@ -3292,7 +3368,9 @@ int H5nx::H5NXmove_link( const std::string &current_name,
             "H5Lmove", "Rename A Link/Dataset" );
         usleep(30000); // give syslog a chance...
         H5NXdumperr("H5nx::H5NXmove_link(): H5Lmove()"
-            + std::string(" Rename A Link/Dataset"));
+            + std::string(" Rename A Link/Dataset ")
+            + current_name + std::string(" -> ")
+            + destination_name);
         return FAIL;
     }
 
