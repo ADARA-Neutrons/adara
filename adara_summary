@@ -246,6 +246,7 @@ declare -A nHostSMSDComBusBroadcastError
 declare -A nHostSMSDComBusConnTimeout
 declare -A nHostSMSDComBusDisconnectError
 declare -A nHostSMSDComBusReconnectThread
+declare -A nHostSMSDComBusBcastDisconn
 declare -A nHostSMSDComBusSendError
 declare -A nHostSMSDOversizePkt
 declare -A nHostSMSDOversizePktREC
@@ -258,6 +259,7 @@ declare -A nHostPVSDComBusBroadcastError
 declare -A nHostPVSDComBusConnTimeout
 declare -A nHostPVSDComBusDisconnectError
 declare -A nHostPVSDComBusReconnectThread
+declare -A nHostPVSDComBusBcastDisconn
 declare -A nHostPVSDDefiningNewDevice
 declare -A nHostPVSDReDefiningDevice
 declare -A nHostPVSDUndefineDevice
@@ -480,6 +482,7 @@ PARSE_LOG()
 		nHostSMSDComBusConnTimeout[$host]=0
 		nHostSMSDComBusDisconnectError[$host]=0
 		nHostSMSDComBusReconnectThread[$host]=0
+		nHostSMSDComBusBcastDisconn[$host]=0
 		nHostSMSDComBusSendError[$host]=0
 		nHostSMSDOversizePkt[$host]=0
 		nHostSMSDOversizePktREC[$host]=0
@@ -492,6 +495,7 @@ PARSE_LOG()
 		nHostPVSDComBusConnTimeout[$host]=0
 		nHostPVSDComBusDisconnectError[$host]=0
 		nHostPVSDComBusReconnectThread[$host]=0
+		nHostPVSDComBusBcastDisconn[$host]=0
 		nHostPVSDDefiningNewDevice[$host]=0
 		nHostPVSDReDefiningDevice[$host]=0
 		nHostPVSDUndefineDevice[$host]=0
@@ -1536,6 +1540,13 @@ PARSE_LOG()
 			nHostSMSDComBusReconnectThread[$host]=$(( \
 				nHostSMSDComBusReconnectThread[$host] + 1 ))
 
+		# "(ComBus) broadcast(): Disconnected" Logs
+		elif [[ "$log" =~ \
+				ComBus:${S}broadcast\(\):${S}Disconnected ]]; then
+			#echo "ComBus Broadcast Disconnected..."
+			nHostSMSDComBusBcastDisconn[$host]=$(( \
+				nHostSMSDComBusBcastDisconn[$host] + 1 ))
+
 		# "(ComBus) SendOriginal() or SendUpdate() failed for Domain" Logs
 		elif [[ "$log" =~ \
 				ComBusSMSMon::SendOriginal\(\)${S}failed${S}for${S}Domain \
@@ -1643,6 +1654,13 @@ PARSE_LOG()
 			#echo "ComBus Reconnect Thread..."
 			nHostPVSDComBusReconnectThread[$host]=$(( \
 				nHostPVSDComBusReconnectThread[$host] + 1 ))
+
+		# "(ComBus) broadcast(): Disconnected" Logs
+		elif [[ "$log" =~ \
+				ComBus:${S}broadcast\(\):${S}Disconnected ]]; then
+			#echo "ComBus Broadcast Disconnected..."
+			nHostPVSDComBusBcastDisconn[$host]=$(( \
+				nHostPVSDComBusBcastDisconn[$host] + 1 ))
 
 		# "Defining New Device" Log
 		elif [[ "$log" =~ \
@@ -2547,6 +2565,10 @@ for h in ${HostList} ; do
 		echo -n "   ${nHostSMSDComBusReconnectThread[$h]} "
 		echo "SMSD \"ComBus Reconnect Thread\" Logs"
 	fi
+	if [[ ${nHostSMSDComBusBcastDisconn[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDComBusBcastDisconn[$h]} "
+		echo "SMSD \"ComBus Can't Broadcast - Disconnected\" Logs"
+	fi
 	if [[ ${nHostSMSDComBusSendError[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSMSDComBusSendError[$h]} "
 		echo "SMSD \"ComBus SendOriginal/Update failed for Domain\" Logs"
@@ -2626,6 +2648,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostPVSDComBusReconnectThread[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDComBusReconnectThread[$h]} "
 		echo "PVSD \"ComBus Reconnect Thread\" Logs"
+	fi
+	if [[ ${nHostPVSDComBusBcastDisconn[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostPVSDComBusBcastDisconn[$h]} "
+		echo "PVSD \"ComBus Can't Broadcast - Disconnected\" Logs"
 	fi
 	if [[ ${nHostPVSDAssignPVID[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostPVSDAssignPVID[$h]} "
