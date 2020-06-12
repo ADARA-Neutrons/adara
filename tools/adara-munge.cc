@@ -1108,7 +1108,7 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 		uint32_t nsec = (uint32_t) pkt.pulseId();
 		sec += 667;
 		nsec += 908933229;
-		if ( nsec > NANO_PER_SECOND_LL )
+		if ( nsec >= NANO_PER_SECOND_LL )
 		{
 			sec++;
 			nsec -= NANO_PER_SECOND_LL;

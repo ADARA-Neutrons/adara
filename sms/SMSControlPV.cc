@@ -2543,7 +2543,7 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			postEvent(mask, *edge);
 
 			ts.tv_nsec++;
-			if (ts.tv_nsec > NANO_PER_SECOND_LL) {
+			if (ts.tv_nsec >= NANO_PER_SECOND_LL) {
 				ts.tv_sec++;
 				ts.tv_nsec -= NANO_PER_SECOND_LL;
 			}
