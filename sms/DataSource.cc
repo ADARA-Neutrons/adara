@@ -2196,9 +2196,9 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		}
 	}
 
-	if (m_save_input_stream) {
-		StorageManager::savePacket(pkt.packet(), pkt.packet_length(),
-			m_smsSourceId);
+	if ( m_save_input_stream ) {
+		StorageManager::savePacket( pkt.packet(), pkt.packet_length(),
+			m_smsSourceId, pkt.base_type() );
 	}
 
 	// Once in a blue moon, dump "Discarded Packet" statistics... ;-D
@@ -2221,7 +2221,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		// << " nsec=" << m_last_pkt_nsec
 		// << " len=" << m_last_pkt_len );
 
-	switch (pkt.base_type()) {
+	switch ( pkt.base_type() ) {
 
 		case ADARA::PacketType::HEARTBEAT_TYPE:
 			/* We actually *do* care about these packets after all;
@@ -2251,7 +2251,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 			/* We use a 0 pulse id to indicate that we don't have an
 			 * active pulse, and nothing should ever send one to us.
 			 */
-			if (!pkt.pulseId()) {
+			if ( !pkt.pulseId() ) {
 				/* Rate-limited logging of pulse id 0 */
 				std::string log_info;
 				if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,

@@ -1290,6 +1290,8 @@ void Markers::emitPacket( const struct timespec &ts,
 	if ( prologue )
 		StorageManager::addPrologue(iovec);
 	else
-		StorageManager::addPacket(iovec);
+		StorageManager::addPacket(iovec,
+			false /* ignore_pkt_timestamp */,
+			false /* check_old_containers */);
 }
 

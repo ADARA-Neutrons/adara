@@ -50,8 +50,16 @@ public:
 
 	void checkPacket() {
 		if (m_runNumber) {
-			if (generatePacket())
-				StorageManager::addPacket(m_packet, m_packetSize);
+			if (generatePacket()) {
+				// Note: generatePacket() Uses Wallclock Time for the
+				// RunInfo Packet, which is Fine for Production,
+				// But Screws Up the Test Harness/Replay,
+				// So We Need to "Ignore the Packet TimeStamp" Here...
+				// Just Always Write This Packet to the "Current" Container.
+				StorageManager::addPacket(m_packet, m_packetSize,
+					true /* ignore_pkt_timestamp */,
+					false /* check_old_containers */);
+			}
 		}
 	}
 
