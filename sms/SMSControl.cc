@@ -1041,8 +1041,8 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 				m_markers->beforeNewRun( m_currentRunNumber );
 
 				// Actually Start a New Recording...
-				StorageManager::startRecording( m_currentRunNumber,
-					m_runInfo->getPropId() );
+				StorageManager::startRecording( (*ts), // Wallclock Time
+					m_currentRunNumber, m_runInfo->getPropId() );
 			}
 			// Logic Error...! ;-O
 			catch ( std::logic_error e ) {
@@ -1158,7 +1158,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 				m_markers->runStop();
 
 				// Actually Stop Recording...
-				StorageManager::stopRecording();
+				StorageManager::stopRecording( (*ts) ); // Wallclock Time
 			}
 			// Logic Error...! ;-O
 			catch ( std::logic_error e ) {
@@ -1374,6 +1374,8 @@ bool SMSControl::checkRequiredDataSources( std::string & why )
 {
 	std::stringstream why_ss;
 
+	uint32_t connected = 0;
+
 	bool okToGo = true;
 
 	for ( uint32_t i=0 ; i < m_dataSources.size() ; i++ )
@@ -1394,8 +1396,22 @@ bool SMSControl::checkRequiredDataSources( std::string & why )
 
 				okToGo = false;
 			}
+			else
+				connected++;
 		}
+		else if ( m_dataSources[i]->isConnected() )
+			connected++;
 	}
+
+	// Sneaky Trigger for Stacked Storage Container Cleanup...
+	// - Among Other Things, This Gets Called When A Data Source Goes Down
+	// If We (Now) Don't Have _Any_ Connected Data Sources,
+	// Then Now Would Be A Good Time to Clean Up
+	// Any Old Stacked Storage Containers... ;-D
+	// (Since They Can't "Time Out" When There's No Data Flowing... :-)
+	// Note: This is Also Necessary for the ADARA Test Harness to Work!
+	if ( !connected )
+		StorageManager::cleanContainerStack();
 
 	if ( okToGo )
 		why_ss << "All Required DataSources are Present";
@@ -1709,6 +1725,7 @@ done:
 
 	// Check for "No Registered Event Sources" State Change...
 	if ( m_eventSources.none() ) {
+
 		// Log/Notify on State Change...
 		ERROR( ( m_recording ? "[RECORDING] " : "" )
 			<< "unregisterEventSource():"
@@ -3143,7 +3160,9 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			 */
 			StorageManager::addPacket(pulse->m_rtdl->packet(),
 						pulse->m_rtdl->packet_length(),
-						false);
+						false /* ignore_pkt_timestamp */,
+						true /* check_old_containers */,
+						false /* notify */);
 		}
 
 		// NO RTDL for Pulse!
