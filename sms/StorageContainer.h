@@ -19,6 +19,9 @@ public:
 				onNewFile;
 
 	const struct timespec &startTime(void) const { return m_startTime; }
+	const struct timespec &minTime(void) const { return m_minTime; }
+	const struct timespec &maxTime(void) const { return m_maxTime; }
+	void setMaxTime(struct timespec maxTime) { m_maxTime = maxTime; }
 	uint32_t runNumber(void) const { return m_runNumber; }
 	std::string propId(void) const { return m_propId; }
 	uint32_t numFiles(void) const { return m_numFiles; }
@@ -41,6 +44,7 @@ public:
 	}
 
 	static SharedPtr create(const struct timespec &start,
+		const struct timespec &minTime,
 		uint32_t run, std::string &propId);
 	static SharedPtr scan(const std::string &path, bool force = false);
 	static uint64_t purge(const std::string &path, uint64_t goal,
@@ -60,6 +64,8 @@ public:
 	void resume(void);
 
 	StorageFile::SharedPtr &file(void) { return m_cur_file; }
+
+	StorageFile::SharedPtr &prologueFile(void) { return m_prologueFile; }
 
 	void getFiles(std::list<StorageFile::SharedPtr> &list);
 
@@ -83,6 +89,8 @@ public:
 private:
 	WeakPtr m_weakThis;
 	struct timespec m_startTime;
+	struct timespec m_minTime;
+	struct timespec m_maxTime;
 	uint32_t m_runNumber;
 	std::string m_propId;
 	uint32_t m_numFiles;
@@ -90,6 +98,7 @@ private:
 	uint32_t m_totFileCount;
 	std::string m_name;
 	StorageFile::SharedPtr m_cur_file;
+	StorageFile::SharedPtr m_prologueFile;
 	onNewFile m_newFile;
 	bool m_active;
 	bool m_paused;
@@ -105,6 +114,7 @@ private:
 	StorageFile::SharedPtr m_dummy_file;
 
 	StorageContainer(const struct timespec &start,
+		const struct timespec &minTime,
 		uint32_t run, std::string &propId);
 	StorageContainer(const std::string &name);
 

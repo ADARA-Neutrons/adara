@@ -342,13 +342,17 @@ void StorageContainer::markManual(void)
 }
 
 StorageContainer::StorageContainer(const struct timespec &start,
+		const struct timespec &minTime,
 		uint32_t run, std::string &propId) :
-	m_startTime(start), m_runNumber(run), m_propId(propId),
+	m_startTime(start), m_minTime(minTime),
+	m_runNumber(run), m_propId(propId),
 	m_numFiles(0), m_numPauseFiles(0), m_totFileCount(0),
 	m_active(true), m_paused(false),
 	m_translated(false), m_manual(false), m_requeueCount(0),
 	m_saved_size(0)
 {
+	m_maxTime.tv_sec = (uint32_t) -1;
+	m_maxTime.tv_nsec = (uint32_t) -1;
 }
 
 StorageContainer::StorageContainer(const std::string &name) :
@@ -358,10 +362,18 @@ StorageContainer::StorageContainer(const std::string &name) :
 	m_translated(false), m_manual(false), m_requeueCount(0),
 	m_saved_size(0)
 {
+	m_startTime.tv_sec = 0;
+	m_startTime.tv_nsec = 0;
+
+	m_minTime.tv_sec = 0;
+	m_minTime.tv_nsec = 0;
+	m_maxTime.tv_sec = (uint32_t) -1;
+	m_maxTime.tv_nsec = (uint32_t) -1;
 }
 
 StorageContainer::SharedPtr StorageContainer::create(
-		const struct timespec &start, uint32_t run, std::string &propId)
+		const struct timespec &start, const struct timespec &minTime,
+		uint32_t run, std::string &propId)
 {
 	char path[64];
 	struct tm tm;
@@ -392,7 +404,8 @@ StorageContainer::SharedPtr StorageContainer::create(
 		throw std::runtime_error("StorageContainer::StorageContainer()"
 					 " path strftime failed");
 
-	StorageContainer::SharedPtr c(new StorageContainer(start, run, propId));
+	StorageContainer::SharedPtr c(
+		new StorageContainer(start, minTime, run, propId));
 	c->m_weakThis = c;
 	c->m_name = path;
 
