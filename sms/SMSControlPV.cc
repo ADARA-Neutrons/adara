@@ -799,7 +799,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 		else {
 			struct timespec old_ts;
 			m_value->getTimeStamp(&old_ts);
-			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
 					<< " String Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
@@ -894,7 +894,7 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 			else {
 				struct timespec old_ts;
 				m_value->getTimeStamp(&old_ts);
-				if ( calcDiffSeconds( new_ts, old_ts ) < 0.0 ) {
+				if ( compareTimeStamps( new_ts, old_ts ) < 0 ) {
 					DEBUG("smsStringPV::unset() m_pv_name=" << m_pv_name
 						<< " String Value Did Not Change, But Time Earlier"
 						<< " - Likely AutoSave Recovery,"
@@ -1133,7 +1133,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 		else {
 			struct timespec old_ts;
 			m_value->getTimeStamp(&old_ts);
-			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsBooleanPV::update() m_pv_name=" << m_pv_name
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, "
@@ -1253,7 +1253,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 		else {
 			struct timespec old_ts;
 			m_value->getTimeStamp(&old_ts);
-			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsEnabledPV::update() m_pv_name=" << m_pv_name
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
@@ -1898,7 +1898,7 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 		else {
 			struct timespec old_ts;
 			m_value->getTimeStamp(&old_ts);
-			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsPassThruPV::update() m_pv_name=" << m_pv_name
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
@@ -2221,7 +2221,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 		else {
 			struct timespec old_ts;
 			m_value->getTimeStamp(&old_ts);
-			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				if ( !no_log ) {
 					DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
 						<< " Value Did Not Change, But Time Earlier"
@@ -2775,7 +2775,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 		else {
 			struct timespec old_ts;
 			m_value->getTimeStamp(&old_ts);
-			if ( calcDiffSeconds( *ts, old_ts ) < 0.0 ) {
+			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsFloat64PV::update() m_pv_name=" << m_pv_name
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
