@@ -287,9 +287,9 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 	if ( !m_skip_pkt )
 	{
 		if ( ( m_filterafter
-				&& calcDiffSeconds( m_lastpkttime, m_threshtime ) > 0.0  )
+				&& compareTimeStamps( m_lastpkttime, m_threshtime ) > 0  )
 			|| ( m_filterbefore
-				&& calcDiffSeconds( m_lastpkttime, m_threshtime ) < 0.0 )
+				&& compareTimeStamps( m_lastpkttime, m_threshtime ) < 0 )
 			|| ( !m_filterafter && !m_filterbefore ) )
 		{
 			m_out.write( (const char *)pkt.packet(), pkt.packet_length() );
