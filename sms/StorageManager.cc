@@ -301,7 +301,9 @@ public:
 std::string StorageManager::m_baseDir;
 int StorageManager::m_base_fd = -1;
 
-StorageContainer::SharedPtr StorageManager::m_cur_container;
+struct timespec StorageManager::m_default_time = { 0, 0 };
+
+std::list<StorageContainer::SharedPtr> StorageManager::m_containerStack;
 StorageFile::SharedPtr StorageManager::m_prologueFile;
 
 StorageManager::ContainerSignal StorageManager::m_contChange;
@@ -337,6 +339,11 @@ boost::shared_ptr<RescanRunDirPV> StorageManager::m_pvRescanRunDir;
 
 boost::shared_ptr<smsBooleanPV> StorageManager::m_pvComBusVerbose;
 bool StorageManager::m_combus_verbose;
+
+boost::shared_ptr<smsFloat64PV>
+	StorageManager::m_pvContainerCleanupTimeout;
+struct timespec StorageManager::m_container_cleanup_timeout;
+double StorageManager::m_container_cleanup_timeout_double;
 
 struct timespec StorageManager::m_scanStart;
 
@@ -478,6 +485,19 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 
 	m_combus_verbose = conf.get<bool>("storage.combus_verbose", true);
 	DEBUG("ComBus Verbose Set to " << m_combus_verbose);
+
+	m_container_cleanup_timeout_double = conf.get<double>(
+		"storage.container_cleanup_timeout", 1.0);
+	m_container_cleanup_timeout.tv_sec =
+		(uint32_t) m_container_cleanup_timeout_double;
+	m_container_cleanup_timeout.tv_nsec =
+		(uint32_t) ( ( m_container_cleanup_timeout_double
+				- ((double) m_container_cleanup_timeout.tv_sec) )
+			* NANO_PER_SECOND_D );
+	DEBUG("Storage Container Cleanup Timeout Set to "
+		<< m_container_cleanup_timeout_double
+		<< " -> (" << m_container_cleanup_timeout.tv_sec
+			<< ", " << m_container_cleanup_timeout.tv_nsec << ")");
 
 	StorageFile::config(conf);
 }
@@ -725,6 +745,10 @@ void StorageManager::lateInit(void)
 	m_pvComBusVerbose = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":ComBusVerbose"));
 
+	m_pvContainerCleanupTimeout = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ContainerCleanupTimeout",
+			0.0, FLOAT64_MAX, FLOAT64_EPSILON, /* AutoSave */ true));
+
 	ctrl->addPV(m_pvPoolsize);
 	ctrl->addPV(m_pvPercent);
 	ctrl->addPV(m_pvMaxBlocksAllowed);
@@ -732,6 +756,7 @@ void StorageManager::lateInit(void)
 	ctrl->addPV(m_pvBlockSize);
 	ctrl->addPV(m_pvRescanRunDir);
 	ctrl->addPV(m_pvComBusVerbose);
+	ctrl->addPV(m_pvContainerCleanupTimeout);
 
 	/* Set the fencepost for the scan; any containers with a
 	 * date after this time have been generated as part of this
@@ -760,11 +785,16 @@ void StorageManager::lateInit(void)
 	/* Initialize ComBus Verbosity PV... */
 	m_pvComBusVerbose->update(m_combus_verbose, &m_scanStart);
 
+	/* Initialize Storage Container Cleanup Timeout PV... */
+	m_pvContainerCleanupTimeout->update(
+		m_container_cleanup_timeout_double, &m_scanStart);
+
 	/* Restore Any PVs to AutoSaved Config Values... */
 
 	struct timespec ts;
 	std::string value;
 	uint32_t uvalue;
+	double dvalue;
 	bool bvalue;
 
 	if ( StorageManager::getAutoSavePV(
@@ -797,6 +827,12 @@ void StorageManager::lateInit(void)
 		m_pvComBusVerbose->update(bvalue, &ts);
 	}
 
+	if ( StorageManager::getAutoSavePV(
+			m_pvContainerCleanupTimeout->getName(), dvalue, ts ) ) {
+		m_container_cleanup_timeout_double = dvalue;
+		m_pvContainerCleanupTimeout->update(dvalue, &ts);
+	}
+
 	/* We need a timestamp for the initial index entry; any timestamp
 	 * will do, as it will be the catch-all if we are asked to go back
 	 * to the beginning of the first container. We just set it here
@@ -825,12 +861,31 @@ void StorageManager::lateInit(void)
 	 * before creating any files -- this ensures all of the correct
 	 * information is in every file we create.
 	 */
-	startContainer();
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	StorageContainer::SharedPtr container;
+	m_containerStack.push_front( container );
+	it = m_containerStack.begin();
+	startContainer( it );
 }
 
-void StorageManager::stop(void)
+void StorageManager::stop(
+		const struct timespec &stopTime ) // EPICS Time...!
 {
-	endCurrentContainer();
+	// Get Current Container...
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	it = m_containerStack.begin();
+
+	// Note: endCurrentContainer() Decrements the TimeStamp
+	// by 1 Nanosecond to use as "Max Time" for the Old Container... ;-D
+	endCurrentContainer( it, stopTime, true );
+
+	// Close Down All the Stacked Containers...
+	for ( ++it ; it != m_containerStack.end() ; ++it )
+	{
+		(*it)->terminate();
+		m_contChange( (*it), false );
+	}
+
 	close(m_base_fd);
 
 	uint64_t value = 0;
@@ -1059,33 +1114,62 @@ void StorageManager::addBaseStorage(uint64_t size)
 }
 
 void StorageManager::startContainer(
-		bool paused, uint32_t run, std::string propId)
+		std::list<StorageContainer::SharedPtr>::iterator &it,
+		const struct timespec &minTime, // EPICS Time...!
+		bool paused, uint32_t run, std::string propId )
 {
 	struct timespec now;
 
-	if (m_cur_container)
-		throw std::logic_error("Already have a container");
+	DEBUG("startContainer(): Starting New Container"
+		<< " at minTime=" << minTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< minTime.tv_nsec << std::setw(0)
+		<< " paused=" << paused
+		<< " run=" << run
+		<< " propId=" << propId);
 
-	if (mkdirat(m_base_fd, m_stateDirPrefix.c_str(), 0775) < 0) {
+	if ( (*it) ) {
+		ERROR("startContainer(): Already Have A Container "
+			<< (*it)->name()
+			<< " in [" << (*it)->minTime().tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< (*it)->minTime().tv_nsec << std::setw(0)
+			<< ", " << (*it)->maxTime().tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+			<< " - Can't Start New Container...!");
+		throw std::logic_error("Already Have A Container");
+	}
+
+	if ( mkdirat( m_base_fd, m_stateDirPrefix.c_str(), 0775 ) < 0 ) {
 		int e = errno;
 		std::string msg("Unable to create new state dir: ");
-		msg += strerror(e);
-		throw std::runtime_error(msg);
+		msg += strerror( e );
+		throw std::runtime_error( msg );
 	}
 
-	clock_gettime(CLOCK_REALTIME, &now);
-	m_cur_container = StorageContainer::create(now, run, propId);
+	clock_gettime( CLOCK_REALTIME, &now );
+	(*it) = StorageContainer::create( now, minTime, run, propId );
+
+	DEBUG("startContainer(): New Current Container "
+		<< (*it)->name() << " Created"
+		<< " in [" << (*it)->minTime().tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< (*it)->minTime().tv_nsec << std::setw(0)
+		<< ", " << (*it)->maxTime().tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< (*it)->maxTime().tv_nsec << std::setw(0) << "]");
 
 	if ( paused ) {
-		m_cur_container->setPaused( paused );
+		(*it)->setPaused( paused );
 	}
 
-	if (run) {
-		m_combus->sendOriginal(run, propId,
-			std::string("SMS run started"), now);
+	if ( run ) {
+		m_combus->sendOriginal( run, propId,
+			std::string("SMS run started"), now );
 	}
 
-	m_contChange(m_cur_container, true);
+	m_contChange( (*it), true );
 
 	/* Containers need to be sure to always have a file; otherwise
 	 * there will be no record if we don't currently have pulses
@@ -1099,17 +1183,74 @@ void StorageManager::startContainer(
 	 * We'll see this file via the fileCreated() call back, and add
 	 * it to the state index at that point.
 	 */
-	m_cur_container->newFile();
+	(*it)->newFile();
 }
 
-void StorageManager::endCurrentContainer(void)
+void StorageManager::endCurrentContainer(
+		std::list<StorageContainer::SharedPtr>::iterator &it,
+		const struct timespec &newStart, // EPICS Time...!
+		bool do_terminate )
 {
-	if (!m_cur_container)
+	DEBUG("endCurrentContainer(): Ending Current Container "
+		<< (*it)->name()
+		<< " with newStart=" << newStart.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< newStart.tv_nsec << std::setw(0)
+		<< " do_terminate=" << do_terminate);
+
+	if ( !(*it) )
 		throw std::logic_error("No container to end");
 
-	m_cur_container->terminate();
-	m_contChange(m_cur_container, false);
-	m_cur_container.reset();
+	// Set Max Time for Current Container to 1 Nanosecond
+	// _Before_ TimeStamp of Next Container Start Time...
+	// (So We Maintain Distinct Time Ranges Per Container...)
+	struct timespec maxTime = newStart;
+	if ( maxTime.tv_nsec > 0 )
+		maxTime.tv_nsec--;
+	else {
+		maxTime.tv_nsec = NANO_PER_SECOND_LL - 1;
+		maxTime.tv_sec--;
+	}
+	(*it)->setMaxTime( maxTime );
+
+	DEBUG("endCurrentContainer(): Setting Current Container"
+		<< (*it)->name()
+		<< " maxTime=" << maxTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< maxTime.tv_nsec << std::setw(0));
+
+	// Do We Terminate This Container Now, or Keep It Alive on the Stack?
+	if ( do_terminate )
+	{
+		// REMOVEME
+		DEBUG("endCurrentContainer(): Terminating Current Container "
+			<< (*it)->name()
+			<< " in [" << (*it)->minTime().tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< (*it)->minTime().tv_nsec << std::setw(0)
+			<< ", " << (*it)->maxTime().tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< (*it)->maxTime().tv_nsec << std::setw(0) << "]");
+
+		// Close Down This Container...
+		(*it)->terminate();
+		m_contChange( (*it), false );
+		(*it).reset();
+	}
+	
+	// Keep Current Container Alive on the Stack...
+	else
+	{
+		// Push New "Empty" Current Container onto Stack...
+		StorageContainer::SharedPtr container;
+		m_containerStack.push_front( container );
+		it = m_containerStack.begin();
+
+		DEBUG("endCurrentContainer():"
+			<< " Pushed New Empty Current Container onto Stack"
+			<< " - Btw, the Container Stack now has "
+			<< m_containerStack.size() << " elements");
+	}
 
 	/* Now that we've changed containers, our index of past state
 	 * snapshots is invalid; clear it out. We'll start repopulating
@@ -1150,80 +1291,129 @@ void StorageManager::saveCreated(uint32_t dataSourceId)
 	(*(m_savePrologue[ dataSourceId ]))();
 }
 
-void StorageManager::startRecording(uint32_t run, std::string propId)
+void StorageManager::startRecording(
+		const struct timespec &runStart, // Wallclock Time...!
+		uint32_t run, std::string propId )
 {
-	if (!run) {
+	if ( !run ) {
 		throw std::logic_error(
 			"Can't Start Recording - Invalid Run Number (0)!");
 	}
 
-	if (!m_cur_container) {
+	// Get Current Container...
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	it = m_containerStack.begin();
+
+	if ( !(*it) ) {
 		throw std::logic_error(
 			"Can't Start Recording - Invalid State, No Run Container!");
 	}
 
-	if (m_cur_container->runNumber()) {
+	if ( (*it)->runNumber() ) {
 		throw std::logic_error(
 			"Can't Start Recording - Already Recording!");
 	}
 
-	endCurrentContainer();
-	startContainer(false /* paused */, run, propId);
+	// COnvert Wallclock TimeStamp to EPICS Epoch...
+	struct timespec runStartEpics = runStart;
+	runStartEpics.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+
+	// Note: endCurrentContainer() Decrements the TimeStamp
+	// by 1 Nanosecond to use as "Max Time" for the Old Container... ;-D
+	endCurrentContainer( it, runStartEpics, false );
+
+	startContainer( it, runStartEpics, false /* paused */, run, propId );
 }
 
-void StorageManager::stopRecording(void)
+void StorageManager::stopRecording(
+		const struct timespec &runStop ) // Wallclock Time...!
 {
-	if (!m_cur_container) {
+	// Get Current Container...
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	it = m_containerStack.begin();
+
+	if ( !(*it) ) {
 		throw std::logic_error(
 			"Can't Stop Recording - Invalid State, No Run Container!");
 	}
 
 	m_combus->sendUpdate(
-		m_cur_container->runNumber(), m_cur_container->propId(),
-		std::string("SMS run stopped"));
-	endCurrentContainer();
-	startContainer();
+		(*it)->runNumber(), (*it)->propId(),
+		std::string("SMS run stopped") );
+
+	// Convert Wallclock TimeStamp to EPICS Epoch...
+	struct timespec runStopEpics = runStop;
+	runStopEpics.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+
+	// Start Next Container 1 Nanosecond _After_ Run Stop TimeStamp
+	// (So We Maintain Distinct Time Ranges Per Container...)
+	struct timespec minTime = runStopEpics;
+	minTime.tv_nsec++;
+	if ( minTime.tv_nsec >= NANO_PER_SECOND_LL ) {
+		minTime.tv_nsec -= NANO_PER_SECOND_LL;
+		minTime.tv_sec++;
+	}
+
+	// Note: endCurrentContainer() Decrements the TimeStamp
+	// by 1 Nanosecond to use as "Max Time" for the Old Container... ;-D
+	endCurrentContainer( it, minTime, false );
+
+	startContainer( it, minTime );
 }
 
 void StorageManager::pauseRecording(void)
 {
-	m_cur_container->pause();
+	// Get Current Container...
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	it = m_containerStack.begin();
+
+	(*it)->pause();
 
 	// Update ComBus Verbosity PV...
 	m_combus_verbose = m_pvComBusVerbose->value();
 
 	// (Optionally) Notify ComBus of Run Pause...
-	if (m_cur_container->runNumber() && m_combus_verbose) {
+	if ( (*it)->runNumber() && m_combus_verbose ) {
 		m_combus->sendUpdate(
-			m_cur_container->runNumber(), m_cur_container->propId(),
+			(*it)->runNumber(), (*it)->propId(),
 			std::string("SMS run paused"));
 	}
 }
 
 void StorageManager::resumeRecording(void)
 {
-	m_cur_container->resume();
+	// Get Current Container...
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	it = m_containerStack.begin();
+
+	(*it)->resume();
 
 	// Update ComBus Verbosity PV...
 	m_combus_verbose = m_pvComBusVerbose->value();
 
 	// (Optionally) Notify ComBus of Run Pause...
-	if (m_cur_container->runNumber() && m_combus_verbose) {
+	if ( (*it)->runNumber() && m_combus_verbose ) {
 		m_combus->sendUpdate(
-			m_cur_container->runNumber(), m_cur_container->propId(),
+			(*it)->runNumber(), (*it)->propId(),
 			std::string("SMS run resumed"));
 	}
 }
 
 void StorageManager::notify(void)
 {
-	m_cur_container->notify();
+	// Get Current Container...
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	it = m_containerStack.begin();
+
+	(*it)->notify();
 }
 
-void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
+void StorageManager::iterateHistory( uint32_t startSeconds,
+		FileOffSetFunc cb )
 {
-	if (startSeconds) {
-		if (m_stateIndex.empty())
+	if ( startSeconds )
+	{
+		if ( m_stateIndex.empty() )
 			throw std::logic_error("State index is empty");
 
 		/* We store newest entries to the front of the list, so
@@ -1235,8 +1425,9 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 		 */
 		std::list<IndexEntry>::iterator v, it, end;
 		end = m_stateIndex.end();
-		for (it = m_stateIndex.begin(), v = it++; it != end; v = it++) {
-			if (v->m_key < startSeconds)
+		for ( it = m_stateIndex.begin(), v = it++ ; it != end ; v = it++ )
+		{
+			if ( v->m_key < startSeconds )
 				break;
 		}
 
@@ -1258,43 +1449,84 @@ void StorageManager::iterateHistory(uint32_t startSeconds, FileOffSetFunc cb)
 		std::list<IndexEntry>::reverse_iterator rit(it), rend;
 		rend = m_stateIndex.rend();
 
-		if (rit->m_stateFile)
-			cb(rit->m_stateFile, 0);
-		cb(rit->m_dataFile, rit->m_resumeOffset);
-		for (rit++; rit != rend; rit++) {
-			if (rit->isDataOnly())
-				cb(rit->m_dataFile, 0);
+		if ( rit->m_stateFile )
+			cb( rit->m_stateFile, 0 );
+		cb( rit->m_dataFile, rit->m_resumeOffset );
+		for ( rit++ ; rit != rend ; rit++ )
+		{
+			if ( rit->isDataOnly() )
+				cb( rit->m_dataFile, 0 );
 		}
-	} else {
+	}
+	else
+	{
+		// Get Current Container...
+		std::list<StorageContainer::SharedPtr>::iterator it;
+		it = m_containerStack.begin();
+
 		/* Ok, we don't want any historical data, so just create a
 		 * transient file to hold the current state information.
 		 */
-		StorageFile::SharedPtr state(StorageFile::stateFile(
-						m_cur_container, "/tmp"));
-		stateSnapshot(state);
-		cb(state, 0);
-		state->persist(false);
+		StorageFile::SharedPtr state( StorageFile::stateFile(
+						(*it), "/tmp" ) );
+		stateSnapshot( state );
+		cb( state, 0 );
+		state->persist( false );
 		state->put_fd();
 
 		/* Now that we've snapshotted the state, inform the
 		 * callback about the current file we're working on.
 		 */
-		StorageFile::SharedPtr &f = m_cur_container->file();
-		cb(f, f->size());
+		StorageFile::SharedPtr &f = (*it)->file();
+		cb( f, f->size() );
 	}
 }
 
-void StorageManager::addPacket(IoVector &iovec, bool notify)
+void StorageManager::addPacket( IoVector &iovec,
+		bool ignore_pkt_timestamp, bool check_old_containers, bool notify )
 {
 	// DEBUG("addPacket() entry");
 
-	ADARA::Header *hdr = (ADARA::Header *) iovec[0].iov_base;
-	uint32_t len = validatePacket(iovec);
-	uint64_t blocks;
-	off_t resumeLocation;
+	uint32_t len = validatePacket( iovec );
 
-	if (!m_cur_container)
+	ADARA::Header *hdr = (ADARA::Header *) iovec[0].iov_base;
+	struct timespec ts = { hdr->ts_sec, hdr->ts_nsec }; // EPICS Time...!
+
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	// If Ignoring Packet TimeStamp, Just Write Into Current Container
+	if ( ignore_pkt_timestamp ) {
+		it = m_containerStack.begin();
+		// REMOVEME
+		DEBUG("addPacket(): Ignore Packet TimeStamp,"
+			<< " Use Current Container "
+			<< (*it)->name() << " for ts=" << ts.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec << std::setw(0)
+			<< " in [" << (*it)->minTime().tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< (*it)->minTime().tv_nsec << std::setw(0)
+			<< ", " << (*it)->maxTime().tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+			<< " check_old_containers=" << check_old_containers
+			<< " - Btw, the Container Stack has "
+			<< m_containerStack.size() << " elements");
+	}
+	else {
+		it = findContainerByTime( ts, check_old_containers );
+	}
+
+	if ( it == m_containerStack.end() || !(*it) ) {
+		DEBUG("addPacket(): No Container Found"
+			<< " for ts=" << ts.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec << std::setw(0)
+			<< " pkt_format=0x" << std::hex << hdr->pkt_format << std::dec
+			<< " check_old_containers=" << check_old_containers
+			<< " - Btw, the Container Stack has "
+			<< m_containerStack.size() << " elements");
 		throw std::logic_error("No container!");
+	}
 
 	switch ( ADARA_BASE_PKT_TYPE( hdr->pkt_format ) ) {
 
@@ -1317,26 +1549,34 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 * - If We're About to Create the 101st File Here (Current File
 	 *   is "Oversized" and Waiting to Pop), then Split Container Now...!
 	 */
-	if ( !m_cur_container->runNumber()
-			&& m_cur_container->file()
-			&& m_cur_container->file()->oversize()
-			&& ( 1 + m_cur_container->totFileCount() ) > 100 ) {
+	if ( !(*it)->runNumber()
+			&& (*it)->file()
+			&& (*it)->file()->oversize()
+			&& ( 1 + (*it)->totFileCount() ) > 100 ) {
 		WARN("addPacket(): Long-Non-Running Container "
-			<< m_baseDir << "/" << m_cur_container->name()
+			<< m_baseDir << "/" << (*it)->name()
 			<< " Reached 100 Files"
 			<< " - Split Container for Purging...");
-		bool paused = m_cur_container->paused();
-		endCurrentContainer();
-		startContainer( paused );
+		// Preserve Container Minimum Time for Stack Searching! ;-D
+		struct timespec minTime = (*it)->minTime();
+		// Preserve Paused State of Container...
+		bool paused = (*it)->paused();
+		// Note: endCurrentContainer() Decrements the TimeStamp
+		// by 1 Nanosecond to use as "Max Time" for the Old Container...
+		struct timespec maxTime;
+		maxTime.tv_sec = hdr->ts_sec;
+		maxTime.tv_nsec = hdr->ts_nsec;
+		endCurrentContainer( it, maxTime, true );
+		startContainer( it, minTime, paused );
 	}
 
 	/* Save off where we are in the stream, as we may need to point
 	 * to this location for replay after a snapshot.
 	 */
-	resumeLocation = m_cur_container->file()->size();
+	off_t resumeLocation = (*it)->file()->size();
 
 	// Write Data Packet to Disk...
-	if ( !m_cur_container->write(iovec, len, notify) ) {
+	if ( !(*it)->write( iovec, len, notify ) ) {
 		// Something Went Wrong Trying to Write This Data to Disk! :-O
 		// We will therefore LOSE THIS EXPERIMENT DATA
 		// as a result of the error, so LOG IT HERE in the hopes
@@ -1344,18 +1584,18 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 		std::stringstream ss;
 		ss << "LOST EXPERIMENT DATA packetType=0x"
 			<< std::hex << hdr->pkt_format << std::dec;
-		logIoVector(ss.str(), iovec);
+		logIoVector( ss.str(), iovec );
 	}
 
 	/* Is it time to take a state snapshot? If we took one while writing
 	 * the current packet out -- ie, we started a new file -- then
 	 * that will update m_nextTimeIndex and we'll know to skip it here.
 	 */
-	if (m_pulseTime >= m_nextIndexTime) {
-		StorageFile::SharedPtr state(StorageFile::stateFile(
-						m_cur_container, m_stateDir));
-		stateSnapshot(state);
-		indexState(state, m_cur_container->file(), resumeLocation);
+	if ( m_pulseTime >= m_nextIndexTime ) {
+		StorageFile::SharedPtr state(
+			StorageFile::stateFile( (*it), m_stateDir ) );
+		stateSnapshot( state );
+		indexState( state, (*it)->file(), resumeLocation );
 		state->put_fd();
 	}
 
@@ -1366,11 +1606,11 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	 * (query the StorageContainer to get the Total Size of
 	 * all open files...! ;-)
 	 */
-	blocks = m_cur_container->openSize() + m_block_size - 1;
+	uint64_t blocks = (*it)->openSize() + m_block_size - 1;
 	blocks /= m_block_size;
 	// *Don't* Update "Max Blocks Allowed" from PV...!
 	// Already Handled in Various PV->changed() Methods...
-	if ((m_blocks_used + blocks) > m_max_blocks_allowed) {
+	if ( ( m_blocks_used + blocks ) > m_max_blocks_allowed ) {
 		uint64_t goal = ( m_blocks_used + blocks ) - m_max_blocks_allowed;
 		std::stringstream ss;
 		ss << "addPacket() Purge Request"
@@ -1386,40 +1626,123 @@ void StorageManager::addPacket(IoVector &iovec, bool notify)
 	// DEBUG("addPacket() exit len=" << len);
 }
 
-void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
+void StorageManager::savePacket( IoVector &iovec, uint32_t dataSourceId,
+		ADARA::PacketType::Type pkt_base_type )
 {
-	uint32_t len = validatePacket(iovec);
-	uint64_t blocks;
+	uint32_t len = validatePacket( iovec );
 
-	if (!m_cur_container)
+	ADARA::Header *hdr = (ADARA::Header *) iovec[0].iov_base;
+	struct timespec ts = { hdr->ts_sec, hdr->ts_nsec }; // EPICS Time...!
+
+	// Determine Whether to Ignore Packet TimeStamp
+	// Based on Base Packet Type...
+	// (Regular Packets Normally Set This Option By Packet Type...)
+	bool ignore_pkt_timestamp = false;
+	switch ( pkt_base_type )
+	{
+		// Ignore the Packet TimeStamps for These Packet Types
+		// - Just Use the "Current" Container for Whatever Saved Packet
+		case ADARA::PacketType::SOURCE_LIST_TYPE:
+		case ADARA::PacketType::DEVICE_DESC_TYPE:
+		case ADARA::PacketType::VAR_VALUE_U32_TYPE:
+		case ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE:
+		case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
+		case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
+		case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
+			ignore_pkt_timestamp = true;
+			break;
+
+		// *Don't* Ignore the Packet TimeStamps for These Packet Types
+		// - We Want to Sort These Packets into Containers By TimeStamp
+		case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
+		case ADARA::PacketType::HEARTBEAT_TYPE:
+		case ADARA::PacketType::DATA_DONE_TYPE:
+		case ADARA::PacketType::RAW_EVENT_TYPE:
+		case ADARA::PacketType::MAPPED_EVENT_TYPE:
+		case ADARA::PacketType::RTDL_TYPE:
+		case ADARA::PacketType::SYNC_TYPE:
+			ignore_pkt_timestamp = false;
+			break;
+
+		// Anything We're Not Expecting to Get,
+		// Just Stuff It Into the "Current" Container;
+		// Better Safe than Sorry, Who Knows What
+		// Weirdness Might Be Within Here... ;-D
+		default:
+			ignore_pkt_timestamp = true;
+			break;
+	}
+
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	// If Ignoring Packet TimeStamp, Just Write Into Current Container
+	if ( ignore_pkt_timestamp ) {
+		it = m_containerStack.begin();
+		// REMOVEME
+		DEBUG("savePacket(): Ignore Packet TimeStamp,"
+			<< " Use Current Container "
+			<< (*it)->name() << " for ts=" << ts.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec << std::setw(0)
+			<< " in [" << (*it)->minTime().tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< (*it)->minTime().tv_nsec << std::setw(0)
+			<< ", " << (*it)->maxTime().tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+			<< " pkt_base_type=0x" << std::hex << pkt_base_type << std::dec
+			<< " - Btw, the Container Stack has "
+			<< m_containerStack.size() << " elements");
+	}
+	else {
+		it = findContainerByTime( ts, false );
+	}
+
+	if ( it == m_containerStack.end() || !(*it) ) {
+		DEBUG("savePacket(): No Container Found"
+			<< " for ts=" << ts.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec << std::setw(0)
+			<< " pkt_format=0x" << std::hex << hdr->pkt_format << std::dec
+			<< " - Btw, the Container Stack has "
+			<< m_containerStack.size() << " elements");
 		throw std::logic_error("No container!");
+	}
 
 	/* Check for Long-Non-Running Containers that Could Make the SMS
 	 * Swell Up and Pop by Eating Up Non-Releasable Local Disk Space...!
 	 * - If We're About to Create the 101st File Here (Current File
 	 *   is "Oversized" and Waiting to Pop), then Split Container Now...!
 	 */
-	if ( !m_cur_container->runNumber()
-			&& m_cur_container->savefile( dataSourceId )
-			&& m_cur_container->savefile( dataSourceId )->oversize()
-			&& ( 1 + m_cur_container->totFileCount() ) > 100 ) {
+	if ( !(*it)->runNumber()
+			&& (*it)->savefile( dataSourceId )
+			&& (*it)->savefile( dataSourceId )->oversize()
+			&& ( 1 + (*it)->totFileCount() ) > 100 ) {
 		WARN("savePacket(): Long-Non-Running Container "
-			<< m_baseDir << "/" << m_cur_container->name()
+			<< m_baseDir << "/" << (*it)->name()
 			<< " Reached 100 Files"
 			<< " - Split Container for Purging...");
-		bool paused = m_cur_container->paused();
-		endCurrentContainer();
-		startContainer( paused );
+		// Preserve Container Minimum Time for Stack Searching! ;-D
+		struct timespec minTime = (*it)->minTime();
+		// Preserve Paused State of Container...
+		bool paused = (*it)->paused();
+		// Note: endCurrentContainer() Decrements the TimeStamp
+		// by 1 Nanosecond to use as "Max Time" for the Old Container...
+		struct timespec maxTime;
+		maxTime.tv_sec = hdr->ts_sec;
+		maxTime.tv_nsec = hdr->ts_nsec;
+		endCurrentContainer( it, maxTime, true );
+		startContainer( it, minTime, paused );
 	}
 
 	// Write Saved Stream Packet to Disk...
-	if ( !m_cur_container->save(iovec, len, dataSourceId, true) ) {
+	if ( !(*it)->save(iovec, len, dataSourceId, true) ) {
 		// Something Went Wrong Trying to Write This Data to Disk! :-O
 		// We will therefore LOSE This Saved Input Stream Data
 		// as a result of the error, so LOG IT HERE in the hopes
 		// it can be salvaged later...! ;-Q
 		std::stringstream ss;
-		ss << "LOST Saved Input Stream Data dataSourceId=" << dataSourceId;
+		ss << "LOST Saved Input Stream Data dataSourceId=" << dataSourceId
+			<< " pkt_format=0x" << std::hex << hdr->pkt_format << std::dec;
 		logIoVector(ss.str(), iovec);
 	}
 
@@ -1430,7 +1753,7 @@ void StorageManager::savePacket(IoVector &iovec, uint32_t dataSourceId)
 	 * (query the StorageContainer to get the Total Size of
 	 * all open files...! ;-)
 	 */
-	blocks = m_cur_container->openSize() + m_block_size - 1;
+	uint64_t blocks = (*it)->openSize() + m_block_size - 1;
 	blocks /= m_block_size;
 	// *Don't* Update "Max Blocks Allowed" from PV...!
 	// Already Handled in Various PV->changed() Methods...
@@ -1499,8 +1822,14 @@ void StorageManager::addSavePrologue(IoVector &iovec,
 	/* We're writing a prologue before putting Saved Input Stream
 	 * data into a file, so we know we have a current container.
 	 */
+
 	uint32_t len = validatePacket(iovec);
-	m_cur_container->save(iovec, len, dataSourceId, false);
+
+	// Get Current Container...
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	it = m_containerStack.begin();
+
+	(*it)->save(iovec, len, dataSourceId, false);
 }
 
 void StorageManager::logIoVector(std::string label, IoVector &iovec)
@@ -1529,6 +1858,250 @@ void StorageManager::logIoVector(std::string label, IoVector &iovec)
 	ss << std::dec;
 
 	ERROR("logIoVector(): " << label << " - " << ss.str());
+}
+
+std::list<StorageContainer::SharedPtr>::iterator
+StorageManager::findContainerByTime(
+		struct timespec &ts, // EPICS Time...!
+		bool check_old_containers )
+{
+	static uint32_t cnt = 0;
+
+	// Update Storage Container Cleanup Timeout PV...
+	// (Infrequently, maybe once per minute...?)
+	if ( !( ++cnt % 9999 ) )
+	{
+		double container_cleanup_timeout =
+			m_pvContainerCleanupTimeout->value();
+		if ( !approximatelyEqual( container_cleanup_timeout,
+				m_container_cleanup_timeout_double, FLOAT64_EPSILON ) )
+		{
+			m_container_cleanup_timeout_double = container_cleanup_timeout;
+			m_container_cleanup_timeout.tv_sec =
+				(uint32_t) m_container_cleanup_timeout_double;
+			m_container_cleanup_timeout.tv_nsec =
+				(uint32_t) ( ( m_container_cleanup_timeout_double
+						- ((double) m_container_cleanup_timeout.tv_sec) )
+					* NANO_PER_SECOND_D );
+			DEBUG("Storage Container Cleanup Timeout Set from PV to "
+				<< m_container_cleanup_timeout_double
+				<< " -> (" << m_container_cleanup_timeout.tv_sec
+					<< ", " << m_container_cleanup_timeout.tv_nsec << ")");
+		}
+	}
+
+	std::list<StorageContainer::SharedPtr>::iterator found_it =
+		m_containerStack.end();
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	for (it = m_containerStack.begin(); it != m_containerStack.end(); ++it)
+	{
+		// Check Back Through Container for Time Range Match...
+		// (Unless We've Already Found the Matching Container...)
+		if ( found_it == m_containerStack.end() )
+		{
+			// This Container Encapsulates This TimeStamp...
+			if ( compareTimeStamps( ts, (*it)->minTime() ) >= 0
+					&& compareTimeStamps( (*it)->maxTime(), ts ) >= 0 )
+			{
+				// REMOVEME
+				DEBUG("findContainerByTime(): Found Container "
+					<< (*it)->name() << " for ts=" << ts.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec << std::setw(0)
+					<< " in [" << (*it)->minTime().tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< (*it)->minTime().tv_nsec << std::setw(0)
+					<< ", " << (*it)->maxTime().tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+					<< " check_old_containers=" << check_old_containers
+					<< " - Btw, the Container Stack has "
+					<< m_containerStack.size() << " elements");
+
+				// Found It! :-D
+				found_it = it;
+
+				// If We're _Not_ Checking Old Containers for Expiration,
+				// Then We're Done! :-D
+				if ( !check_old_containers )
+					break;
+			}
+		}
+
+		// Now We've Found the Matching Container,
+		// So Check for "Old" Storage Containers that have
+		// Reached the Cleanup Timeout Threshold and Expired...
+		else
+		{
+			// Compute the Container's Expiration Time...
+			struct timespec container_expire = (*it)->maxTime();
+			container_expire.tv_sec += m_container_cleanup_timeout.tv_sec;
+			container_expire.tv_nsec +=
+				m_container_cleanup_timeout.tv_nsec;
+			if ( container_expire.tv_nsec >= NANO_PER_SECOND_LL )
+			{
+				container_expire.tv_nsec -= NANO_PER_SECOND_LL;
+				container_expire.tv_sec++;
+			}
+
+			// REMOVEME
+			DEBUG("findContainerByTime(): Container "
+				<< (*it)->name()
+				<< " in [" << (*it)->minTime().tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< (*it)->minTime().tv_nsec << std::setw(0)
+				<< ", " << (*it)->maxTime().tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+				<< " has Expiration Time = "
+				<< container_expire.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< container_expire.tv_nsec << std::setw(0)
+				<< " (ts=" << ts.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec << std::setw(0) << ")"
+				<< " - Btw, the Container Stack has "
+				<< m_containerStack.size() << " elements");
+
+			// Is It Time to Close Down This Container?
+			if ( compareTimeStamps( ts, container_expire ) >= 0 )
+			{
+				DEBUG("findContainerByTime(): Container "
+					<< (*it)->name()
+					<< " in [" << (*it)->minTime().tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< (*it)->minTime().tv_nsec << std::setw(0)
+					<< ", " << (*it)->maxTime().tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+					<< " has EXPIRED: "
+					<< " ts=" << ts.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec << std::setw(0)
+					<< " >= Expiration Time "
+					<< container_expire.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< container_expire.tv_nsec << std::setw(0)
+					<< ", Terminating Expired Container"
+					<< " - Btw, the Container Stack has "
+					<< m_containerStack.size() << " elements");
+
+				// Finally Close Down This Container...
+				(*it)->terminate();
+				m_contChange( (*it), false );
+				(*it).reset();
+
+				// Remove Container from Stack
+				it = m_containerStack.erase( it );
+				--it; // For Next Iteration...
+			}
+		}
+	}
+
+	// Didn't Find Container for That Time...! ;-O
+	if ( found_it == m_containerStack.end() )
+	{
+		// Check TimeStamp Versus Oldest Stacked Container Min Time...
+		// (To Capture Case of Bogus SAWTOOTH TimeStamps, That Are
+		// So Far Out of Order that We Already Closed Their Container!
+		// Or More Likely Simply a Bogus TimeStamp from Somewhere... ;-b)
+
+		// Snag "Oldest" Container...
+		it = m_containerStack.end();
+		if ( it != m_containerStack.begin() )
+		{
+			it--;
+			if ( (*it) )
+			{
+				// Does TimeStamp Occur _Before_ Oldest Container...?
+				if ( compareTimeStamps( ts, (*it)->minTime() ) < 0 )
+				{
+					// Use "Current Container" for All Such
+					// Bogus TimeStamps... ;-Q
+					it = m_containerStack.begin();
+
+					// XXX TODO Add Rate-Limited Logging Here...!! ;-D
+					ERROR("findContainerByTime():"
+						<< " Container SAWTOOTH for ts="
+						<< ts.tv_sec << "."
+						<< std::setfill('0') << std::setw(9) << ts.tv_nsec
+						<< " -> Using Current Container "
+						<< (*it)->name()
+						<< " in [" << (*it)->minTime().tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< (*it)->minTime().tv_nsec << std::setw(0)
+						<< ", " << (*it)->maxTime().tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+						<< " check_old_containers=" << check_old_containers
+						<< " - Btw, the Container Stack has "
+						<< m_containerStack.size() << " elements");
+
+					return( it );
+				}
+			}
+		}
+
+		// No Containers to Compare Times...?!
+		ERROR("findContainerByTime(): No Container Found for ts="
+			<< ts.tv_sec << "."
+			<< std::setfill('0') << std::setw(9) << ts.tv_nsec
+			<< " check_old_containers=" << check_old_containers
+			<< " - Btw, the Container Stack has "
+			<< m_containerStack.size() << " elements");
+	}
+	return( found_it );
+}
+
+void StorageManager::cleanContainerStack(void)
+{
+	// Skip Past Current Container...
+	std::list<StorageContainer::SharedPtr>::iterator it;
+	it = m_containerStack.begin();
+
+	// Make Sure We Actually Have Any Containers... ;-D
+	if ( it == m_containerStack.end() || !(*it) )
+	{
+		DEBUG("cleanContainerStack(): No Containers Present!"
+			<< " - Btw, the Container Stack has "
+			<< m_containerStack.size() << " elements");
+		return;
+	}
+
+	DEBUG("cleanContainerStack(): Skip Past Current Container "
+		<< (*it)->name()
+		<< " in [" << (*it)->minTime().tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< (*it)->minTime().tv_nsec << std::setw(0)
+		<< ", " << (*it)->maxTime().tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+		<< " - Btw, the Container Stack has "
+		<< m_containerStack.size() << " elements");
+
+	// Close Down All the Stacked Containers...
+	for ( ++it ; it != m_containerStack.end() ; ++it )
+	{
+		DEBUG("cleanContainerStack(): Closing Container "
+			<< (*it)->name()
+			<< " in [" << (*it)->minTime().tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< (*it)->minTime().tv_nsec << std::setw(0)
+			<< ", " << (*it)->maxTime().tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+			<< " - Btw, the Container Stack has "
+			<< m_containerStack.size() << " elements");
+
+		// Close Down This Container...
+		(*it)->terminate();
+		m_contChange( (*it), false );
+		(*it).reset();
+
+		// Remove Container from Stack
+		it = m_containerStack.erase( it );
+		--it; // For Next Iteration...
+	}
 }
 
 void StorageManager::scanDaily(const std::string &dir)
