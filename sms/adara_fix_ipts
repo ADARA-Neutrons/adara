@@ -1872,62 +1872,99 @@ for run in ${RUN_NUMBERS} ; do
 	echo -e "\nFound SMS Raw Data Directory for Run ${run}:\n\t[${rundir}]"
 
 	#
-	# Locate & Backup the First ADARA Output Stream File for This Run
+	# Keep Looking for the "Right" Data File
+	# Until We Find One with At Least One RunInfo Section... ;-D
 	#
 
-	if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
-		echo -e -n "\nLocating ${SMS_WHICH_DATA_FILE} Data File "
-		echo "for Run ${run}."
-		datafile=`${LS} "${rundir}" \
-			| ${GREP} -E "^f[0-9]+-run-${run}.adara$" \
-			| ${HEAD} -1`
-	else
-		echo -e -n "\nLocating ${SMS_WHICH_DATA_FILE} Data File "
-		echo "for Run ${run}."
-		datafile=`${LS} "${rundir}" \
-			| ${GREP} -E "^f[0-9]+-run-${run}.adara$" \
-			| ${TAIL} -1`
-	fi
-	ckdatafile=$?
+	index=1
+	found=0
 
-	if [[ ${ckdatafile} != 0 ]]; then
-		echo -e -n "\nERROR Locating ${SMS_WHICH_DATA_FILE} ADARA Output "
-		echo "Stream File for Run ${run}!"
-		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
-		continue
-	fi
+	retry=1
 
-	# Make Sure We Only Got *1* Data File...! ;-D
-	ckone=`echo "${datafile}" | ${WC} | ${AWK} '{print $1}'`
+	while [[ $retry == 1 ]]; do
 
-	if [[ ${ckone} != 1 ]]; then
-		echo -e -n "\nERROR: Multiple Output Stream Files Found "
-		echo "for Run ${run}!"
-		echo -e "\n${datafile}\n"
-		CHECK_PROCEED
-		echo -e "\nContinuing with Next Run Number..."
-		continue
-	fi
+		#
+		# Locate & Backup the "First" ADARA Output Stream File for This Run
+		#
 
-	echo -e -n "\nFound ${SMS_WHICH_DATA_FILE} ADARA Output Stream File "
-	echo "for Run ${run}:"
-	echo -e "\t[${datafile}]"
+		if [[ "${SMS_WHICH_DATA_FILE}" == "FIRST" ]]; then
+			echo -e -n "\nLocating ${SMS_WHICH_DATA_FILE} Data File "
+			echo "for Run ${run}."
+			datafile=`${LS} "${rundir}" \
+				| ${GREP} -E "^f[0-9]+-run-${run}.adara$" \
+				| ${HEAD} -${index} | ${TAIL} -1`
+		else
+			echo -e -n "\nLocating ${SMS_WHICH_DATA_FILE} Data File "
+			echo "for Run ${run}."
+			datafile=`${LS} "${rundir}" \
+				| ${GREP} -E "^f[0-9]+-run-${run}.adara$" \
+				| ${TAIL} -${index} | ${HEAD} -1`
+		fi
+		ckdatafile=$?
+
+		if [[ ${ckdatafile} != 0 ]]; then
+			echo -e -n "\nERROR Locating ${SMS_WHICH_DATA_FILE} "
+			echo "ADARA Output Stream File for Run ${run}!"
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			retry=0
+			continue
+		fi
+
+		# Make Sure We Only Got *1* Data File...! ;-D
+		ckone=`echo "${datafile}" | ${WC} | ${AWK} '{print $1}'`
+
+		if [[ ${ckone} != 1 ]]; then
+			echo -e -n "\nERROR: Multiple Output Stream Files Found "
+			echo "for Run ${run}!"
+			echo -e "\n${datafile}\n"
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			retry=0
+			continue
+		fi
+
+		echo -e -n "\nFound ${SMS_WHICH_DATA_FILE} "
+		echo "ADARA Output Stream File for Run ${run}:"
+		echo -e "\t[${datafile}]"
+
+		#
+		# Capture the Line Number Bounds of First/Last "RunInfo" Section,
+		# for Limiting Range of Subsequent Substitutions...
+		#
+
+		runinfo_lines_wnum=`${GREP} --text -n \
+			-e "<runinfo " -e "</runinfo>" \
+			"${rundir}/${datafile}"`
+		ckruninfolines=$?
+
+		if [[ ${ckruninfolines} != 0 ]]; then
+			echo -e -n "\nERROR Extracting RunInfo Section Lines "
+			echo "from Stream File for Run ${run}!"
+			echo -e "\n\t[${runinfo_lines_wnum}]"
+			### Try the "2nd" or "Next to Last" File... (Increase Index)
+			CHECK_PROCEED \
+				"Do You Want To Increment The File Index and Retry"
+			_ckincrindex=$?
+			if [[ ${_ckincrindex} != 0 ]]; then
+				retry=0
+				continue
+			else
+				index=$(( index + 1 ))
+				retry=1
+			fi
+		else
+			found=1
+			retry=0
+		fi
+
+	done
 
 	#
-	# Capture the Line Number Bounds of First/Last "RunInfo" Section,
-	# for Limiting Range of Subsequent Substitutions...
+	# If We Did Not Find a Data File, Continue with Next Run Number...
 	#
 
-	runinfo_lines_wnum=`${GREP} --text -n -e "<runinfo " -e "</runinfo>" \
-		"${rundir}/${datafile}"`
-	ckruninfolines=$?
-
-	if [[ ${ckruninfolines} != 0 ]]; then
-		echo -e -n "\nERROR Extracting RunInfo Section Lines "
-		echo "from Stream File for Run ${run}!"
-		echo -e "\n\t[${runinfo_lines_wnum}]"
-		### TODO: Try the "2nd" or "Next to Last" File...?
+	if [[ $found == 0 ]]; then
 		echo -e "\nContinuing with Next Run Number..."
 		continue
 	fi
