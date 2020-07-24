@@ -5,6 +5,21 @@
 # Track things like Memory/CPU Usage, as well as Note If/When PVSD Fails!
 # (and maybe even notify via email or text message on a crash...! :-)
 #
+# Also Check AdaraMonitor Status PVs while we're at it... ;-D
+#
+
+# Source Controls Environment (for ${BL} env setting):
+if [ -e /etc/profile.d/controls.sh ] ; then
+	source /etc/profile.d/controls.sh
+fi
+
+ADARA_MONITOR_PVS="${BL}:CS:Adara:PVStreamer \
+	${BL}:CS:Adara:DASMon \
+	${BL}:CS:Adara:MonitorPVs \
+	${BL}:CS:Adara:Workflow \
+	${BL}:CS:Adara:Catalog \
+	${BL}:CS:Adara:Reduction \
+	${BL}:CS:Adara:Stat"
 
 LOG_HOME="/SNS/users/y8y"
 
@@ -25,6 +40,8 @@ PVSD_LOG="/var/log/pvsd.log"
 PROG="pvsd_mon"
 
 TIME="/usr/bin/time" # for Test Harness, duh... ;-b
+
+WAIT="-w 9" # for caget wait... ;-)
 
 #
 # Parse Command Line Options... ;-)
@@ -68,6 +85,71 @@ if [ "#$status#" == '##' ]; then
 		# Just Exit Cleanly, Nothing to log here... ;-D
 		exit 0
 	fi
+fi
+
+#
+# Check ADARA Monitor Status PVs...
+#
+
+if [ $do_notify == 1 ]; then
+
+	for pv in ${ADARA_MONITOR_PVS} ; do
+
+		#echo "pv=[${pv}]"
+
+		# Try 3 Times to Get the Status PV, as Needed...
+
+		cnt=0
+
+		while [[ $cnt -lt 3 ]]; do
+
+			# Ignore Odd Channel Access
+			# "Duplicate EPICS CA Address" Warnings...
+			pvstat=`caget ${WAIT} "${pv}" 2>&1`
+
+			# Did We Time Out Connecting to the Status PV...?
+			if [[ "$pvstat" =~ Channel${S}connect${S}timed${S}out ]]; then
+				echo "Channel Connect Timed Out on: ${pv}..."
+				cnt=$(( $cnt + 1 ))
+			else
+				break
+			fi
+			
+		done
+
+		if [[ "$pvstat" =~ Channel${S}connect${S}timed${S}out ]]; then
+
+			echo -e -n "Error on ${host}: Timed Out $cnt Times"
+			echo -e " on ADARA Monitor Status PV!\n"
+			echo -e "   [${pv}]\n"
+			echo -e "   -> ${pvstat}\n"
+
+			caget ${WAIT} "${pv}"
+
+			echo
+
+		else
+
+			# Strip Off Actual PV Status Value...
+			pvstat=`echo "${pvstat}" \
+				| grep -v "Warning" | awk '{print $2}'`
+
+			if [[ "${pvstat}" != "OK" ]]; then
+
+				echo -e "Error on ${host}: ADARA Monitor Status Not OK!\n"
+				echo -e "   [${pv}]\n"
+				echo -e "   -> ${pvstat}\n"
+
+				caget ${WAIT} "${pv}"
+
+				echo
+
+			fi
+
+		fi
+
+	done
+
 fi
 
 # Extract statistics of interest
