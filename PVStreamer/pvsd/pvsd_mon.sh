@@ -23,6 +23,8 @@ ADARA_MONITOR_PVS="${BL}:CS:Adara:PVStreamer \
 
 LOG_HOME="/SNS/users/y8y"
 
+S="[[:space:]]"
+
 host=`hostname`
 #echo "host=$host"
 
@@ -120,9 +122,9 @@ if [ $do_notify == 1 ]; then
 		if [[ "$pvstat" =~ Channel${S}connect${S}timed${S}out ]]; then
 
 			echo -e -n "Error on ${host}: Timed Out $cnt Times"
-			echo -e " on ADARA Monitor Status PV!\n"
-			echo -e "   [${pv}]\n"
-			echo -e "   -> ${pvstat}\n"
+			echo -e " on ADARA Monitor Status PV!"
+			echo -e "   [${pv}]"
+			echo -e "      -> ${pvstat}"
 
 			caget ${WAIT} "${pv}"
 
@@ -136,9 +138,8 @@ if [ $do_notify == 1 ]; then
 
 			if [[ "${pvstat}" != "OK" ]]; then
 
-				echo -e "Error on ${host}: ADARA Monitor Status Not OK!\n"
-				echo -e "   [${pv}]\n"
-				echo -e "   -> ${pvstat}\n"
+				echo -e "Error on ${host}: ADARA Monitor Status Not OK!"
+				echo -e "   [${pv}] -> ${pvstat}"
 
 				caget ${WAIT} "${pv}"
 
