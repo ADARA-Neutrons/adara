@@ -149,12 +149,13 @@ namespace DataFlags {
 
 namespace RunStatus {
 	enum Enum {
-		NO_RUN	= 0,
-		NEW_RUN	= 1,
-		RUN_EOF	= 2,
-		RUN_BOF	= 3,
-		END_RUN	= 4,
-		STATE	= 5,
+		NO_RUN		= 0,
+		NEW_RUN		= 1,
+		RUN_EOF		= 2,
+		RUN_BOF		= 3,
+		END_RUN		= 4,
+		STATE		= 5,
+		PROLOGUE	= 6,
 	};
 }
 
