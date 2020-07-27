@@ -14,6 +14,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.RunInfo"));
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
+#include "ADARAUtils.h"
 #include "RunInfo.h"
 #include "StorageManager.h"
 #include "SMSControl.h"
@@ -402,8 +403,8 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 		SMSControl *ctrl, bool sendSampleInRunInfo ) :
 	m_facility(facility), m_beamline(beamline), m_ctrl(ctrl),
 	m_sendSampleInRunInfo(sendSampleInRunInfo),
-	m_runNumber(0), m_packetValid(false),
-	m_packet(NULL), m_packetSize(0)
+	m_runNumber(0), m_lastRunNumber(0),
+	m_packetValid(false), m_packet(NULL), m_packetSize(0)
 {
 	std::string prefix(beamline);
 	prefix += ":SMS:RunInfo:";
@@ -557,7 +558,7 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 	 */
 
 	m_connection = StorageManager::onPrologue(
-		boost::bind(&RunInfo::onPrologue, this));
+		boost::bind(&RunInfo::onPrologue, this, _1));
 
 	// Restore Any PVs to AutoSaved Config Values...
 
@@ -808,7 +809,7 @@ void RunInfo::pvChanged( RunInfoPV* pv )
 
 extern std::string SMSD_VERSION;
 
-bool RunInfo::generatePacket(void)
+bool RunInfo::generatePacket( uint32_t runNumber )
 {
 	if (m_packetValid)
 		return(false);
@@ -837,7 +838,7 @@ bool RunInfo::generatePacket(void)
 	xml += "</instrument_name>\n";
 
 	xml += "   <run_number>";
-	xml += boost::lexical_cast<std::string>(m_runNumber);
+	xml += boost::lexical_cast<std::string>(runNumber);
 	xml += "</run_number>\n";
 
 	addUserInfo(xml, m_userPV->value());
@@ -892,10 +893,23 @@ bool RunInfo::generatePacket(void)
 	return(true);
 }
 
-void RunInfo::onPrologue(void)
+void RunInfo::onPrologue( bool capture_last )
 {
-	if (m_runNumber) {
-		generatePacket();
+	// When Capturing Prologue Headers, Always Refer to *Last* Run Number
+	// (Or the Lack Thereof), as We Capture Prologue Headers Only
+	// _After_ the Run Number has Already Changed... ;-D
+
+	if ( capture_last ) {
+		if ( m_lastRunNumber ) {
+			generatePacket( m_lastRunNumber );
+			StorageManager::addPrologue(m_packet, m_packetSize);
+		}
+	}
+
+	// Normal Operation, Only Dump RunInfo Packet When In A Run...
+
+	else if ( m_runNumber ) {
+		generatePacket( m_runNumber );
 		StorageManager::addPrologue(m_packet, m_packetSize);
 	}
 }

@@ -39,6 +39,7 @@ public:
 
 	void setRunNumber(uint32_t run) {
 		m_packetValid = false;
+		m_lastRunNumber = m_runNumber;
 		m_runNumber = run;
 	}
 
@@ -50,7 +51,7 @@ public:
 
 	void checkPacket() {
 		if (m_runNumber) {
-			if (generatePacket()) {
+			if (generatePacket(m_runNumber)) {
 				// Note: generatePacket() Uses Wallclock Time for the
 				// RunInfo Packet, which is Fine for Production,
 				// But Screws Up the Test Harness/Replay,
@@ -122,6 +123,7 @@ private:
 	RunInfoFloat64PVSharedPtr m_volumeCubicFloat64PV;
 
 	uint32_t m_runNumber;
+	uint32_t m_lastRunNumber;
 	bool m_packetValid;
 	uint8_t *m_packet;
 	uint32_t m_packetSize;
@@ -130,8 +132,10 @@ private:
 
 	RunInfoPVSharedPtr addPV(const std::string &prefix, const char *pv_name,
 		   const char *xml_name, RunInfoMap &map);
-	bool generatePacket(void);
-	void onPrologue(void);
+
+	bool generatePacket(uint32_t runNumber);
+
+	void onPrologue( bool capture_last );
 };
 
 #endif /* __RUNINFO_H */
