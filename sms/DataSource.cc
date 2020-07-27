@@ -1314,7 +1314,8 @@ DataSource::DataSource( const std::string &name,
 	// Register for Signal to Dump Device Descriptor & Starting Values
 	// into Saved Input Streams...
 	m_connection = StorageManager::onSavePrologue(
-		boost::bind(&DataSource::onSavePrologue, this), m_smsSourceId );
+		boost::bind(&DataSource::onSavePrologue, this, _1),
+		m_smsSourceId );
 
 	// "Enabled" PV Update Triggers "startConnect()" when Enabled... :-D
 	// (Possibly Using TimeStamp from AutoSaved Value... ;-D)
@@ -3575,7 +3576,7 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 	return false;
 }
 
-void DataSource::onSavePrologue(void)
+void DataSource::onSavePrologue( bool UNUSED(capture_last) )
 {
 	// Make a Little Stream Annotation Packet for This Saved Input Stream
 

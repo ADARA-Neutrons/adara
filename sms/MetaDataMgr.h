@@ -81,7 +81,7 @@ private:
 	void updateVariable(uint32_t dev, uint32_t varId,
 			    PacketSharedPtr &inPkt, uint32_t srcTag);
 
-	void onPrologue(void);
+	void onPrologue( bool capture_last );
 };
 
 #endif /* __METADATAMGR_H */

@@ -19,6 +19,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
 #include <boost/bind.hpp>
 
 #include "ADARA.h"
+#include "ADARAUtils.h"
 #include "PixelMap.h"
 #include "StorageManager.h"
 
@@ -450,7 +451,7 @@ PixelMap::PixelMap(const std::string &path,
 		m_packet = genAltPacket(map.get(), m_packetSize);
 
 	m_connection = StorageManager::onPrologue(
-				boost::bind(&PixelMap::onPrologue, this));
+				boost::bind(&PixelMap::onPrologue, this, _1));
 
 	INFO("Done with Pixel Map.");
 }
@@ -460,7 +461,7 @@ PixelMap::~PixelMap()
 	m_connection.disconnect();
 }
 
-void PixelMap::onPrologue(void)
+void PixelMap::onPrologue( bool UNUSED(capture_last) )
 {
 	StorageManager::addPrologue(m_packet.get(), m_packetSize);
 }

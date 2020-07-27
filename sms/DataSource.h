@@ -220,7 +220,7 @@ private:
 	void updateBandwidthMinute(struct timespec &now, bool do_log);
 	void updateBandwidthTenMin(struct timespec &now, bool do_log);
 
-	void onSavePrologue(void);
+	void onSavePrologue(bool capture_last);
 
 	// Device Descriptor and Variable Packet Tracking
 	// (for Saved Input Stream File Prologue...)

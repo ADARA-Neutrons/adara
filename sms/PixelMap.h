@@ -76,7 +76,7 @@ private:
 	uint32_t m_numBanks;
 	boost::signals2::connection m_connection;
 
-	void onPrologue(void);
+	void onPrologue( bool capture_last );
 };
 
 #endif /* __PIXEL_MAP_H */

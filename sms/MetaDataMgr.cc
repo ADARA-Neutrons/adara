@@ -38,7 +38,7 @@ RateLimitedLogging::History RLLHistory_MetaDataMgr;
 MetaDataMgr::MetaDataMgr() : m_nextMappedDevId(1)
 {
 	m_connection = StorageManager::onPrologue(
-				boost::bind( &MetaDataMgr::onPrologue, this ) );
+				boost::bind( &MetaDataMgr::onPrologue, this, _1 ) );
 }
 
 MetaDataMgr::~MetaDataMgr()
@@ -746,7 +746,7 @@ void MetaDataMgr::updateVariable( uint32_t dev, uint32_t varId,
 	varPktMap[varId] = inPkt;
 }
 
-void MetaDataMgr::onPrologue(void)
+void MetaDataMgr::onPrologue( bool UNUSED(capture_last) )
 {
 	DeviceMap::iterator dit, dend = m_devices.end();
 	for ( dit = m_devices.begin(); dit != dend; ++dit ) {

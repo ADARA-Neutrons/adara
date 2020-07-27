@@ -1016,7 +1016,7 @@ DetectorBankSet::DetectorBankSet(const boost::property_tree::ptree & conf)
 	// Set Up Callback for Adding Detector Bank Set Config to Prologue...
 
 	m_connection = StorageManager::onPrologue(
-				boost::bind(&DetectorBankSet::onPrologue, this));
+				boost::bind(&DetectorBankSet::onPrologue, this, _1));
 }
 
 DetectorBankSet::~DetectorBankSet()
@@ -1076,7 +1076,7 @@ void DetectorBankSet::resetPacketTime(void)
 	fields[3] = ts.tv_nsec;
 }
 
-void DetectorBankSet::onPrologue(void)
+void DetectorBankSet::onPrologue( bool UNUSED(capture_last) )
 {
 	// Update Prologue Packet with Latest Detector Bank Set Configs...
 	std::vector<DetectorBankSetInfo *>::iterator dbs;
