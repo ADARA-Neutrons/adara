@@ -85,13 +85,21 @@ private:
 	bool m_inRun;
 	bool m_isPaused;
 	bool m_isPausedPT;
+
+	bool m_lastInRun;
+	bool m_lastIsPaused;
+
 	bool m_notesCommentSet;
 	bool m_notesCommentAutoReset;
 	bool m_useFirstNotesComment;
 
 	uint32_t m_runNumber;
 
+	uint32_t m_lastRunNumber;
+
 	uint32_t m_scanIndex;
+
+	uint32_t m_lastScanIndex;
 
 	MarkerQueue pauseQueue;
 	MarkerQueue resumeQueue;

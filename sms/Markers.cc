@@ -95,10 +95,11 @@ private:
 
 Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	m_ctrl(ctrl), m_inRun(false), m_isPaused(false), m_isPausedPT(false),
+	m_lastInRun(false), m_lastIsPaused(false),
 	m_notesCommentSet(false),
 	m_notesCommentAutoReset(notesCommentAutoReset),
 	m_useFirstNotesComment(false),
-	m_runNumber(0), m_scanIndex(0)
+	m_runNumber(0), m_lastRunNumber(0), m_scanIndex(0), m_lastScanIndex(0)
 {
 	std::string prefix(ctrl->getBeamlineId());
 	prefix += ":SMS:";
@@ -203,6 +204,7 @@ void Markers::beforeNewRun( uint32_t runNumber )
 	clock_gettime( CLOCK_REALTIME, &now );
 
 	// Save Run Number for Run Stop Comment...
+	m_lastRunNumber = m_runNumber;
 	m_runNumber = runNumber;
 
 	/* Reset the scan index, comment, and paused flag at the start of
@@ -214,6 +216,7 @@ void Markers::beforeNewRun( uint32_t runNumber )
 	if ( m_pausedPV->value() ) {
 		// Set Paused State _Before_ Resume,
 		// for Next Prologue to Use Queued...
+		m_lastIsPaused = m_isPaused;
 		m_isPaused = false;
 		// Clean Up Container before Actual Start!
 		// NOTE: Triggers New File/Prologue with _Current_ State...!
@@ -242,6 +245,7 @@ void Markers::beforeNewRun( uint32_t runNumber )
 			std::pair<struct timespec, std::string>( now,
 				ss_scan.str() + "[PRE-RUN] " + comment ) );
 		m_indexPV->update(0, &now);
+		m_lastScanIndex = m_scanIndex;
 		m_scanIndex = 0;
 	}
 
@@ -265,6 +269,7 @@ void Markers::beforeNewRun( uint32_t runNumber )
 	}
 
 	// Run is About to Start Now...
+	m_lastInRun = m_inRun;
 	m_inRun = true;
 }
 
@@ -284,6 +289,7 @@ void Markers::runStop(void)
 	if ( m_pausedPV->value() ) {
 		// Set Paused State _Before_ Resume,
 		// for Next Prologue to Use Queued...
+		m_lastIsPaused = m_isPaused;
 		m_isPaused = false;
 		// Clean Up Container before Full Stop!
 		// Thwart Impending "Scan Start Continuation" Packet
@@ -316,6 +322,7 @@ void Markers::runStop(void)
 		emitPacket( now, ADARA::MarkerType::SCAN_STOP, m_scanIndex,
 			"", "Warning: Scan Stopped at Run Stop!" );
 		m_indexPV->update( 0, &now );
+		m_lastScanIndex = m_scanIndex;
 		m_scanIndex = 0;
 	}
 
@@ -338,6 +345,7 @@ void Markers::runStop(void)
 	}
 
 	// No Longer in a Run Now...
+	m_lastInRun = m_inRun;
 	m_inRun = false;
 
 	// Reset Run Notes Set Flag, Allow Set Again for Next Run...
@@ -375,6 +383,7 @@ void Markers::pause( struct timespec *ts,
 	{
 		// Set Paused State _Before_ Pause for Next Prologue to Skip Queued
 		m_isPaused = true;
+		m_lastIsPaused = m_isPaused; // Mirror Explicit Pause State Change
 		// NOTE: Triggers New File/Prologue with _Current_ State...!
 		m_ctrl->pauseRecording();
 	}
@@ -419,6 +428,7 @@ void Markers::resume( struct timespec *ts,
 	{
 		// Set Paused State _Before_ Resume for Next Prologue to Use Queued
 		m_isPaused = false;
+		m_lastIsPaused = m_isPaused; // Mirror Explicit Pause State Change
 		// NOTE: Triggers New File/Prologue with _Current_ State...!
 		m_ctrl->resumeRecording();
 	}
@@ -454,6 +464,7 @@ void Markers::startScan( struct timespec *ts,
 		// Already Added on Scan Comment PV Set...
 		comment = "";
 		m_scanIndex = m_indexPV->value();
+		m_lastScanIndex = m_scanIndex; // Mirror Explicit Scan Index Change
 		scanIndex = m_scanIndex;
 	}
 
@@ -500,6 +511,7 @@ void Markers::stopScan( struct timespec *ts,
 		comment = "";
 		scanIndex = m_scanIndex;
 		m_scanIndex = 0;
+		m_lastScanIndex = m_scanIndex; // Mirror Explicit Scan Index Change
 	}
 
 	std::stringstream ss;
@@ -981,8 +993,30 @@ void Markers::dumpRunNotesComment( bool prologue )
 
 void Markers::dumpQueuedComments( bool prologue, bool capture_last )
 {
+	uint32_t runNumber;
+	uint32_t scanIndex;
+	uint32_t isPaused;
+	uint32_t inRun;
+
+	// Snag Proper State Depending on Whether This is a Real Dump,
+	// Or Simply a "Captured" Last Prologue Header...
+	if ( capture_last )
+	{
+		runNumber = m_lastRunNumber;
+		scanIndex = m_lastScanIndex;
+		isPaused = m_lastIsPaused;
+		inRun = m_lastInRun;
+	}
+	else
+	{
+		runNumber = m_runNumber;
+		scanIndex = m_scanIndex;
+		isPaused = m_isPaused;
+		inRun = m_inRun;
+	}
+
 	// Keep Saving Things Until a Run Actually Starts (& Un-Pauses!)
-	if ( !m_inRun || m_isPaused )
+	if ( !inRun || isPaused )
 		return;
 
 	MarkerQueue::iterator pause_it = pauseQueue.begin();
@@ -1103,24 +1137,24 @@ void Markers::dumpQueuedComments( bool prologue, bool capture_last )
 
 		// Handle Scan Index Decoding from Saved Comment String... ;-Q
 		std::string comment = next_it->second;
-		uint32_t scanIndex = m_scanIndex; // Use as Default if Not a Scan
+		uint32_t use_scanIndex = scanIndex; // Use as Default if Not a Scan
 		std::stringstream ss_scan;
 		if ( is_scan )
 		{
 			std::size_t found;
 			if ( (found = comment.find("|")) != std::string::npos )
 			{
-				scanIndex = boost::lexical_cast<uint32_t>(
+				use_scanIndex = boost::lexical_cast<uint32_t>(
 					comment.substr( 0, found ) );
 				comment = comment.substr( found + 1 );
 			}
-			ss_scan << "scanIndex=" << scanIndex << " ";
+			ss_scan << "scanIndex=" << use_scanIndex << " ";
 		}
 
 		// Dump Next Comment/Marker...
 		std::stringstream ss;
 		ss << "dumpQueuedComments()"
-			<< " Run " << m_runNumber << ": "
+			<< " Run " << runNumber << ": "
 			<< desc << " MarkerType=" << markerType << " at "
 			<< next_it->first.tv_sec - ADARA::EPICS_EPOCH_OFFSET
 			<< "." << std::setfill('0') << std::setw(9)
@@ -1132,7 +1166,7 @@ void Markers::dumpQueuedComments( bool prologue, bool capture_last )
 		else
 			DEBUG( ss.str() );
 
-		emitPacket( next_it->first, markerType, scanIndex,
+		emitPacket( next_it->first, markerType, use_scanIndex,
 			prefix, comment, prologue );
 
 		// Increment Given Iterator...
@@ -1185,6 +1219,30 @@ void Markers::dumpQueuedComments( bool prologue, bool capture_last )
 
 void Markers::onPrologue( bool capture_last )
 {
+	uint32_t runNumber;
+	uint32_t scanIndex;
+	uint32_t isPaused;
+	uint32_t inRun;
+
+	// Snag Proper State Depending on Whether This is a Real Dump,
+	// Or Simply a "Captured" Last Prologue Header...
+	if ( capture_last )
+	{
+		runNumber = m_lastRunNumber;
+		scanIndex = m_lastScanIndex;
+		isPaused = m_lastIsPaused;
+		inRun = m_lastInRun;
+	}
+	else
+	{
+		runNumber = m_runNumber;
+		scanIndex = m_scanIndex;
+		isPaused = m_isPaused;
+		inRun = m_inRun;
+	}
+
+	// Skip Irreversible Run Notes State Change
+	// If Only Capturing Last Prologue Header...
 	if ( !capture_last )
 	{
 		// Dump Latest of Any Interim Run Notes Comment
@@ -1195,29 +1253,29 @@ void Markers::onPrologue( bool capture_last )
 	// Dump Any Pre-Run Scan Comments Now...
 	dumpQueuedComments( true, capture_last );
 
-	if ( m_scanIndex )
+	if ( scanIndex )
 	{
 		std::stringstream ss;
 		ss << "[NEW RUN FILE CONTINUATION] ";
-		if ( !m_inRun )
+		if ( !inRun )
 			ss << "[PRE-RUN] ";
-		else if ( m_isPaused || m_isPausedPT )
-			ss << "[PAUSED Run " << m_runNumber << "] ";
+		else if ( isPaused || m_isPausedPT )
+			ss << "[PAUSED Run " << runNumber << "] ";
 		else
-			ss << "[Run " << m_runNumber << "] ";
-		ss << "Scan #" << m_scanIndex << " Started.";
+			ss << "[Run " << runNumber << "] ";
+		ss << "Scan #" << scanIndex << " Started.";
 		DEBUG("onPrologue() " << ss.str());
 		emitPrologue( ADARA::MarkerType::SCAN_START, ss.str() );
 	}
 
-	if ( m_isPaused )
+	if ( isPaused )
 	{
 		std::stringstream ss;
 		ss << "[NEW RUN FILE CONTINUATION] ";
-		if ( !m_inRun )
+		if ( !inRun )
 			ss << "[PRE-RUN] ";
 		ss << "Run ";
-		if ( m_inRun ) ss << m_runNumber << " ";
+		if ( inRun ) ss << runNumber << " ";
 		ss << "Paused.";
 		DEBUG("onPrologue() " << ss.str());
 		emitPrologue( ADARA::MarkerType::PAUSE, ss.str() );
