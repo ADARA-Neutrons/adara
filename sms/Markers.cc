@@ -155,7 +155,7 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	ctrl->addPV(m_annotationCommentPV);
 
 	m_connection = StorageManager::onPrologue(
-				boost::bind( &Markers::onPrologue, this ) );
+				boost::bind( &Markers::onPrologue, this, _1 ) );
 
 	// Initialize Notes Comment Auto Reset PV...
 	struct timespec now;
@@ -979,7 +979,7 @@ void Markers::dumpRunNotesComment( bool prologue )
 	// (...Done in dumpQueuedComments() to Interleave with Other Queues...)
 }
 
-void Markers::dumpQueuedComments( bool prologue )
+void Markers::dumpQueuedComments( bool prologue, bool capture_last )
 {
 	// Keep Saving Things Until a Run Actually Starts (& Un-Pauses!)
 	if ( !m_inRun || m_isPaused )
@@ -1154,38 +1154,46 @@ void Markers::dumpQueuedComments( bool prologue )
 			system_it++;
 	}
 
-	// Clear Out Queued Pauses
-	pauseQueue.clear();
+	// Only Clear Out Queued Markers If _Not_ Capturing Last Prologue...!
+	if ( !capture_last )
+	{
+		// Clear Out Queued Pauses
+		pauseQueue.clear();
 
-	// Clear Out Queued Resumes
-	resumeQueue.clear();
+		// Clear Out Queued Resumes
+		resumeQueue.clear();
 
-	// Clear Out Queued Scan Starts
-	scanStartQueue.clear();
+		// Clear Out Queued Scan Starts
+		scanStartQueue.clear();
 
-	// Clear Out Queued Scan Stops
-	scanStopQueue.clear();
+		// Clear Out Queued Scan Stops
+		scanStopQueue.clear();
 
-	// Clear Out Queued Scan Comments
-	scanCommentQueue.clear();
+		// Clear Out Queued Scan Comments
+		scanCommentQueue.clear();
 
-	// Clear Out Queued Run Notes Comments
-	notesCommentQueue.clear();
+		// Clear Out Queued Run Notes Comments
+		notesCommentQueue.clear();
 
-	// Clear Out Queued Annotation Comments
-	annotationCommentQueue.clear();
+		// Clear Out Queued Annotation Comments
+		annotationCommentQueue.clear();
 
-	// Clear Out Queued System Comments
-	systemCommentQueue.clear();
+		// Clear Out Queued System Comments
+		systemCommentQueue.clear();
+	}
 }
 
-void Markers::onPrologue(void)
+void Markers::onPrologue( bool capture_last )
 {
-	// Dump Latest of Any Interim Run Notes Comment (Log Any Intervening)
-	dumpRunNotesComment( true );
+	if ( !capture_last )
+	{
+		// Dump Latest of Any Interim Run Notes Comment
+		// (Log Any Intervening)
+		dumpRunNotesComment( true );
+	}
 
 	// Dump Any Pre-Run Scan Comments Now...
-	dumpQueuedComments( true );
+	dumpQueuedComments( true, capture_last );
 
 	if ( m_scanIndex )
 	{

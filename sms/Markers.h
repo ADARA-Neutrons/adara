@@ -103,9 +103,10 @@ private:
 	MarkerQueue systemCommentQueue;
 
 	void dumpRunNotesComment( bool prologue = false );
-	void dumpQueuedComments( bool prologue = false );
+	void dumpQueuedComments( bool prologue = false,
+		bool capture_last = false );
 
-	void onPrologue(void);
+	void onPrologue( bool capture_last );
 
 	void emitPrologue( ADARA::MarkerType::Enum, std::string comment = "" );
 
