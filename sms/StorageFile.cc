@@ -111,7 +111,7 @@ void StorageFile::put_fd(void)
 	}
 }
 
-void StorageFile::makePath(void)
+void StorageFile::makePath(bool is_prologue)
 {
 	StorageContainer::SharedPtr c = m_owner.lock();
 	char name[32];
@@ -125,13 +125,26 @@ void StorageFile::makePath(void)
 
 	m_path = c->name();
 
-	if ( m_paused ) {
-		snprintf(name, sizeof(name), "/f%08u-p%08u",
-			m_fileNumber, m_pauseFileNumber);
+	if (is_prologue) {
+		if (m_fileNumber) {
+			snprintf(name, sizeof(name), "/prologue-ds%08u",
+				m_pauseFileNumber);
+		}
+		else {
+			snprintf(name, sizeof(name), "/prologue");
+		}
 	}
+
 	else {
-		snprintf(name, sizeof(name), "/f%08u", m_fileNumber);
+		if ( m_paused ) {
+			snprintf(name, sizeof(name), "/f%08u-p%08u",
+				m_fileNumber, m_pauseFileNumber);
+		}
+		else {
+			snprintf(name, sizeof(name), "/f%08u", m_fileNumber);
+		}
 	}
+
 	m_path += name;
 
 	if (m_runNumber) {
@@ -600,10 +613,12 @@ StorageFile::SharedPtr StorageFile::newFile(OwnerPtr owner,
 	StorageFile::SharedPtr f(
 		new StorageFile(owner, fileNumber, pauseFileNumber) );
 	f->m_active = true;
-	f->makePath();
+	f->makePath( status == ADARA::RunStatus::PROLOGUE );
 	f->open(O_CREAT|O_EXCL|O_RDWR);
-	f->addSync();
-	f->addRunStatus(status);
+	if ( status != ADARA::RunStatus::PROLOGUE ) {
+		f->addSync();
+		f->addRunStatus(status);
+	}
 	return f;
 }
 
@@ -861,5 +876,136 @@ uint64_t StorageFile::fileSize(const std::string &path)
 	uint64_t file_size = statbuf.st_size;
 
 	return( file_size );
+}
+
+bool StorageFile::catFile(StorageFile::SharedPtr src)
+{
+	char buf[1024];
+	uint8_t *p;
+
+	int nbytes, len, rc;
+	int src_fd;
+
+	bool ret = true;
+
+	// Make Sure We Got A Real Source File... ;-D
+	if ( !src ) {
+		ERROR("catFile(): Error Empty Source File!");
+		return( false );
+	}
+
+	// Open Source File & Retrieve File Descriptor...
+	try {
+		src_fd = src->get_fd();
+	} catch (std::runtime_error re) {
+		ERROR("catFile(): Unable to Open Source File "
+			<< src->m_path << ": " << re.what());
+		return( false );
+	}
+
+	// Repeatedly Read A Buffer from Source File
+	// And Concatenate the Buffer to This File...
+	while ( ret == true ) {
+
+		// Check Source File Descriptor...
+		if ( src_fd < 0 ) {
+			ERROR("catFile(): Invalid File Descriptor"
+				<< " for Source File " << src->m_path);
+			return( false );
+		}
+
+		// Read Buffer from Source File...
+		// NOTE: This is Standard C Library read()... ;-o
+		rc = ::read( src_fd, buf, sizeof(buf) );
+
+		if ( rc == (ssize_t) -1 ) {
+			if (errno != EAGAIN && errno != EINTR) {
+				int e = errno;
+				ERROR("catFile(): Unable to Read Source File "
+					<< src->m_path << " src_fd=" << src_fd << " - "
+					<< strerror(e));
+				// *Don't* Throw Exception Here, Just Limp Along
+				// and Wait for Help/Restart... ;-D
+				if ( src_fd >= 0 ) {
+					DEBUG("Close Dead src_fd=" << src_fd);
+					src->put_fd();
+					src_fd = -1;
+				}
+				return( false );
+			}
+			nbytes = 0;
+		}
+		else {
+			// REMOVEME
+			DEBUG("catFile(): Read " << rc << " Bytes"
+				" from Source File " << src->m_path);
+			nbytes = rc;
+			if ( nbytes == 0 ) {
+				// REMOVEME
+				DEBUG("catFile(): End of File for Source File "
+					<< src->m_path);
+				break;
+			}
+		}
+
+		// Concatenate Buffer to This File...
+
+		p = (uint8_t *) buf;
+
+		for ( len=nbytes ; len ; len -= rc ) {
+
+			// Check File Descriptor...
+			if (m_fd < 0) {
+				ERROR("catFile(): Invalid File Descriptor!"
+					<< " m_fd=" << m_fd);
+				// This Will Require Cleanup of Raw Data File... ;-b
+				if (len != nbytes) {
+					ERROR("catFile(): BUMMER!"
+						<< " Partial Write Before Failure -"
+						<< " wrote " << (nbytes - len) << " bytes"
+						<< " of " << nbytes << " bytes from This Buffer"
+						<< " of the Source File " << src->m_path);
+				}
+				ret = false;
+				break;
+			}
+
+			rc = ::write(m_fd, p, len);
+			if (rc <= 0) {
+				if (errno == EAGAIN || errno == EINTR)
+					continue;
+
+				// *Don't* Throw Exception Here...!
+				// We can live without Sync point in Raw Data files...
+				// Whine Loudly tho. ;-D
+				int err = errno;
+				ERROR("catFile() Write Error: "
+					<< "m_fd=" << m_fd << " - "
+					<< strerror(err));
+				// This Will Require Cleanup of Raw Data File... ;-b
+				if (len != nbytes) {
+					ERROR("catFile(): BUMMER!"
+						<< " Partial Write Before Failure -"
+						<< " wrote " << (nbytes - len) << " bytes"
+						<< " of " << nbytes << " bytes from This Buffer"
+						<< " of the Source File " << src->m_path);
+				}
+				ret = false;
+				break;
+			}
+
+			m_syncDistance += rc;
+			m_size += rc;
+			p += rc;
+		}
+	}
+
+	// Close Source File...
+	if ( src_fd >= 0 ) {
+		src->put_fd();
+		src_fd = -1;
+	}
+
+	return( ret );
 }
 

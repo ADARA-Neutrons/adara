@@ -73,6 +73,8 @@ public:
 	bool save(IoVector &iovec, uint32_t len, uint32_t *written = NULL);
 	void terminateSave(void);
 
+	bool catFile(SharedPtr src);
+
 	~StorageFile();
 
 	static void config(const boost::property_tree::ptree &conf);
@@ -100,7 +102,7 @@ private:
 	static off_t m_max_file_size;
 	static off_t m_max_sync_distance;
 
-	void makePath(void);
+	void makePath(bool is_prologue);
 	void open(int flags);
 	void addSync(void);
 	void addRunStatus(ADARA::RunStatus::Enum status);
