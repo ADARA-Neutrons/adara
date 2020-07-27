@@ -65,7 +65,24 @@ public:
 
 	StorageFile::SharedPtr &file(void) { return m_cur_file; }
 
-	StorageFile::SharedPtr &prologueFile(void) { return m_prologueFile; }
+	StorageFile::SharedPtr &lastPrologueFile(void)
+		{ return m_lastPrologueFile; }
+
+	StorageFile::SharedPtr &lastSavePrologueFile(uint32_t dataSourceId)
+	{
+		if ( dataSourceId < m_ds_input_files.size()
+				&& m_lastSavePrologueFiles[dataSourceId] ) {
+			return m_lastSavePrologueFiles[dataSourceId];
+		}
+		else
+			return m_dummy_file;
+	}
+
+	void getLastPrologueFiles(void);
+
+	void copyLastPrologueFiles( std::string &name,
+			StorageFile::SharedPtr &lastPrologueFile,
+			std::vector<StorageFile::SharedPtr> &lastSavePrologueFiles );
 
 	void getFiles(std::list<StorageFile::SharedPtr> &list);
 
@@ -98,7 +115,8 @@ private:
 	uint32_t m_totFileCount;
 	std::string m_name;
 	StorageFile::SharedPtr m_cur_file;
-	StorageFile::SharedPtr m_prologueFile;
+	StorageFile::SharedPtr m_lastPrologueFile;
+	std::vector<StorageFile::SharedPtr> m_lastSavePrologueFiles;
 	onNewFile m_newFile;
 	bool m_active;
 	bool m_paused;

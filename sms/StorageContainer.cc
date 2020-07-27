@@ -69,10 +69,26 @@ void StorageContainer::newFile(void)
 	// for Long-Non-Running Container Splitting...
 	m_totFileCount++;
 
-	/* Tell the storage manager about the new file so we can
-	 * add the prologue before anyone else sees it.
-	 */
-	StorageManager::fileCreated(m_cur_file);
+	// If We are an Old Container with a "Last" Prologue File,
+	// Just Append That File Directly Now...
+	if ( m_lastPrologueFile )
+	{
+		DEBUG("StorageContainer::newFile():"
+			<< " Directly Appending Last Prologue File "
+			<< m_lastPrologueFile->path()
+			<< " for New File "
+			<< m_cur_file->path());
+
+		m_cur_file->catFile( m_lastPrologueFile );
+	}
+
+	// Tell the storage manager about the new file so we can
+	// add the prologue before anyone else sees it.
+	else
+	{
+		StorageManager::fileCreated( m_cur_file,
+			false /* capture_last */ );
+	}
 
 	/* Notify Any Subscribers that we have a New File to process...
 	 * (_Even_ in Paused mode, subscribers can use StorageFile::paused()
@@ -230,10 +246,28 @@ bool StorageContainer::save(IoVector &iovec, uint32_t len,
 		// for Long-Non-Running Container Splitting...
 		m_totFileCount++;
 
-		/* Tell the storage manager about the new Saved Input Stream file
-		 * so we can add the prologue before anyone else sees it.
-	 	 */
-		StorageManager::saveCreated( dataSourceId );
+		// If We are an Old Container with a "Last" Save Prologue File,
+		// Just Append That File Directly Now...
+		if ( dataSourceId < m_lastSavePrologueFiles.size()
+				&& m_lastSavePrologueFiles[dataSourceId] )
+		{
+			DEBUG("StorageContainer::save():"
+				<< " Directly Appending Last Save Prologue File "
+				<< m_lastSavePrologueFiles[dataSourceId]->path()
+				<< " for New Save File "
+				<< m_ds_input_files[dataSourceId]->path());
+
+			m_ds_input_files[dataSourceId]->catFile(
+				m_lastSavePrologueFiles[dataSourceId] );
+		}
+
+		// Tell the storage manager about the new Saved Input Stream file
+		// so we can add the prologue before anyone else sees it.
+		else
+		{
+			StorageManager::saveCreated( dataSourceId,
+				false /* capture_last */ );
+		}
 	}
 
 	// TODO On Error, Should We Try to Close the Current
@@ -282,6 +316,140 @@ void StorageContainer::resume(void)
 	// Create New Non-Paused Run File to Resume Normal Data Collection
 	if (!m_cur_file)
 		newFile();
+}
+
+void StorageContainer::getLastPrologueFiles(void)
+{
+	DEBUG("getLastPrologueFiles(): Capture Prologue Headers"
+		<< " for Stacked Container " << m_name);
+
+	// Capture "Last" Prologue Header File for This Container
+	m_lastPrologueFile = StorageFile::newFile( m_weakThis,
+		0, 0, ADARA::RunStatus::PROLOGUE );
+
+	// Tell the storage manager about the new file so we can
+	// add the prologue header
+	StorageManager::fileCreated( m_lastPrologueFile,
+		true /* capture_last */ );
+
+	// Close the Prologue Header File...
+	m_lastPrologueFile->put_fd();
+
+	DEBUG("getLastPrologueFiles(): Created Raw Data Prologue Header File "
+		<< m_lastPrologueFile->path()
+		<< " for Stacked Container " << m_name);
+
+	// Allocate Last Save Prologue File Vector to
+	// Match DataSource Input Files Vector Size...
+	if ( m_ds_input_files.size() > m_lastSavePrologueFiles.size() )
+	{
+		for ( uint32_t i = m_lastSavePrologueFiles.size() ;
+				i < m_ds_input_files.size() ; i++ )
+		{
+			// Create an Entry for the Saved Input Stream Prologue File
+			// for this Data Source...
+			m_lastSavePrologueFiles.push_back( StorageFile::SharedPtr() );
+		}
+	}
+
+	// Capture a "Last" Save Prologue Header File for This Container,
+	// For Each Valid Data Source ID... :-D
+	for ( uint32_t i = 0 ; i < m_ds_input_files.size() ; i++ )
+	{
+		if ( m_ds_input_files[i] )
+		{
+			m_lastSavePrologueFiles[i] = StorageFile::newFile( m_weakThis,
+				1, i, ADARA::RunStatus::PROLOGUE );
+
+			// Tell the storage manager about the new file so we can
+			// add the save prologue header
+			StorageFile::SharedPtr tmp = m_ds_input_files[i];
+			m_ds_input_files[i] = m_lastSavePrologueFiles[i];
+			StorageManager::saveCreated( i, true /* capture_last */ );
+			m_ds_input_files[i] = tmp;
+
+			// Close the Save Prologue Header File...
+			m_lastSavePrologueFiles[i]->put_fd();
+
+			DEBUG("getLastPrologueFiles():"
+				<< " Created Saved Data Prologue Header File "
+				<< m_lastSavePrologueFiles[i]->path()
+				<< " for Data Source ID " << i
+				<< " for Stacked Container " << m_name);
+		}
+	}
+}
+
+void StorageContainer::copyLastPrologueFiles( std::string &name,
+		StorageFile::SharedPtr &lastPrologueFile,
+		std::vector<StorageFile::SharedPtr> &lastSavePrologueFiles )
+{
+	DEBUG("copyLastPrologueFiles(): Copy Over Prologue Headers"
+		<< " from Last Stacked Container " << name
+		<< " for New Stacked Container " << m_name);
+
+	// Make New "Last" Prologue Header File for This Container
+	m_lastPrologueFile = StorageFile::newFile( m_weakThis,
+		0, 0, ADARA::RunStatus::PROLOGUE );
+
+	// Copy "Last" Prologue Header File from Previous Container
+	DEBUG("copyLastPrologueFiles():"
+		<< " Appending Previous Last Prologue File "
+		<< lastPrologueFile->path()
+		<< " to New Last Prologue File "
+		<< m_lastPrologueFile->path());
+	m_lastPrologueFile->catFile( lastPrologueFile );
+
+	// Close the Prologue Header File...
+	m_lastPrologueFile->put_fd();
+
+	DEBUG("copyLastPrologueFiles(): Created Raw Data Prologue Header File "
+		<< m_lastPrologueFile->path()
+		<< " for Stacked Container " << m_name);
+
+	// Allocate Last Save Prologue File Vector to
+	// Match DataSource Input Files Vector Size...
+	if ( lastSavePrologueFiles.size() > m_lastSavePrologueFiles.size() )
+	{
+		for ( uint32_t i = m_lastSavePrologueFiles.size() ;
+				i < lastSavePrologueFiles.size() ; i++ )
+		{
+			// Create an Entry for the Saved Input Stream Prologue File
+			// for this Data Source...
+			m_lastSavePrologueFiles.push_back( StorageFile::SharedPtr() );
+		}
+	}
+
+	// Copy "Last" Save Prologue Header File from Previous Container
+	// for This Container, For Each Valid Data Source ID... :-D
+	for ( uint32_t i = 0 ; i < lastSavePrologueFiles.size() ; i++ )
+	{
+		if ( lastSavePrologueFiles[i] )
+		{
+			m_lastSavePrologueFiles[i] = StorageFile::newFile( m_weakThis,
+				1, i, ADARA::RunStatus::PROLOGUE );
+
+			// Copy "Last" Prologue Header File from Previous Container
+			DEBUG("copyLastPrologueFiles():"
+				<< " Appending Previous Last Save Prologue File "
+				<< lastSavePrologueFiles[i]->path()
+				<< " to New Last Save Prologue File "
+				<< m_lastSavePrologueFiles[i]->path()
+				<< " for Data Source ID " << i
+				<< " for Stacked Container " << m_name);
+			m_lastSavePrologueFiles[i]->catFile(
+				lastSavePrologueFiles[i] );
+
+			// Close the Save Prologue Header File...
+			m_lastSavePrologueFiles[i]->put_fd();
+
+			DEBUG("copyLastPrologueFiles():"
+				<< " Created Saved Data Prologue Header File "
+				<< m_lastSavePrologueFiles[i]->path()
+				<< " for Data Source ID " << i
+				<< " for Stacked Container " << m_name);
+		}
+	}
 }
 
 void StorageContainer::getFiles(std::list<StorageFile::SharedPtr> &list)
