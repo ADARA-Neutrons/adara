@@ -587,12 +587,16 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 		case ADARA::RunStatus::END_RUN:
 			fprintf( stderr, "    End of run\n" );
 			break;
+		case ADARA::RunStatus::PROLOGUE:
+			fprintf( stderr, "    [PROLOGUE]\n" );
+			break;
 		}
 
 		if (pkt.runNumber()) {
 			fprintf( stderr, "    Run %u started at epoch %u\n",
 				pkt.runNumber(), pkt.runStart() );
-			if (pkt.status() != ADARA::RunStatus::STATE)
+			if (pkt.status() != ADARA::RunStatus::STATE
+					&& pkt.status() != ADARA::RunStatus::PROLOGUE)
 				fprintf( stderr, "    File index %u\n", pkt.fileNumber() );
 #if 0
 			if (pkt.version() == 0x01) {

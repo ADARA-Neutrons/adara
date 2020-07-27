@@ -778,12 +778,16 @@ bool Parser::rxPacket(const ADARA::RunStatusPkt &pkt)
 		case ADARA::RunStatus::END_RUN:
 			printf("    End of run\n");
 			break;
+		case ADARA::RunStatus::PROLOGUE:
+			printf("    [PROLOGUE]\n");
+			break;
 		}
 
 		if (pkt.runNumber()) {
 			printf("    Run %u started at epoch %u\n",
 				pkt.runNumber(), pkt.runStart());
-			if (pkt.status() != ADARA::RunStatus::STATE)
+			if (pkt.status() != ADARA::RunStatus::STATE
+					&& pkt.status() != ADARA::RunStatus::PROLOGUE)
 				printf("    File index %u\n", pkt.fileNumber());
 #if 0
 			if (pkt.version() == 0x01) {
