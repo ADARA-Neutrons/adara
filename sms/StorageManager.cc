@@ -303,6 +303,9 @@ int StorageManager::m_base_fd = -1;
 
 struct timespec StorageManager::m_default_time = { 0, 0 };
 
+StorageFile::SharedPtr StorageManager::dummyFile;
+std::vector<StorageFile::SharedPtr> StorageManager::dummySaveFiles;
+
 std::list<StorageContainer::SharedPtr> StorageManager::m_containerStack;
 StorageFile::SharedPtr StorageManager::m_prologueFile;
 
@@ -1116,7 +1119,9 @@ void StorageManager::addBaseStorage(uint64_t size)
 void StorageManager::startContainer(
 		std::list<StorageContainer::SharedPtr>::iterator &it,
 		const struct timespec &minTime, // EPICS Time...!
-		bool paused, uint32_t run, std::string propId )
+		bool paused, uint32_t run, std::string propId,
+		std::string lastName, StorageFile::SharedPtr &lastPrologueFile,
+		std::vector<StorageFile::SharedPtr> &lastSavePrologueFiles )
 {
 	struct timespec now;
 
@@ -1170,6 +1175,13 @@ void StorageManager::startContainer(
 	}
 
 	m_contChange( (*it), true );
+
+	// Copy Any Saved "Last" Prologue Header Files from Old Container
+	// Into New Container...
+	if ( lastPrologueFile || lastSavePrologueFiles.size() ) {
+		(*it)->copyLastPrologueFiles( lastName, lastPrologueFile,
+			lastSavePrologueFiles );
+	}
 
 	/* Containers need to be sure to always have a file; otherwise
 	 * there will be no record if we don't currently have pulses
@@ -1241,6 +1253,10 @@ void StorageManager::endCurrentContainer(
 	// Keep Current Container Alive on the Stack...
 	else
 	{
+		// Get "Last" Prologue and SavePrologue Files
+		// Before Pushing New Container Onto Stack...
+		(*it)->getLastPrologueFiles();
+
 		// Push New "Empty" Current Container onto Stack...
 		StorageContainer::SharedPtr container;
 		m_containerStack.push_front( container );
@@ -1260,35 +1276,38 @@ void StorageManager::endCurrentContainer(
 	retireIndexDir();
 }
 
-void StorageManager::stateSnapshot(StorageFile::SharedPtr &f)
+void StorageManager::stateSnapshot( StorageFile::SharedPtr &f,
+		bool capture_last )
 {
 	if (m_prologueFile)
 		throw std::logic_error("Recursive use of prologue files");
 
 	m_prologueFile = f;
-	m_prologue();
+	m_prologue( capture_last );
 	m_prologueFile.reset();
 }
 
-void StorageManager::fileCreated(StorageFile::SharedPtr &f)
+void StorageManager::fileCreated( StorageFile::SharedPtr &f,
+		bool capture_last )
 {
 	/* Each new file gives us an opportunity to add a state checkpoint
 	 * at low cost; we do not need a separate state file as we'll be
 	 * taking a snapshot as part of the file creation.
 	 */
 	StorageFile::SharedPtr noFile;
-	indexState(noFile, f, 0);
+	indexState( noFile, f, 0 );
 
-	stateSnapshot(f);
+	stateSnapshot( f, capture_last );
 }
 
-void StorageManager::saveCreated(uint32_t dataSourceId)
+void StorageManager::saveCreated( uint32_t dataSourceId,
+		bool capture_last )
 {
 	/* Each new Saved Input Stream file needs to get a copy of
 	 * all the Device Descriptors and Starting PV Values,
 	 * so trigger a Prologue Spew for the given Data Source. :-D
 	 */
-	(*(m_savePrologue[ dataSourceId ]))();
+	(*(m_savePrologue[ dataSourceId ]))( capture_last );
 }
 
 void StorageManager::startRecording(
@@ -1469,7 +1488,7 @@ void StorageManager::iterateHistory( uint32_t startSeconds,
 		 */
 		StorageFile::SharedPtr state( StorageFile::stateFile(
 						(*it), "/tmp" ) );
-		stateSnapshot( state );
+		stateSnapshot( state, false /* capture_last */ );
 		cb( state, 0 );
 		state->persist( false );
 		state->put_fd();
@@ -1566,8 +1585,19 @@ void StorageManager::addPacket( IoVector &iovec,
 		struct timespec maxTime;
 		maxTime.tv_sec = hdr->ts_sec;
 		maxTime.tv_nsec = hdr->ts_nsec;
+		// Capture Any "Last" Prologue Header Files from Old Container
+		std::string lastName = (*it)->name();
+		StorageFile::SharedPtr lastPrologueFile =
+			(*it)->lastPrologueFile();
+		std::vector<StorageFile::SharedPtr> lastSavePrologueFiles;
+		for ( uint32_t i=0 ; i < (*it)->numSaveDataSources() ; i++ ) {
+			lastSavePrologueFiles.push_back(
+				(*it)->lastSavePrologueFile( i ) );
+		}
 		endCurrentContainer( it, maxTime, true );
-		startContainer( it, minTime, paused );
+		startContainer( it, minTime, paused,
+			0 /* run */, "UNKNOWN" /* propId */,
+			lastName, lastPrologueFile, lastSavePrologueFiles );
 	}
 
 	/* Save off where we are in the stream, as we may need to point
@@ -1594,7 +1624,7 @@ void StorageManager::addPacket( IoVector &iovec,
 	if ( m_pulseTime >= m_nextIndexTime ) {
 		StorageFile::SharedPtr state(
 			StorageFile::stateFile( (*it), m_stateDir ) );
-		stateSnapshot( state );
+		stateSnapshot( state, false /* capture_last */ );
 		indexState( state, (*it)->file(), resumeLocation );
 		state->put_fd();
 	}
@@ -1730,8 +1760,19 @@ void StorageManager::savePacket( IoVector &iovec, uint32_t dataSourceId,
 		struct timespec maxTime;
 		maxTime.tv_sec = hdr->ts_sec;
 		maxTime.tv_nsec = hdr->ts_nsec;
+		// Capture Any "Last" Prologue Header Files from Old Container
+		std::string lastName = (*it)->name();
+		StorageFile::SharedPtr lastPrologueFile =
+			(*it)->lastPrologueFile();
+		std::vector<StorageFile::SharedPtr> lastSavePrologueFiles;
+		for ( uint32_t i=0 ; i < (*it)->numSaveDataSources() ; i++ ) {
+			lastSavePrologueFiles.push_back(
+				(*it)->lastSavePrologueFile( i ) );
+		}
 		endCurrentContainer( it, maxTime, true );
-		startContainer( it, minTime, paused );
+		startContainer( it, minTime, paused,
+			0 /* run */, "UNKNOWN" /* propId */,
+			lastName, lastPrologueFile, lastSavePrologueFiles );
 	}
 
 	// Write Saved Stream Packet to Disk...

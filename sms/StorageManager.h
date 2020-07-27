@@ -31,7 +31,8 @@ class StorageManager {
 public:
 	typedef boost::signals2::signal<void (StorageContainer::SharedPtr &,
 					bool)> ContainerSignal;
-	typedef boost::signals2::signal<void (void)> PrologueSignal;
+	typedef boost::signals2::signal<void (bool)> PrologueSignal;
+
 	typedef boost::function<void (StorageFile::SharedPtr &, off_t)>
 								FileOffSetFunc;
 
@@ -272,7 +273,9 @@ private:
 	static uint32_t readRunFile(const char *path, bool notify);
 	static bool cleanupRunFiles(void);
 
-	static void stateSnapshot(StorageFile::SharedPtr &f);
+	static void stateSnapshot(StorageFile::SharedPtr &f,
+				bool capture_last = false);
+
 	static bool retireIndexDir(bool remove = true);
 	static bool cleanupIndexes(void);
 	static void indexState(StorageFile::SharedPtr &state,
@@ -300,20 +303,32 @@ private:
 	static void addBaseStorage(uint64_t size);
 
 	static struct timespec m_default_time;
+
+	static StorageFile::SharedPtr dummyFile;
+	static std::vector<StorageFile::SharedPtr> dummySaveFiles;
+
 	static void startContainer(
 				std::list<StorageContainer::SharedPtr>::iterator &it,
 				const struct timespec &minTime = m_default_time, // EPICS
 				bool paused = false, uint32_t run = 0,
-				std::string propId = std::string("UNKNOWN"));
+				std::string propId = std::string("UNKNOWN"),
+				std::string lastName = std::string("<LastContainer>"),
+				StorageFile::SharedPtr &lastPrologueFile = dummyFile,
+				std::vector<StorageFile::SharedPtr> &lastSavePrologueFiles
+					= dummySaveFiles );
+
 	static void endCurrentContainer(
 				std::list<StorageContainer::SharedPtr>::iterator &it,
 				const struct timespec &newStart, // EPICS Time...!
 				bool do_terminate);
 
-	static void fileCreated(StorageFile::SharedPtr &f);
+	static void fileCreated(StorageFile::SharedPtr &f,
+				bool capture_last = false);
+
 	static uint32_t validatePacket(const IoVector &iovec);
 
-	static void saveCreated(uint32_t dataSourceId);
+	static void saveCreated(uint32_t dataSourceId,
+				bool capture_last = false);
 
 	friend class StorageContainer;
 };
