@@ -12,7 +12,10 @@ CACHE_DIR="/SNSlocal/rsyslog.cache"
 
 ALTOPT="" # for Alternate/Secondary SMS Deployments... ;-D
 
+GREP="/usr/bin/grep"
 HEAD="/usr/bin/head"
+AWK="/usr/bin/awk"
+WC="/usr/bin/wc"
 
 #
 # Dump Usage
@@ -25,7 +28,7 @@ USAGE()
 	echo "                      [--adara_summary=<path>] \\"
 	echo "                      [--cache_dir=<CACHE_DIR>] \\"
 	echo "                      [--connect] [--connect_pid=<PID>] \\"
-	echo "                      [--oneshot] [--help|-h]"
+	echo "                      [--autoexit] [--oneshot] [--help|-h]"
 	echo
 
 	echo "where:"
@@ -43,6 +46,8 @@ USAGE()
 	echo
 	echo "   --connect_pid=<PID>    = connect to Specific ADARA Monitor PID"
 	echo
+	echo "      --autoexit          = automatically exit on NO FILES"
+	echo
 	echo "      --oneshot           = only execute summary once, then exit"
 	echo
 	echo "     --help | -h          = display this usage information"
@@ -52,6 +57,7 @@ USAGE()
 CONNECT_PID=""
 
 do_connect=0
+do_autoexit=0
 do_oneshot=0
 
 for arg in "$@" ; do
@@ -101,6 +107,9 @@ for arg in "$@" ; do
 			USAGE
 			exit -5
 		fi
+	elif [[ "#$key#" == '#--autoexit#' ]]; then
+		echo -e "\nExecuting ADARA Monitor in AutoExit Mode."
+		do_autoexit=1
 	elif [[ "#$key#" == '#--oneshot#' ]]; then
 		echo -e "\nExecuting ADARA Monitor in OneShot Mode."
 		do_oneshot=1
@@ -187,6 +196,18 @@ DO_SUMMARY()
 
 	echo -n "Summary Done: "
 	date
+
+	if [[ $do_autoexit == 1 ]]; then
+
+		cknone=`${GREP} "NO ERRORS/FILES" "${CACHE_DIR}/${SUMMARY}" \
+			| ${WC} | ${AWK} '{print $1}'`
+
+		if [[ ${cknone} == 1 ]]; then
+			echo -e "\n*** Auto-Exit: NO ERROR/FILES Detected...!"
+			CLEAR_CACHE AutoExit
+		fi
+
+	fi
 }
 
 #
@@ -195,6 +216,9 @@ DO_SUMMARY()
 
 CLEAR_CACHE()
 {
+	local _autoexit="$1"
+	shift
+
 	echo -e -n "\nRemoving Any Processed Local Cache Files "
 	echo -e "or Leftover Summaries:\n"
 
@@ -203,6 +227,12 @@ CLEAR_CACHE()
 		-mindepth 1 -not -cnewer "${CACHE_DIR}/${SUMMARY}" \
 		-and -not -path "${CACHE_DIR}/${SUMMARY}" \
 		-print -exec /bin/rm -f {} \;
+
+	# If in AutoExit Mode, Just Exit After Clearing the Latest Cache
+	if [[ "${_autoexit}" == "AutoExit" ]]; then
+		echo -e "\n*** AutoExit: Automatically Exiting ADARA Monitor.\n"
+		exit 0
+	fi
 
 	# Generate a New ADARA Summary Now...
 	echo -e "\nRefreshing ADARA Summary..."
@@ -311,6 +341,27 @@ DO_CONNECT()
 	/bin/ls -l "${CACHE_DIR}/${SUMMARY}" | /usr/bin/sed -e "s@ /@\n    /@"
 
 	/bin/cat "${CACHE_DIR}/${SUMMARY}"
+
+	ckdone=`${GREP} "Lines" "${CACHE_DIR}/${SUMMARY}" \
+		| ${WC} | ${AWK} '{print $1}'`
+
+	if [[ ${ckdone} -ge 1 ]]; then
+
+		if [[ $do_autoexit == 1 ]]; then
+
+			cknone=`${GREP} "NO ERRORS/FILES" "${CACHE_DIR}/${SUMMARY}" \
+				| ${WC} | ${AWK} '{print $1}'`
+
+			if [[ ${cknone} == 1 ]]; then
+				echo -e "\n*** Auto-Exit: NO ERROR/FILES Detected...!"
+				CLEAR_PREVIOUS_CACHE
+			fi
+
+		fi
+
+	else
+		echo -e "\n(*** Warning: ADARA Summary Incomplete...!)\n"
+	fi
 }
 
 #
