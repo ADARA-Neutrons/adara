@@ -388,24 +388,34 @@ void StorageContainer::copyLastPrologueFiles( std::string &name,
 		<< " from Last Stacked Container " << name
 		<< " for New Stacked Container " << m_name);
 
-	// Make New "Last" Prologue Header File for This Container
-	m_lastPrologueFile = StorageFile::newFile( m_weakThis,
-		0, 0, ADARA::RunStatus::PROLOGUE );
+	if ( lastPrologueFile )
+	{
+		// Make New "Last" Prologue Header File for This Container
+		m_lastPrologueFile = StorageFile::newFile( m_weakThis,
+			0, 0, ADARA::RunStatus::PROLOGUE );
 
-	// Copy "Last" Prologue Header File from Previous Container
-	DEBUG("copyLastPrologueFiles():"
-		<< " Appending Previous Last Prologue File "
-		<< lastPrologueFile->path()
-		<< " to New Last Prologue File "
-		<< m_lastPrologueFile->path());
-	m_lastPrologueFile->catFile( lastPrologueFile );
+		// Copy "Last" Prologue Header File from Previous Container
+		DEBUG("copyLastPrologueFiles():"
+			<< " Appending Previous Last Prologue File "
+			<< lastPrologueFile->path()
+			<< " to New Last Prologue File "
+			<< m_lastPrologueFile->path());
+		m_lastPrologueFile->catFile( lastPrologueFile );
 
-	// Close the Prologue Header File...
-	m_lastPrologueFile->put_fd();
+		// Close the Prologue Header File...
+		m_lastPrologueFile->put_fd();
 
-	DEBUG("copyLastPrologueFiles(): Created Raw Data Prologue Header File "
-		<< m_lastPrologueFile->path()
-		<< " for Stacked Container " << m_name);
+		DEBUG("copyLastPrologueFiles():"
+			<< " Created Raw Data Prologue Header File "
+			<< m_lastPrologueFile->path()
+			<< " for Stacked Container " << m_name);
+	}
+	else
+	{
+		DEBUG("copyLastPrologueFiles():"
+			<< " No Raw Data Prologue Header File to Copy"
+			<< " for Stacked Container " << m_name);
+	}
 
 	// Allocate Last Save Prologue File Vector to
 	// Match DataSource Input Files Vector Size...
