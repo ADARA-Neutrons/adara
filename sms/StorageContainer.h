@@ -70,7 +70,7 @@ public:
 
 	StorageFile::SharedPtr &lastSavePrologueFile(uint32_t dataSourceId)
 	{
-		if ( dataSourceId < m_ds_input_files.size()
+		if ( dataSourceId < m_lastSavePrologueFiles.size()
 				&& m_lastSavePrologueFiles[dataSourceId] ) {
 			return m_lastSavePrologueFiles[dataSourceId];
 		}
