@@ -221,13 +221,19 @@ CLEAR_CACHE()
 	shift
 
 	echo -e -n "\nRemoving Any Processed Local Cache Files "
-	echo -e "or Leftover Summaries:\n"
+	echo -e "or Leftover Summaries:"
 
 	# Remove Any Older Files than the Current ADARA Summary File...
-	find "${CACHE_DIR}/" \
+	local _files=`find "${CACHE_DIR}/" \
 		-mindepth 1 -not -cnewer "${CACHE_DIR}/${SUMMARY}" \
 		-and -not -path "${CACHE_DIR}/${SUMMARY}" \
-		-print -exec /bin/rm -f {} \;
+		-print -exec /bin/rm -f {} \; `
+
+	if [[ -n "${_files}" ]]; then
+		echo -e "\n${_files}"
+	else
+		echo -e "\n[No Files]"
+	fi
 
 	# If in AutoExit Mode, Just Exit After Clearing the Latest Cache
 	if [[ "${_autoexit}" == "AutoExit" ]]; then
