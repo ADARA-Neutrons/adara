@@ -16,6 +16,7 @@ GREP="/usr/bin/grep"
 HEAD="/usr/bin/head"
 AWK="/usr/bin/awk"
 WC="/usr/bin/wc"
+CAT="/bin/cat"
 
 #
 # Dump Usage
@@ -165,7 +166,7 @@ DO_SUMMARY()
 
 	LAST_CACHE_STATE=`/bin/ls -ld "${CACHE_DIR}"`
 
-	/bin/cat "${CACHE_DIR}/${SUMMARY}"
+	${CAT} "${CACHE_DIR}/${SUMMARY}"
 
 	LAST_TIME=`date +"%s"`
 
@@ -340,27 +341,23 @@ DO_CONNECT()
 
 	/bin/ls -l "${CACHE_DIR}/${SUMMARY}" | /usr/bin/sed -e "s@ /@\n    /@"
 
-	/bin/cat "${CACHE_DIR}/${SUMMARY}"
+	${CAT} "${CACHE_DIR}/${SUMMARY}"
+
+	cknone=`${GREP} "NO ERRORS/FILES" "${CACHE_DIR}/${SUMMARY}" \
+		| ${WC} | ${AWK} '{print $1}'`
 
 	ckdone=`${GREP} "Lines" "${CACHE_DIR}/${SUMMARY}" \
 		| ${WC} | ${AWK} '{print $1}'`
 
-	if [[ ${ckdone} -ge 1 ]]; then
+	if [[ $do_autoexit == 1 && ${cknone} == 1 ]]; then
 
-		if [[ $do_autoexit == 1 ]]; then
+		echo -e "*** Auto-Exit: NO ERROR/FILES Detected...!"
+		CLEAR_PREVIOUS_CACHE
 
-			cknone=`${GREP} "NO ERRORS/FILES" "${CACHE_DIR}/${SUMMARY}" \
-				| ${WC} | ${AWK} '{print $1}'`
+	elif [[ ${ckdone} == 0 ]]; then
 
-			if [[ ${cknone} == 1 ]]; then
-				echo -e "\n*** Auto-Exit: NO ERROR/FILES Detected...!"
-				CLEAR_PREVIOUS_CACHE
-			fi
+		echo -e "(*** Warning: ADARA Summary Incomplete...!)\n"
 
-		fi
-
-	else
-		echo -e "\n(*** Warning: ADARA Summary Incomplete...!)\n"
 	fi
 }
 
