@@ -38,7 +38,7 @@ struct sync_packet {
 struct run_status_packet {
 	ADARA::Header	hdr;
 	uint32_t	run_number;
-	uint32_t	run_start;
+	uint32_t	run_start; // EPICS Time...!
 	uint32_t	status_number;
 #if 0
 	uint32_t	paused_number;
@@ -269,8 +269,10 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 
 	spkt.run_number = m_runNumber;
 
-	if (m_runNumber)
+	if (m_runNumber) {
+		// Convert Wallclock Time to EPICS Time...
 		spkt.run_start = m_startTime - ADARA::EPICS_EPOCH_OFFSET;
+	}
 
 	// Ignore Paused File Number in RunStatus Packet...
 	// (TODO Figure out how to munge this field if we ever need
@@ -590,14 +592,15 @@ StorageFile::StorageFile(OwnerPtr &owner,
 	m_owner(owner), m_runNumber(0),
 	m_fileNumber(fileNumber), m_pauseFileNumber(pauseFileNumber),
 	m_addendumFileNumber(0),
-	m_startTime(0), m_persist(true), m_oversize(false),
+	m_startTime(0), // Wallclock Time...!
+	m_persist(true), m_oversize(false),
 	m_active(false), m_paused(false), m_addendum(false),
 	m_size(0), m_sizeLastUpdate(0), m_syncDistance(0), m_fd(-1), m_fdRefs(0)
 {
 	StorageContainer::SharedPtr c = m_owner.lock();
 	if (c) {
 		m_runNumber = c->runNumber();
-		m_startTime = c->startTime().tv_sec;
+		m_startTime = c->startTime().tv_sec; // Wallclock Time...!
 		m_paused = c->paused();
 	}
 	// Even if Container isn't Paused, this Run file could be (a la import)

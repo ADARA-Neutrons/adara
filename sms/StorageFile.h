@@ -86,7 +86,7 @@ private:
 	uint32_t m_fileNumber;
 	uint32_t m_pauseFileNumber;
 	uint32_t m_addendumFileNumber;
-	uint32_t m_startTime;
+	uint32_t m_startTime; // Wallclock Time...!
 	bool m_persist;
 	bool m_oversize;
 	bool m_active;
