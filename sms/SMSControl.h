@@ -125,6 +125,9 @@ public:
 
 	void updateDataSourceConnectivity(void);
 
+	uint32_t numConnectedDataSources(void)
+		{ return m_numConnectedDataSources; }
+
 	boost::shared_ptr<Markers> getMarkers(void) { return m_markers; }
 
 	static void config(const boost::property_tree::ptree &conf);
@@ -240,6 +243,8 @@ private:
 	std::vector<struct timespec> m_dataSourcesMaxTimes; // EPICS Time...!
 
 	struct timespec m_oldestMaxDataSourceTime; // EPICS Time...!
+
+	uint32_t m_numConnectedDataSources;
 
 	uint32_t m_eventSourcesIndex[ SOURCE_SET_SIZE ];
 	SourceSet m_eventSources;

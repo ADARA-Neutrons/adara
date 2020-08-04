@@ -518,6 +518,7 @@ void SMSControl::addSource(const std::string &name,
 
 SMSControl::SMSControl() :
 	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
+	m_numConnectedDataSources(0),
 	m_noRegisteredEventSources(true), m_noRegisteredEventSourcesCount(0),
 	m_lastPulseId(0), m_lastRingPeriod(0),
 	m_monitorReserve(1024), m_bankReserve(4096),
@@ -1428,6 +1429,9 @@ bool SMSControl::checkRequiredDataSources( std::string & why )
 	// Note: This is Also Necessary for the ADARA Test Harness to Work!
 	if ( !connected )
 		StorageManager::cleanContainerStack();
+
+	// Update Connected DataSource Count...
+	m_numConnectedDataSources = connected;
 
 	if ( okToGo )
 		why_ss << "All Required DataSources are Present";
