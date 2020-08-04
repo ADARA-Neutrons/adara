@@ -129,7 +129,9 @@ public:
 	}
 
 	static std::list<StorageContainer::SharedPtr>::iterator
-		findContainerByTime( struct timespec &ts, // EPICS Time...!
+		findContainerByTime( std::string label,
+					bool ignore_pkt_timestamp,
+					struct timespec &ts, // EPICS Time...!
 					bool check_old_containers = true );
 
 	static void cleanContainerStack(void);
@@ -144,7 +146,7 @@ public:
 	static bool updateNextRun(uint32_t run);
 
 	static const struct timespec &scanStart(void) {
-		return m_scanStart;
+		return m_scanStart; // Wallclock Time...!
 	}
 
 	static void encodeAutoSaveString( std::string str_in,
@@ -226,7 +228,7 @@ private:
 	static struct timespec m_container_cleanup_timeout;
 	static double m_container_cleanup_timeout_double;
 
-	static struct timespec m_scanStart;
+	static struct timespec m_scanStart; // Wallclock Time...!
 	static uint64_t m_scannedBlocks;
 	static std::list<StorageContainer::SharedPtr> m_pendingRuns;
 
