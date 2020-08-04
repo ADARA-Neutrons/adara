@@ -72,6 +72,12 @@ public:
 		return m_max_pulse_seq_list;
 	}
 
+	void resetMaxTime(void)
+	{
+		m_maxTime.tv_sec = 0; // Wallclock Time...!
+		m_maxTime.tv_nsec = 0;
+	}
+
 private:
 	typedef std::map<uint32_t, boost::shared_ptr<HWSource> > HWSrcMap;
 
@@ -104,6 +110,7 @@ private:
 	unsigned int m_max_read_chunk;
 	uint32_t m_rtdlNoDataThresh;
 	bool m_save_input_stream;
+	struct timespec m_maxTime; // Wallclock Time...!
 
 	boost::shared_ptr<smsStringPV> m_pvName;
 	boost::shared_ptr<smsStringPV> m_pvBaseName;

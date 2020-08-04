@@ -445,6 +445,8 @@ public:
 						<< std::hex << m_lastPulse
 						<< " src=0x" << m_hwId << std::dec
 						<< " (" << m_name << ")");
+					// Reset DataSource Max Time Too! ;-D
+					m_dataSource->resetMaxTime();
 				}
 
 				// Finish/Release Oldest Pulse...
@@ -1297,6 +1299,8 @@ DataSource::DataSource( const std::string &name,
 		throw std::runtime_error(msg);
 	}
 
+	resetMaxTime();
+
 	m_lastRTDLPulseId = 0;
 	m_lastRTDLCycle = 0;
 	m_dupRTDL = 0;
@@ -1464,11 +1468,13 @@ void DataSource::unregisterHWSources(bool isSourceDown, bool stateChanged,
 			if ( psit != it->second->m_pulseSeqList.begin() ) --psit;
 			for ( ; psit != it->second->m_pulseSeqList.end() ; )
 			{
+				PulseInvariants &pulse = psit->first;
 				INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "unregisterHWSources():"
 					<< " End Pulse"
 					<< std::hex << " 0x" << psit->first.m_pulseId
 						<< std::dec
+					<< " pulseGood=" << pulse.m_pulseGood
 					<< " (" << m_name << ")" );
 				it->second->endPulse( psit, false );
 				// Make Sure We Process the First Pulse in List Too...! ;-D
@@ -1610,6 +1616,13 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 	 * failure
 	 */
 	unregisterHWSources(true, stateChanged, "Disconnected");
+
+	resetMaxTime();
+
+	if ( stateChanged ) {
+		m_ctrl->updateMaxDataSourceTime( m_smsSourceId,
+			&m_maxTime ); // Wallclock Time...! (0.0 from Reset)
+	}
 
 	m_lastRTDLPulseId = 0;
 	m_lastRTDLCycle = 0;
@@ -2214,7 +2227,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 	// Save "Last Packet" Info for Debugging...
 	m_last_pkt_type = pkt.type();
 	m_last_pkt_len = pkt.payload_length();
-	m_last_pkt_sec = pkt.timestamp().tv_sec;
+	m_last_pkt_sec = pkt.timestamp().tv_sec; // Wallclock Time...!
 	m_last_pkt_nsec = pkt.timestamp().tv_nsec;
 
 	// INFO("rxPacket() type=0x" << std::hex << m_last_pkt_type << std::dec
@@ -2222,7 +2235,9 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		// << " nsec=" << m_last_pkt_nsec
 		// << " len=" << m_last_pkt_len );
 
-	switch ( pkt.base_type() ) {
+	ADARA::PacketType::Type bt = pkt.base_type();
+
+	switch ( bt ) {
 
 		case ADARA::PacketType::HEARTBEAT_TYPE:
 			/* We actually *do* care about these packets after all;
@@ -2263,6 +2278,18 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 						<< "Received pulse id 0 from " << m_name);
 				}
 				return false;
+			}
+			/* Capture Max Packet Time for Stacked Container Expiration */
+			if ( bt != ADARA::PacketType::SOURCE_LIST_TYPE
+					&& bt != ADARA::PacketType::DEVICE_DESC_TYPE
+					&& bt != ADARA::PacketType::STREAM_ANNOTATION_TYPE )
+			{
+				if ( compareTimeStamps( // Wallclock Time...!
+						pkt.timestamp(), m_maxTime ) > 0 ) {
+					m_maxTime = pkt.timestamp(); // Wallclock Time...!
+					m_ctrl->updateMaxDataSourceTime( m_smsSourceId,
+						&m_maxTime ); // Wallclock Time...!
+				}
 			}
 			return Parser::rxPacket(pkt);
 
@@ -3475,7 +3502,7 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 	{
 		// Pass-Thru Invoke Appropriate Markers Handler Method...
 		boost::shared_ptr<Markers> markers = m_ctrl->getMarkers();
-		struct timespec ts = pkt.timestamp();
+		struct timespec ts = pkt.timestamp(); // Wallclock Time...!
 		switch ( pkt.marker_type() ) {
 			case ADARA::MarkerType::GENERIC:
 				markers->addAnnotationComment( &ts,
