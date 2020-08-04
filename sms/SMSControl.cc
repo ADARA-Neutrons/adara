@@ -500,6 +500,12 @@ void SMSControl::addSource(const std::string &name,
 							 save_input_stream));
 	m_dataSources.push_back(src);
 
+	// Add Another DataSource Max Time Entry
+	struct timespec init_ts;
+	init_ts.tv_sec = 0; // EPICS Time...!
+	init_ts.tv_nsec = 0;
+	m_dataSourcesMaxTimes.push_back(init_ts);
+
 	// Update Number of Data Sources PV...
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
@@ -656,6 +662,16 @@ SMSControl::SMSControl() :
 	// - "true": Do Log Status as Error
 	// - "true": Major Error
 	setSummaryReason( false, true, true );
+
+	// Initialize Oldest DataSource Max Time
+	m_oldestMaxDataSourceTime.tv_sec = 0; // EPICS Time...!
+	m_oldestMaxDataSourceTime.tv_nsec = 0;
+
+	// Push "Zero-Index" DataSource Max Time Entry (We Count From 1)
+	struct timespec init_ts;
+	init_ts.tv_sec = 0; // EPICS Time...!
+	init_ts.tv_nsec = 0;
+	m_dataSourcesMaxTimes.push_back(init_ts);
 
 	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
@@ -2098,6 +2114,98 @@ void SMSControl::resetPacketStats(void)
 	if (m_dataSources.size() > 0) {
 		m_dataSources[0]->resetPacketStats();
 	}
+}
+
+void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
+		struct timespec *ts ) // Wallclock Time...!
+{
+	// REMOVEME
+	DEBUG("updateMaxDataSourceTime(): srcId=" << srcId
+		<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+		<< "." << std::setfill('0') << std::setw(9)
+		<< ts->tv_nsec);
+
+	if ( srcId >= m_dataSourcesMaxTimes.size() )
+	{
+		ERROR("updateMaxDataSourceTime():"
+			<< " Invalid DataSource srcId=" << srcId
+			<< ", Out of Range"
+			<< " m_dataSourcesMaxTimes.size()="
+			<< m_dataSourcesMaxTimes.size()
+			<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
+		return;
+	}
+
+	// Set Max Time for This DataSource
+	m_dataSourcesMaxTimes[ srcId ] = *ts; // Wallclock Time...!
+
+	// Reset DataSource Max Time...
+	if ( ts->tv_sec == 0 && ts->tv_nsec == 0 )
+	{
+		ERROR("updateMaxDataSourceTime():"
+			<< " Reset DataSource Max Time srcId=" << srcId
+			<< " m_dataSourcesMaxTimes[" << srcId << "]="
+			<< m_dataSourcesMaxTimes[ srcId ].tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< m_dataSourcesMaxTimes[ srcId ].tv_nsec);
+	}
+
+	else
+	{
+		// Convert Wallclock to EPICS Time...
+		m_dataSourcesMaxTimes[ srcId ].tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+	}
+
+	// Update Overall Oldest Max DataSource Time...
+
+	struct timespec oldest; // EPICS Time...!
+	oldest.tv_sec = 0;
+	oldest.tv_nsec = 0;
+
+	for ( uint32_t i=0 ; i < m_dataSourcesMaxTimes.size() ; i++ )
+	{
+		// REMOVEME
+		DEBUG("updateMaxDataSourceTime():"
+			<< " m_dataSourcesMaxTimes[" << i << "]="
+			<< m_dataSourcesMaxTimes[i].tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< m_dataSourcesMaxTimes[i].tv_nsec
+			<< " oldest=" << oldest.tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< oldest.tv_nsec);
+
+		if ( m_dataSourcesMaxTimes[i].tv_sec != 0
+				|| m_dataSourcesMaxTimes[i].tv_nsec != 0 )
+		{
+			if ( oldest.tv_sec == 0 && oldest.tv_nsec == 0 )
+			{
+				DEBUG("updateMaxDataSourceTime(): FIRST...");
+				oldest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
+			}
+			else if ( compareTimeStamps(
+					m_dataSourcesMaxTimes[i], oldest ) < 0 )
+			{
+				DEBUG("updateMaxDataSourceTime(): OLDER...");
+				oldest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
+			}
+		}
+	}
+
+	// REMOVEME
+	DEBUG("updateMaxDataSourceTime():"
+		<< " oldest=" << oldest.tv_sec
+		<< "." << std::setfill('0') << std::setw(9)
+		<< oldest.tv_nsec);
+
+	// Save Oldest Max DataSource Time
+	m_oldestMaxDataSourceTime = oldest; // EPICS Time...!
+}
+
+struct timespec &SMSControl::oldestMaxDataSourceTime(void)
+{
+	return( m_oldestMaxDataSourceTime ); // EPICS Time...!
 }
 
 int32_t SMSControl::registerLiveClient(std::string clientName,

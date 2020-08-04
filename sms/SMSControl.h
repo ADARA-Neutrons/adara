@@ -86,6 +86,11 @@ public:
 
 	void resetPacketStats(void);
 
+	void updateMaxDataSourceTime( uint32_t srcId,
+			struct timespec *ts ); // Wallclock Time...!
+
+	struct timespec &oldestMaxDataSourceTime(void); // EPICS Time...!
+
 	int32_t registerLiveClient(std::string clientName,
 			boost::shared_ptr<smsStringPV> & pvName,
 			boost::shared_ptr<smsUint32PV> & pvRequestedStartTime,
@@ -231,6 +236,10 @@ private:
 			bool major = false);
 
 	std::vector<boost::shared_ptr<DataSource> > m_dataSources;
+
+	std::vector<struct timespec> m_dataSourcesMaxTimes; // EPICS Time...!
+
+	struct timespec m_oldestMaxDataSourceTime; // EPICS Time...!
 
 	uint32_t m_eventSourcesIndex[ SOURCE_SET_SIZE ];
 	SourceSet m_eventSources;
