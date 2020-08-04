@@ -18,10 +18,15 @@ public:
 	typedef boost::signals2::signal<void (StorageFile::SharedPtr &)>
 				onNewFile;
 
-	const struct timespec &startTime(void) const { return m_startTime; }
-	const struct timespec &minTime(void) const { return m_minTime; }
-	const struct timespec &maxTime(void) const { return m_maxTime; }
-	void setMaxTime(struct timespec maxTime) { m_maxTime = maxTime; }
+	const struct timespec &startTime(void)
+		const { return m_startTime; } // Wallclock Time...!
+	const struct timespec &minTime(void)
+		const { return m_minTime; } // EPICS Time...!
+	const struct timespec &maxTime(void)
+		const { return m_maxTime; } // EPICS Time...!
+	void setMaxTime(struct timespec maxTime)
+		{ m_maxTime = maxTime; } // EPICS Time...!
+
 	uint32_t runNumber(void) const { return m_runNumber; }
 	std::string propId(void) const { return m_propId; }
 	uint32_t numFiles(void) const { return m_numFiles; }
@@ -43,8 +48,9 @@ public:
 		return m_newFile.connect(slot);
 	}
 
-	static SharedPtr create(const struct timespec &start,
-		const struct timespec &minTime,
+	static SharedPtr create(
+		const struct timespec &start, // Wallclock Time...!
+		const struct timespec &minTime, // EPICS Time...!
 		uint32_t run, std::string &propId);
 	static SharedPtr scan(const std::string &path, bool force = false);
 	static uint64_t purge(const std::string &path, uint64_t goal,
@@ -105,9 +111,9 @@ public:
 
 private:
 	WeakPtr m_weakThis;
-	struct timespec m_startTime;
-	struct timespec m_minTime;
-	struct timespec m_maxTime;
+	struct timespec m_startTime; // Wallclock Time...!
+	struct timespec m_minTime; // EPICS Time...!
+	struct timespec m_maxTime; // EPICS Time...!
 	uint32_t m_runNumber;
 	std::string m_propId;
 	uint32_t m_numFiles;
@@ -131,8 +137,9 @@ private:
 	std::vector<uint32_t> m_ds_input_num_files;
 	StorageFile::SharedPtr m_dummy_file;
 
-	StorageContainer(const struct timespec &start,
-		const struct timespec &minTime,
+	StorageContainer(
+		const struct timespec &start, // Wallclock Time...!
+		const struct timespec &minTime, // EPICS Time...!
 		uint32_t run, std::string &propId);
 	StorageContainer(const std::string &name);
 

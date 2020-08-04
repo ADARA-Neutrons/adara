@@ -519,18 +519,20 @@ void StorageContainer::markManual(void)
 	m_manual = true;
 }
 
-StorageContainer::StorageContainer(const struct timespec &start,
-		const struct timespec &minTime,
+StorageContainer::StorageContainer(
+		const struct timespec &start, // Wallclock Time...!
+		const struct timespec &minTime, // EPICS Time...!
 		uint32_t run, std::string &propId) :
-	m_startTime(start), m_minTime(minTime),
+	m_startTime(start), // Wallclock Time...!
+	m_minTime(minTime), // EPICS Time...!
 	m_runNumber(run), m_propId(propId),
 	m_numFiles(0), m_numPauseFiles(0), m_totFileCount(0),
 	m_active(true), m_paused(false),
 	m_translated(false), m_manual(false), m_requeueCount(0),
 	m_saved_size(0)
 {
-	m_maxTime.tv_sec = (uint32_t) -1;
-	m_maxTime.tv_nsec = (uint32_t) -1;
+	m_maxTime.tv_sec = 0; // EPICS Time...!
+	m_maxTime.tv_nsec = 0;
 }
 
 StorageContainer::StorageContainer(const std::string &name) :
@@ -540,17 +542,19 @@ StorageContainer::StorageContainer(const std::string &name) :
 	m_translated(false), m_manual(false), m_requeueCount(0),
 	m_saved_size(0)
 {
-	m_startTime.tv_sec = 0;
+	m_startTime.tv_sec = 0; // Wallclock Time...!
 	m_startTime.tv_nsec = 0;
 
-	m_minTime.tv_sec = 0;
+	m_minTime.tv_sec = 0; // EPICS Time...!
 	m_minTime.tv_nsec = 0;
-	m_maxTime.tv_sec = (uint32_t) -1;
-	m_maxTime.tv_nsec = (uint32_t) -1;
+
+	m_maxTime.tv_sec = 0; // EPICS Time...!
+	m_maxTime.tv_nsec = 0;
 }
 
 StorageContainer::SharedPtr StorageContainer::create(
-		const struct timespec &start, const struct timespec &minTime,
+		const struct timespec &start, // Wallclock Time...!
+		const struct timespec &minTime, // EPICS Time...!
 		uint32_t run, std::string &propId)
 {
 	char path[64];
@@ -587,7 +591,8 @@ StorageContainer::SharedPtr StorageContainer::create(
 	c->m_weakThis = c;
 	c->m_name = path;
 
-	snprintf(path, sizeof(path), ".%09lu", start.tv_nsec);
+	snprintf(path, sizeof(path), ".%09lu",
+		start.tv_nsec); // Wallclock Time...!
 	c->m_name += path;
 
 	if (run) {
@@ -802,10 +807,10 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path,
 		bool force)
 {
 	std::string cpath;
-	struct timespec ts;
+	struct timespec ts; // Wallclock Time...!
 	uint32_t run;
 
-	if (!validatePath(path, cpath, ts, run)) {
+	if (!validatePath(path, cpath, ts, run)) { // Wallclock Time...!
 		WARN("scan(): Invalid storage container at '" << path << "'");
 		return StorageContainer::SharedPtr();
 	}
@@ -815,7 +820,8 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path,
 	 * here. Unless of course we're trying to Re-Scan a run directory,
 	 * in which case we should ignore this criteria...! ;-D
 	 */
-	const timespec &start = StorageManager::scanStart();
+	const timespec &start =
+		StorageManager::scanStart(); // Wallclock Time...!
 	if ( !force
 			&& ( ts.tv_sec > start.tv_sec
 				|| ( ts.tv_sec == start.tv_sec
@@ -828,7 +834,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path,
 	StorageContainer::SharedPtr c(new StorageContainer(cpath));
 	c->m_weakThis = c;
 	c->m_runNumber = run;
-	c->m_startTime = ts;
+	c->m_startTime = ts; // Wallclock Time...!
 
 	fs::directory_iterator end, it(path);
 	StorageFile::SharedPtr f;
