@@ -1231,8 +1231,18 @@ void StorageManager::endCurrentContainer(
 		<< std::setfill('0') << std::setw(9)
 		<< maxTime.tv_nsec << std::setw(0));
 
+	// Get Number of Connected DataSources...
+	SMSControl *ctrl = SMSControl::getInstance();
+	uint32_t numConnected = ctrl->numConnectedDataSources();
+
+	DEBUG("endCurrentContainer(): Number of Connected DataSources = "
+		<< numConnected);
+
 	// Do We Terminate This Container Now, or Keep It Alive on the Stack?
-	if ( do_terminate )
+	// Note: If There Are *No More DataSources* Connected Right Now,
+	// Then We Should Just Go Ahead and Terminate the Current Container,
+	// as There's No Immediate Chance of having its Expiration Triggered!
+	if ( do_terminate || numConnected == 0 )
 	{
 		// REMOVEME
 		DEBUG("endCurrentContainer(): Terminating Current Container "
@@ -1242,7 +1252,9 @@ void StorageManager::endCurrentContainer(
 			<< (*it)->minTime().tv_nsec << std::setw(0)
 			<< ", " << (*it)->maxTime().tv_sec << "."
 			<< std::setfill('0') << std::setw(9)
-			<< (*it)->maxTime().tv_nsec << std::setw(0) << "]");
+			<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+			<< " do_terminate=" << do_terminate
+			<< " numConnected=" << numConnected);
 
 		// Close Down This Container...
 		(*it)->terminate();
@@ -1264,6 +1276,8 @@ void StorageManager::endCurrentContainer(
 
 		DEBUG("endCurrentContainer():"
 			<< " Pushed New Empty Current Container onto Stack"
+			<< " do_terminate=" << do_terminate
+			<< " numConnected=" << numConnected
 			<< " - Btw, the Container Stack now has "
 			<< m_containerStack.size() << " elements");
 	}
