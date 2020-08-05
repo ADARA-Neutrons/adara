@@ -886,14 +886,16 @@ bool StorageFile::catFile(StorageFile::SharedPtr src)
 	char buf[1024];
 	uint8_t *p;
 
-	int nbytes, len, rc;
+	int total, nbytes, len, rc;
 	int src_fd;
 
 	bool ret = true;
 
 	// Make Sure We Got A Real Source File... ;-D
 	if ( !src ) {
-		ERROR("catFile(): Error Empty Source File!");
+		ERROR("catFile():"
+			<< " [" << m_path << "]"
+			<< " Error Empty Source File!");
 		return( false );
 	}
 
@@ -901,18 +903,25 @@ bool StorageFile::catFile(StorageFile::SharedPtr src)
 	try {
 		src_fd = src->get_fd();
 	} catch (std::runtime_error re) {
-		ERROR("catFile(): Unable to Open Source File "
+		ERROR("catFile():"
+			<< " [" << m_path << "]"
+			<< " Unable to Open Source File "
 			<< src->m_path << ": " << re.what());
 		return( false );
 	}
 
 	// Repeatedly Read A Buffer from Source File
 	// And Concatenate the Buffer to This File...
+
+	total = 0;
+
 	while ( ret == true ) {
 
 		// Check Source File Descriptor...
 		if ( src_fd < 0 ) {
-			ERROR("catFile(): Invalid File Descriptor"
+			ERROR("catFile():"
+				<< " [" << m_path << "]"
+				<< " Invalid File Descriptor"
 				<< " for Source File " << src->m_path);
 			return( false );
 		}
@@ -924,7 +933,9 @@ bool StorageFile::catFile(StorageFile::SharedPtr src)
 		if ( rc == (ssize_t) -1 ) {
 			if (errno != EAGAIN && errno != EINTR) {
 				int e = errno;
-				ERROR("catFile(): Unable to Read Source File "
+				ERROR("catFile():"
+					<< " [" << m_path << "]"
+					<< " Unable to Read Source File "
 					<< src->m_path << " src_fd=" << src_fd << " - "
 					<< strerror(e));
 				// *Don't* Throw Exception Here, Just Limp Along
@@ -939,14 +950,16 @@ bool StorageFile::catFile(StorageFile::SharedPtr src)
 			nbytes = 0;
 		}
 		else {
-			// REMOVEME
-			DEBUG("catFile(): Read " << rc << " Bytes"
-				" from Source File " << src->m_path);
+			// DEBUG("catFile():"
+				// << " [" << m_path << "]"
+				// << " Read " << rc << " Bytes"
+				// << " from Source File " << src->m_path);
 			nbytes = rc;
 			if ( nbytes == 0 ) {
-				// REMOVEME
-				DEBUG("catFile(): End of File for Source File "
-					<< src->m_path);
+				// DEBUG("catFile():"
+					// << " [" << m_path << "]"
+					// << " End of File for Source File "
+					// << src->m_path);
 				break;
 			}
 		}
@@ -959,11 +972,15 @@ bool StorageFile::catFile(StorageFile::SharedPtr src)
 
 			// Check File Descriptor...
 			if (m_fd < 0) {
-				ERROR("catFile(): Invalid File Descriptor!"
+				ERROR("catFile():"
+					<< " [" << m_path << "]"
+					<< " Invalid File Descriptor!"
 					<< " m_fd=" << m_fd);
 				// This Will Require Cleanup of Raw Data File... ;-b
 				if (len != nbytes) {
-					ERROR("catFile(): BUMMER!"
+					ERROR("catFile():"
+						<< " [" << m_path << "]"
+						<< " BUMMER!"
 						<< " Partial Write Before Failure -"
 						<< " wrote " << (nbytes - len) << " bytes"
 						<< " of " << nbytes << " bytes from This Buffer"
@@ -982,12 +999,15 @@ bool StorageFile::catFile(StorageFile::SharedPtr src)
 				// We can live without Sync point in Raw Data files...
 				// Whine Loudly tho. ;-D
 				int err = errno;
-				ERROR("catFile() Write Error: "
-					<< "m_fd=" << m_fd << " - "
+				ERROR("catFile():"
+					<< " [" << m_path << "]"
+					<< " Write Error: " << "m_fd=" << m_fd << " - "
 					<< strerror(err));
 				// This Will Require Cleanup of Raw Data File... ;-b
 				if (len != nbytes) {
-					ERROR("catFile(): BUMMER!"
+					ERROR("catFile():"
+						<< " [" << m_path << "]"
+						<< " BUMMER!"
 						<< " Partial Write Before Failure -"
 						<< " wrote " << (nbytes - len) << " bytes"
 						<< " of " << nbytes << " bytes from This Buffer"
@@ -1001,7 +1021,14 @@ bool StorageFile::catFile(StorageFile::SharedPtr src)
 			m_size += rc;
 			p += rc;
 		}
+
+		total += nbytes;
 	}
+
+	DEBUG("catFile():"
+		<< " [" << m_path << "]"
+		<< " Copied " << total << " Bytes"
+		<< " from Source File " << src->m_path);
 
 	// Close Source File...
 	if ( src_fd >= 0 ) {
