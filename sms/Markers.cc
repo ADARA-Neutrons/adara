@@ -322,8 +322,8 @@ void Markers::runStop(void)
 		emitPacket( now, ADARA::MarkerType::SCAN_STOP, m_scanIndex,
 			"", "Warning: Scan Stopped at Run Stop!" );
 		m_indexPV->update( 0, &now );
-		m_lastScanIndex = m_scanIndex;
 		m_scanIndex = 0;
+		m_lastScanIndex = m_scanIndex; // Mirror Run Stop Scan Index Reset
 	}
 
 	// Add Run Stop Comment...
