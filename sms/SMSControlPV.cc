@@ -267,7 +267,7 @@ void smsPV::notify(void)
 
 void smsPV::timestamp(struct timespec &ts)
 {
-    m_value->getTimeStamp(&ts);
+    m_value->getTimeStamp(&ts); // Wallclock Time...!
 }
 
 void smsPV::destroy(void)
@@ -334,7 +334,7 @@ smsRunNumberPV::smsRunNumberPV(const std::string &prefix)
 
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 
 	m_pv_name = prefix + ":RunNumber";
 }
@@ -368,7 +368,7 @@ caStatus smsRunNumberPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsRunNumberPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -395,14 +395,14 @@ void smsRunNumberPV::update(uint32_t run, struct timespec *ts)
 			<< "." << std::setfill('0') << std::setw(9)
 			<< ts->tv_nsec);
 		// Still Update TimeStamp
-		m_value->setTimeStamp(ts);
+		m_value->setTimeStamp(ts); // Wallclock Time...!
 		notify();
 		return;
 	}
 
 	val = new gddScalar(gddAppType_value, aitEnumUint32);
 	val->put(run);
-	val->setTimeStamp(ts);
+	val->setTimeStamp(ts); // Wallclock Time...!
 
 	/* This does the unref/ref for us, so each event posted will
 	 * get its own copy of the value at that time.
@@ -429,7 +429,7 @@ smsRecordingPV::smsRecordingPV(const std::string &prefix,
 
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 
 	m_pv_name = prefix + ":Recording";
 }
@@ -461,7 +461,7 @@ caStatus smsRecordingPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsRecordingPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -485,7 +485,7 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	val.get(v);
 
 	struct timespec ts;
-	val.getTimeStamp(&ts);
+	val.getTimeStamp(&ts); // Wallclock Time...!
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
@@ -535,14 +535,14 @@ void smsRecordingPV::update(bool recording, struct timespec *ts)
 			<< "." << std::setfill('0') << std::setw(9)
 			<< ts->tv_nsec);
 		// Still Update TimeStamp
-		m_value->setTimeStamp(ts);
+		m_value->setTimeStamp(ts); // Wallclock Time...!
 		notify();
 		return;
 	}
 
 	val = new gddScalar(gddAppType_value, aitEnumEnum16);
 	val->put(recording);
-	val->setTimeStamp(ts);
+	val->setTimeStamp(ts); // Wallclock Time...!
 
 	/* This does the unref/ref for us, so each event posted will
 	 * get its own copy of the value at that time.
@@ -595,7 +595,7 @@ caStatus smsStringPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		char *str = (char *) m_value->dataPointer();
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsStringPV::read() m_pv_name=" << m_pv_name
 			<< " value=[" << str << "]"
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -610,7 +610,7 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	unsigned int start, nelem;
 
 	struct timespec ts;
-	val.getTimeStamp(&ts);
+	val.getTimeStamp(&ts); // Wallclock Time...!
 
 	/* caput sends a null string as a scalar, so interpret that
 	 * as an unset request.
@@ -717,7 +717,7 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
 				<< ts.tv_nsec);
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			changed();
@@ -732,7 +732,7 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					<< ts.tv_nsec);
 			}
 			// Still Update TimeStamp
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			notify();
 		}
 		return S_casApp_success;
@@ -742,7 +742,7 @@ caStatus smsStringPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					MAX_LENGTH);
 	nv->putRef((const aitUint8 *) new_str, new charArrayDestructor);
 
-	nv->setTimeStamp(&ts);
+	nv->setTimeStamp(&ts); // Wallclock Time...!
 	nv->setStat(epicsAlarmNone);
 	nv->setSevr(epicsSevNone);
 
@@ -791,14 +791,14 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
 				<< ts->tv_nsec);
-			m_value->setTimeStamp(ts);
+			m_value->setTimeStamp(ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			changed();
 		}
 		else {
 			struct timespec old_ts;
-			m_value->getTimeStamp(&old_ts);
+			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
 					<< " String Value Did Not Change, But Time Earlier"
@@ -806,7 +806,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 					<< "." << std::setfill('0') << std::setw(9)
 					<< ts->tv_nsec);
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 				changed();
 			}
@@ -818,7 +818,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 					<< "." << std::setfill('0') << std::setw(9)
 					<< ts->tv_nsec);
 				// Still Update TimeStamp
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 			}
 		}
@@ -828,7 +828,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 	gddAtomic *nv = new gddAtomic(gddAppType_value, aitEnumUint8, 1,
 					MAX_LENGTH);
 	nv->putRef((const aitUint8 *) new_str, new charArrayDestructor);
-	nv->setTimeStamp(ts);
+	nv->setTimeStamp(ts); // Wallclock Time...!
 	nv->setStat(epicsAlarmNone);
 	nv->setSevr(epicsSevNone);
 
@@ -864,7 +864,7 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 			<< "." << std::setfill('0') << std::setw(9)
 			<< new_ts.tv_nsec);
 		// Still Update TimeStamp
-		m_value->setTimeStamp(&new_ts);
+		m_value->setTimeStamp(&new_ts); // Wallclock Time...!
 		notify();
 		return;
 	}
@@ -886,14 +886,14 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 					<< " ts=" << new_ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
 					<< "." << std::setfill('0') << std::setw(9)
 					<< new_ts.tv_nsec);
-				m_value->setTimeStamp(&new_ts);
+				m_value->setTimeStamp(&new_ts); // Wallclock Time...!
 				m_first_set = false;
 				notify();
 				changed();
 			}
 			else {
 				struct timespec old_ts;
-				m_value->getTimeStamp(&old_ts);
+				m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 				if ( compareTimeStamps( new_ts, old_ts ) < 0 ) {
 					DEBUG("smsStringPV::unset() m_pv_name=" << m_pv_name
 						<< " String Value Did Not Change, But Time Earlier"
@@ -903,7 +903,7 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 							- ADARA::EPICS_EPOCH_OFFSET
 						<< "." << std::setfill('0') << std::setw(9)
 						<< new_ts.tv_nsec);
-					m_value->setTimeStamp(&new_ts);
+					m_value->setTimeStamp(&new_ts); // Wallclock Time...!
 					notify();
 					changed();
 				}
@@ -915,7 +915,7 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 						<< "." << std::setfill('0') << std::setw(9)
 						<< new_ts.tv_nsec);
 					// Still Update TimeStamp
-					m_value->setTimeStamp(&new_ts);
+					m_value->setTimeStamp(&new_ts); // Wallclock Time...!
 					notify();
 				}
 			}
@@ -943,7 +943,7 @@ void smsStringPV::unset(bool init, struct timespec *ts)
 	m_value->putRef((const aitUint8 *) new_str, new charArrayDestructor);
 	m_value->setStat(epicsAlarmUDF);
 	m_value->setSevr(epicsSevNone);
-	m_value->setTimeStamp(&new_ts);
+	m_value->setTimeStamp(&new_ts); // Wallclock Time...!
 
 	unsigned int start, nelem;
 	m_value->getBound(0, start, nelem);
@@ -971,7 +971,7 @@ void smsStringPV::changed(void)
 	{
 		// AutoSave PV Value Change...
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		StorageManager::autoSavePV( m_pv_name, value(), &ts );
 	}
 }
@@ -988,7 +988,7 @@ smsBooleanPV::smsBooleanPV(const std::string &name,
 
 	/* Default all booleans (and derivatives) to false on startup */
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 	m_value->put(0);
 }
 
@@ -1019,7 +1019,7 @@ caStatus smsBooleanPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsBooleanPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1044,7 +1044,7 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	val.get(v);
 
 	struct timespec ts;
-	val.getTimeStamp(&ts);
+	val.getTimeStamp(&ts); // Wallclock Time...!
 
 	std::string log_info;
 	bool do_log = false;
@@ -1074,7 +1074,7 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
 				<< ts.tv_nsec);
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			changed();
@@ -1089,7 +1089,7 @@ caStatus smsBooleanPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					<< ts.tv_nsec);
 			}
 			// Still Update TimeStamp
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			notify();
 		}
 		return S_casApp_success;
@@ -1124,7 +1124,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
 				<< ts->tv_nsec);
-			m_value->setTimeStamp(ts);
+			m_value->setTimeStamp(ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			if ( !m_no_changed_on_update || force_changed )
@@ -1132,7 +1132,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 		}
 		else {
 			struct timespec old_ts;
-			m_value->getTimeStamp(&old_ts);
+			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsBooleanPV::update() m_pv_name=" << m_pv_name
 					<< " Value Did Not Change, But Time Earlier"
@@ -1146,7 +1146,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 					<< "." << std::setfill('0') << std::setw(9)
 					<< ts->tv_nsec);
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 				if ( !m_no_changed_on_update || force_changed )
 					changed();
@@ -1159,7 +1159,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 					<< "." << std::setfill('0') << std::setw(9)
 					<< ts->tv_nsec);
 				// Still Update TimeStamp
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 			}
 		}
@@ -1168,7 +1168,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 
 	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
 	nval->put(val);
-	nval->setTimeStamp(ts);
+	nval->setTimeStamp(ts); // Wallclock Time...!
 
 	/* This does the unref/ref for us, so each event posted will
 	 * get its own copy of the value at that time.
@@ -1204,7 +1204,7 @@ void smsBooleanPV::changed(void)
 	{
 		// AutoSave PV Value Change...
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		bool bval = value();
 		// Use String Representation of Boolean for AutoSave File... :-D
 		std::string bvalstr = ( bval ) ? "true" : "false";
@@ -1245,14 +1245,14 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
 				<< ts->tv_nsec);
-			m_value->setTimeStamp(ts);
+			m_value->setTimeStamp(ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			changed();
 		}
 		else {
 			struct timespec old_ts;
-			m_value->getTimeStamp(&old_ts);
+			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsEnabledPV::update() m_pv_name=" << m_pv_name
 					<< " Value Did Not Change, But Time Earlier"
@@ -1260,7 +1260,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 					<< "." << std::setfill('0') << std::setw(9)
 					<< ts->tv_nsec);
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 				changed();
 			}
@@ -1272,7 +1272,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 					<< "." << std::setfill('0') << std::setw(9)
 					<< ts->tv_nsec);
 				// Still Update TimeStamp
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 			}
 		}
@@ -1281,7 +1281,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 
 	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
 	nval->put(val);
-	nval->setTimeStamp(ts);
+	nval->setTimeStamp(ts); // Wallclock Time...!
 
 	if (val != 0) {
 		m_dataSource->enabled();
@@ -1311,7 +1311,7 @@ smsErrorPV::smsErrorPV(const std::string &name)
 
 	/* Default all booleans (and derivatives) to false on startup */
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 	m_value->put(0);
 }
 
@@ -1342,7 +1342,7 @@ caStatus smsErrorPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsErrorPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1367,7 +1367,7 @@ caStatus smsErrorPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	val.get(v);
 
 	struct timespec ts;
-	val.getTimeStamp(&ts);
+	val.getTimeStamp(&ts); // Wallclock Time...!
 
 	std::string log_info;
 	bool do_log = false;
@@ -1419,7 +1419,7 @@ caStatus smsErrorPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< ts.tv_nsec);
 		}
 		// Still Update TimeStamp
-		m_value->setTimeStamp(&ts);
+		m_value->setTimeStamp(&ts); // Wallclock Time...!
 		notify();
 		return S_casApp_success;
 	}
@@ -1463,14 +1463,14 @@ void smsErrorPV::update(bool val, bool major, struct timespec *ts)
 			<< "." << std::setfill('0') << std::setw(9)
 			<< ts->tv_nsec);
 		// Still Update TimeStamp
-		m_value->setTimeStamp(ts);
+		m_value->setTimeStamp(ts); // Wallclock Time...!
 		notify();
 		return;
 	}
 
 	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
 	nval->put(val);
-	nval->setTimeStamp(ts);
+	nval->setTimeStamp(ts); // Wallclock Time...!
 
 	if (val != 0) {
 		nval->setStat(epicsAlarmState);
@@ -1515,7 +1515,7 @@ smsConnectedPV::smsConnectedPV(const std::string &name) : smsPV(name)
 
 	/* Default all booleans (and derivatives) to false on startup */
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 	m_value->put(0);
 }
 
@@ -1546,7 +1546,7 @@ caStatus smsConnectedPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsConnectedPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1571,7 +1571,7 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	val.get(v);
 
 	struct timespec ts;
-	val.getTimeStamp(&ts);
+	val.getTimeStamp(&ts); // Wallclock Time...!
 
 	bool do_log = false;
 	std::string log_info;
@@ -1603,7 +1603,7 @@ caStatus smsConnectedPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< ts.tv_nsec);
 		}
 		// Still Update TimeStamp
-		m_value->setTimeStamp(&ts);
+		m_value->setTimeStamp(&ts); // Wallclock Time...!
 		notify();
 		return S_casApp_success;
 	}
@@ -1632,14 +1632,14 @@ void smsConnectedPV::update(uint16_t val, struct timespec *ts)
 			<< "." << std::setfill('0') << std::setw(9)
 			<< ts->tv_nsec);
 		// Still Update TimeStamp
-		m_value->setTimeStamp(ts);
+		m_value->setTimeStamp(ts); // Wallclock Time...!
 		notify();
 		return;
 	}
 
 	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
 	nval->put(val);
-	nval->setTimeStamp(ts);
+	nval->setTimeStamp(ts); // Wallclock Time...!
 
 	// Failed...
 	if (val == 2) {
@@ -1759,7 +1759,7 @@ smsPassThruPV::smsPassThruPV(const std::string &name, bool auto_save)
 
 	/* Default all booleans (and derivatives) to false on startup */
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 	m_value->put(0);
 }
 
@@ -1790,7 +1790,7 @@ caStatus smsPassThruPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsPassThruPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1815,7 +1815,7 @@ caStatus smsPassThruPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	val.get(v);
 
 	struct timespec ts;
-	val.getTimeStamp(&ts);
+	val.getTimeStamp(&ts); // Wallclock Time...!
 
 	std::string log_info;
 	bool do_log = false;
@@ -1845,7 +1845,7 @@ caStatus smsPassThruPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
 				<< ts.tv_nsec);
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			changed();
@@ -1860,7 +1860,7 @@ caStatus smsPassThruPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					<< ts.tv_nsec);
 			}
 			// Still Update TimeStamp
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			notify();
 		}
 		return S_casApp_success;
@@ -1890,14 +1890,14 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
 				<< ts->tv_nsec);
-			m_value->setTimeStamp(ts);
+			m_value->setTimeStamp(ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			changed();
 		}
 		else {
 			struct timespec old_ts;
-			m_value->getTimeStamp(&old_ts);
+			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsPassThruPV::update() m_pv_name=" << m_pv_name
 					<< " Value Did Not Change, But Time Earlier"
@@ -1905,7 +1905,7 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 					<< "." << std::setfill('0') << std::setw(9)
 					<< ts->tv_nsec);
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 				changed();
 			}
@@ -1917,7 +1917,7 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 						<< "." << std::setfill('0') << std::setw(9)
 						<< ts->tv_nsec);
 				// Still Update TimeStamp
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 			}
 		}
@@ -1926,7 +1926,7 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 
 	nval = new gddScalar(gddAppType_value, aitEnumEnum16);
 	nval->put(val);
-	nval->setTimeStamp(ts);
+	nval->setTimeStamp(ts); // Wallclock Time...!
 
 	/* This does the unref/ref for us, so each event posted will
 	 * get its own copy of the value at that time.
@@ -2003,7 +2003,7 @@ void smsPassThruPV::changed(void)
 	{
 		// AutoSave PV Value Change...
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		std::stringstream ss;
 		ss << value();
 		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
@@ -2026,7 +2026,7 @@ smsUint32PV::smsUint32PV(const std::string &name,
 	clock_gettime(CLOCK_REALTIME, &ts);
 
 	m_value = new gddScalar(gddAppType_value, aitEnumUint32);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 	m_value->put(0);
 }
 
@@ -2118,7 +2118,7 @@ caStatus smsUint32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsUint32PV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2143,7 +2143,7 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	val.get(v);
 
 	struct timespec ts;
-	val.getTimeStamp(&ts);
+	val.getTimeStamp(&ts); // Wallclock Time...!
 
 	std::string log_info;
 	bool do_log = false;
@@ -2166,7 +2166,7 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
 				<< ts.tv_nsec);
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			changed();
@@ -2181,7 +2181,7 @@ caStatus smsUint32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					<< ts.tv_nsec);
 			}
 			// Still Update TimeStamp
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			notify();
 		}
 		return S_casApp_success;
@@ -2213,14 +2213,14 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 					<< "." << std::setfill('0') << std::setw(9)
 					<< ts->tv_nsec);
 			}
-			m_value->setTimeStamp(ts);
+			m_value->setTimeStamp(ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			changed();
 		}
 		else {
 			struct timespec old_ts;
-			m_value->getTimeStamp(&old_ts);
+			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				if ( !no_log ) {
 					DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
@@ -2230,7 +2230,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 						<< "." << std::setfill('0') << std::setw(9)
 						<< ts->tv_nsec);
 				}
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 				changed();
 			}
@@ -2244,7 +2244,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 						<< ts->tv_nsec);
 				}
 				// Still Update TimeStamp
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 			}
 		}
@@ -2253,7 +2253,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 
 	nval = new gddScalar(gddAppType_value, aitEnumUint32);
 	nval->put(val);
-	nval->setTimeStamp(ts);
+	nval->setTimeStamp(ts); // Wallclock Time...!
 
 	/* This does the unref/ref for us, so each event posted will
 	 * get its own copy of the value at that time.
@@ -2285,7 +2285,7 @@ void smsUint32PV::changed(void)
 	{
 		// AutoSave PV Value Change...
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		std::stringstream ss;
 		ss << value();
 		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
@@ -2300,7 +2300,7 @@ smsInt32PV::smsInt32PV(const std::string &name) : smsPV(name)
 	clock_gettime(CLOCK_REALTIME, &ts);
 
 	m_value = new gddScalar(gddAppType_value, aitEnumInt32);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 	m_value->put(0);
 }
 
@@ -2326,7 +2326,7 @@ caStatus smsInt32PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsInt32PV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2351,7 +2351,7 @@ caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	val.get(v);
 
 	struct timespec ts;
-	val.getTimeStamp(&ts);
+	val.getTimeStamp(&ts); // Wallclock Time...!
 
 	std::string log_info;
 	bool do_log = false;
@@ -2376,7 +2376,7 @@ caStatus smsInt32PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< ts.tv_nsec);
 		}
 		// Still Update TimeStamp
-		m_value->setTimeStamp(&ts);
+		m_value->setTimeStamp(&ts); // Wallclock Time...!
 		notify();
 		return S_casApp_success;
 	}
@@ -2405,14 +2405,14 @@ void smsInt32PV::update(int32_t val, struct timespec *ts)
 			<< "." << std::setfill('0') << std::setw(9)
 			<< ts->tv_nsec);
 		// Still Update TimeStamp
-		m_value->setTimeStamp(ts);
+		m_value->setTimeStamp(ts); // Wallclock Time...!
 		notify();
 		return;
 	}
 
 	nval = new gddScalar(gddAppType_value, aitEnumInt32);
 	nval->put(val);
-	nval->setTimeStamp(ts);
+	nval->setTimeStamp(ts); // Wallclock Time...!
 
 	/* This does the unref/ref for us, so each event posted will
 	 * get its own copy of the value at that time.
@@ -2451,7 +2451,7 @@ smsTriggerPV::smsTriggerPV(const std::string &name)
 
 	/* We'll stay false except for briefly when someone sets us true */
 	m_value = new gddScalar(gddAppType_value, aitEnumEnum16);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 	m_value->put(0);
 }
 
@@ -2482,7 +2482,7 @@ caStatus smsTriggerPV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsTriggerPV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2506,7 +2506,7 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	val.get(v);
 
 	struct timespec ts;
-	val.getTimeStamp(&ts);
+	val.getTimeStamp(&ts); // Wallclock Time...!
 
 	std::string log_info;
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
@@ -2526,7 +2526,7 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	}
 
 	// Always Set smsTriggerPV Timestamp for Latest Trigger...! ;-D
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 
 	if (v) {
 		triggered(&ts);
@@ -2538,7 +2538,7 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 			smartGDDPointer edge;
 
 			edge = new gddScalar(gddAppType_value, aitEnumEnum16);
-			edge->setTimeStamp(&ts);
+			edge->setTimeStamp(&ts); // Wallclock Time...!
 			edge->put(1);
 			postEvent(mask, *edge);
 
@@ -2547,7 +2547,7 @@ caStatus smsTriggerPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				ts.tv_sec++;
 				ts.tv_nsec -= NANO_PER_SECOND_LL;
 			}
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			postEvent(mask, *m_value);
 		}
 
@@ -2574,7 +2574,7 @@ smsFloat64PV::smsFloat64PV(const std::string &name,
 	clock_gettime(CLOCK_REALTIME, &ts);
 
 	m_value = new gddScalar(gddAppType_value, aitEnumFloat64);
-	m_value->setTimeStamp(&ts);
+	m_value->setTimeStamp(&ts); // Wallclock Time...!
 	m_value->put(0.0);
 }
 
@@ -2674,7 +2674,7 @@ caStatus smsFloat64PV::read(const casCtx &UNUSED(ctx), gdd &prototype)
 	if ( RateLimitedLogging::checkLog( RLLHistory_SMSControlPV,
 			RLL_PV_READ, m_pv_name, 60, 5, 60, log_info ) ) {
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		DEBUG(log_info << "smsFloat64PV::read() m_pv_name=" << m_pv_name
 			<< " value=" << v
 			<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2699,7 +2699,7 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 	val.get(v);
 
 	struct timespec ts;
-	val.getTimeStamp(&ts);
+	val.getTimeStamp(&ts); // Wallclock Time...!
 
 	std::string log_info;
 	bool do_log = false;
@@ -2722,7 +2722,7 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 				<< " ts=" << ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
 				<< ts.tv_nsec);
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			changed();
@@ -2737,7 +2737,7 @@ caStatus smsFloat64PV::write(const casCtx &UNUSED(ctx), const gdd &val)
 					<< ts.tv_nsec);
 			}
 			// Still Update TimeStamp
-			m_value->setTimeStamp(&ts);
+			m_value->setTimeStamp(&ts); // Wallclock Time...!
 			notify();
 		}
 		return S_casApp_success;
@@ -2767,14 +2767,14 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
 				<< ts->tv_nsec);
-			m_value->setTimeStamp(ts);
+			m_value->setTimeStamp(ts); // Wallclock Time...!
 			m_first_set = false;
 			notify();
 			changed();
 		}
 		else {
 			struct timespec old_ts;
-			m_value->getTimeStamp(&old_ts);
+			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsFloat64PV::update() m_pv_name=" << m_pv_name
 					<< " Value Did Not Change, But Time Earlier"
@@ -2782,7 +2782,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 					<< "." << std::setfill('0') << std::setw(9)
 					<< ts->tv_nsec);
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 				changed();
 			}
@@ -2794,7 +2794,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 					<< "." << std::setfill('0') << std::setw(9)
 					<< ts->tv_nsec);
 				// Still Update TimeStamp
-				m_value->setTimeStamp(ts);
+				m_value->setTimeStamp(ts); // Wallclock Time...!
 				notify();
 			}
 		}
@@ -2803,7 +2803,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 
 	nval = new gddScalar(gddAppType_value, aitEnumFloat64);
 	nval->put(val);
-	nval->setTimeStamp(ts);
+	nval->setTimeStamp(ts); // Wallclock Time...!
 
 	/* This does the unref/ref for us, so each event posted will
 	 * get its own copy of the value at that time.
@@ -2835,7 +2835,7 @@ void smsFloat64PV::changed(void)
 	{
 		// AutoSave PV Value Change...
 		struct timespec ts;
-		m_value->getTimeStamp(&ts);
+		m_value->getTimeStamp(&ts); // Wallclock Time...!
 		std::stringstream ss;
 		ss << std::setprecision(17) << value();
 		StorageManager::autoSavePV( m_pv_name, ss.str(), &ts );
