@@ -31,35 +31,35 @@ public:
 	void beforeNewRun( uint32_t runNumber );
 	void runStop(void);
 
-	void addAnnotationComment( struct timespec *ts,
+	void addAnnotationComment( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void startScan( struct timespec *ts,
+	void startScan( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void stopScan( struct timespec *ts,
+	void stopScan( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void addScanComment( struct timespec *ts,
+	void addScanComment( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void pause( struct timespec *ts,
+	void pause( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void resume( struct timespec *ts,
+	void resume( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void addNotesComment( struct timespec *ts,
+	void addNotesComment( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
-	void addSystemComment( struct timespec *ts,
+	void addSystemComment( struct timespec *ts, // Wallclock Time...!
 		uint32_t scanIndex = -1, std::string comment = "" );
 
-	void annotate( struct timespec *ts,
+	void annotate( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
 		// DEPRECATED
-	void addRunComment( struct timespec *ts,
+	void addRunComment( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru = IGNORE,
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
 		// DEPRECATED
@@ -118,7 +118,7 @@ private:
 
 	void emitPrologue( ADARA::MarkerType::Enum, std::string comment = "" );
 
-	void emitPacket( const struct timespec &,
+	void emitPacket( const struct timespec &, // Wallclock Time...!
 		ADARA::MarkerType::Enum,
 		uint32_t scanIndex,
 		std::string prefix = "",
