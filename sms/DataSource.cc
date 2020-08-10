@@ -3505,42 +3505,42 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 		struct timespec ts = pkt.timestamp(); // Wallclock Time...!
 		switch ( pkt.marker_type() ) {
 			case ADARA::MarkerType::GENERIC:
-				markers->addAnnotationComment( &ts,
+				markers->addAnnotationComment( &ts, // Wallclock Time...!
 					m_ignore_annotation_pkts,
 					pkt.scanIndex(), pkt.comment() );
 				break;
 			case ADARA::MarkerType::SCAN_START:
-				markers->startScan( &ts,
+				markers->startScan( &ts, // Wallclock Time...!
 					m_ignore_annotation_pkts,
 					pkt.scanIndex(), "" );
 					// Don't Pass Comment, Let Scan Start Re-Generate It...
 				break;
 			case ADARA::MarkerType::SCAN_STOP:
-				markers->stopScan( &ts,
+				markers->stopScan( &ts, // Wallclock Time...!
 					m_ignore_annotation_pkts,
 					pkt.scanIndex(), "" );
 					// Don't Pass Comment, Let Scan Stop Re-Generate It...
 				break;
 			case ADARA::MarkerType::PAUSE:
-				markers->pause( &ts,
+				markers->pause( &ts, // Wallclock Time...!
 					m_ignore_annotation_pkts,
 					pkt.scanIndex(), "" );
 					// Don't Pass Comment, Let Pause Re-Generate It...
 				break;
 			case ADARA::MarkerType::RESUME:
-				markers->resume( &ts,
+				markers->resume( &ts, // Wallclock Time...!
 					m_ignore_annotation_pkts,
 					pkt.scanIndex(), "" );
 					// Don't Pass Comment, Let Resume Re-Generate It...
 				break;
 			case ADARA::MarkerType::OVERALL_RUN_COMMENT:
-				markers->addNotesComment( &ts,
+				markers->addNotesComment( &ts, // Wallclock Time...!
 					m_ignore_annotation_pkts,
 					pkt.scanIndex(), pkt.comment() );
 				break;
 			case ADARA::MarkerType::SYSTEM:
 				// Always Pass Thru System Comments...
-				markers->addSystemComment( &ts,
+				markers->addSystemComment( &ts, // Wallclock Time...!
 					pkt.scanIndex(), pkt.comment() );
 				// Optionally Execute External System Commands...
 				if ( m_ignore_annotation_pkts == Markers::EXECUTE )
@@ -3556,7 +3556,7 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 							- ADARA::EPICS_EPOCH_OFFSET
 						<< "." << std::setfill('0') << std::setw(9)
 						<< pkt.timestamp().tv_nsec );
-					m_ctrl->externalRunControl( &ts,
+					m_ctrl->externalRunControl( &ts, // Wallclock Time...!
 						pkt.scanIndex(), pkt.comment() );
 				}
 				break;
