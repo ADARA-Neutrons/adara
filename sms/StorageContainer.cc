@@ -3,6 +3,9 @@
 
 static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
 
+#include <string>
+#include <sstream>
+#include <iomanip>
 #include <stdexcept>
 
 #include <stdio.h>
@@ -18,7 +21,9 @@ static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
 #include "StorageContainer.h"
 #include "StorageManager.h"
 #include "StorageFile.h"
+#include "SMSControl.h"
 #include "ADARA.h"
+#include "ADARAUtils.h"
 
 namespace fs = boost::filesystem;
 
@@ -30,63 +35,339 @@ const char *StorageContainer::m_manual_marker = "manual_processing_needed";
 
 const char *StorageContainer::m_proposal_id_marker_prefix = "proposal-";
 
-void StorageContainer::terminateFile(void)
+// Default "New Start" Time, for "Don't Care" Scenarios...
+// (Set to 0 Seconds, 1 Nanoseconds, so --Nanoseconds leaves it at 0.0! :-)
+struct timespec StorageContainer::m_default_start_time = { 0, 1 };
+
+void StorageContainer::terminateFile(
+		std::list<struct PauseMode>::iterator &it,
+		bool do_terminate,
+		const struct timespec &newStart ) // EPICS Time...!
 {
-	ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
-	if (m_runNumber) {
-		status = m_active ? ADARA::RunStatus::RUN_EOF :
-				    ADARA::RunStatus::END_RUN;
+	if ( !(it->m_file) )
+	{
+		std::stringstream ss;
+		ss << "terminateFile(): No File to Terminate!"
+			<< " newStart=" << newStart.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< newStart.tv_nsec << std::setw(0)
+			<< " do_terminate=" << do_terminate
+			<< " in PauseMode " << it->m_numModes
+			<< " [" << it->m_minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_minTime.tv_nsec << std::setw(0)
+			<< ", " << it->m_maxTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+			<< " m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_lastPrologueFile="
+			<< ( ( it->m_lastPrologueFile ) ?
+				it->m_lastPrologueFile->path() : "(null)" )
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements";
+		throw std::logic_error( ss.str() );
 	}
-	m_cur_file->terminate(status);
-	StorageManager::addBaseStorage(m_cur_file->size());
-	m_cur_file.reset();
+
+	DEBUG("terminateFile(): Terminating File "
+		<< it->m_file->path()
+		<< " newStart=" << newStart.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< newStart.tv_nsec << std::setw(0)
+		<< " do_terminate=" << do_terminate
+		<< " in PauseMode " << it->m_numModes
+		<< " [" << it->m_minTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< it->m_minTime.tv_nsec << std::setw(0)
+		<< ", " << it->m_maxTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+		<< " m_paused=" << it->m_paused
+		<< " m_numModes=" << it->m_numModes
+		<< " m_numFiles=" << it->m_numFiles
+		<< " m_numPauseFiles=" << it->m_numPauseFiles
+		<< " m_lastPrologueFile="
+		<< ( ( it->m_lastPrologueFile ) ?
+			it->m_lastPrologueFile->path() : "(null)" )
+		<< " - Btw, the PauseMode Stack now has "
+		<< m_pauseModeStack.size() << " elements");
+
+	// Set Max Time for Current PauseMode to 1 Nanosecond
+	// _Before_ TimeStamp of Next PauseMode Start Time...
+	// (So We Maintain Distinct Time Ranges Per PauseMode...)
+	struct timespec maxTime = newStart; // EPICS Time...!
+	if ( maxTime.tv_nsec > 0 )
+		maxTime.tv_nsec--;
+	else {
+		maxTime.tv_nsec = NANO_PER_SECOND_LL - 1;
+		maxTime.tv_sec--;
+	}
+	it->m_maxTime = maxTime;
+
+	DEBUG("terminateFile(): Setting Current PauseMode " << it->m_numModes
+		<< " maxTime=" << it->m_maxTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< it->m_maxTime.tv_nsec << std::setw(0));
+
+	// Do We Terminate This PauseMode Now, or Keep It Alive on the Stack?
+	if ( do_terminate )
+	{
+		ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
+		if ( m_runNumber )
+		{
+			status = m_active ? ADARA::RunStatus::RUN_EOF :
+				    	ADARA::RunStatus::END_RUN;
+		}
+
+		it->m_file->terminate( status );
+		StorageManager::addBaseStorage( it->m_file->size() );
+		it->m_file.reset();
+	}
+
+	// Keep Current PauseMode Alive on the Stack...
+	else
+	{
+		// Get "Last" Prologue File (_Not_ Any SavePrologue Files!)
+		// Before Pushing New PauseMode Onto Stack...
+		getLastPrologueFiles( it, false );
+
+		// Push New "Empty" Current PauseMode onto Stack...
+
+		struct PauseMode pauseMode;
+
+		pauseMode.m_minTime.tv_sec = 0;
+		pauseMode.m_minTime.tv_nsec = 0;
+		pauseMode.m_maxTime.tv_sec = 0;
+		pauseMode.m_maxTime.tv_nsec = 0;
+
+		// Carry Over Current Pause State and File/Pause Numbers
+		pauseMode.m_numModes = it->m_numModes;
+		pauseMode.m_numFiles = it->m_numFiles;
+		pauseMode.m_numPauseFiles = it->m_numPauseFiles;
+		pauseMode.m_paused = it->m_paused;
+
+		m_pauseModeStack.push_front( pauseMode );
+
+		it = m_pauseModeStack.begin();
+
+		DEBUG("terminateFile():"
+			<< " Pushed New Empty Current PauseMode onto Stack"
+			<< " do_terminate=" << do_terminate
+			<< ", Inherited m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements");
+	}
 }
 
-void StorageContainer::newFile(void)
+void StorageContainer::newFile(
+		bool oldestContainer,
+		std::list<struct PauseMode>::iterator &it,
+		bool paused, const struct timespec &minTime ) // EPICS Time...!
 {
-	if (m_cur_file)
+	if ( it->m_file )
+	{
+		DEBUG("newFile(): StorageFile Already Exists "
+			<< it->m_file->path()
+			<< " in PauseMode " << it->m_numModes
+			<< " [" << it->m_minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_minTime.tv_nsec << std::setw(0)
+			<< ", " << it->m_maxTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+			<< " m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_lastPrologueFile="
+			<< ( ( it->m_lastPrologueFile ) ?
+				it->m_lastPrologueFile->path() : "(null)" )
+			<< ", Requested minTime=" << minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< minTime.tv_nsec << std::setw(0)
+			<< " paused=" << paused
+			<< " oldestContainer=" << oldestContainer
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements");
 		return;
+	}
+
+	DEBUG("newFile(): Create New StorageFile"
+		<< " minTime=" << minTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< minTime.tv_nsec << std::setw(0)
+		<< " paused=" << paused
+		<< " oldestContainer=" << oldestContainer
+		<< " from m_paused=" << it->m_paused
+		<< " m_numModes=" << it->m_numModes
+		<< " m_numFiles=" << it->m_numFiles
+		<< " m_numPauseFiles=" << it->m_numPauseFiles
+		<< " m_lastPrologueFile="
+		<< ( ( it->m_lastPrologueFile ) ?
+			it->m_lastPrologueFile->path() : "(null)" )
+		<< " - Btw, the PauseMode Stack now has "
+		<< m_pauseModeStack.size() << " elements");
+
+	it->m_paused = paused;
+
+	it->m_minTime.tv_sec = minTime.tv_sec;
+	it->m_minTime.tv_nsec = minTime.tv_nsec;
 
 	ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
 
-	if (m_runNumber) {
+	if ( m_runNumber ) {
 		status = ADARA::RunStatus::NEW_RUN;
-		if (m_numFiles)
+		if ( it->m_numModes )
 			status = ADARA::RunStatus::RUN_BOF;
 	}
 
-	if (m_paused) {
-		m_cur_file = StorageFile::newFile(m_weakThis,
-				m_numFiles, ++m_numPauseFiles, status);
+	// Bump for First PauseMode Index...
+	if ( it->m_numModes == 0 )
+		it->m_numModes = 1;
+
+	if ( it->m_paused )
+	{
+		it->m_file = StorageFile::newFile( m_weakThis, it->m_paused,
+				it->m_numModes, it->m_numFiles, ++(it->m_numPauseFiles),
+				status );
 	}
-	else {
-		m_cur_file = StorageFile::newFile(m_weakThis,
-				++m_numFiles, 0, status);
+	else
+	{
+		it->m_file = StorageFile::newFile( m_weakThis, it->m_paused,
+				it->m_numModes, ++(it->m_numFiles),
+				/* it->m_numPauseFiles = */ 0, status );
 	}
-	m_files.push_back(m_cur_file);
+
+	// REMOVEME
+	DEBUG("newFile(): New StorageFile Created "
+		<< it->m_file->path()
+		<< " in PauseMode " << it->m_numModes
+		<< " [" << it->m_minTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< it->m_minTime.tv_nsec << std::setw(0)
+		<< ", " << it->m_maxTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+		<< " m_paused=" << it->m_paused
+		<< " m_numModes=" << it->m_numModes
+		<< " m_numFiles=" << it->m_numFiles
+		<< " m_numPauseFiles=" << it->m_numPauseFiles
+		<< " m_lastPrologueFile="
+		<< ( ( it->m_lastPrologueFile ) ?
+			it->m_lastPrologueFile->path() : "(null)" )
+		<< " oldestContainer=" << oldestContainer
+		<< " - Btw, the PauseMode Stack now has "
+		<< m_pauseModeStack.size() << " elements");
+
+	// Stagger Adding File to Container File List
+	// If This Isn't the Oldest PauseMode on the Stack
+	// of the Oldest Container on the Stack...
+	std::list<struct PauseMode>::iterator next = it; next++;
+	if ( oldestContainer && next == m_pauseModeStack.end() )
+	{
+		// If We Have Some Previously Deferred Pending Files on Our List,
+		// Go Ahead and Push Them Onto the Container File List Now...
+		if ( it->m_pendingFiles.size() > 0 )
+		{
+			std::list<StorageFile::SharedPtr>::iterator fit;
+			for ( fit = it->m_pendingFiles.begin() ;
+					fit != it->m_pendingFiles.end() ; ++fit )
+			{
+				DEBUG("newFile():"
+					<< " Pushing Previously Pending File "
+					<< (*fit)->path()
+					<< " Onto Container File List"
+					<< " (and Notifying FileAdded)"
+					<< " from PauseMode " << it->m_numModes
+					<< " in [" << it->m_minTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< it->m_minTime.tv_nsec << std::setw(0)
+					<< ", " << it->m_maxTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+					<< " m_paused=" << it->m_paused
+					<< " m_numModes=" << it->m_numModes
+					<< " m_numFiles=" << it->m_numFiles
+					<< " m_numPauseFiles=" << it->m_numPauseFiles
+					<< " m_lastPrologueFile="
+					<< ( ( it->m_lastPrologueFile ) ?
+						it->m_lastPrologueFile->path() : "(null)" )
+					<< " oldestContainer=" << oldestContainer
+					<< " - Btw, the PauseMode Stack has "
+					<< m_pauseModeStack.size() << " elements");
+
+				m_files.push_back( *fit );
+				m_newFile( *fit );
+			}
+
+			it->m_pendingFiles.clear();
+		}
+
+		DEBUG("newFile(): Adding File to Container File List "
+			<< it->m_file->path());
+
+		m_files.push_back( it->m_file );
+	}
+	else
+	{
+		// We're _Not_ at the "Bottom" of the PauseMode Stack,
+		// So Push This New File Onto the _End_ of the Pending Files List
+		it->m_pendingFiles.push_back( it->m_file );
+		// REMOVEME
+		DEBUG("newFile(): Defer Adding File from New Stacked PauseMode"
+			<< " to Container File List "
+			<< it->m_file->path() << ","
+			<< " Instead Add New File to Pending Files List"
+			<< " (Size Now " << it->m_pendingFiles.size() << ")"
+			<< " in PauseMode " << it->m_numModes
+			<< " [" << it->m_minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_minTime.tv_nsec << std::setw(0)
+			<< ", " << it->m_maxTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+			<< " m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_lastPrologueFile="
+			<< ( ( it->m_lastPrologueFile ) ?
+				it->m_lastPrologueFile->path() : "(null)" )
+			<< " oldestContainer=" << oldestContainer
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements");
+	}
 
 	// Keep Track of the Number of Stream Files,
 	// for Long-Non-Running Container Splitting...
 	m_totFileCount++;
 
-	// If We are an Old Container with a "Last" Prologue File,
-	// Just Append That File Directly Now...
-	if ( m_lastPrologueFile )
+	// If We are an Old Container/PauseMode with a "Last" Prologue File,
+	// Then Just Append That File Directly Now...
+	if ( it->m_lastPrologueFile )
 	{
-		DEBUG("StorageContainer::newFile():"
+		DEBUG("newFile():"
 			<< " Directly Appending Last Prologue File "
-			<< m_lastPrologueFile->path()
+			<< it->m_lastPrologueFile->path()
 			<< " for New File "
-			<< m_cur_file->path());
+			<< it->m_file->path());
 
-		m_cur_file->catFile( m_lastPrologueFile );
+		it->m_file->catFile( it->m_lastPrologueFile );
 	}
 
 	// Tell the storage manager about the new file so we can
 	// add the prologue before anyone else sees it.
 	else
 	{
-		StorageManager::fileCreated( m_cur_file,
+		DEBUG("newFile(): Append Normal FileCreated File Prologue to "
+			<< it->m_file->path());
+
+		StorageManager::fileCreated( it->m_file,
 			false /* capture_last */ );
 	}
 
@@ -94,10 +375,375 @@ void StorageContainer::newFile(void)
 	 * (_Even_ in Paused mode, subscribers can use StorageFile::paused()
 	 * to selectively ignore any Paused run files... :-)
 	 */
-	m_newFile(m_cur_file);
+	// Stagger FileAdded Notify for Container
+	// If This Isn't the Oldest PauseMode on the Stack
+	// of the Oldest Container on the Stack...
+	if ( oldestContainer && next == m_pauseModeStack.end() )
+	{
+		DEBUG("newFile(): FileAdded Notify for "
+			<< it->m_file->path());
+
+		m_newFile( it->m_file );
+	}
+	else
+	{
+		// REMOVEME
+		DEBUG("newFile(): Defer FileAdded Notify"
+			<< " for New Stacked PauseMode "
+			<< it->m_file->path()
+			<< " in PauseMode " << it->m_numModes
+			<< " [" << it->m_minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_minTime.tv_nsec << std::setw(0)
+			<< ", " << it->m_maxTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+			<< " m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_lastPrologueFile="
+			<< ( ( it->m_lastPrologueFile ) ?
+				it->m_lastPrologueFile->path() : "(null)" )
+			<< " oldestContainer=" << oldestContainer
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements");
+	}
 }
 
-bool StorageContainer::write(IoVector &iovec, uint32_t len, bool notify,
+void StorageContainer::getPauseModeByTime(
+		std::list<struct PauseMode>::iterator &pm_it,
+		bool ignore_pkt_timestamp,
+		struct timespec &ts, // EPICS Time...!
+		bool check_old_pausemodes )
+{
+	std::list<struct PauseMode>::iterator found_it;
+
+	std::list<struct PauseMode>::iterator it =
+		m_pauseModeStack.begin();
+
+	// If Ignoring Packet TimeStamp, Just Write Into Current PauseMode
+	if ( ignore_pkt_timestamp )
+	{
+		found_it = m_pauseModeStack.begin();
+		if ( found_it != m_pauseModeStack.end() )
+		{
+			// REMOVEME
+			DEBUG("getPauseModeByTime():"
+				<< " Ignore Packet TimeStamp,"
+				<< " Use Current PauseMode " << it->m_numModes
+				<< " for ts=" << ts.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec << std::setw(0)
+				<< " in [" << found_it->m_minTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< found_it->m_minTime.tv_nsec << std::setw(0)
+				<< ", " << found_it->m_maxTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< found_it->m_maxTime.tv_nsec << std::setw(0) << "]"
+				<< " check_old_pausemodes=" << check_old_pausemodes
+				<< " m_paused=" << found_it->m_paused
+				<< " m_numModes=" << it->m_numModes
+				<< " m_numFiles=" << found_it->m_numFiles
+				<< " m_numPauseFiles=" << found_it->m_numPauseFiles
+				<< " m_lastPrologueFile="
+				<< ( ( found_it->m_lastPrologueFile ) ?
+					found_it->m_lastPrologueFile->path() : "(null)" )
+				<< " - Btw, the PauseMode Stack has "
+				<< m_pauseModeStack.size() << " elements");
+
+			// Step Past Current PauseMode,
+			// No Need to Check Its Expiration Yet...
+			it = found_it;
+			it++;
+		}
+	}
+	else
+	{
+		found_it = m_pauseModeStack.end();
+	}
+
+	// First, Make Sure We've Found the PauseMode with Time Range Match
+	// - Check Back Through PauseModes for a Time Range Match...
+	// (Unless We've Already Found the Matching PauseMode...)
+
+	for ( ; found_it == m_pauseModeStack.end()
+			&& it != m_pauseModeStack.end(); ++it )
+	{
+		// This PauseMode Encapsulates This EPICS TimeStamp...
+		if ( compareTimeStamps( ts, it->m_minTime ) >= 0
+			&& ( ( it->m_maxTime.tv_sec == 0
+					&& it->m_maxTime.tv_nsec == 0 )
+				|| compareTimeStamps( it->m_maxTime, ts ) >= 0 ) )
+		{
+			// REMOVEME
+			DEBUG("getPauseModeByTime():"
+				<< " Found PauseMode " << it->m_numModes
+				<< " for ts=" << ts.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec << std::setw(0)
+				<< " in [" << it->m_minTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< it->m_minTime.tv_nsec << std::setw(0)
+				<< ", " << it->m_maxTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+				<< " check_old_pausemodes=" << check_old_pausemodes
+				<< " m_paused=" << it->m_paused
+				<< " m_numModes=" << it->m_numModes
+				<< " m_numFiles=" << it->m_numFiles
+				<< " m_numPauseFiles=" << it->m_numPauseFiles
+				<< " m_lastPrologueFile="
+				<< ( ( it->m_lastPrologueFile ) ?
+					it->m_lastPrologueFile->path() : "(null)" )
+				<< " - Btw, the PauseMode Stack has "
+				<< m_pauseModeStack.size() << " elements");
+
+			// Found It! :-D
+			found_it = it;
+		}
+	}
+
+	// Now We've (Hopefully) Found the Matching PauseMode;
+	// If So, Then Check for Any "Older" PauseModes that have
+	// Now Reached the Cleanup Timeout Threshold and Expired...
+
+	if ( check_old_pausemodes && found_it != m_pauseModeStack.end() )
+	{
+		// Use Same Container Timeout for PauseModes Too...
+		struct timespec container_cleanup_timeout =
+			StorageManager::getContainerCleanupTimeout();
+
+		// Get "Oldest" Max DataSource Time,
+		// to Use as Furthest "Safe" Time Advancement for Comparison...
+		SMSControl *ctrl = SMSControl::getInstance();
+		struct timespec old_ts =
+			ctrl->oldestMaxDataSourceTime(); // EPICS Time...!
+
+		// Start at "End" of the PauseMode List, and Work Backwards,
+		// Up to Just Before the Present/Found PauseMode...
+		it = m_pauseModeStack.end();
+		if ( it != m_pauseModeStack.begin() )
+			it--;
+
+		for ( ; it != found_it && it != m_pauseModeStack.begin() ; --it )
+		{
+			// Compute the PauseMode's EPICS Expiration Time...
+			struct timespec pausemode_expire = it->m_maxTime;
+
+			// Skip Old PauseMode Expiration Check If No Max Time...
+			if ( pausemode_expire.tv_sec == 0
+					&& pausemode_expire.tv_nsec == 0 )
+			{
+				DEBUG("getPauseModeByTime():"
+					<< " No Max Time for PauseMode " << it->m_numModes
+					<< " in [" << it->m_minTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< it->m_minTime.tv_nsec << std::setw(0)
+					<< ", " << it->m_maxTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+					<< " - Don't Check for PauseMode Expiration");
+				continue;
+			}
+
+			// Add Timeout Threshold to PauseMode Max Time...
+			pausemode_expire.tv_sec += container_cleanup_timeout.tv_sec;
+			pausemode_expire.tv_nsec +=
+				container_cleanup_timeout.tv_nsec;
+			if ( pausemode_expire.tv_nsec >= NANO_PER_SECOND_LL )
+			{
+				pausemode_expire.tv_nsec -= NANO_PER_SECOND_LL;
+				pausemode_expire.tv_sec++;
+			}
+
+			// REMOVEME
+			DEBUG("getPauseModeByTime():"
+				<< " PauseMode " << it->m_numModes
+				<< " in [" << it->m_minTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< it->m_minTime.tv_nsec << std::setw(0)
+				<< ", " << it->m_maxTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+				<< " has Expiration Time = "
+				<< pausemode_expire.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< pausemode_expire.tv_nsec << std::setw(0)
+				<< ", old_ts=" << old_ts.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< old_ts.tv_nsec << std::setw(0)
+				<< " m_paused=" << it->m_paused
+				<< " m_numModes=" << it->m_numModes
+				<< " m_numFiles=" << it->m_numFiles
+				<< " m_numPauseFiles=" << it->m_numPauseFiles
+				<< " m_lastPrologueFile="
+				<< ( ( it->m_lastPrologueFile ) ?
+					it->m_lastPrologueFile->path() : "(null)" )
+				<< " - Btw, the PauseMode Stack has "
+				<< m_pauseModeStack.size() << " elements");
+
+			// Is It Time to Close Down This PauseMode?
+			// Note: old_ts = 0.0 When Uninitialized...
+			if ( compareTimeStamps( old_ts, pausemode_expire ) >= 0 )
+			{
+				DEBUG("getPauseModeByTime():"
+					<< " PauseMode " << it->m_numModes
+					<< " in [" << it->m_minTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< it->m_minTime.tv_nsec << std::setw(0)
+					<< ", " << it->m_maxTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+					<< " has EXPIRED: "
+					<< " old_ts=" << old_ts.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< old_ts.tv_nsec << std::setw(0)
+					<< " >= Expiration Time "
+					<< pausemode_expire.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< pausemode_expire.tv_nsec << std::setw(0)
+					<< ", Terminating Expired PauseMode"
+					<< " m_paused=" << it->m_paused
+					<< " m_numModes=" << it->m_numModes
+					<< " m_numFiles=" << it->m_numFiles
+					<< " m_numPauseFiles=" << it->m_numPauseFiles
+					<< " m_lastPrologueFile="
+					<< ( ( it->m_lastPrologueFile ) ?
+						it->m_lastPrologueFile->path() : "(null)" )
+					<< " - Btw, the PauseMode Stack has "
+					<< m_pauseModeStack.size() << " elements");
+
+				// Finally Close Down This PauseMode...
+
+				if ( it->m_file )
+				{
+					ADARA::RunStatus::Enum status =
+							ADARA::RunStatus::NO_RUN;
+					if ( m_runNumber )
+					{
+						status = m_active ? ADARA::RunStatus::RUN_EOF :
+									ADARA::RunStatus::END_RUN;
+					}
+
+					it->m_file->terminate( status );
+					StorageManager::addBaseStorage( it->m_file->size() );
+					it->m_file.reset();
+				}
+
+				// _Now_ Add Any Deferred Files to Container List,
+				// And Kick Out All Associated FileAdded Notifications...
+
+				std::list<StorageFile::SharedPtr>::iterator fit;
+				for ( fit = it->m_pendingFiles.begin() ;
+						fit != it->m_pendingFiles.end() ; ++fit )
+				{
+					DEBUG("getPauseModeByTime():"
+						<< " Pushing Pending File "
+						<< (*fit)->path()
+						<< " Onto Container File List"
+						<< " (and Notifying FileAdded)"
+						<< " from PauseMode " << it->m_numModes
+						<< " in [" << it->m_minTime.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< it->m_minTime.tv_nsec << std::setw(0)
+						<< ", " << it->m_maxTime.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+						<< " m_paused=" << it->m_paused
+						<< " m_numModes=" << it->m_numModes
+						<< " m_numFiles=" << it->m_numFiles
+						<< " m_numPauseFiles=" << it->m_numPauseFiles
+						<< " m_lastPrologueFile="
+						<< ( ( it->m_lastPrologueFile ) ?
+							it->m_lastPrologueFile->path() : "(null)" )
+						<< " - Btw, the PauseMode Stack has "
+						<< m_pauseModeStack.size() << " elements");
+
+					m_files.push_back( *fit );
+					m_newFile( *fit );
+				}
+
+				it->m_pendingFiles.clear();
+
+				// Remove PauseMode from Stack
+				// Note: erase() Leaves Iterator Pointing at _Next_ Entry,
+				// Which is Fine Because We're Iterating "Backwards"...!
+				it = m_pauseModeStack.erase( it );
+			}
+		}
+	}
+
+	// Didn't Find PauseMode for That Time...! ;-O
+	if ( found_it == m_pauseModeStack.end() )
+	{
+		// Check TimeStamp Versus Oldest Stacked PauseMode Min Time...
+		// (To Capture Case of Bogus SAWTOOTH TimeStamps, That Are
+		// So Far Out of Order that We Already Closed Their PauseMode!
+		// Or More Likely Simply a Bogus TimeStamp from Somewhere... ;-b)
+
+		// Snag "Oldest" PauseMode...
+		it = m_pauseModeStack.end();
+		if ( it != m_pauseModeStack.begin() )
+		{
+			it--;
+			if ( it->m_file )
+			{
+				// Does EPICS TimeStamp Occur _Before_ Oldest PauseMode...?
+				if ( compareTimeStamps( ts, it->m_minTime ) < 0 )
+				{
+					// Use "Current PauseMode" for All Such
+					// Bogus TimeStamps... ;-Q
+					it = m_pauseModeStack.begin();
+
+					// XXX TODO Add Rate-Limited Logging Here...!! ;-D
+					ERROR("getPauseModeByTime():"
+						<< " PauseMode SAWTOOTH for ts="
+						<< ts.tv_sec << "."
+						<< std::setfill('0') << std::setw(9) << ts.tv_nsec
+						<< " -> Using Current PauseMode " << it->m_numModes
+						<< " in [" << it->m_minTime.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< it->m_minTime.tv_nsec << std::setw(0)
+						<< ", " << it->m_maxTime.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+						<< " check_old_pausemodes=" << check_old_pausemodes
+						<< " m_paused=" << it->m_paused
+						<< " m_numModes=" << it->m_numModes
+						<< " m_numFiles=" << it->m_numFiles
+						<< " m_numPauseFiles=" << it->m_numPauseFiles
+						<< " m_lastPrologueFile="
+						<< ( ( it->m_lastPrologueFile ) ?
+							it->m_lastPrologueFile->path() : "(null)" )
+						<< " - Btw, the PauseMode Stack has "
+						<< m_pauseModeStack.size() << " elements");
+
+					pm_it = it;
+
+					return;
+				}
+			}
+		}
+
+		// No PauseModes to Compare Times...?!
+		ERROR("getPauseModeByTime(): No PauseMode Found"
+			<< " for ts=" << ts.tv_sec << "."
+			<< std::setfill('0') << std::setw(9) << ts.tv_nsec
+			<< " check_old_pausemodes=" << check_old_pausemodes
+			<< " - Btw, the PauseMode Stack has "
+			<< m_pauseModeStack.size() << " elements");
+	}
+
+	pm_it = found_it;
+
+	return;
+}
+
+bool StorageContainer::write(
+		bool oldestContainer,
+		std::list<struct PauseMode>::iterator &it,
+		IoVector &iovec, uint32_t len, bool notify,
 		uint32_t *written)
 {
 	static uint32_t retry_count = 0;
@@ -109,11 +755,24 @@ bool StorageContainer::write(IoVector &iovec, uint32_t len, bool notify,
 	 * (Note: this is encapsulated in the StorageFile::oversize() method,
 	 * which only triggers when "notify" is true... A-Ha! ;-D)
 	 */
-	if (m_cur_file && m_cur_file->oversize())
-		terminateFile();
 
-	if (!m_cur_file)
-		newFile();
+	// Preserve/Inherit Min & Max Time for Any PauseMode
+	// Oversize Roll-Overs Here...
+	// (Pre-Increment Max Time for Decrement in terminateFile()...)
+	struct timespec maxTime = it->m_maxTime;
+	maxTime.tv_nsec++;
+	if ( maxTime.tv_nsec >= NANO_PER_SECOND_LL ) {
+		maxTime.tv_nsec -= NANO_PER_SECOND_LL;
+		maxTime.tv_sec++;
+	}
+	struct timespec minTime = it->m_minTime;
+	bool paused = it->m_paused;
+
+	if ( it->m_file && it->m_file->oversize() )
+		terminateFile( it, /* do_terminate */ true, maxTime );
+
+	if ( !it->m_file )
+		newFile( oldestContainer, it, paused, minTime );
 
 	// On File Write Error, Try to Close the Current Data File
 	// and Open a New One Here, Just in Case This Helps...
@@ -124,7 +783,7 @@ bool StorageContainer::write(IoVector &iovec, uint32_t len, bool notify,
 
 	do
 	{
-		writeOk = m_cur_file->write(iovec, len, notify, written);
+		writeOk = it->m_file->write(iovec, len, notify, written);
 
 		// File Write Failed...!
 		if ( !writeOk ) {
@@ -132,19 +791,19 @@ bool StorageContainer::write(IoVector &iovec, uint32_t len, bool notify,
 			if ( retry_count++ < 5 ) {
 				ERROR("Container Write Failed!"
 					<< " Try Rotating File & Retrying Write"
-					<< " m_cur_file="
-						<< ( m_cur_file ? m_cur_file->path() : "(null)" )
+					<< " it->m_file="
+						<< ( it->m_file ? it->m_file->path() : "(null)" )
 					<< " retry_count=" << retry_count);
-				terminateFile();
-				newFile();
+				terminateFile( it, /* do_terminate */ true, maxTime );
+				newFile( oldestContainer, it, paused, minTime );
 				doRetry = true;
 			}
 			// Retry Count Exceeded, Fail Hard...!
 			else {
 				ERROR("Container Write Failed!"
 					<< " Retry Count Exceeded, HARD FAIL on Write...!"
-					<< " m_cur_file="
-						<< ( m_cur_file ? m_cur_file->path() : "(null)" )
+					<< " it->m_file="
+						<< ( it->m_file ? it->m_file->path() : "(null)" )
 					<< " retry_count=" << retry_count);
 				doRetry = false;
 			}
@@ -155,9 +814,10 @@ bool StorageContainer::write(IoVector &iovec, uint32_t len, bool notify,
 			// We Were Buggered, But Now We've Recovered... Whew! ;-D
 			if ( retry_count ) {
 				ERROR("Container Recovered - Write Succeeded!"
-					<< " m_cur_file="
-						<< ( m_cur_file ? m_cur_file->path() : "(null)" )
-					<< " Resetting retry_count=" << retry_count << " -> 0");
+					<< " it->m_file="
+						<< ( it->m_file ? it->m_file->path() : "(null)" )
+					<< " Resetting retry_count="
+					<< retry_count << " -> 0");
 				// Reset Retry Count, We Got Through...
 				retry_count = 0;
 			}
@@ -172,17 +832,189 @@ bool StorageContainer::write(IoVector &iovec, uint32_t len, bool notify,
 
 void StorageContainer::terminate(void)
 {
-	// Clean Up & Close Latest Data File
+	DEBUG("terminate(): Terminating Container " << m_name
+		<< " m_active=" << m_active
+		<< " m_runNumber=" << m_runNumber);
+
+	// Iterate Thru All PauseMode Structs In Turn...
+
+	std::list<struct PauseMode>::iterator it;
+
+	// Clean Up & Close Latest Data File for Each PauseMode,
+	// Starting from "Oldest" Up to Current...
+
+	// Still need to use a Forward Iterator for terminateFile() API,
+	// so just Start from the End and Work Backwards... ;-D
+	it = m_pauseModeStack.end();
+	if ( it != m_pauseModeStack.begin() )
+		it--;
+
+	for ( ; it != m_pauseModeStack.begin(); --it )
+	{
+		DEBUG("terminate(): Terminating Container " << m_name
+			<< " - Closing PauseMode " << it->m_numModes
+			<< " [" << it->m_minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_minTime.tv_nsec << std::setw(0)
+			<< ", " << it->m_maxTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+			<< " m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_lastPrologueFile="
+			<< ( ( it->m_lastPrologueFile ) ?
+				it->m_lastPrologueFile->path() : "(null)" )
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements");
+
+		// Finally Close Down This PauseMode...
+
+		if ( it->m_file )
+		{
+			ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
+			if ( m_runNumber )
+			{
+				status = m_active ? ADARA::RunStatus::RUN_EOF :
+							ADARA::RunStatus::END_RUN;
+			}
+
+			it->m_file->terminate( status );
+			StorageManager::addBaseStorage( it->m_file->size() );
+			it->m_file.reset();
+		}
+
+		// _Now_ Add Any Deferred Files to Container List,
+		// And Kick Out All Associated FileAdded Notifications...
+
+		std::list<StorageFile::SharedPtr>::iterator fit;
+		for ( fit = it->m_pendingFiles.begin() ;
+				fit != it->m_pendingFiles.end() ; ++fit )
+		{
+			DEBUG("terminate(): Terminating Container " << m_name
+				<< " - Pushing Pending File " << (*fit)->path()
+				<< " onto Container File List"
+				<< " and Notifying FileAdded"
+				<< " for PauseMode " << it->m_numModes
+				<< " [" << it->m_minTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< it->m_minTime.tv_nsec << std::setw(0)
+				<< ", " << it->m_maxTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+				<< " m_paused=" << it->m_paused
+				<< " m_numModes=" << it->m_numModes
+				<< " m_numFiles=" << it->m_numFiles
+				<< " m_numPauseFiles=" << it->m_numPauseFiles
+				<< " m_lastPrologueFile="
+				<< ( ( it->m_lastPrologueFile ) ?
+					it->m_lastPrologueFile->path() : "(null)" )
+				<< " - Btw, the PauseMode Stack now has "
+				<< m_pauseModeStack.size() << " elements");
+
+			m_files.push_back( *fit );
+			m_newFile( *fit );
+		}
+
+		it->m_pendingFiles.clear();
+
+		// Remove PauseMode from Stack
+		// Note: erase() Leaves Iterator Pointing at _Next_ Entry,
+		// Which is Fine Because We're Iterating "Backwards"...!
+		it = m_pauseModeStack.erase( it );
+	}
+
+	// Now Close "Current" PauseMode, Set Container Inactive
+	// (To Trigger "End of Run" Status Packet...)
+
 	m_active = false;
-	if (m_cur_file)
-		terminateFile();
-	
+
+	if ( it != m_pauseModeStack.end() )
+	{
+		DEBUG("terminate(): Terminating Container " << m_name
+			<< " m_active=" << m_active
+			<< " - Closing Current PauseMode " << it->m_numModes
+			<< " [" << it->m_minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_minTime.tv_nsec << std::setw(0)
+			<< ", " << it->m_maxTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+			<< " m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_lastPrologueFile="
+			<< ( ( it->m_lastPrologueFile ) ?
+				it->m_lastPrologueFile->path() : "(null)" )
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements");
+
+		if ( it->m_file )
+		{
+			ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
+			if ( m_runNumber )
+			{
+				status = m_active ? ADARA::RunStatus::RUN_EOF :
+							ADARA::RunStatus::END_RUN;
+			}
+
+			it->m_file->terminate( status );
+			StorageManager::addBaseStorage( it->m_file->size() );
+			it->m_file.reset();
+		}
+
+		// _Now_ Add Any Deferred Files to Container List,
+		// And Kick Out All Associated FileAdded Notifications...
+
+		std::list<StorageFile::SharedPtr>::iterator fit;
+		for ( fit = it->m_pendingFiles.begin() ;
+				fit != it->m_pendingFiles.end() ; ++fit )
+		{
+			DEBUG("terminate(): Terminating Container " << m_name
+				<< " - Pushing Pending File " << (*fit)->path()
+				<< " onto Container File List"
+				<< " and Notifying FileAdded"
+				<< " for Current PauseMode " << it->m_numModes
+				<< " [" << it->m_minTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< it->m_minTime.tv_nsec << std::setw(0)
+				<< ", " << it->m_maxTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+				<< " m_paused=" << it->m_paused
+				<< " m_numModes=" << it->m_numModes
+				<< " m_numFiles=" << it->m_numFiles
+				<< " m_numPauseFiles=" << it->m_numPauseFiles
+				<< " m_lastPrologueFile="
+				<< ( ( it->m_lastPrologueFile ) ?
+					it->m_lastPrologueFile->path() : "(null)" )
+				<< " - Btw, the PauseMode Stack now has "
+				<< m_pauseModeStack.size() << " elements");
+
+			m_files.push_back( *fit );
+			m_newFile( *fit );
+		}
+
+		it->m_pendingFiles.clear();
+
+		// Remove Final/Current PauseMode from Stack
+		m_pauseModeStack.erase( it );
+	}
+
 	// Clean Up & Close DataSource Saved Input Stream Files, Too!
 	for ( uint32_t i = 0 ; i < m_ds_input_files.size() ; i++ )
 	{
 		// Terminate Saved Input Stream File for this Data Source...
 		if ( m_ds_input_files[i] )
 		{
+			DEBUG("terminate(): Terminating Container " << m_name
+				<< " m_active=" << m_active
+				<< " - Closing Saved Data File "
+				<< m_ds_input_files[i]->path()
+				<< " for Data Source ID " << i);
+
 			m_ds_input_files[i]->terminateSave();
 			StorageManager::addBaseStorage( m_ds_input_files[i]->size() );
 			m_ds_input_files[i].reset();
@@ -192,8 +1024,11 @@ void StorageContainer::terminate(void)
 
 void StorageContainer::notify(void)
 {
-	if (m_cur_file)
-		m_cur_file->notify();
+	std::list<struct PauseMode>::iterator it;
+    it = m_pauseModeStack.begin();
+
+	if ( it->m_file )
+		it->m_file->notify();
 }
 
 bool StorageContainer::save(IoVector &iovec, uint32_t len,
@@ -278,110 +1113,219 @@ bool StorageContainer::save(IoVector &iovec, uint32_t len,
 	return m_ds_input_files[dataSourceId]->save(iovec, len, written);
 }
 
-void StorageContainer::pause(void)
+void StorageContainer::pause( bool oldestContainer,
+		struct timespec &pauseTime ) // EPICS Time
 {
-	DEBUG("Pausing StorageContainer"
+	std::list<struct PauseMode>::iterator it;
+    it = m_pauseModeStack.begin();
+
+	DEBUG("Pausing StorageContainer " << m_name
 		<< " m_active=" << m_active
 		<< " m_runNumber=" << m_runNumber
-		<< " m_cur_file="
-			<< ( m_cur_file ? m_cur_file->path() : "(null)" ) );
-
-	m_paused = true;
+		<< " pauseTime=" << pauseTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< pauseTime.tv_nsec << std::setw(0)
+		<< " it->m_file="
+			<< ( it->m_file ? it->m_file->path() : "(null)" ) );
 
 	// Close Any Non-Paused Run File...
-	if (m_cur_file && !m_cur_file->paused())
-		terminateFile();
+	if ( it->m_file && !it->m_file->paused() )
+	{
+		terminateFile( it, /* do_terminate */ false, pauseTime );
+		it->m_numModes++; // Increment for Next PauseMode...
+		it->m_numFiles = 1; // Preset File Number Counter (No Incr Paused)
+	}
 
 	// Create New Paused Run File...
-	if (!m_cur_file)
-		newFile();
+	if ( !it->m_file )
+		newFile( oldestContainer, it, /* paused */ true, pauseTime );
 }
 
-void StorageContainer::resume(void)
+void StorageContainer::resume( bool oldestContainer,
+		struct timespec &resumeTime ) // EPICS Time
 {
-	DEBUG("Resuming StorageContainer"
+	std::list<struct PauseMode>::iterator it;
+    it = m_pauseModeStack.begin();
+
+	DEBUG("Resuming StorageContainer " << m_name
 		<< " m_active=" << m_active
 		<< " m_runNumber=" << m_runNumber
-		<< " m_cur_file="
-			<< ( m_cur_file ? m_cur_file->path() : "(null)" ) );
-
-	m_numPauseFiles = 0;
-
-	m_paused = false;
+		<< " resumeTime=" << resumeTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< resumeTime.tv_nsec << std::setw(0)
+		<< " it->m_file="
+			<< ( it->m_file ? it->m_file->path() : "(null)" ) );
 
 	// Close Any Paused Run File...
-	if (m_cur_file && m_cur_file->paused())
-		terminateFile();
+	if ( it->m_file && it->m_file->paused() )
+	{
+		terminateFile( it, /* do_terminate */ false, resumeTime );
+		it->m_numModes++; // Increment for Next PauseMode...
+		it->m_numFiles = 0; // Reset File Number Counter (Pre-Increments)
+	}
+
+	// Just to Be Sure... :-D
+	it->m_numPauseFiles = 0;
 
 	// Create New Non-Paused Run File to Resume Normal Data Collection
-	if (!m_cur_file)
-		newFile();
+	if ( !it->m_file )
+		newFile( oldestContainer, it, /* paused */ false, resumeTime );
 }
 
-void StorageContainer::getLastPrologueFiles(void)
+void StorageContainer::getLastPrologueFiles(
+		std::list<struct PauseMode>::iterator &it,
+		bool do_save_prologues )
 {
 	DEBUG("getLastPrologueFiles(): Capture Prologue Headers"
-		<< " for Stacked Container " << m_name);
+		<< " for Stacked Container " << m_name
+		<< " in PauseMode " << it->m_numModes
+		<< " [" << it->m_minTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< it->m_minTime.tv_nsec << std::setw(0)
+		<< ", " << it->m_maxTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+		<< " m_paused=" << it->m_paused
+		<< " m_numModes=" << it->m_numModes
+		<< " m_numFiles=" << it->m_numFiles
+		<< " m_numPauseFiles=" << it->m_numPauseFiles
+		<< " m_lastPrologueFile="
+		<< ( ( it->m_lastPrologueFile ) ?
+			it->m_lastPrologueFile->path() : "(null)" )
+		<< " - Btw, the PauseMode Stack now has "
+		<< m_pauseModeStack.size() << " elements");
 
-	// Capture "Last" Prologue Header File for This Container
-	m_lastPrologueFile = StorageFile::newFile( m_weakThis,
-		0, 0, ADARA::RunStatus::PROLOGUE );
-
-	// Tell the storage manager about the new file so we can
-	// add the prologue header
-	StorageManager::fileCreated( m_lastPrologueFile,
-		true /* capture_last */ );
-
-	// Close the Prologue Header File...
-	m_lastPrologueFile->put_fd();
-
-	DEBUG("getLastPrologueFiles(): Created Raw Data Prologue Header File "
-		<< m_lastPrologueFile->path()
-		<< " for Stacked Container " << m_name);
-
-	// Allocate Last Save Prologue File Vector to
-	// Match DataSource Input Files Vector Size...
-	if ( m_ds_input_files.size() > m_lastSavePrologueFiles.size() )
+	// Make Sure We Don't Already Have A "Last" Prologue Header File...
+	if ( !(it->m_lastPrologueFile) )
 	{
-		for ( uint32_t i = m_lastSavePrologueFiles.size() ;
-				i < m_ds_input_files.size() ; i++ )
-		{
-			// Create an Entry for the Saved Input Stream Prologue File
-			// for this Data Source...
-			m_lastSavePrologueFiles.push_back( StorageFile::SharedPtr() );
-		}
+		// Capture "Last" Prologue Header File for This Container
+		it->m_lastPrologueFile = StorageFile::newFile( m_weakThis,
+			it->m_paused, it->m_numModes, 0, 0,
+			ADARA::RunStatus::PROLOGUE );
+
+		// Tell the storage manager about the new file so we can
+		// add the prologue header
+		StorageManager::fileCreated( it->m_lastPrologueFile,
+			true /* capture_last */ );
+
+		// Close the Prologue Header File...
+		it->m_lastPrologueFile->put_fd();
+
+		DEBUG("getLastPrologueFiles():"
+			<< " Created Raw Data Prologue Header File "
+			<< it->m_lastPrologueFile->path()
+			<< " for Stacked Container " << m_name
+			<< " in PauseMode " << it->m_numModes
+			<< " [" << it->m_minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_minTime.tv_nsec << std::setw(0)
+			<< ", " << it->m_maxTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+			<< " m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_lastPrologueFile="
+			<< ( ( it->m_lastPrologueFile ) ?
+				it->m_lastPrologueFile->path() : "(null)" )
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements");
 	}
 
-	// Capture a "Last" Save Prologue Header File for This Container,
-	// For Each Valid Data Source ID... :-D
-	for ( uint32_t i = 0 ; i < m_ds_input_files.size() ; i++ )
+	// Already Have A "Last" Prologue Header File...
+	else
 	{
-		if ( m_ds_input_files[i] )
+		DEBUG("getLastPrologueFiles():"
+			<< " _Already_ Have Raw Data Prologue Header File "
+			<< it->m_lastPrologueFile->path()
+			<< " for Stacked Container " << m_name
+			<< " in PauseMode " << it->m_numModes
+			<< " [" << it->m_minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_minTime.tv_nsec << std::setw(0)
+			<< ", " << it->m_maxTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+			<< " m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_lastPrologueFile="
+			<< ( ( it->m_lastPrologueFile ) ?
+				it->m_lastPrologueFile->path() : "(null)" )
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements");
+	}
+
+	// As Requested, Get Last Save Prologue Files Too...
+	if ( do_save_prologues )
+	{
+		// Allocate Last Save Prologue File Vector to
+		// Match DataSource Input Files Vector Size...
+		if ( m_ds_input_files.size() > m_lastSavePrologueFiles.size() )
 		{
-			m_lastSavePrologueFiles[i] = StorageFile::newFile( m_weakThis,
-				1, i, ADARA::RunStatus::PROLOGUE );
+			for ( uint32_t i = m_lastSavePrologueFiles.size() ;
+					i < m_ds_input_files.size() ; i++ )
+			{
+				// Create an Entry for the Saved Input Stream Prologue File
+				// for this Data Source...
+				m_lastSavePrologueFiles.push_back(
+					StorageFile::SharedPtr() );
+			}
+		}
 
-			// Tell the storage manager about the new file so we can
-			// add the save prologue header
-			StorageFile::SharedPtr tmp = m_ds_input_files[i];
-			m_ds_input_files[i] = m_lastSavePrologueFiles[i];
-			StorageManager::saveCreated( i, true /* capture_last */ );
-			m_ds_input_files[i] = tmp;
+		// Capture a "Last" Save Prologue Header File for This Container,
+		// For Each Valid Data Source ID... :-D
+		for ( uint32_t i = 0 ; i < m_ds_input_files.size() ; i++ )
+		{
+			if ( m_ds_input_files[i] )
+			{
+				// Make Sure We Don't Already Have A "Last" Save Prologue
+				// Header File for This DataSource...
+				if ( !(m_lastSavePrologueFiles[i]) )
+				{
+					m_lastSavePrologueFiles[i] =
+						StorageFile::newFile( m_weakThis,
+							/* paused */ false, 0, 1, i,
+							ADARA::RunStatus::PROLOGUE );
 
-			// Close the Save Prologue Header File...
-			m_lastSavePrologueFiles[i]->put_fd();
+					// Tell the storage manager about the new file
+					// so we can add the save prologue header
+					StorageFile::SharedPtr tmp = m_ds_input_files[i];
+					m_ds_input_files[i] = m_lastSavePrologueFiles[i];
+					StorageManager::saveCreated( i,
+						true /* capture_last */ );
+					m_ds_input_files[i] = tmp;
 
-			DEBUG("getLastPrologueFiles():"
-				<< " Created Saved Data Prologue Header File "
-				<< m_lastSavePrologueFiles[i]->path()
-				<< " for Data Source ID " << i
-				<< " for Stacked Container " << m_name);
+					// Close the Save Prologue Header File...
+					m_lastSavePrologueFiles[i]->put_fd();
+
+					DEBUG("getLastPrologueFiles():"
+						<< " Created Saved Data Prologue Header File "
+						<< m_lastSavePrologueFiles[i]->path()
+						<< " for Data Source ID " << i
+						<< " for Stacked Container " << m_name);
+				}
+
+				// Already Have A "Last" Prologue Header File...
+				else
+				{
+					DEBUG("getLastPrologueFiles():"
+						<< " _Already_ Have A"
+						<< " Saved Data Prologue Header File "
+						<< m_lastSavePrologueFiles[i]->path()
+						<< " for Data Source ID " << i
+						<< " for Stacked Container " << m_name);
+				}
+			}
 		}
 	}
 }
 
-void StorageContainer::copyLastPrologueFiles( std::string &name,
-		StorageFile::SharedPtr &lastPrologueFile,
+void StorageContainer::copyLastPrologueFiles(
+		std::list<struct PauseMode>::iterator &it,
+		std::string &name, StorageFile::SharedPtr &lastPrologueFile,
 		std::vector<StorageFile::SharedPtr> &lastSavePrologueFiles )
 {
 	DEBUG("copyLastPrologueFiles(): Copy Over Prologue Headers"
@@ -391,23 +1335,26 @@ void StorageContainer::copyLastPrologueFiles( std::string &name,
 	if ( lastPrologueFile )
 	{
 		// Make New "Last" Prologue Header File for This Container
-		m_lastPrologueFile = StorageFile::newFile( m_weakThis,
-			0, 0, ADARA::RunStatus::PROLOGUE );
+		// Note: This is Only Called for Long-Non-Running Container Splits,
+		// Prior to Creating 1st "New File", so NumModes Needs an Incr...
+		it->m_lastPrologueFile = StorageFile::newFile( m_weakThis,
+			it->m_paused, it->m_numModes + 1, 0, 0,
+			ADARA::RunStatus::PROLOGUE );
 
 		// Copy "Last" Prologue Header File from Previous Container
 		DEBUG("copyLastPrologueFiles():"
 			<< " Appending Previous Last Prologue File "
 			<< lastPrologueFile->path()
 			<< " to New Last Prologue File "
-			<< m_lastPrologueFile->path());
-		m_lastPrologueFile->catFile( lastPrologueFile );
+			<< it->m_lastPrologueFile->path());
+		it->m_lastPrologueFile->catFile( lastPrologueFile );
 
 		// Close the Prologue Header File...
-		m_lastPrologueFile->put_fd();
+		it->m_lastPrologueFile->put_fd();
 
 		DEBUG("copyLastPrologueFiles():"
 			<< " Created Raw Data Prologue Header File "
-			<< m_lastPrologueFile->path()
+			<< it->m_lastPrologueFile->path()
 			<< " for Stacked Container " << m_name);
 	}
 	else
@@ -437,7 +1384,7 @@ void StorageContainer::copyLastPrologueFiles( std::string &name,
 		if ( lastSavePrologueFiles[i] )
 		{
 			m_lastSavePrologueFiles[i] = StorageFile::newFile( m_weakThis,
-				1, i, ADARA::RunStatus::PROLOGUE );
+				/* paused */ false, 0, 1, i, ADARA::RunStatus::PROLOGUE );
 
 			// Copy "Last" Prologue Header File from Previous Container
 			DEBUG("copyLastPrologueFiles():"
@@ -525,22 +1472,18 @@ StorageContainer::StorageContainer(
 		uint32_t run, std::string &propId) :
 	m_startTime(start), // Wallclock Time...!
 	m_minTime(minTime), // EPICS Time...!
-	m_runNumber(run), m_propId(propId),
-	m_numFiles(0), m_numPauseFiles(0), m_totFileCount(0),
-	m_active(true), m_paused(false),
-	m_translated(false), m_manual(false), m_requeueCount(0),
-	m_saved_size(0)
+	m_runNumber(run), m_propId(propId), m_totFileCount(0),
+	m_active(true), m_translated(false), m_manual(false),
+	m_requeueCount(0), m_saved_size(0)
 {
 	m_maxTime.tv_sec = 0; // EPICS Time...!
 	m_maxTime.tv_nsec = 0;
 }
 
 StorageContainer::StorageContainer(const std::string &name) :
-	m_runNumber(0), m_propId("UNKNOWN"),
-	m_numFiles(0), m_numPauseFiles(0), m_totFileCount(0),
-	m_name(name), m_active(false), m_paused(false),
-	m_translated(false), m_manual(false), m_requeueCount(0),
-	m_saved_size(0)
+	m_runNumber(0), m_propId("UNKNOWN"), m_totFileCount(0),
+	m_name(name), m_active(false), m_translated(false), m_manual(false),
+	m_requeueCount(0), m_saved_size(0)
 {
 	m_startTime.tv_sec = 0; // Wallclock Time...!
 	m_startTime.tv_nsec = 0;
@@ -614,6 +1557,44 @@ StorageContainer::SharedPtr StorageContainer::create(
 		c->createMarker(path.c_str());
 	}
 
+	// Create Initial Empty PauseMode Struct on Stack...
+
+	struct PauseMode pauseMode;
+
+	pauseMode.m_minTime.tv_sec = c->m_minTime.tv_sec;
+	pauseMode.m_minTime.tv_nsec = c->m_minTime.tv_nsec;
+
+	pauseMode.m_maxTime.tv_sec = c->m_maxTime.tv_sec;
+	pauseMode.m_maxTime.tv_nsec = c->m_maxTime.tv_nsec;
+
+	pauseMode.m_numModes = 0;
+	pauseMode.m_numFiles = 0;
+	pauseMode.m_numPauseFiles = 0;
+
+	pauseMode.m_paused = false; // always initialize to Not Paused mode...
+
+	c->m_pauseModeStack.push_front( pauseMode );
+
+	std::list<struct PauseMode>::iterator it = c->m_pauseModeStack.begin();
+
+	DEBUG("create():"
+		<< " Pushed New Empty Current PauseMode onto Stack"
+		<< " [" << it->m_minTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< it->m_minTime.tv_nsec << std::setw(0)
+		<< ", " << it->m_maxTime.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+		<< " m_paused=" << it->m_paused
+		<< " m_numModes=" << it->m_numModes
+		<< " m_numFiles=" << it->m_numFiles
+		<< " m_numPauseFiles=" << it->m_numPauseFiles
+		<< " m_lastPrologueFile="
+		<< ( ( it->m_lastPrologueFile ) ?
+			it->m_lastPrologueFile->path() : "(null)" )
+		<< " - Btw, the PauseMode Stack now has "
+		<< c->m_pauseModeStack.size() << " elements");
+
 	return c;
 }
 
@@ -685,7 +1666,7 @@ bool StorageContainer::validate(void)
 			if (last_paused)
 				expected++;
 			if ( (*it)->addendum() ) {
-				// Log Here, In Sorted Order, Rather than in importFile()...
+				// Log Here, In Sorted Order, Rather than in importFile()
 				DEBUG("Including ADARA Run Addendum file: "
 					<< (*it)->path());
 				addendumExpected++;
@@ -902,7 +1883,7 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path,
 			had_errors = true;
 	}
 
-	c->m_files.sort(order_by_filenumber);
+	c->m_files.sort( order_by_filenumber );
 
 	/* We're a run pending translation -- verify we have all of our
 	 * data.
@@ -1095,10 +2076,18 @@ void StorageContainer::purgeBackups(const std::string &path)
 
 uint64_t StorageContainer::openSize(void)
 {
+	std::list<struct PauseMode>::iterator it;
+
 	uint64_t openSize = 0;
 
-	if (m_cur_file)
-		openSize += m_cur_file->size();
+	// Iterate Thru Whole PauseMode Stack...
+	// Capture Size of *All* Open Files...
+	for ( it = m_pauseModeStack.begin() ;
+			it != m_pauseModeStack.end() ; ++it )
+	{
+		if ( it->m_file )
+			openSize += it->m_file->size();
+	}
 
 	for ( uint32_t i = 0 ; i < m_ds_input_files.size() ; i++ )
 	{
