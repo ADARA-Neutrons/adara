@@ -28,8 +28,8 @@ public:
 	Markers( SMSControl *ctrl, bool notesCommentAutoReset );
 	~Markers();
 
-	void beforeNewRun( uint32_t runNumber );
-	void runStop(void);
+	void beforeNewRun( uint32_t runNumber, struct timespec *ts );
+	void runStop( struct timespec *ts );
 
 	void addAnnotationComment( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru = IGNORE,

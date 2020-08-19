@@ -32,7 +32,7 @@ public:
 	void changed(void)
 	{
 		struct timespec ts;
-		m_value->getTimeStamp( &ts );
+		m_value->getTimeStamp( &ts ); // Wallclock Time...!
 		if ( value() )
 			m_markers->pause( &ts );
 		else
@@ -53,7 +53,7 @@ public:
 	MarkerTriggerPV( const std::string &name, callback cb ) :
 		smsTriggerPV(name), m_cb(cb) {}
 
-	void triggered( struct timespec *ts )
+	void triggered( struct timespec *ts ) // Wallclock Time...!
 	{
 		m_cb( ts, Markers::IGNORE, -1, "" );
 	}
@@ -78,7 +78,7 @@ public:
 
 		std::string comment = value();
 		struct timespec ts;
-		m_value->getTimeStamp( &ts );
+		m_value->getTimeStamp( &ts ); // Wallclock Time...!
 
 		// Only Call Callback if String PV Set to Non-Empty Value...
 		// (Otherwise, "unset()" triggers a callback... ;-b)
@@ -198,11 +198,9 @@ Markers::~Markers()
 
 // NOTE: This method gets called to "Clean Up" _Before_ a New Run Starts!
 // (*None* of these packets here will go into the New Run...! ;-)
-void Markers::beforeNewRun( uint32_t runNumber )
+void Markers::beforeNewRun( uint32_t runNumber,
+		struct timespec *ts ) // Wallclock Time...!
 {
-	struct timespec now;
-	clock_gettime( CLOCK_REALTIME, &now );
-
 	// Save Run Number for Run Stop Comment...
 	m_lastRunNumber = m_runNumber;
 	m_runNumber = runNumber;
@@ -220,31 +218,31 @@ void Markers::beforeNewRun( uint32_t runNumber )
 		m_isPaused = false;
 		// Clean Up Container before Actual Start!
 		// NOTE: Triggers New File/Prologue with _Current_ State...!
-		m_ctrl->resumeRecording();
+		m_ctrl->resumeRecording( ts ); // Wallclock Time...!
 		// Spew "We've Resumed" Packet
 		std::string comment = "Warning: Run Resumed at New Run Start!";
-		emitPacket( now, ADARA::MarkerType::RESUME, m_scanIndex,
+		emitPacket( *ts, ADARA::MarkerType::RESUME, m_scanIndex,
 			"", comment );
 		// _This_ update() _Doesn't_ trigger changed()...!
-		m_pausedPV->update(false, &now);
+		m_pausedPV->update(false, ts); // Wallclock Time...!
 		// _Also_ Queue This Resume Comment for _After_ Run Start...
 		// (just use generic Annotation Comment... ;-)
 		resumeQueue.push_back(
-			std::pair<struct timespec, std::string>( now,
+			std::pair<struct timespec, std::string>( *ts,
 				"[PRE-RUN] " + comment ) );
 	}
 
 	if ( m_scanIndex ) {
 		std::string comment = "Warning: Scan Stopped at New Run Start!";
-		emitPacket( now, ADARA::MarkerType::SCAN_STOP, m_scanIndex,
+		emitPacket( *ts, ADARA::MarkerType::SCAN_STOP, m_scanIndex,
 			"", comment );
 		// _Also_ Queue This Scan Stop/Comment for _After_ Run Start...
 		std::stringstream ss_scan;
 		ss_scan << m_scanIndex << "|";
 		scanStopQueue.push_back(
-			std::pair<struct timespec, std::string>( now,
+			std::pair<struct timespec, std::string>( *ts,
 				ss_scan.str() + "[PRE-RUN] " + comment ) );
-		m_indexPV->update(0, &now);
+		m_indexPV->update(0, ts); // Wallclock Time...!
 		m_lastScanIndex = m_scanIndex;
 		m_scanIndex = 0;
 	}
@@ -252,19 +250,24 @@ void Markers::beforeNewRun( uint32_t runNumber )
 	// Don't Unset Comment PV(s) on Run Start, _Only_ on Run Stop...
 	// Comments can be entered in the "Before Run" interim...! ;-D
 
-	// Queue Run Start Comment... (Get New Timestamp, for Proper Ordering!)
-	clock_gettime( CLOCK_REALTIME, &now );
+	// Queue Run Start Comment... (Bump Timestamp, for Proper Ordering!)
+	struct timespec next = *ts;
+	next.tv_nsec++;
+	if ( next.tv_nsec >= NANO_PER_SECOND_LL ) {
+		next.tv_nsec -= NANO_PER_SECOND_LL;
+		next.tv_sec++;
+	}
 	std::stringstream ss;
 	ss << "Run " << m_runNumber << " Started.";
 	annotationCommentQueue.push_back(
-		std::pair<struct timespec, std::string>( now, ss.str() ) );
+		std::pair<struct timespec, std::string>( next, ss.str() ) );
 
 	// If Run Notes Comment Persists Since the Last Run Ended,
 	// And No Other Run Notes have been Queued as Yet, Then Re-Use It Now!
 	// (Will Get Run Notes Queued, Set/Dumped on First Run Prologue...)
 	if ( m_notesCommentPV->valid() && !notesCommentQueue.size() ) {
 		struct timespec ts;
-		m_notesCommentPV->timestamp( ts );
+		m_notesCommentPV->timestamp( ts ); // Wallclock Time...!
 		addNotesComment( &ts );
 	}
 
@@ -273,11 +276,8 @@ void Markers::beforeNewRun( uint32_t runNumber )
 	m_inRun = true;
 }
 
-void Markers::runStop(void)
+void Markers::runStop( struct timespec *ts ) // Wallclock Time...!
 {
-	struct timespec now;
-	clock_gettime( CLOCK_REALTIME, &now );
-
 	/* Reset the scan index, comment, and paused flag at the end of
 	 * each run, if it was stopped _Without_ first unpausing/stopping
 	 * the scan... We'll emit markers if we were paused or in a scan so
@@ -297,7 +297,7 @@ void Markers::runStop(void)
 		uint32_t save_scanIndex = m_scanIndex;
 		m_scanIndex = 0;
 		// NOTE: Triggers New File/Prologue with _Current_ State...!
-		m_ctrl->resumeRecording();
+		m_ctrl->resumeRecording( ts ); // Wallclock Time...!
 		// Restore Any Hanging Scan Index for Completion of Stop...
 		m_scanIndex = save_scanIndex;
 		// DO DUMP of Queued Markers/Comments *First* Here, Before Warning!
@@ -306,10 +306,10 @@ void Markers::runStop(void)
 		// Dump Any Pre-Run Scan Comments Now...
 		dumpQueuedComments();
 		// Spew "We've Resumed" Packet
-		emitPacket( now, ADARA::MarkerType::RESUME, m_scanIndex,
+		emitPacket( *ts, ADARA::MarkerType::RESUME, m_scanIndex,
 			"", "Warning: Run Resumed at Run Stop!" );
 		// _This_ update() _Doesn't_ trigger changed()...!
-		m_pausedPV->update( false, &now );
+		m_pausedPV->update( false, ts ); // Wallclock Time...!
 	}
 
 	// (Possibly Redundant _Second_ Queued Dump Attempt, Ok if Empty Now.)
@@ -319,9 +319,9 @@ void Markers::runStop(void)
 	dumpQueuedComments();
 
 	if ( m_scanIndex ) {
-		emitPacket( now, ADARA::MarkerType::SCAN_STOP, m_scanIndex,
+		emitPacket( *ts, ADARA::MarkerType::SCAN_STOP, m_scanIndex,
 			"", "Warning: Scan Stopped at Run Stop!" );
-		m_indexPV->update( 0, &now );
+		m_indexPV->update( 0, ts ); // Wallclock Time...!
 		m_scanIndex = 0;
 		m_lastScanIndex = m_scanIndex; // Mirror Run Stop Scan Index Reset
 	}
@@ -329,19 +329,19 @@ void Markers::runStop(void)
 	// Add Run Stop Comment...
 	std::stringstream ss;
 	ss << "Run " << m_runNumber << " Stopped.";
-	emitPacket( now, ADARA::MarkerType::GENERIC, m_scanIndex,
+	emitPacket( *ts, ADARA::MarkerType::GENERIC, m_scanIndex,
 		"", ss.str() );
 
 	// Clear All Comment PVs on Run Stop...
-	m_commentPV->unset( false, &now ); // DEPRECATED
-	m_scanCommentPV->unset( false, &now );
-	m_annotationCommentPV->unset( false, &now );
+	m_commentPV->unset( false, ts ); // DEPRECATED, Wallclock Time...!
+	m_scanCommentPV->unset( false, ts ); // Wallclock Time...!
+	m_annotationCommentPV->unset( false, ts ); // Wallclock Time...!
 
 	// Optionally Auto-Reset the Run Notes Between Runs
 	// (Don't Always Reset, Often Convenient to Re-Use... ;-)
 	m_notesCommentAutoReset = m_notesCommentAutoResetPV->value();
 	if ( m_notesCommentAutoReset ) {
-		m_notesCommentPV->unset( false, &now );
+		m_notesCommentPV->unset( false, ts ); // Wallclock Time...!
 	}
 
 	// No Longer in a Run Now...
@@ -352,7 +352,7 @@ void Markers::runStop(void)
 	m_notesCommentSet = false;
 }
 
-void Markers::pause( struct timespec *ts,
+void Markers::pause( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
@@ -368,8 +368,11 @@ void Markers::pause( struct timespec *ts,
 	}
 
 	std::stringstream ss;
-	ss << "Run ";
-	if ( m_inRun ) ss << m_runNumber << " ";
+	if ( m_inRun ) {
+		ss << "Run " << m_runNumber << " ";
+	} else {
+		ss << "Data Collection ";
+	}
 	ss << "Paused.";
 	DEBUG(ss.str()
 		<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -385,7 +388,7 @@ void Markers::pause( struct timespec *ts,
 		m_isPaused = true;
 		m_lastIsPaused = m_isPaused; // Mirror Explicit Pause State Change
 		// NOTE: Triggers New File/Prologue with _Current_ State...!
-		m_ctrl->pauseRecording();
+		m_ctrl->pauseRecording( ts ); // Wallclock Time...!
 	}
 	else
 	{
@@ -400,7 +403,7 @@ void Markers::pause( struct timespec *ts,
 	}
 }
 
-void Markers::resume( struct timespec *ts,
+void Markers::resume( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
@@ -416,8 +419,11 @@ void Markers::resume( struct timespec *ts,
 	}
 
 	std::stringstream ss;
-	ss << "Run ";
-	if ( m_inRun ) ss << m_runNumber << " ";
+	if ( m_inRun ) {
+		ss << "Run " << m_runNumber << " ";
+	} else {
+		ss << "Data Collection ";
+	}
 	ss << "Resumed.";
 	DEBUG(ss.str()
 		<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -430,7 +436,7 @@ void Markers::resume( struct timespec *ts,
 		m_isPaused = false;
 		m_lastIsPaused = m_isPaused; // Mirror Explicit Pause State Change
 		// NOTE: Triggers New File/Prologue with _Current_ State...!
-		m_ctrl->resumeRecording();
+		m_ctrl->resumeRecording( ts ); // Wallclock Time...!
 	}
 	else
 	{
@@ -449,7 +455,7 @@ void Markers::resume( struct timespec *ts,
 	}
 }
 
-void Markers::startScan( struct timespec *ts,
+void Markers::startScan( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
@@ -495,7 +501,7 @@ void Markers::startScan( struct timespec *ts,
 	}
 }
 
-void Markers::stopScan( struct timespec *ts,
+void Markers::stopScan( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
@@ -542,7 +548,7 @@ void Markers::stopScan( struct timespec *ts,
 }
 
 // DEPRECATED
-void Markers::annotate( struct timespec *ts,
+void Markers::annotate( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
@@ -599,7 +605,7 @@ void Markers::annotate( struct timespec *ts,
 }
 
 // DEPRECATED
-void Markers::addRunComment( struct timespec *ts,
+void Markers::addRunComment( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
@@ -683,7 +689,7 @@ void Markers::addRunComment( struct timespec *ts,
 	}
 }
 
-void Markers::addScanComment( struct timespec *ts,
+void Markers::addScanComment( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
@@ -753,7 +759,7 @@ void Markers::addScanComment( struct timespec *ts,
 	}
 }
 
-void Markers::addNotesComment( struct timespec *ts,
+void Markers::addNotesComment( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
@@ -832,7 +838,7 @@ void Markers::addNotesComment( struct timespec *ts,
 	}
 }
 
-void Markers::addAnnotationComment( struct timespec *ts,
+void Markers::addAnnotationComment( struct timespec *ts, // Wallclock Time
 		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {
 	std::string comment;
@@ -884,7 +890,7 @@ void Markers::addAnnotationComment( struct timespec *ts,
 	}
 }
 
-void Markers::addSystemComment( struct timespec *ts,
+void Markers::addSystemComment( struct timespec *ts, // Wallclock Time...!
 		uint32_t scanIndex, std::string comment )
 {
 	std::stringstream ss;
@@ -1290,7 +1296,7 @@ void Markers::emitPrologue( ADARA::MarkerType::Enum markerType,
 	emitPacket( now, markerType, m_scanIndex, "", comment, true );
 }
 
-void Markers::emitPacket( const struct timespec &ts,
+void Markers::emitPacket( const struct timespec &ts, // Wallclock Time...!
 		ADARA::MarkerType::Enum markerType, uint32_t scanIndex,
 		std::string prefix, std::string comment, bool prologue )
 {
