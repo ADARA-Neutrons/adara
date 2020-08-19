@@ -91,6 +91,8 @@ public:
 
 	struct timespec &oldestMaxDataSourceTime(void); // EPICS Time...!
 
+	struct timespec &newestMaxDataSourceTime(void); // EPICS Time...!
+
 	int32_t registerLiveClient(std::string clientName,
 			boost::shared_ptr<smsStringPV> & pvName,
 			boost::shared_ptr<smsUint32PV> & pvRequestedStartTime,
@@ -114,8 +116,8 @@ public:
 
 	bool getRecording(void);
 
-	void pauseRecording(void);
-	void resumeRecording(void);
+	void pauseRecording( struct timespec *ts ); // Wallclock Time...!
+	void resumeRecording( struct timespec *ts ); // Wallclock Time...!
 
 	void externalRunControl( struct timespec *ts,
 			uint32_t scanIndex, std::string command );
@@ -243,6 +245,8 @@ private:
 	std::vector<struct timespec> m_dataSourcesMaxTimes; // EPICS Time...!
 
 	struct timespec m_oldestMaxDataSourceTime; // EPICS Time...!
+
+	struct timespec m_newestMaxDataSourceTime; // EPICS Time...!
 
 	uint32_t m_numConnectedDataSources;
 

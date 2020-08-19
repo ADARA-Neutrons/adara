@@ -664,9 +664,13 @@ SMSControl::SMSControl() :
 	// - "true": Major Error
 	setSummaryReason( false, true, true );
 
-	// Initialize Oldest DataSource Max Time
+	// Initialize "Oldest" DataSource Max Time
 	m_oldestMaxDataSourceTime.tv_sec = 0; // EPICS Time...!
 	m_oldestMaxDataSourceTime.tv_nsec = 0;
+
+	// Initialize "Newest" DataSource Max Time
+	m_newestMaxDataSourceTime.tv_sec = 0; // EPICS Time...!
+	m_newestMaxDataSourceTime.tv_nsec = 0;
 
 	// Push "Zero-Index" DataSource Max Time Entry (We Count From 1)
 	struct timespec init_ts;
@@ -1055,7 +1059,8 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 				// Let our Marker Control code have a shot at
 				// fixing up current state before we start recording
 				// in a new container.
-				m_markers->beforeNewRun( m_currentRunNumber );
+				m_markers->beforeNewRun( m_currentRunNumber,
+					ts ); // Wallclock Time...!
 
 				// Actually Start a New Recording...
 				StorageManager::startRecording( (*ts), // Wallclock Time
@@ -1172,7 +1177,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 
 				// Let our Marker Control code have a shot at
 				// fixing up current state before we stop recording.
-				m_markers->runStop();
+				m_markers->runStop( ts ); // Wallclock Time...!
 
 				// Actually Stop Recording...
 				StorageManager::stopRecording( (*ts) ); // Wallclock Time
@@ -1272,24 +1277,36 @@ bool SMSControl::getRecording(void)
 	return m_recording;
 }
 
-void SMSControl::pauseRecording(void)
+void SMSControl::pauseRecording( struct timespec *ts ) // Wallclock Time
 {
 	if ( m_currentRunNumber )
-		INFO("Pausing Run " << m_currentRunNumber);
+		INFO("Pausing Run " << m_currentRunNumber
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 	else
-		INFO("Pausing Data Collection (Not Currently Recording)");
+		INFO("Pausing Data Collection (Not Currently Recording)"
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 
-	StorageManager::pauseRecording();
+	StorageManager::pauseRecording( ts ); // Wallclock Time...!
 }
 
-void SMSControl::resumeRecording(void)
+void SMSControl::resumeRecording( struct timespec *ts ) // Wallclock Time
 {
 	if ( m_currentRunNumber )
-		INFO("Resuming Run " << m_currentRunNumber);
+		INFO("Resuming Run " << m_currentRunNumber
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 	else
-		INFO("Resuming Data Collection (Not Currently Recording)");
+		INFO("Resuming Data Collection (Not Currently Recording)"
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 
-	StorageManager::resumeRecording();
+	StorageManager::resumeRecording( ts ); // Wallclock Time...!
 }
 
 void SMSControl::externalRunControl( struct timespec *ts,
@@ -2168,6 +2185,10 @@ void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
 	oldest.tv_sec = 0;
 	oldest.tv_nsec = 0;
 
+	struct timespec newest; // EPICS Time...!
+	newest.tv_sec = 0;
+	newest.tv_nsec = 0;
+
 	for ( uint32_t i=0 ; i < m_dataSourcesMaxTimes.size() ; i++ )
 	{
 		// REMOVEME
@@ -2178,21 +2199,38 @@ void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
 			<< m_dataSourcesMaxTimes[i].tv_nsec
 			<< " oldest=" << oldest.tv_sec
 			<< "." << std::setfill('0') << std::setw(9)
-			<< oldest.tv_nsec);
+			<< oldest.tv_nsec
+			<< " newest=" << newest.tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< newest.tv_nsec);
 
 		if ( m_dataSourcesMaxTimes[i].tv_sec != 0
 				|| m_dataSourcesMaxTimes[i].tv_nsec != 0 )
 		{
+			// Update "Oldest" Max DataSource Time...
 			if ( oldest.tv_sec == 0 && oldest.tv_nsec == 0 )
 			{
-				DEBUG("updateMaxDataSourceTime(): FIRST...");
+				DEBUG("updateMaxDataSourceTime(): FIRST Oldest...");
 				oldest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
 			}
 			else if ( compareTimeStamps(
 					m_dataSourcesMaxTimes[i], oldest ) < 0 )
 			{
-				DEBUG("updateMaxDataSourceTime(): OLDER...");
+				DEBUG("updateMaxDataSourceTime(): OLDER Oldest...");
 				oldest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
+			}
+
+			// Update "Newest" Max DataSource Time...
+			if ( newest.tv_sec == 0 && newest.tv_nsec == 0 )
+			{
+				DEBUG("updateMaxDataSourceTime(): FIRST Newest...");
+				newest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
+			}
+			else if ( compareTimeStamps(
+					m_dataSourcesMaxTimes[i], newest ) > 0 )
+			{
+				DEBUG("updateMaxDataSourceTime(): NEWER Newest...");
+				newest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
 			}
 		}
 	}
@@ -2201,15 +2239,26 @@ void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
 	DEBUG("updateMaxDataSourceTime():"
 		<< " oldest=" << oldest.tv_sec
 		<< "." << std::setfill('0') << std::setw(9)
-		<< oldest.tv_nsec);
+		<< oldest.tv_nsec
+		<< " newest=" << newest.tv_sec
+		<< "." << std::setfill('0') << std::setw(9)
+		<< newest.tv_nsec);
 
-	// Save Oldest Max DataSource Time
+	// Save "Oldest" Max DataSource Time
 	m_oldestMaxDataSourceTime = oldest; // EPICS Time...!
+
+	// Save "Newest" Max DataSource Time
+	m_newestMaxDataSourceTime = newest; // EPICS Time...!
 }
 
 struct timespec &SMSControl::oldestMaxDataSourceTime(void)
 {
 	return( m_oldestMaxDataSourceTime ); // EPICS Time...!
+}
+
+struct timespec &SMSControl::newestMaxDataSourceTime(void)
+{
+	return( m_newestMaxDataSourceTime ); // EPICS Time...!
 }
 
 int32_t SMSControl::registerLiveClient(std::string clientName,
