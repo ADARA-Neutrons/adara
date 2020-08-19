@@ -46,8 +46,8 @@ public:
 	static void stopRecording(
 			const struct timespec &runStop); // Wallclock Time...!
 
-	static void pauseRecording(void);
-	static void resumeRecording(void);
+	static void pauseRecording( struct timespec *ts ); // Wallclock Time...
+	static void resumeRecording( struct timespec *ts ); // Wallclock Time...
 
 	static void iterateHistory(uint32_t startSeconds, FileOffSetFunc cb);
 
@@ -133,6 +133,10 @@ public:
 					bool ignore_pkt_timestamp,
 					struct timespec &ts, // EPICS Time...!
 					bool check_old_containers = true );
+
+	static struct timespec &getContainerCleanupTimeout(void) {
+		return m_container_cleanup_timeout;
+	}
 
 	static void cleanContainerStack(void);
 
@@ -233,6 +237,7 @@ private:
 	static std::list<StorageContainer::SharedPtr> m_pendingRuns;
 
 	static std::list<StorageContainer::SharedPtr> m_containerStack;
+
 	static StorageFile::SharedPtr m_prologueFile;
 
 	static ContainerSignal m_contChange;

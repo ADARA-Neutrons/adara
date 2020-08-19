@@ -1165,8 +1165,13 @@ void StorageManager::startContainer(
 		<< std::setfill('0') << std::setw(9)
 		<< (*it)->maxTime().tv_nsec << std::setw(0) << "]");
 
+	// New Container Starts in Paused Mode...?
 	if ( paused ) {
-		(*it)->setPaused( paused );
+
+		// Set New Container's Initial PauseMode to "Paused" Mode... ;-D
+		// Preset File Number Counter to 1...
+		// (No Pre-Increment in Paused Mode)
+		(*it)->setPaused( paused, 1 );
 	}
 
 	if ( run ) {
@@ -1179,8 +1184,10 @@ void StorageManager::startContainer(
 	// Copy Any Saved "Last" Prologue Header Files from Old Container
 	// Into New Container...
 	if ( lastPrologueFile || lastSavePrologueFiles.size() ) {
-		(*it)->copyLastPrologueFiles( lastName, lastPrologueFile,
-			lastSavePrologueFiles );
+		std::list<struct StorageContainer::PauseMode>::iterator pm_it;
+		(*it)->getCurrentFileIterator( pm_it );
+		(*it)->copyLastPrologueFiles( pm_it,
+			lastName, lastPrologueFile, lastSavePrologueFiles );
 	}
 
 	/* Containers need to be sure to always have a file; otherwise
@@ -1195,7 +1202,11 @@ void StorageManager::startContainer(
 	 * We'll see this file via the fileCreated() call back, and add
 	 * it to the state index at that point.
 	 */
-	(*it)->newFile();
+	std::list<StorageContainer::SharedPtr>::iterator next = it; next++;
+	std::list<struct StorageContainer::PauseMode>::iterator pm_it;
+	(*it)->getCurrentFileIterator( pm_it );
+	(*it)->newFile( /* oldestContainer */ next == m_containerStack.end(),
+		pm_it, paused, minTime );
 }
 
 void StorageManager::endCurrentContainer(
@@ -1203,15 +1214,23 @@ void StorageManager::endCurrentContainer(
 		const struct timespec &newStart, // EPICS Time...!
 		bool do_terminate )
 {
+	if ( !(*it) )
+	{
+		std::stringstream ss;
+		ss << "endCurrentContainer(): No Container to End!"
+			<< " newStart=" << newStart.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< newStart.tv_nsec << std::setw(0)
+			<< " do_terminate=" << do_terminate;
+		throw std::logic_error( ss.str() );
+	}
+
 	DEBUG("endCurrentContainer(): Ending Current Container "
 		<< (*it)->name()
 		<< " with newStart=" << newStart.tv_sec << "."
 		<< std::setfill('0') << std::setw(9)
 		<< newStart.tv_nsec << std::setw(0)
 		<< " do_terminate=" << do_terminate);
-
-	if ( !(*it) )
-		throw std::logic_error("No container to end");
 
 	// Set Max Time for Current Container to 1 Nanosecond
 	// _Before_ TimeStamp of Next Container Start Time...
@@ -1225,7 +1244,7 @@ void StorageManager::endCurrentContainer(
 	}
 	(*it)->setMaxTime( maxTime ); // EPICS Time...!
 
-	DEBUG("endCurrentContainer(): Setting Current Container"
+	DEBUG("endCurrentContainer(): Setting Current Container "
 		<< (*it)->name()
 		<< " maxTime=" << maxTime.tv_sec << "."
 		<< std::setfill('0') << std::setw(9)
@@ -1267,7 +1286,9 @@ void StorageManager::endCurrentContainer(
 	{
 		// Get "Last" Prologue and SavePrologue Files
 		// Before Pushing New Container Onto Stack...
-		(*it)->getLastPrologueFiles();
+		std::list<struct StorageContainer::PauseMode>::iterator pm_it;
+		(*it)->getCurrentFileIterator( pm_it );
+		(*it)->getLastPrologueFiles( pm_it, true );
 
 		// Push New "Empty" Current Container onto Stack...
 		StorageContainer::SharedPtr container;
@@ -1347,7 +1368,7 @@ void StorageManager::startRecording(
 			"Can't Start Recording - Already Recording!");
 	}
 
-	// COnvert Wallclock TimeStamp to EPICS Epoch...
+	// Convert Wallclock TimeStamp to EPICS Epoch...
 	struct timespec runStartEpics = runStart;
 	runStartEpics.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
 
@@ -1394,13 +1415,22 @@ void StorageManager::stopRecording(
 	startContainer( it, minTime ); // EPICS Time...!
 }
 
-void StorageManager::pauseRecording(void)
+void StorageManager::pauseRecording(
+		struct timespec *ts ) // Wallclock Time...!
 {
+	// Convert Wallclock TimeStamp to EPICS Epoch...
+	struct timespec pauseTime = *ts;
+	pauseTime.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+
 	// Get Current Container...
 	std::list<StorageContainer::SharedPtr>::iterator it;
 	it = m_containerStack.begin();
 
-	(*it)->pause();
+	// Get "Next" Container (for "Oldest Container" param)
+	std::list<StorageContainer::SharedPtr>::iterator next = it; next++;
+
+	(*it)->pause( /* oldestContainer */ next == m_containerStack.end(),
+		pauseTime ); // EPICS Time...!
 
 	// Update ComBus Verbosity PV...
 	m_combus_verbose = m_pvComBusVerbose->value();
@@ -1413,13 +1443,22 @@ void StorageManager::pauseRecording(void)
 	}
 }
 
-void StorageManager::resumeRecording(void)
+void StorageManager::resumeRecording(
+		struct timespec *ts ) // Wallclock Time...!
 {
+	// Convert Wallclock TimeStamp to EPICS Epoch...
+	struct timespec resumeTime = *ts;
+	resumeTime.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+
 	// Get Current Container...
 	std::list<StorageContainer::SharedPtr>::iterator it;
 	it = m_containerStack.begin();
 
-	(*it)->resume();
+	// Get "Next" Container (for "Oldest Container" param)
+	std::list<StorageContainer::SharedPtr>::iterator next = it; next++;
+
+	(*it)->resume( /* oldestContainer */ next == m_containerStack.end(),
+		resumeTime ); // EPICS Time...!
 
 	// Update ComBus Verbosity PV...
 	m_combus_verbose = m_pvComBusVerbose->value();
@@ -1560,28 +1599,75 @@ void StorageManager::addPacket( IoVector &iovec,
 			break;
 	}
 
+	// Get Proper PauseMode Off of Stack for This Packet/Time...
+	std::list<struct StorageContainer::PauseMode>::iterator pm_it;
+	(*it)->getPauseModeByTime( pm_it, ignore_pkt_timestamp,
+		ts, check_old_containers );
+
 	/* Check for Long-Non-Running Containers that Could Make the SMS
 	 * Swell Up and Pop by Eating Up Non-Releasable Local Disk Space...!
 	 * - If We're About to Create the 101st File Here (Current File
 	 *   is "Oversized" and Waiting to Pop), then Split Container Now...!
+	 * [Unless It's Already Been "Split", and Has a Container Max Time!]
 	 */
+	// Check the Given/Selected PauseMode for Overflow...
 	if ( !(*it)->runNumber()
-			&& (*it)->file()
-			&& (*it)->file()->oversize()
+			&& (*it)->maxTime().tv_sec == 0
+			&& (*it)->maxTime().tv_nsec == 0
+			&& pm_it->m_file
+			&& pm_it->m_file->oversize()
 			&& ( 1 + (*it)->totFileCount() ) > 100 ) {
 		WARN("addPacket(): Long-Non-Running Container "
 			<< m_baseDir << "/" << (*it)->name()
 			<< " Reached 100 Files"
+			<< " (" << pm_it->m_file->path() << ")"
 			<< " - Split Container for Purging...");
-		// Preserve Container Minimum Time for Stack Searching! ;-D
-		struct timespec minTime = (*it)->minTime(); // EPICS Time...!
+		// Are We "Terminating" This Container or Not...?
+		bool do_terminate = ( (*it)->numPauseModeOnStack() == 1 );
 		// Preserve Paused State of Container...
 		bool paused = (*it)->paused();
+		// Get "Newest" Max DataSource Time
+		// for Container Time Range Cut-Off...
+		SMSControl *ctrl = SMSControl::getInstance();
+		struct timespec maxTime =
+			ctrl->newestMaxDataSourceTime(); // EPICS Time...!
+		// Take *Lesser* of "Newest" Max DataSource Time and Wallclock...
+		// (In Case We Have a "Bogus Future TimeStamp" Gumming Things Up!)
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		if ( compareTimeStamps( now, maxTime ) < 0 ) {
+			ERROR("addPacket(): Bogus Future Newest Max DataSource Time "
+				<< maxTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< maxTime.tv_nsec << std::setw(0)
+				<< " > "
+				<< now.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< now.tv_nsec << std::setw(0)
+				<< " Current Wallclock Time - Use Wallclock!");
+			maxTime.tv_sec = now.tv_sec;
+			maxTime.tv_nsec = now.tv_nsec;
+		}
 		// Note: endCurrentContainer() Decrements the TimeStamp
 		// by 1 Nanosecond to use as "Max Time" for the Old Container...
-		struct timespec maxTime; // EPICS Time...!
-		maxTime.tv_sec = hdr->ts_sec;
-		maxTime.tv_nsec = hdr->ts_nsec;
+		// Let's Keep Everything Up To/Including Max Time in Old Container.
+		maxTime.tv_nsec++;
+		if ( maxTime.tv_nsec >= NANO_PER_SECOND_LL ) {
+			maxTime.tv_nsec -= NANO_PER_SECOND_LL;
+			maxTime.tv_sec++;
+		}
+		// Choose New Container Minimum Time...
+		struct timespec minTime;
+		if ( do_terminate ) {
+			// If the Current Container is Going Away, Then Preserve
+			// Original Container Minimum Time for Stack Searching! ;-D
+			minTime = (*it)->minTime(); // EPICS Time...!
+		}
+		else {
+			// If We're Keeping the Current Container on the Stack,
+			// Split the Time Range, Use Old Max Time as New Min Time...
+			minTime = maxTime; // EPICS Time...!
+		}
 		// Capture Any "Last" Prologue Header Files from Old Container
 		std::string lastName = (*it)->name();
 		StorageFile::SharedPtr lastPrologueFile =
@@ -1591,10 +1677,81 @@ void StorageManager::addPacket( IoVector &iovec,
 			lastSavePrologueFiles.push_back(
 				(*it)->lastSavePrologueFile( i ) );
 		}
-		endCurrentContainer( it, maxTime, true ); // EPICS Time...!
+		// *Only* Terminate Old Container If There are
+		// No Other Unfinished PauseMode Files...
+		// (i.e. the Size of the PauseMode Stack is 1...)
+		endCurrentContainer( it, maxTime, // EPICS Time...!
+			do_terminate );
+		// If We _Just Now_ Created the "Last" Prologue Header Files,
+		// And There Weren't Any Before, Then Copy Them Over Now... ;-D
+		std::list<StorageContainer::SharedPtr>::iterator former_it;
+		if ( !do_terminate ) {
+			former_it = m_containerStack.begin();
+			if ( former_it != m_containerStack.end() ) {
+				++former_it;
+				// Make Sure We've Still Got Something... ;-D
+				if ( former_it != m_containerStack.end() ) {
+					DEBUG("addPacket():"
+						<< " Get Newly Created Last Prologue Headers"
+						<< " from Former Container "
+						<< (*former_it)->name()
+						<< " in [" << (*former_it)->minTime().tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< (*former_it)->minTime().tv_nsec << std::setw(0)
+						<< ", " << (*former_it)->maxTime().tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< (*former_it)->maxTime().tv_nsec
+						<< std::setw(0) << "]"
+						<< " check_old_containers=" << check_old_containers
+						<< " - Btw, the Container Stack has "
+						<< m_containerStack.size() << " elements");
+					if ( !lastPrologueFile ) {
+						lastPrologueFile =
+							(*former_it)->lastPrologueFile();
+					}
+					for ( uint32_t i=0 ;
+							i < (*former_it)->numSaveDataSources() ;
+								i++ ) {
+						if ( !(lastSavePrologueFiles[i]) ) {
+							lastSavePrologueFiles[i] =
+								(*former_it)->lastSavePrologueFile( i );
+						}
+					}
+				}
+				else {
+					ERROR("addPacket(): Whoa... No Former Container Left"
+						<< " to Get Newly Created Last Prologue Headers!"
+						<< " check_old_containers=" << check_old_containers
+						<< " - Btw, the Container Stack has "
+						<< m_containerStack.size() << " elements");
+				}
+			}
+			else {
+				ERROR("addPacket(): Whoa... Empty Container Stack,"
+					<< " No Containers Left"
+					<< " to Get Newly Created Last Prologue Headers!"
+					<< " check_old_containers=" << check_old_containers
+					<< " - Btw, the Container Stack has "
+					<< m_containerStack.size() << " elements");
+			}
+		}
+		// Create the New Container...
 		startContainer( it, minTime, paused, // EPICS Time...!
 			0 /* run */, "UNKNOWN" /* propId */,
 			lastName, lastPrologueFile, lastSavePrologueFiles );
+		// Now, If We *Didn't* Just Actually Terminate the Old Container,
+		// Then Reinstate This _Former_ Container for This Write...! ;-D
+		// (So the New Overflow File Lands in the Old Container...! :-D)
+		if ( !do_terminate ) {
+			// Make Sure We've Still Got Something... ;-D
+			if ( former_it != m_containerStack.end() )
+				it = former_it;
+		}
+		else {
+			// We Just Terminated Our Previous PauseMode,
+			// Need to Get Latest/New Current PauseMode...! ;-b
+			(*it)->getCurrentFileIterator( pm_it );
+		}
 	}
 
 	/* Save off where we are in the stream, as we may need to point
@@ -1603,7 +1760,10 @@ void StorageManager::addPacket( IoVector &iovec,
 	off_t resumeLocation = (*it)->file()->size();
 
 	// Write Data Packet to Disk...
-	if ( !(*it)->write( iovec, len, notify ) ) {
+	std::list<StorageContainer::SharedPtr>::iterator next = it; next++;
+	if ( !(*it)->write(
+			/* oldestContainer */ next == m_containerStack.end(),
+			pm_it, iovec, len, notify ) ) {
 		// Something Went Wrong Trying to Write This Data to Disk! :-O
 		// We will therefore LOSE THIS EXPERIMENT DATA
 		// as a result of the error, so LOG IT HERE in the hopes
@@ -1722,24 +1882,66 @@ void StorageManager::savePacket( IoVector &iovec, uint32_t dataSourceId,
 	 * Swell Up and Pop by Eating Up Non-Releasable Local Disk Space...!
 	 * - If We're About to Create the 101st File Here (Current File
 	 *   is "Oversized" and Waiting to Pop), then Split Container Now...!
+	 * [Unless It's Already Been "Split", and Has a Container Max Time!]
 	 */
+	// Check the Given Saved Input File for Overflow...
 	if ( !(*it)->runNumber()
+			&& (*it)->maxTime().tv_sec == 0
+			&& (*it)->maxTime().tv_nsec == 0
 			&& (*it)->savefile( dataSourceId )
 			&& (*it)->savefile( dataSourceId )->oversize()
 			&& ( 1 + (*it)->totFileCount() ) > 100 ) {
 		WARN("savePacket(): Long-Non-Running Container "
 			<< m_baseDir << "/" << (*it)->name()
 			<< " Reached 100 Files"
+			<< " (" << (*it)->savefile( dataSourceId )->path() << ")"
 			<< " - Split Container for Purging...");
-		// Preserve Container Minimum Time for Stack Searching! ;-D
-		struct timespec minTime = (*it)->minTime(); // EPICS Time...!
+		// Are We "Terminating" This Container or Not...?
+		bool do_terminate = ( (*it)->numPauseModeOnStack() == 1 );
 		// Preserve Paused State of Container...
 		bool paused = (*it)->paused();
+		// Get "Newest" Max DataSource Time
+		// for Container Time Range Cut-Off...
+		SMSControl *ctrl = SMSControl::getInstance();
+		struct timespec maxTime =
+			ctrl->newestMaxDataSourceTime(); // EPICS Time...!
+		// Take *Lesser* of "Newest" Max DataSource Time and Wallclock...
+		// (In Case We Have a "Bogus Future TimeStamp" Gumming Things Up!)
+		struct timespec now;
+		clock_gettime(CLOCK_REALTIME, &now);
+		if ( compareTimeStamps( now, maxTime ) < 0 ) {
+			ERROR("savePacket(): Bogus Future Newest Max DataSource Time "
+				<< maxTime.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< maxTime.tv_nsec << std::setw(0)
+				<< " > "
+				<< now.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< now.tv_nsec << std::setw(0)
+				<< " Current Wallclock Time - Use Wallclock!");
+			maxTime.tv_sec = now.tv_sec;
+			maxTime.tv_nsec = now.tv_nsec;
+		}
 		// Note: endCurrentContainer() Decrements the TimeStamp
 		// by 1 Nanosecond to use as "Max Time" for the Old Container...
-		struct timespec maxTime; // EPICS Time...!
-		maxTime.tv_sec = hdr->ts_sec;
-		maxTime.tv_nsec = hdr->ts_nsec;
+		// Let's Keep Everything Up To/Including Max Time in Old Container.
+		maxTime.tv_nsec++;
+		if ( maxTime.tv_nsec >= NANO_PER_SECOND_LL ) {
+			maxTime.tv_nsec -= NANO_PER_SECOND_LL;
+			maxTime.tv_sec++;
+		}
+		// Choose New Container Minimum Time...
+		struct timespec minTime;
+		if ( do_terminate ) {
+			// If the Current Container is Going Away, Then Preserve
+			// Original Container Minimum Time for Stack Searching! ;-D
+			minTime = (*it)->minTime(); // EPICS Time...!
+		}
+		else {
+			// If We're Keeping the Current Container on the Stack,
+			// Split the Time Range, Use Old Max Time as New Min Time...
+			minTime = maxTime; // EPICS Time...!
+		}
 		// Capture Any "Last" Prologue Header Files from Old Container
 		std::string lastName = (*it)->name();
 		StorageFile::SharedPtr lastPrologueFile =
@@ -1749,10 +1951,73 @@ void StorageManager::savePacket( IoVector &iovec, uint32_t dataSourceId,
 			lastSavePrologueFiles.push_back(
 				(*it)->lastSavePrologueFile( i ) );
 		}
-		endCurrentContainer( it, maxTime, true ); // EPICS Time...!
+		// *Only* Terminate Old Container If There are
+		// No Other Unfinished PauseMode Files...
+		// (i.e. the Size of the PauseMode Stack is 1...)
+		endCurrentContainer( it, maxTime, // EPICS Time...!
+			do_terminate );
+		// If We _Just Now_ Created the "Last" Prologue Header Files,
+		// And There Weren't Any Before, Then Copy Them Over Now... ;-D
+		std::list<StorageContainer::SharedPtr>::iterator former_it;
+		if ( !do_terminate ) {
+			former_it = m_containerStack.begin();
+			if ( former_it != m_containerStack.end() ) {
+				++former_it;
+				// Make Sure We've Still Got Something... ;-D
+				if ( former_it != m_containerStack.end() ) {
+					DEBUG("savePacket():"
+						<< " Get Newly Created Last Prologue Headers"
+						<< " from Former Container "
+						<< (*former_it)->name()
+						<< " in [" << (*former_it)->minTime().tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< (*former_it)->minTime().tv_nsec << std::setw(0)
+						<< ", " << (*former_it)->maxTime().tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< (*former_it)->maxTime().tv_nsec
+						<< std::setw(0) << "]"
+						<< " - Btw, the Container Stack has "
+						<< m_containerStack.size() << " elements");
+					if ( !lastPrologueFile ) {
+						lastPrologueFile =
+							(*former_it)->lastPrologueFile();
+					}
+					for ( uint32_t i=0 ;
+							i < (*former_it)->numSaveDataSources() ;
+								i++ ) {
+						if ( !(lastSavePrologueFiles[i]) ) {
+							lastSavePrologueFiles[i] =
+								(*former_it)->lastSavePrologueFile( i );
+						}
+					}
+				}
+				else {
+					ERROR("savePacket(): Whoa... No Former Container Left"
+						<< " to Get Newly Created Last Prologue Headers!"
+						<< " - Btw, the Container Stack has "
+						<< m_containerStack.size() << " elements");
+				}
+			}
+			else {
+				ERROR("savePacket(): Whoa... Empty Container Stack,"
+					<< " No Containers Left"
+					<< " to Get Newly Created Last Prologue Headers!"
+					<< " - Btw, the Container Stack has "
+					<< m_containerStack.size() << " elements");
+			}
+		}
+		// Create the New Container...
 		startContainer( it, minTime, paused, // EPICS Time...!
 			0 /* run */, "UNKNOWN" /* propId */,
 			lastName, lastPrologueFile, lastSavePrologueFiles );
+		// Now, If We *Didn't* Just Actually Terminate the Old Container,
+		// Then Reinstate This _Former_ Container for This Write...! ;-D
+		// (So the New Overflow File Lands in the Old Container...! :-D)
+		if ( !do_terminate ) {
+			// Make Sure We've Still Got Something... ;-D
+			if ( former_it != m_containerStack.end() )
+				it = former_it;
+		}
 	}
 
 	// Write Saved Stream Packet to Disk...
@@ -1953,7 +2218,7 @@ StorageManager::findContainerByTime(
 		found_it = m_containerStack.end();
 	}
 
-	for ( ; it != m_containerStack.end(); ++it)
+	for ( ; it != m_containerStack.end(); ++it )
 	{
 		// Check Back Through Container for Time Range Match...
 		// (Unless We've Already Found the Matching Container...)
@@ -2079,7 +2344,9 @@ StorageManager::findContainerByTime(
 
 				// Remove Container from Stack
 				it = m_containerStack.erase( it );
-				--it; // For Next Iteration...
+				// Note: erase() Leaves Iterator Pointing at _Next_ Entry,
+				// So Pre-Decrement Prior to Impending Loop Increment...
+				--it;
 			}
 		}
 
@@ -2194,7 +2461,9 @@ void StorageManager::cleanContainerStack(void)
 
 		// Remove Container from Stack
 		it = m_containerStack.erase( it );
-		--it; // For Next Iteration...
+		// Note: erase() Leaves Iterator Pointing at _Next_ Entry,
+		// So Pre-Decrement Prior to Impending Loop Increment...
+		--it;
 	}
 }
 
