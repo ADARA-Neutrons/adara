@@ -35,6 +35,7 @@ public:
 	bool addendum(void) const { return m_addendum; }
 	bool oversize(void) const { return m_oversize; }
 	off_t size(void) const { return m_size; }
+	uint32_t modeNumber(void) const { return m_modeNumber; }
 	uint32_t fileNumber(void) const { return m_fileNumber; }
 	uint32_t pauseFileNumber(void) const { return m_pauseFileNumber; }
 	uint32_t addendumFileNumber(void) const { return m_addendumFileNumber; }
@@ -47,9 +48,9 @@ public:
 	}
 
 	/* Create a new file within a container to store data */
-	static SharedPtr newFile(OwnerPtr owner,
-			uint32_t fileNumber, uint32_t pauseFileNumber,
-			ADARA::RunStatus::Enum status);
+	static SharedPtr newFile(OwnerPtr owner, bool paused,
+			uint32_t modeNumber, uint32_t fileNumber,
+			uint32_t pauseFileNumber, ADARA::RunStatus::Enum status);
 
 	/* Create a file to persist experiment state information */
 	static SharedPtr stateFile(OwnerPtr runInfo,
@@ -83,6 +84,7 @@ private:
 	OwnerPtr m_owner;
 	std::string m_path;
 	uint32_t m_runNumber;
+	uint32_t m_modeNumber;
 	uint32_t m_fileNumber;
 	uint32_t m_pauseFileNumber;
 	uint32_t m_addendumFileNumber;
@@ -107,8 +109,8 @@ private:
 	void addSync(void);
 	void addRunStatus(ADARA::RunStatus::Enum status);
 
-	StorageFile(OwnerPtr &owner,
-		uint32_t fileNumber, uint32_t pauseFileNumber);
+	StorageFile(OwnerPtr &owner, bool paused,
+		uint32_t modeNumber, uint32_t fileNumber, uint32_t pauseFileNumber);
 };
 
 #endif /* __STORAGE_FILE */

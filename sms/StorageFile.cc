@@ -131,17 +131,18 @@ void StorageFile::makePath(bool is_prologue)
 				m_pauseFileNumber);
 		}
 		else {
-			snprintf(name, sizeof(name), "/prologue");
+			snprintf(name, sizeof(name), "/prologue-m%08u", m_modeNumber );
 		}
 	}
 
 	else {
 		if ( m_paused ) {
-			snprintf(name, sizeof(name), "/f%08u-p%08u",
-				m_fileNumber, m_pauseFileNumber);
+			snprintf(name, sizeof(name), "/m%08u-f%08u-p%08u",
+				m_modeNumber, m_fileNumber, m_pauseFileNumber);
 		}
 		else {
-			snprintf(name, sizeof(name), "/f%08u", m_fileNumber);
+			snprintf(name, sizeof(name), "/m%08u-f%08u",
+				m_modeNumber, m_fileNumber);
 		}
 	}
 
@@ -278,7 +279,9 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 	// (TODO Figure out how to munge this field if we ever need
 	// to _Recover_ any Paused Files into a given run...! ;-)
 	// [Solved in V1 Packet Type, See Below... Yet To Be Activated... ;-]
-	spkt.status_number = m_fileNumber | ((uint32_t) status << 24);
+	spkt.status_number = (m_fileNumber & 0xfff)
+		| ((m_modeNumber & 0xfff) << 12)
+		| ((uint32_t) status << 24);
 
 #if 0
 	spkt.paused_number = m_pauseFileNumber | ((uint32_t) m_paused << 24);
@@ -293,13 +296,16 @@ void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 
 	// Write Run Status Packet to Disk...
 	if ( !write(iovec, sizeof(spkt), false) ) {
-		// Something Went Wrong Trying to Write This Run Status Pkt to Disk!
+		// Something Went Wrong Writing This Run Status Pkt to Disk!
 		// We will therefore LOSE THIS DATA as a result of the error,
 		// so LOG IT HERE in the hopes it can be salvaged later...! ;-Q
 		// Fortunately, We'll get Another Copy of this Run Status Pkt
 		// with the _Next_ Data File, so we _May_ Be Ok here...?
 		std::stringstream ss;
-		ss << "LOST Run Status Packet fileNumber=" << m_fileNumber
+		ss << "LOST Run Status Packet"
+			<< " modeNumber=" << m_modeNumber
+			<< " fileNumber=" << m_fileNumber
+			<< " pauseFileNumber=" << m_pauseFileNumber
 			<< " status=" << status;
 		StorageManager::logIoVector(ss.str(), iovec);
 	}
@@ -587,21 +593,22 @@ void StorageFile::terminateSave(void)
 	put_fd();
 }
 
-StorageFile::StorageFile(OwnerPtr &owner,
-		uint32_t fileNumber, uint32_t pauseFileNumber) :
+StorageFile::StorageFile(OwnerPtr &owner, bool paused,
+		uint32_t modeNumber, uint32_t fileNumber,
+		uint32_t pauseFileNumber) :
 	m_owner(owner), m_runNumber(0),
-	m_fileNumber(fileNumber), m_pauseFileNumber(pauseFileNumber),
+	m_modeNumber(modeNumber), m_fileNumber(fileNumber),
+	m_pauseFileNumber(pauseFileNumber),
 	m_addendumFileNumber(0),
 	m_startTime(0), // Wallclock Time...!
 	m_persist(true), m_oversize(false),
-	m_active(false), m_paused(false), m_addendum(false),
+	m_active(false), m_paused(paused), m_addendum(false),
 	m_size(0), m_sizeLastUpdate(0), m_syncDistance(0), m_fd(-1), m_fdRefs(0)
 {
 	StorageContainer::SharedPtr c = m_owner.lock();
 	if (c) {
 		m_runNumber = c->runNumber();
 		m_startTime = c->startTime().tv_sec; // Wallclock Time...!
-		m_paused = c->paused();
 	}
 	// Even if Container isn't Paused, this Run file could be (a la import)
 	if (pauseFileNumber)
@@ -609,12 +616,13 @@ StorageFile::StorageFile(OwnerPtr &owner,
 }
 
 StorageFile::SharedPtr StorageFile::newFile(OwnerPtr owner,
-					    uint32_t fileNumber, uint32_t pauseFileNumber,
-					    ADARA::RunStatus::Enum status)
+		bool paused, uint32_t modeNumber, uint32_t fileNumber,
+		uint32_t pauseFileNumber, ADARA::RunStatus::Enum status)
 {
 	// (Fyi, Non-Zero Paused File Number Forces File to Paused State...!)
 	StorageFile::SharedPtr f(
-		new StorageFile(owner, fileNumber, pauseFileNumber) );
+		new StorageFile(owner, paused, modeNumber, fileNumber,
+			pauseFileNumber) );
 	f->m_active = true;
 	f->makePath( status == ADARA::RunStatus::PROLOGUE );
 	f->open(O_CREAT|O_EXCL|O_RDWR);
@@ -628,7 +636,9 @@ StorageFile::SharedPtr StorageFile::newFile(OwnerPtr owner,
 StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 					      const std::string &basePath)
 {
-	StorageFile::SharedPtr f(new StorageFile(runInfo, 0, 0));
+	StorageFile::SharedPtr f(
+		new StorageFile(runInfo, /* paused */ false, 0, 0, 0) );
+
 	f->m_path = basePath + "/SMS-State-XXXXXX";
 
 	/* We don't assume C++11 compliance, so we cannot rely on
@@ -679,7 +689,8 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 StorageFile::SharedPtr StorageFile::saveFile(OwnerPtr owner,
 		uint32_t dataSourceId, uint32_t saveFileNumber)
 {
-	StorageFile::SharedPtr f( new StorageFile(owner, saveFileNumber, 0) );
+	StorageFile::SharedPtr f(
+		new StorageFile(owner, /* paused */ false, 0, saveFileNumber, 0) );
 
 	f->m_active = true;
 
@@ -720,17 +731,29 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		const std::string &path, bool &saved_file, uint64_t &saved_size)
 {
 	fs::path p(path);
-	uint32_t fileNumber = 0, saveFileNumber = 0, runNumber = 0;
+	uint32_t modeNumber = 0, fileNumber = 0, saveFileNumber = 0;
 	uint32_t pauseFileNumber = 0, addendumFileNumber = 0;
+	uint32_t runNumber = 0;
 	uint32_t sourceId = 0;
 	std::string save_type;
 
 	// Explicitly Parse All Known File Name Types...
 	bool paused_file = false;
 	bool addendum_file = false;
-	if ( sscanf(p.filename().c_str(), "f%u-p%u-run-%u.adara",
+	if ( sscanf(p.filename().c_str(), "m%u-f%u-p%u-run-%u.adara",
+			&modeNumber, &fileNumber, &pauseFileNumber, &runNumber)
+				== 4 ) {
+		// DEBUG("Ignoring ADARA Paused Run file: " << p);
+		paused_file = true;
+	}
+	else if ( sscanf(p.filename().c_str(), "f%u-p%u-run-%u.adara",
 			&fileNumber, &pauseFileNumber, &runNumber) == 3 ) {
 		// DEBUG("Ignoring ADARA Paused Run file: " << p);
+		paused_file = true;
+	}
+	else if ( sscanf(p.filename().c_str(), "m%u-f%u-p%u.adara",
+			&modeNumber, &fileNumber, &pauseFileNumber) == 3 ) {
+		// DEBUG("Ignoring ADARA Paused Non-Run file: " << p);
 		paused_file = true;
 	}
 	else if ( sscanf(p.filename().c_str(), "f%u-p%u.adara",
@@ -749,20 +772,58 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		saved_file = true;
 	}
 	// *Only* Support Addendums to Run Containers, Not Between Runs...
-	else if ( sscanf(p.filename().c_str(), "f%u-add%u-run-%u.adara",
-			&fileNumber, &addendumFileNumber, &runNumber) == 3 ) {
+	else if ( sscanf(p.filename().c_str(), "m%u-f%u-add%u-run-%u.adara",
+			&modeNumber, &fileNumber, &addendumFileNumber,
+			&runNumber) == 4 ) {
 		// Verify Valid Addendum File Number...
 		if ( !addendumFileNumber ) {
-			WARN("Improperly named ADARA file (Zero Addendum File Number): "
-				<< p);
+			WARN("Improperly named ADARA file"
+				<< " (Zero Addendum File Number): " << p);
 			return StorageFile::SharedPtr();
 		}
 		// Log in StorageContainer::validate(), for Sorted Ordering... :-D
 		// DEBUG("Including ADARA Run Addendum file: " << p);
 		addendum_file = true;
 	}
-	else if ( sscanf(p.filename().c_str(), "f%u-run-%u.adara",
+	// *Only* Support Addendums to Run Containers, Not Between Runs...
+	else if ( sscanf(p.filename().c_str(), "f%u-add%u-run-%u.adara",
+			&fileNumber, &addendumFileNumber, &runNumber) == 3 ) {
+		// Verify Valid Addendum File Number...
+		if ( !addendumFileNumber ) {
+			WARN("Improperly named ADARA file"
+				<< " (Zero Addendum File Number): " << p);
+			return StorageFile::SharedPtr();
+		}
+		// Log in StorageContainer::validate(), for Sorted Ordering... :-D
+		// DEBUG("Including ADARA Run Addendum file: " << p);
+		addendum_file = true;
+	}
+	else if ( sscanf(p.filename().c_str(), "prologue-ds%u-run-%u.adara",
+			&sourceId, &runNumber) == 2 ) {
+		save_type = "Run Save Prologue";
+		saved_file = true; // Categorize All Prologue Files as "Saved"
+	}
+	else if ( sscanf(p.filename().c_str(), "prologue-ds%u.adara",
+			&sourceId ) == 1 ) {
+		save_type = "Non-Run Save Prologue";
+		saved_file = true; // Categorize All Prologue Files as "Saved"
+	}
+	else if ( sscanf(p.filename().c_str(), "prologue-m%u-run-%u.adara",
+			&modeNumber, &runNumber) == 2 ) {
+		save_type = "Run Prologue";
+		saved_file = true; // Categorize All Prologue Files as "Saved"
+	}
+	else if ( sscanf(p.filename().c_str(), "prologue-m%u.adara",
+			&modeNumber ) == 1 ) {
+		save_type = "Non-Run Prologue";
+		saved_file = true; // Categorize All Prologue Files as "Saved"
+	}
+	else if ( sscanf(p.filename().c_str(), "m%u-f%u-run-%u.adara",
+				&modeNumber, &fileNumber, &runNumber) != 3
+			&& sscanf(p.filename().c_str(), "f%u-run-%u.adara",
 				&fileNumber, &runNumber) != 2
+			&& sscanf(p.filename().c_str(), "m%u-f%u.adara",
+				&modeNumber, &fileNumber) != 2
 			&& sscanf(p.filename().c_str(), "f%u.adara",
 				&fileNumber) != 1 ) {
 		WARN("Improperly named ADARA file: " << p);
@@ -775,11 +836,14 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		saved_size = fileSize( path );
 		
 		// DEBUG("Ignoring ADARA Data Source " << sourceId
+			// << " PauseMode " << modeNumber
 			// << " Saved Input Stream " << save_type << " file: " << p
 			// << " (" << saved_size << " bytes)");
 
 		return StorageFile::SharedPtr();
 	}
+
+	// Ok to Have Omitted PauseMode Number == 0... (For Backwards Compat)
 
 	// Verify Valid File Number...
 	if ( !fileNumber ) {
@@ -789,7 +853,8 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 
 	// Verify Valid Paused File Number... (used to set Paused State!)
 	if ( paused_file && !pauseFileNumber ) {
-		WARN("Improperly named ADARA file (Zero Pause File Number): " << p);
+		WARN("Improperly named ADARA file"
+			<< " (Zero Pause File Number): " << p);
 		return StorageFile::SharedPtr();
 	}
 
@@ -802,10 +867,11 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 
 	// (Fyi, Non-Zero Paused File Number Forces File to Paused State...!)
 	StorageFile::SharedPtr f(
-		new StorageFile(owner, fileNumber, pauseFileNumber) );
+		new StorageFile(owner, paused_file, modeNumber, fileNumber,
+			pauseFileNumber) );
 	f->m_path = path;
 
-	// Don't Throw An Exception Just Trying to Import Some Old Data File...!
+	// Don't Throw An Exception Just Trying to Import Some Old Data File...
 	// (Whine Loudly Tho... ;-D)
 	try {
 		f->open(O_RDONLY);
