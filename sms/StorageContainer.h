@@ -106,12 +106,10 @@ public:
 			struct timespec &ts, // EPICS Time...!
 			bool check_old_pausemodes );
 
-	void newFile( bool oldestContainer,
-			std::list<struct PauseMode>::iterator &it,
+	void newFile( std::list<struct PauseMode>::iterator &it,
 			bool paused, const struct timespec &minTime ); // EPICS Time...!
 
-	bool write( bool oldestContainer,
-			std::list<struct PauseMode>::iterator &it,
+	bool write( std::list<struct PauseMode>::iterator &it,
 			IoVector &iovec, uint32_t len, bool notify = true,
 			uint32_t *written = NULL );
 
@@ -122,10 +120,8 @@ public:
 	bool save(IoVector &iovec, uint32_t len, uint32_t dataSourceId,
 			bool notify, uint32_t *written = NULL);
 
-	void pause( bool oldestContainer,
-			struct timespec &pauseTime ); // EPICS Time...!
-	void resume( bool oldestContainer,
-			struct timespec &resumeTime ); // EPICS Time...!
+	void pause( struct timespec &pauseTime ); // EPICS Time...!
+	void resume( struct timespec &resumeTime ); // EPICS Time...!
 
 	StorageFile::SharedPtr &file(void)
 	{

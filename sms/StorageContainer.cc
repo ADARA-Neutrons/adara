@@ -63,6 +63,8 @@ void StorageContainer::terminateFile(
 			<< " m_numModes=" << it->m_numModes
 			<< " m_numFiles=" << it->m_numFiles
 			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_pendingFiles.size()="
+				<< it->m_pendingFiles.size()
 			<< " m_lastPrologueFile="
 			<< ( ( it->m_lastPrologueFile ) ?
 				it->m_lastPrologueFile->path() : "(null)" )
@@ -88,6 +90,8 @@ void StorageContainer::terminateFile(
 		<< " m_numModes=" << it->m_numModes
 		<< " m_numFiles=" << it->m_numFiles
 		<< " m_numPauseFiles=" << it->m_numPauseFiles
+		<< " m_pendingFiles.size()="
+			<< it->m_pendingFiles.size()
 		<< " m_lastPrologueFile="
 		<< ( ( it->m_lastPrologueFile ) ?
 			it->m_lastPrologueFile->path() : "(null)" )
@@ -165,7 +169,6 @@ void StorageContainer::terminateFile(
 }
 
 void StorageContainer::newFile(
-		bool oldestContainer,
 		std::list<struct PauseMode>::iterator &it,
 		bool paused, const struct timespec &minTime ) // EPICS Time...!
 {
@@ -184,6 +187,8 @@ void StorageContainer::newFile(
 			<< " m_numModes=" << it->m_numModes
 			<< " m_numFiles=" << it->m_numFiles
 			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_pendingFiles.size()="
+				<< it->m_pendingFiles.size()
 			<< " m_lastPrologueFile="
 			<< ( ( it->m_lastPrologueFile ) ?
 				it->m_lastPrologueFile->path() : "(null)" )
@@ -191,7 +196,6 @@ void StorageContainer::newFile(
 			<< std::setfill('0') << std::setw(9)
 			<< minTime.tv_nsec << std::setw(0)
 			<< " paused=" << paused
-			<< " oldestContainer=" << oldestContainer
 			<< " - Btw, the PauseMode Stack now has "
 			<< m_pauseModeStack.size() << " elements");
 		return;
@@ -202,11 +206,12 @@ void StorageContainer::newFile(
 		<< std::setfill('0') << std::setw(9)
 		<< minTime.tv_nsec << std::setw(0)
 		<< " paused=" << paused
-		<< " oldestContainer=" << oldestContainer
 		<< " from m_paused=" << it->m_paused
 		<< " m_numModes=" << it->m_numModes
 		<< " m_numFiles=" << it->m_numFiles
 		<< " m_numPauseFiles=" << it->m_numPauseFiles
+		<< " m_pendingFiles.size()="
+			<< it->m_pendingFiles.size()
 		<< " m_lastPrologueFile="
 		<< ( ( it->m_lastPrologueFile ) ?
 			it->m_lastPrologueFile->path() : "(null)" )
@@ -257,18 +262,18 @@ void StorageContainer::newFile(
 		<< " m_numModes=" << it->m_numModes
 		<< " m_numFiles=" << it->m_numFiles
 		<< " m_numPauseFiles=" << it->m_numPauseFiles
+		<< " m_pendingFiles.size()="
+			<< it->m_pendingFiles.size()
 		<< " m_lastPrologueFile="
 		<< ( ( it->m_lastPrologueFile ) ?
 			it->m_lastPrologueFile->path() : "(null)" )
-		<< " oldestContainer=" << oldestContainer
 		<< " - Btw, the PauseMode Stack now has "
 		<< m_pauseModeStack.size() << " elements");
 
 	// Stagger Adding File to Container File List
-	// If This Isn't the Oldest PauseMode on the Stack
-	// of the Oldest Container on the Stack...
+	// If This Isn't the Oldest PauseMode on the Stack...
 	std::list<struct PauseMode>::iterator next = it; next++;
-	if ( oldestContainer && next == m_pauseModeStack.end() )
+	if ( next == m_pauseModeStack.end() )
 	{
 		// If We Have Some Previously Deferred Pending Files on Our List,
 		// Go Ahead and Push Them Onto the Container File List Now...
@@ -294,10 +299,11 @@ void StorageContainer::newFile(
 					<< " m_numModes=" << it->m_numModes
 					<< " m_numFiles=" << it->m_numFiles
 					<< " m_numPauseFiles=" << it->m_numPauseFiles
+					<< " m_pendingFiles.size()="
+						<< it->m_pendingFiles.size()
 					<< " m_lastPrologueFile="
 					<< ( ( it->m_lastPrologueFile ) ?
 						it->m_lastPrologueFile->path() : "(null)" )
-					<< " oldestContainer=" << oldestContainer
 					<< " - Btw, the PauseMode Stack has "
 					<< m_pauseModeStack.size() << " elements");
 
@@ -335,10 +341,11 @@ void StorageContainer::newFile(
 			<< " m_numModes=" << it->m_numModes
 			<< " m_numFiles=" << it->m_numFiles
 			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_pendingFiles.size()="
+				<< it->m_pendingFiles.size()
 			<< " m_lastPrologueFile="
 			<< ( ( it->m_lastPrologueFile ) ?
 				it->m_lastPrologueFile->path() : "(null)" )
-			<< " oldestContainer=" << oldestContainer
 			<< " - Btw, the PauseMode Stack now has "
 			<< m_pauseModeStack.size() << " elements");
 	}
@@ -376,9 +383,8 @@ void StorageContainer::newFile(
 	 * to selectively ignore any Paused run files... :-)
 	 */
 	// Stagger FileAdded Notify for Container
-	// If This Isn't the Oldest PauseMode on the Stack
-	// of the Oldest Container on the Stack...
-	if ( oldestContainer && next == m_pauseModeStack.end() )
+	// If This Isn't the Oldest PauseMode on the Stack...
+	if ( next == m_pauseModeStack.end() )
 	{
 		DEBUG("newFile(): FileAdded Notify for "
 			<< it->m_file->path());
@@ -402,10 +408,11 @@ void StorageContainer::newFile(
 			<< " m_numModes=" << it->m_numModes
 			<< " m_numFiles=" << it->m_numFiles
 			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_pendingFiles.size()="
+				<< it->m_pendingFiles.size()
 			<< " m_lastPrologueFile="
 			<< ( ( it->m_lastPrologueFile ) ?
 				it->m_lastPrologueFile->path() : "(null)" )
-			<< " oldestContainer=" << oldestContainer
 			<< " - Btw, the PauseMode Stack now has "
 			<< m_pauseModeStack.size() << " elements");
 	}
@@ -446,6 +453,8 @@ void StorageContainer::getPauseModeByTime(
 				<< " m_numModes=" << it->m_numModes
 				<< " m_numFiles=" << found_it->m_numFiles
 				<< " m_numPauseFiles=" << found_it->m_numPauseFiles
+				<< " m_pendingFiles.size()="
+					<< it->m_pendingFiles.size()
 				<< " m_lastPrologueFile="
 				<< ( ( found_it->m_lastPrologueFile ) ?
 					found_it->m_lastPrologueFile->path() : "(null)" )
@@ -493,6 +502,8 @@ void StorageContainer::getPauseModeByTime(
 				<< " m_numModes=" << it->m_numModes
 				<< " m_numFiles=" << it->m_numFiles
 				<< " m_numPauseFiles=" << it->m_numPauseFiles
+				<< " m_pendingFiles.size()="
+					<< it->m_pendingFiles.size()
 				<< " m_lastPrologueFile="
 				<< ( ( it->m_lastPrologueFile ) ?
 					it->m_lastPrologueFile->path() : "(null)" )
@@ -577,6 +588,8 @@ void StorageContainer::getPauseModeByTime(
 				<< " m_numModes=" << it->m_numModes
 				<< " m_numFiles=" << it->m_numFiles
 				<< " m_numPauseFiles=" << it->m_numPauseFiles
+				<< " m_pendingFiles.size()="
+					<< it->m_pendingFiles.size()
 				<< " m_lastPrologueFile="
 				<< ( ( it->m_lastPrologueFile ) ?
 					it->m_lastPrologueFile->path() : "(null)" )
@@ -608,31 +621,17 @@ void StorageContainer::getPauseModeByTime(
 					<< " m_numModes=" << it->m_numModes
 					<< " m_numFiles=" << it->m_numFiles
 					<< " m_numPauseFiles=" << it->m_numPauseFiles
+					<< " m_pendingFiles.size()="
+						<< it->m_pendingFiles.size()
 					<< " m_lastPrologueFile="
 					<< ( ( it->m_lastPrologueFile ) ?
 						it->m_lastPrologueFile->path() : "(null)" )
 					<< " - Btw, the PauseMode Stack has "
 					<< m_pauseModeStack.size() << " elements");
 
-				// Finally Close Down This PauseMode...
-
-				if ( it->m_file )
-				{
-					ADARA::RunStatus::Enum status =
-							ADARA::RunStatus::NO_RUN;
-					if ( m_runNumber )
-					{
-						status = m_active ? ADARA::RunStatus::RUN_EOF :
-									ADARA::RunStatus::END_RUN;
-					}
-
-					it->m_file->terminate( status );
-					StorageManager::addBaseStorage( it->m_file->size() );
-					it->m_file.reset();
-				}
-
-				// _Now_ Add Any Deferred Files to Container List,
+				// _First_ Add Any Deferred Files to Container List,
 				// And Kick Out All Associated FileAdded Notifications...
+				// (To Make Sure These Files are Processed By Listeners!)
 
 				std::list<StorageFile::SharedPtr>::iterator fit;
 				for ( fit = it->m_pendingFiles.begin() ;
@@ -654,6 +653,8 @@ void StorageContainer::getPauseModeByTime(
 						<< " m_numModes=" << it->m_numModes
 						<< " m_numFiles=" << it->m_numFiles
 						<< " m_numPauseFiles=" << it->m_numPauseFiles
+						<< " m_pendingFiles.size()="
+							<< it->m_pendingFiles.size()
 						<< " m_lastPrologueFile="
 						<< ( ( it->m_lastPrologueFile ) ?
 							it->m_lastPrologueFile->path() : "(null)" )
@@ -665,6 +666,23 @@ void StorageContainer::getPauseModeByTime(
 				}
 
 				it->m_pendingFiles.clear();
+
+				// Finally Close Down This PauseMode & The Final File...
+
+				if ( it->m_file )
+				{
+					ADARA::RunStatus::Enum status =
+							ADARA::RunStatus::NO_RUN;
+					if ( m_runNumber )
+					{
+						status = m_active ? ADARA::RunStatus::RUN_EOF :
+									ADARA::RunStatus::END_RUN;
+					}
+
+					it->m_file->terminate( status );
+					StorageManager::addBaseStorage( it->m_file->size() );
+					it->m_file.reset();
+				}
 
 				// Remove PauseMode from Stack
 				// Note: erase() Leaves Iterator Pointing at _Next_ Entry,
@@ -713,6 +731,8 @@ void StorageContainer::getPauseModeByTime(
 						<< " m_numModes=" << it->m_numModes
 						<< " m_numFiles=" << it->m_numFiles
 						<< " m_numPauseFiles=" << it->m_numPauseFiles
+						<< " m_pendingFiles.size()="
+							<< it->m_pendingFiles.size()
 						<< " m_lastPrologueFile="
 						<< ( ( it->m_lastPrologueFile ) ?
 							it->m_lastPrologueFile->path() : "(null)" )
@@ -741,7 +761,6 @@ void StorageContainer::getPauseModeByTime(
 }
 
 bool StorageContainer::write(
-		bool oldestContainer,
 		std::list<struct PauseMode>::iterator &it,
 		IoVector &iovec, uint32_t len, bool notify,
 		uint32_t *written)
@@ -772,7 +791,7 @@ bool StorageContainer::write(
 		terminateFile( it, /* do_terminate */ true, maxTime );
 
 	if ( !it->m_file )
-		newFile( oldestContainer, it, paused, minTime );
+		newFile( it, paused, minTime );
 
 	// On File Write Error, Try to Close the Current Data File
 	// and Open a New One Here, Just in Case This Helps...
@@ -795,7 +814,7 @@ bool StorageContainer::write(
 						<< ( it->m_file ? it->m_file->path() : "(null)" )
 					<< " retry_count=" << retry_count);
 				terminateFile( it, /* do_terminate */ true, maxTime );
-				newFile( oldestContainer, it, paused, minTime );
+				newFile( it, paused, minTime );
 				doRetry = true;
 			}
 			// Retry Count Exceeded, Fail Hard...!
@@ -863,30 +882,17 @@ void StorageContainer::terminate(void)
 			<< " m_numModes=" << it->m_numModes
 			<< " m_numFiles=" << it->m_numFiles
 			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_pendingFiles.size()="
+				<< it->m_pendingFiles.size()
 			<< " m_lastPrologueFile="
 			<< ( ( it->m_lastPrologueFile ) ?
 				it->m_lastPrologueFile->path() : "(null)" )
 			<< " - Btw, the PauseMode Stack now has "
 			<< m_pauseModeStack.size() << " elements");
 
-		// Finally Close Down This PauseMode...
-
-		if ( it->m_file )
-		{
-			ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
-			if ( m_runNumber )
-			{
-				status = m_active ? ADARA::RunStatus::RUN_EOF :
-							ADARA::RunStatus::END_RUN;
-			}
-
-			it->m_file->terminate( status );
-			StorageManager::addBaseStorage( it->m_file->size() );
-			it->m_file.reset();
-		}
-
-		// _Now_ Add Any Deferred Files to Container List,
+		// _First_ Add Any Deferred Files to Container List,
 		// And Kick Out All Associated FileAdded Notifications...
+		// (To Make Sure These Files are Processed By Listeners!)
 
 		std::list<StorageFile::SharedPtr>::iterator fit;
 		for ( fit = it->m_pendingFiles.begin() ;
@@ -907,6 +913,8 @@ void StorageContainer::terminate(void)
 				<< " m_numModes=" << it->m_numModes
 				<< " m_numFiles=" << it->m_numFiles
 				<< " m_numPauseFiles=" << it->m_numPauseFiles
+				<< " m_pendingFiles.size()="
+					<< it->m_pendingFiles.size()
 				<< " m_lastPrologueFile="
 				<< ( ( it->m_lastPrologueFile ) ?
 					it->m_lastPrologueFile->path() : "(null)" )
@@ -918,6 +926,22 @@ void StorageContainer::terminate(void)
 		}
 
 		it->m_pendingFiles.clear();
+
+		// Finally Close Down This PauseMode & The Final File...
+
+		if ( it->m_file )
+		{
+			ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
+			if ( m_runNumber )
+			{
+				status = m_active ? ADARA::RunStatus::RUN_EOF :
+							ADARA::RunStatus::END_RUN;
+			}
+
+			it->m_file->terminate( status );
+			StorageManager::addBaseStorage( it->m_file->size() );
+			it->m_file.reset();
+		}
 
 		// Remove PauseMode from Stack
 		// Note: erase() Leaves Iterator Pointing at _Next_ Entry,
@@ -945,28 +969,17 @@ void StorageContainer::terminate(void)
 			<< " m_numModes=" << it->m_numModes
 			<< " m_numFiles=" << it->m_numFiles
 			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_pendingFiles.size()="
+				<< it->m_pendingFiles.size()
 			<< " m_lastPrologueFile="
 			<< ( ( it->m_lastPrologueFile ) ?
 				it->m_lastPrologueFile->path() : "(null)" )
 			<< " - Btw, the PauseMode Stack now has "
 			<< m_pauseModeStack.size() << " elements");
 
-		if ( it->m_file )
-		{
-			ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
-			if ( m_runNumber )
-			{
-				status = m_active ? ADARA::RunStatus::RUN_EOF :
-							ADARA::RunStatus::END_RUN;
-			}
-
-			it->m_file->terminate( status );
-			StorageManager::addBaseStorage( it->m_file->size() );
-			it->m_file.reset();
-		}
-
-		// _Now_ Add Any Deferred Files to Container List,
+		// _First_ Add Any Deferred Files to Container List,
 		// And Kick Out All Associated FileAdded Notifications...
+		// (To Make Sure These Files are Processed By Listeners!)
 
 		std::list<StorageFile::SharedPtr>::iterator fit;
 		for ( fit = it->m_pendingFiles.begin() ;
@@ -987,6 +1000,8 @@ void StorageContainer::terminate(void)
 				<< " m_numModes=" << it->m_numModes
 				<< " m_numFiles=" << it->m_numFiles
 				<< " m_numPauseFiles=" << it->m_numPauseFiles
+				<< " m_pendingFiles.size()="
+					<< it->m_pendingFiles.size()
 				<< " m_lastPrologueFile="
 				<< ( ( it->m_lastPrologueFile ) ?
 					it->m_lastPrologueFile->path() : "(null)" )
@@ -998,6 +1013,22 @@ void StorageContainer::terminate(void)
 		}
 
 		it->m_pendingFiles.clear();
+
+		// Finally Close Down This PauseMode & The Final File...
+
+		if ( it->m_file )
+		{
+			ADARA::RunStatus::Enum status = ADARA::RunStatus::NO_RUN;
+			if ( m_runNumber )
+			{
+				status = m_active ? ADARA::RunStatus::RUN_EOF :
+							ADARA::RunStatus::END_RUN;
+			}
+
+			it->m_file->terminate( status );
+			StorageManager::addBaseStorage( it->m_file->size() );
+			it->m_file.reset();
+		}
 
 		// Remove Final/Current PauseMode from Stack
 		m_pauseModeStack.erase( it );
@@ -1113,8 +1144,7 @@ bool StorageContainer::save(IoVector &iovec, uint32_t len,
 	return m_ds_input_files[dataSourceId]->save(iovec, len, written);
 }
 
-void StorageContainer::pause( bool oldestContainer,
-		struct timespec &pauseTime ) // EPICS Time
+void StorageContainer::pause( struct timespec &pauseTime ) // EPICS Time
 {
 	std::list<struct PauseMode>::iterator it;
     it = m_pauseModeStack.begin();
@@ -1138,11 +1168,10 @@ void StorageContainer::pause( bool oldestContainer,
 
 	// Create New Paused Run File...
 	if ( !it->m_file )
-		newFile( oldestContainer, it, /* paused */ true, pauseTime );
+		newFile( it, /* paused */ true, pauseTime );
 }
 
-void StorageContainer::resume( bool oldestContainer,
-		struct timespec &resumeTime ) // EPICS Time
+void StorageContainer::resume( struct timespec &resumeTime ) // EPICS Time
 {
 	std::list<struct PauseMode>::iterator it;
     it = m_pauseModeStack.begin();
@@ -1169,7 +1198,7 @@ void StorageContainer::resume( bool oldestContainer,
 
 	// Create New Non-Paused Run File to Resume Normal Data Collection
 	if ( !it->m_file )
-		newFile( oldestContainer, it, /* paused */ false, resumeTime );
+		newFile( it, /* paused */ false, resumeTime );
 }
 
 void StorageContainer::getLastPrologueFiles(
@@ -1189,6 +1218,8 @@ void StorageContainer::getLastPrologueFiles(
 		<< " m_numModes=" << it->m_numModes
 		<< " m_numFiles=" << it->m_numFiles
 		<< " m_numPauseFiles=" << it->m_numPauseFiles
+		<< " m_pendingFiles.size()="
+			<< it->m_pendingFiles.size()
 		<< " m_lastPrologueFile="
 		<< ( ( it->m_lastPrologueFile ) ?
 			it->m_lastPrologueFile->path() : "(null)" )
@@ -1226,6 +1257,8 @@ void StorageContainer::getLastPrologueFiles(
 			<< " m_numModes=" << it->m_numModes
 			<< " m_numFiles=" << it->m_numFiles
 			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_pendingFiles.size()="
+				<< it->m_pendingFiles.size()
 			<< " m_lastPrologueFile="
 			<< ( ( it->m_lastPrologueFile ) ?
 				it->m_lastPrologueFile->path() : "(null)" )
@@ -1251,6 +1284,8 @@ void StorageContainer::getLastPrologueFiles(
 			<< " m_numModes=" << it->m_numModes
 			<< " m_numFiles=" << it->m_numFiles
 			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_pendingFiles.size()="
+				<< it->m_pendingFiles.size()
 			<< " m_lastPrologueFile="
 			<< ( ( it->m_lastPrologueFile ) ?
 				it->m_lastPrologueFile->path() : "(null)" )
@@ -1589,6 +1624,8 @@ StorageContainer::SharedPtr StorageContainer::create(
 		<< " m_numModes=" << it->m_numModes
 		<< " m_numFiles=" << it->m_numFiles
 		<< " m_numPauseFiles=" << it->m_numPauseFiles
+		<< " m_pendingFiles.size()="
+			<< it->m_pendingFiles.size()
 		<< " m_lastPrologueFile="
 		<< ( ( it->m_lastPrologueFile ) ?
 			it->m_lastPrologueFile->path() : "(null)" )

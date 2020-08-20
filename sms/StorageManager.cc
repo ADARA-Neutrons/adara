@@ -1205,8 +1205,7 @@ void StorageManager::startContainer(
 	std::list<StorageContainer::SharedPtr>::iterator next = it; next++;
 	std::list<struct StorageContainer::PauseMode>::iterator pm_it;
 	(*it)->getCurrentFileIterator( pm_it );
-	(*it)->newFile( /* oldestContainer */ next == m_containerStack.end(),
-		pm_it, paused, minTime );
+	(*it)->newFile( pm_it, paused, minTime );
 }
 
 void StorageManager::endCurrentContainer(
@@ -1429,8 +1428,7 @@ void StorageManager::pauseRecording(
 	// Get "Next" Container (for "Oldest Container" param)
 	std::list<StorageContainer::SharedPtr>::iterator next = it; next++;
 
-	(*it)->pause( /* oldestContainer */ next == m_containerStack.end(),
-		pauseTime ); // EPICS Time...!
+	(*it)->pause( pauseTime ); // EPICS Time...!
 
 	// Update ComBus Verbosity PV...
 	m_combus_verbose = m_pvComBusVerbose->value();
@@ -1457,8 +1455,7 @@ void StorageManager::resumeRecording(
 	// Get "Next" Container (for "Oldest Container" param)
 	std::list<StorageContainer::SharedPtr>::iterator next = it; next++;
 
-	(*it)->resume( /* oldestContainer */ next == m_containerStack.end(),
-		resumeTime ); // EPICS Time...!
+	(*it)->resume( resumeTime ); // EPICS Time...!
 
 	// Update ComBus Verbosity PV...
 	m_combus_verbose = m_pvComBusVerbose->value();
@@ -1761,9 +1758,7 @@ void StorageManager::addPacket( IoVector &iovec,
 
 	// Write Data Packet to Disk...
 	std::list<StorageContainer::SharedPtr>::iterator next = it; next++;
-	if ( !(*it)->write(
-			/* oldestContainer */ next == m_containerStack.end(),
-			pm_it, iovec, len, notify ) ) {
+	if ( !(*it)->write( pm_it, iovec, len, notify ) ) {
 		// Something Went Wrong Trying to Write This Data to Disk! :-O
 		// We will therefore LOSE THIS EXPERIMENT DATA
 		// as a result of the error, so LOG IT HERE in the hopes
