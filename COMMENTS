@@ -15,7 +15,8 @@ You can set:
       -> can add as many comments as you'd like...
       -> all show up in the NeXus under "/entry/DASlogs/comments"
       -> each comment is automatically prefixed with "Scan <number>: "
-      -> comments also prefixed with "[PRE-RUN]" or "[PAUSED]" as appropriate
+      -> comments are also prefixed with "[PRE-RUN]" or "[PAUSED]",
+	  as appropriate
 
    - Run "Notes" (BLXXX:SMS:Marker:NotesComment)
       -> can only set *Exactly Once* per run...
@@ -27,8 +28,9 @@ You can set:
 These various annotations can be set at any time _Before_ the Run Starts
 or _During_ the Run... (Everything gets reset on Run Stop... :-)
 
-Fyi, the "BLXXX:SMS:Marker:NotesComment" and "BLXXX::SMS:Marker:Comment" PVs
-will still work, but it's the old gruesome "trigger-based" commenting approach,
+Fyi, the "BLXXX::SMS:Marker:Comment" PV, with associated Trigger PVs
+"BLXXX:SMS:Marker:Annotate" and "BLXXX:SMS:Marker:RunComment", will
+still work, but it's the old gruesome "trigger-based" commenting approach,
 which is now deprecated... :-)
 
 It's possible that the CSS screens for your beamline don't yet provide
@@ -40,5 +42,5 @@ Please let us know! :-)
 Enjoy!
    Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
  
-[Last Updated: July 31, 2017]
+[Last Updated: August 20, 2020]
 
