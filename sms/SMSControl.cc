@@ -130,6 +130,54 @@ public:
 	}
 };
 
+class LogLevelPV : public smsStringPV {
+public:
+	LogLevelPV(const std::string &name) :
+		smsStringPV(name) {}
+
+	void changed(void)
+	{
+		std::string logLevelStr = value();
+		if ( !logLevelStr.compare("OFF") )
+			log4cxx::Logger::getRootLogger()
+				->setLevel(log4cxx::Level::getOff());
+		else if ( !logLevelStr.compare("FATAL") )
+			log4cxx::Logger::getRootLogger()
+				->setLevel(log4cxx::Level::getFatal());
+		else if ( !logLevelStr.compare("ERROR") )
+			log4cxx::Logger::getRootLogger()
+				->setLevel(log4cxx::Level::getError());
+		else if ( !logLevelStr.compare("WARN") )
+			log4cxx::Logger::getRootLogger()
+				->setLevel(log4cxx::Level::getWarn());
+		else if ( !logLevelStr.compare("INFO") )
+			log4cxx::Logger::getRootLogger()
+				->setLevel(log4cxx::Level::getInfo());
+		else if ( !logLevelStr.compare("DEBUG") )
+			log4cxx::Logger::getRootLogger()
+				->setLevel(log4cxx::Level::getDebug());
+		else if ( !logLevelStr.compare("TRACE") )
+			log4cxx::Logger::getRootLogger()
+				->setLevel(log4cxx::Level::getTrace());
+		else if ( !logLevelStr.compare("ALL") )
+			log4cxx::Logger::getRootLogger()
+				->setLevel(log4cxx::Level::getAll());
+		else {
+			ERROR("LogLevelPV::changed(): Unknown LogLevel String"
+				<< " [" << logLevelStr << "]"
+				<< " - Ignoring, Reverting to Former LogLevel...");
+			// Restore Log4CXX LogLevel String PV to Current LogLevel...
+			LevelPtr logLevel =
+				log4cxx::Logger::getRootLogger()->getLevel();
+			ERROR("LogLevelPV::changed(): Setting LogLevel String PV to"
+				<< " [" << logLevel->toString() << "]");
+			struct timespec now;
+			clock_gettime(CLOCK_REALTIME, &now);
+			update(logLevel->toString(), &now);
+		}
+	}
+};
+
 class CleanShutdownPV : public smsTriggerPV {
 public:
 	CleanShutdownPV(const std::string &name) :
@@ -532,6 +580,9 @@ SMSControl::SMSControl() :
 	m_pvVersion = boost::shared_ptr<smsStringPV>(new
 						smsStringPV(prefix + ":Version"));
 
+	m_pvLogLevel = boost::shared_ptr<LogLevelPV>(new
+						LogLevelPV(prefix + ":LogLevel"));
+
 	m_pvRecording = boost::shared_ptr<smsRecordingPV>(new
 						smsRecordingPV(prefix, this));
 	m_pvRunNumber = boost::shared_ptr<smsRunNumberPV>(new
@@ -618,6 +669,7 @@ SMSControl::SMSControl() :
 						CleanShutdownPV(prefix + ":CleanShutdown"));
 
 	addPV(m_pvVersion);
+	addPV(m_pvLogLevel);
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
@@ -644,6 +696,12 @@ SMSControl::SMSControl() :
 
 	// Initialize Version PV to Usual SMS Daemon Version String...
 	m_pvVersion->update(m_version, &now);
+
+	// Initialize Log4CXX LogLevel String PV...
+	LevelPtr logLevel = log4cxx::Logger::getRootLogger()->getLevel();
+	DEBUG("SMSControl(): Starting LogLevel is"
+		<< " [" << logLevel->toString() << "]");
+	m_pvLogLevel->update(logLevel->toString(), &now);
 
 	// Initialize the System Summary Status/Reason...
 
