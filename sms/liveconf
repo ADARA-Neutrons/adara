@@ -1509,6 +1509,10 @@ if [[ "$command" == "status" \
 
 		echo
 
+		caget $WAIT -S ${PRE}:SMS:LogLevel
+
+		echo
+
 	fi
 
 	if [[ "$command" == "status" \
