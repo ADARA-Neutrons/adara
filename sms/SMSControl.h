@@ -25,6 +25,7 @@ class smsBooleanPV;
 class smsUint32PV;
 class smsConnectedPV;
 class PopPulseBufferPV;
+class LogLevelPV;
 class CleanShutdownPV;
 class RunInfo;
 class Geometry;
@@ -209,6 +210,8 @@ private:
 	uint32_t m_nextSrcId;
 
 	boost::shared_ptr<smsStringPV> m_pvVersion;
+	boost::shared_ptr<LogLevelPV> m_pvLogLevel;
+
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
 	boost::shared_ptr<smsErrorPV> m_pvSummary;
