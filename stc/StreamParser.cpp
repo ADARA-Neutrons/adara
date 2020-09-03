@@ -4899,9 +4899,9 @@ StreamParser::pvValueUpdate
                 << " (" << pvinfo->m_device_name << ")";
             ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
                 << " [" << pvinfo->m_connection << "]" << ")";
-            syslog( LOG_ERR,
-                "[%i] %s %s%s %s %s = %s @ %lu.%09lu (%lu) %s",
-                g_pid, "STC Error:", log_info.c_str(),
+            syslog( LOG_INFO,
+                "[%i] %s%s %s %s = %s @ %lu.%09lu (%lu) %s",
+                g_pid, log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Got Pre-Pulse Variable Value Update",
                 ssinfo.str().c_str(),
