@@ -781,9 +781,9 @@ private:
                     // If So, Then Fix Non-Normalized Value Updates Now.
                     if ( start_time )
                     {
-                        syslog( LOG_ERR,
-                            "[%i] %s: %s %s %s %s, %s: %s",
-                            g_pid, "STC Error", "NxPVInfo::flushBuffers()",
+                        syslog( LOG_INFO,
+                            "[%i] %s %s %s %s, %s: %s",
+                            g_pid, "NxPVInfo::flushBuffers()",
                             this->m_device_str.c_str(),
                             "Normalizing PV Value Times",
                             "with First Pulse Time",
