@@ -1701,16 +1701,39 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 
                 bool active_state = false;
 
+                // For Logging...
+                std::string ckDeviceStr = "";
+                if ( ich->second.m_device != NULL )
+                {
+                    ckDeviceStr = " for Device ["
+                        + ich->second.m_device->m_name + "]";
+                }
+                std::string ckPvStr = "";
+                if ( ich->second.m_pv != NULL )
+                {
+                    ckPvStr = " PV <"
+                        + ich->second.m_pv->m_name + "> ("
+                        + ich->second.m_pv->m_connection + ")";
+                }
+
                 switch ( a_args.type )
                 {
                 case DBR_TIME_STRING:
                     state.m_str_val =
                         ((struct dbr_time_string *)a_args.dbr)->value;
+                    state.m_elem_count = a_args.count; // Always 1 String?
                     updateState<struct dbr_time_string>(
                         a_args.dbr, state );
-                    state.m_elem_count = a_args.count;
                     if ( !state.m_str_val.compare("true") )
                         active_state = true;
+                    syslog( LOG_DEBUG, "%s: %s%s%s %s=[%s] %s=%u %s=%lu",
+                        "DeviceAgent::epicsEventHandler()",
+                        "Got String PV Value Update",
+                        ckDeviceStr.c_str(), ckPvStr.c_str(),
+                        "state.m_str_val", state.m_str_val.c_str(),
+                        "state.m_elem_count", state.m_elem_count,
+                        "state.m_str_val.size()", state.m_str_val.size() );
+                    usleep(33333); // give syslog a chance...
                     break;
                 case DBR_TIME_SHORT:
                     // Could be Scalar Numerical Value
@@ -1775,8 +1798,33 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                         &((struct dbr_time_char *)a_args.dbr)->value;
                     state.m_elem_count = a_args.count;
                     updateState<struct dbr_time_char>( a_args.dbr, state );
+                    // *** Trim String Value to Specified Length!!
+                    if ( state.m_elem_count < state.m_str_val.size() )
+                    {
+                        syslog( LOG_ERR,
+                            "%s %s: %s%s%s ORIG %s=[%s] %s=%u %s=%lu",
+                            "PVSD ERROR:",
+                            "DeviceAgent::epicsEventHandler()",
+                            "Got Char PV Value Update TRIMMING LENGTH",
+                            ckDeviceStr.c_str(), ckPvStr.c_str(),
+                            "state.m_str_val", state.m_str_val.c_str(),
+                            "state.m_elem_count", state.m_elem_count,
+                            "state.m_str_val.size()",
+                            state.m_str_val.size() );
+                        usleep(33333); // give syslog a chance...
+                        state.m_str_val.erase( state.m_elem_count );
+                    }
+                    // Check/Set Any Active State Value
                     if ( state.m_uint_val )
                         active_state = true;
+                    syslog( LOG_DEBUG, "%s: %s%s%s %s=[%s] %s=%u %s=%lu",
+                        "DeviceAgent::epicsEventHandler()",
+                        "Got Char PV Value Update",
+                        ckDeviceStr.c_str(), ckPvStr.c_str(),
+                        "state.m_str_val", state.m_str_val.c_str(),
+                        "state.m_elem_count", state.m_elem_count,
+                        "state.m_str_val.size()", state.m_str_val.size() );
+                    usleep(33333); // give syslog a chance...
                     break;
                 case DBR_TIME_LONG:
                     // Could be Scalar Numerical Value
