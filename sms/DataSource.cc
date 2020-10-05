@@ -3542,23 +3542,22 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 				// Always Pass Thru System Comments...
 				markers->addSystemComment( &ts, // Wallclock Time...!
 					pkt.scanIndex(), pkt.comment() );
-				// Optionally Execute External System Commands...
-				if ( m_ignore_annotation_pkts == Markers::EXECUTE )
-				{
-					DEBUG( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-						<< "DataSource::rxPacket(AnnotationPkt):"
-						<< " External RunControl Packet Received"
-						<< " from " << m_name
-						<< " - Execute:"
-						<< " Command=[" << pkt.comment() << "]"
-						<< " scanIndex=" << pkt.scanIndex()
-						<< " at " << pkt.timestamp().tv_sec
-							- ADARA::EPICS_EPOCH_OFFSET
-						<< "." << std::setfill('0') << std::setw(9)
-						<< pkt.timestamp().tv_nsec );
-					m_ctrl->externalRunControl( &ts, // Wallclock Time...!
-						pkt.scanIndex(), pkt.comment() );
-				}
+				// Execute Any External System Commands... (Start/Stop Run)
+				// (Need to Do This in _Either_ PassThru or Execute Mode,
+				// I.e. to Get Proper Starting TimeStamp for Run Replay!)
+				DEBUG( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
+					<< "DataSource::rxPacket(AnnotationPkt):"
+					<< " External RunControl Packet Received"
+					<< " from " << m_name
+					<< " - Execute:"
+					<< " Command=[" << pkt.comment() << "]"
+					<< " scanIndex=" << pkt.scanIndex()
+					<< " at " << pkt.timestamp().tv_sec
+						- ADARA::EPICS_EPOCH_OFFSET
+					<< "." << std::setfill('0') << std::setw(9)
+					<< pkt.timestamp().tv_nsec );
+				m_ctrl->externalRunControl( &ts, // Wallclock Time...!
+					pkt.scanIndex(), pkt.comment() );
 				break;
 		}
 	}
