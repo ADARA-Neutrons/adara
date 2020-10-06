@@ -52,6 +52,8 @@ STCClient::STCClient(int fd, StorageContainer::SharedPtr &run,
 	INFO("Initiating Translation of " << m_run->runNumber()
 		<< " SendPausedData=" << m_send_paused_data);
 
+	std::list<StorageFile::SharedPtr>::iterator it;
+
 	m_timer = new TimerAdapter<STCClient>(this, &STCClient::sendHeartbeat);
 
 	std::stringstream ss;
@@ -90,6 +92,14 @@ STCClient::STCClient(int fd, StorageContainer::SharedPtr &run,
 	}
 
 	run->getFiles(m_files);
+
+	DEBUG("STCClient(): m_files.size() = " << m_files.size()
+		<< " for Run " << m_run->runNumber());
+	for ( it = m_files.begin() ; it != m_files.end() ; ++it ) {
+		DEBUG("STCClient(): m_files[]: " << (*it)->path()
+			<< " for Run " << m_run->runNumber());
+	}
+
 	if (run->active()) {
 		m_contConnection = run->connect(
 			boost::bind(&STCClient::fileAdded, this, _1));
@@ -291,6 +301,8 @@ void STCClient::writable(void)
 		/* We finished this file, and there will be no more data
 		 * coming for it; close it out and go to the next one.
 		 */
+		DEBUG("writable(): Done with file=" << f->path()
+			<< " wrote " << m_cur_offset << " of size=" << f->size());
 		if (m_file_fd >= 0) {
 			f->put_fd();
 			m_file_fd = -1;
@@ -404,10 +416,13 @@ void STCClient::sendDataDone(void)
 
 void STCClient::fileAdded(StorageFile::SharedPtr &f)
 {
-        /* We don't need to try to start sending from this file just yet
+	/* We don't need to try to start sending from this file just yet
 	 * (assuming it is the front of our list), as we'll get an update
 	 * notification very soon.
 	 */
+	DEBUG("fileAdded(): Add File " << f->path()
+		<< " f->active()=" << f->active()
+		<< " for Run " << m_run->runNumber());
 	m_files.push_back(f);
 	m_fileConnection = f->connect(boost::bind(&STCClient::fileUpdated,
 						  this, _1));
@@ -416,6 +431,10 @@ void STCClient::fileAdded(StorageFile::SharedPtr &f)
 void STCClient::fileUpdated(const StorageFile &f)
 {
 	// DEBUG("fileUpdated() entry");
+
+	// DEBUG("fileUpdated(): Update File " << f.path()
+		// << " f.active()=" << f.active()
+		// << " for Run " << m_run->runNumber());
 
 	/* The current file just got updated; if we're not already waiting
 	 * for buffer space in the socket, try to send the new data
