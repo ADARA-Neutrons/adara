@@ -133,6 +133,10 @@ public:
 
 	boost::shared_ptr<Markers> getMarkers(void) { return m_markers; }
 
+	void updateVerbose(void);
+
+	uint32_t verbose(void) { return m_verbose; }
+
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
 	static void late_config(const boost::property_tree::ptree &conf);
@@ -347,6 +351,9 @@ private:
 	boost::shared_ptr<smsUint32PV> m_pvChopperTOFBits;
 	static uint32_t m_chopperTOFBits;
 	static uint32_t m_chopperTOFMask;
+
+	boost::shared_ptr<smsUint32PV> m_pvVerbose;
+	static uint32_t m_verbose;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 

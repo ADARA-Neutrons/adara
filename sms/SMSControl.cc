@@ -103,6 +103,8 @@ uint32_t SMSControl::m_monitorTOFMask;
 uint32_t SMSControl::m_chopperTOFBits;
 uint32_t SMSControl::m_chopperTOFMask;
 
+uint32_t SMSControl::m_verbose;
+
 class PopPulseBufferPV : public smsInt32PV {
 public:
 	PopPulseBufferPV(const std::string &name) :
@@ -321,6 +323,9 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	m_chopperTOFMask = ((uint32_t) -1) >> (32 - m_chopperTOFBits);
 	INFO("Setting Chopper TOF Mask to 0x"
 		<< std::hex << m_chopperTOFMask << std::dec << ".");
+
+	m_verbose = conf.get<uint32_t>("sms.verbose", 0);
+	INFO("Setting SMS Verbose Value to " << m_verbose << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -656,6 +661,11 @@ SMSControl::SMSControl() :
 							+ "ChopperTOFBits", 0, INT32_MAX,
 						/* AutoSave */ true));
 
+	m_pvVerbose = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "Verbose", 0, INT32_MAX,
+						/* AutoSave */ true));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -686,6 +696,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvIgnoreInterleavedSawtooth);
 	addPV(m_pvMonitorTOFBits);
 	addPV(m_pvChopperTOFBits);
+	addPV(m_pvVerbose);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
 	addPV(m_pvCleanShutdown);
@@ -778,6 +789,9 @@ SMSControl::SMSControl() :
 
 	// Initialize Chopper TOF Bits PV...
 	m_pvChopperTOFBits->update( m_chopperTOFBits, &now);
+
+	// Initialize SMS Verbose Value PV...
+	m_pvVerbose->update( m_verbose, &now);
 
 	// Initialize Fast "Last Pulse" Lookup...
 	PulseIdentifier m_lastPid(-1,-1);
@@ -876,6 +890,12 @@ SMSControl::SMSControl() :
 			<< std::hex << m_chopperTOFMask << std::dec << ".");
 	}
 
+	if ( StorageManager::getAutoSavePV(
+			m_pvVerbose->getName(), uvalue, ts ) ) {
+		m_verbose = uvalue;
+		m_pvVerbose->update(uvalue, &ts);
+	}
+
 	// Initialize Next Run Number...
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
@@ -969,6 +989,21 @@ SMSControl::SMSControl() :
 
 SMSControl::~SMSControl()
 {
+}
+
+// Update SMS Verbose Value from PV...
+void SMSControl::updateVerbose(void)
+{
+	// Get Latest SMS Verbose Value from PV...
+	uint32_t tmp = m_pvVerbose->value();
+
+	// Check if SMS Verbose Value Changed, Log It...
+	if ( tmp != m_verbose )
+	{
+		DEBUG("updateVerbose(): SMS Verbose Value Changed from "
+			<< m_verbose << " to " << tmp);
+		m_verbose = tmp;
+	}
 }
 
 void SMSControl::show(unsigned level) const
@@ -2199,10 +2234,13 @@ void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
 		struct timespec *ts ) // Wallclock Time...!
 {
 	// REMOVEME
-	DEBUG("updateMaxDataSourceTime(): srcId=" << srcId
-		<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
-		<< "." << std::setfill('0') << std::setw(9)
-		<< ts->tv_nsec);
+	if ( m_verbose > 1 )
+	{
+		DEBUG("updateMaxDataSourceTime(): srcId=" << srcId
+			<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
+	}
 
 	if ( srcId >= m_dataSourcesMaxTimes.size() )
 	{
@@ -2250,17 +2288,20 @@ void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
 	for ( uint32_t i=0 ; i < m_dataSourcesMaxTimes.size() ; i++ )
 	{
 		// REMOVEME
-		DEBUG("updateMaxDataSourceTime():"
-			<< " m_dataSourcesMaxTimes[" << i << "]="
-			<< m_dataSourcesMaxTimes[i].tv_sec
-			<< "." << std::setfill('0') << std::setw(9)
-			<< m_dataSourcesMaxTimes[i].tv_nsec
-			<< " oldest=" << oldest.tv_sec
-			<< "." << std::setfill('0') << std::setw(9)
-			<< oldest.tv_nsec
-			<< " newest=" << newest.tv_sec
-			<< "." << std::setfill('0') << std::setw(9)
-			<< newest.tv_nsec);
+		if ( m_verbose > 1 )
+		{
+			DEBUG("updateMaxDataSourceTime():"
+				<< " m_dataSourcesMaxTimes[" << i << "]="
+				<< m_dataSourcesMaxTimes[i].tv_sec
+				<< "." << std::setfill('0') << std::setw(9)
+				<< m_dataSourcesMaxTimes[i].tv_nsec
+				<< " oldest=" << oldest.tv_sec
+				<< "." << std::setfill('0') << std::setw(9)
+				<< oldest.tv_nsec
+				<< " newest=" << newest.tv_sec
+				<< "." << std::setfill('0') << std::setw(9)
+				<< newest.tv_nsec);
+		}
 
 		if ( m_dataSourcesMaxTimes[i].tv_sec != 0
 				|| m_dataSourcesMaxTimes[i].tv_nsec != 0 )
@@ -2268,39 +2309,46 @@ void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
 			// Update "Oldest" Max DataSource Time...
 			if ( oldest.tv_sec == 0 && oldest.tv_nsec == 0 )
 			{
-				DEBUG("updateMaxDataSourceTime(): FIRST Oldest...");
+				if ( m_verbose > 1 )
+					DEBUG("updateMaxDataSourceTime(): FIRST Oldest...");
 				oldest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
 			}
 			else if ( compareTimeStamps(
 					m_dataSourcesMaxTimes[i], oldest ) < 0 )
 			{
-				DEBUG("updateMaxDataSourceTime(): OLDER Oldest...");
+				if ( m_verbose > 1 )
+					DEBUG("updateMaxDataSourceTime(): OLDER Oldest...");
 				oldest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
 			}
 
 			// Update "Newest" Max DataSource Time...
 			if ( newest.tv_sec == 0 && newest.tv_nsec == 0 )
 			{
-				DEBUG("updateMaxDataSourceTime(): FIRST Newest...");
+				if ( m_verbose > 1 )
+					DEBUG("updateMaxDataSourceTime(): FIRST Newest...");
 				newest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
 			}
 			else if ( compareTimeStamps(
 					m_dataSourcesMaxTimes[i], newest ) > 0 )
 			{
-				DEBUG("updateMaxDataSourceTime(): NEWER Newest...");
+				if ( m_verbose > 1 )
+					DEBUG("updateMaxDataSourceTime(): NEWER Newest...");
 				newest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
 			}
 		}
 	}
 
 	// REMOVEME
-	DEBUG("updateMaxDataSourceTime():"
-		<< " oldest=" << oldest.tv_sec
-		<< "." << std::setfill('0') << std::setw(9)
-		<< oldest.tv_nsec
-		<< " newest=" << newest.tv_sec
-		<< "." << std::setfill('0') << std::setw(9)
-		<< newest.tv_nsec);
+	if ( m_verbose )
+	{
+		DEBUG("updateMaxDataSourceTime():"
+			<< " oldest=" << oldest.tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< oldest.tv_nsec
+			<< " newest=" << newest.tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< newest.tv_nsec);
+	}
 
 	// Save "Oldest" Max DataSource Time
 	m_oldestMaxDataSourceTime = oldest; // EPICS Time...!
