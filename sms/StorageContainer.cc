@@ -429,6 +429,8 @@ void StorageContainer::getPauseModeByTime(
 	std::list<struct PauseMode>::iterator it =
 		m_pauseModeStack.begin();
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// If Ignoring Packet TimeStamp, Just Write Into Current PauseMode
 	if ( ignore_pkt_timestamp )
 	{
@@ -436,30 +438,33 @@ void StorageContainer::getPauseModeByTime(
 		if ( found_it != m_pauseModeStack.end() )
 		{
 			// REMOVEME
-			DEBUG("getPauseModeByTime():"
-				<< " Ignore Packet TimeStamp,"
-				<< " Use Current PauseMode " << it->m_numModes
-				<< " for ts=" << ts.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< ts.tv_nsec << std::setw(0)
-				<< " in [" << found_it->m_minTime.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< found_it->m_minTime.tv_nsec << std::setw(0)
-				<< ", " << found_it->m_maxTime.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< found_it->m_maxTime.tv_nsec << std::setw(0) << "]"
-				<< " check_old_pausemodes=" << check_old_pausemodes
-				<< " m_paused=" << found_it->m_paused
-				<< " m_numModes=" << it->m_numModes
-				<< " m_numFiles=" << found_it->m_numFiles
-				<< " m_numPauseFiles=" << found_it->m_numPauseFiles
-				<< " m_pendingFiles.size()="
-					<< it->m_pendingFiles.size()
-				<< " m_lastPrologueFile="
-				<< ( ( found_it->m_lastPrologueFile ) ?
-					found_it->m_lastPrologueFile->path() : "(null)" )
-				<< " - Btw, the PauseMode Stack has "
-				<< m_pauseModeStack.size() << " elements");
+			if ( ctrl->verbose() )
+			{
+				DEBUG("getPauseModeByTime():"
+					<< " Ignore Packet TimeStamp,"
+					<< " Use Current PauseMode " << it->m_numModes
+					<< " for ts=" << ts.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec << std::setw(0)
+					<< " in [" << found_it->m_minTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< found_it->m_minTime.tv_nsec << std::setw(0)
+					<< ", " << found_it->m_maxTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< found_it->m_maxTime.tv_nsec << std::setw(0) << "]"
+					<< " check_old_pausemodes=" << check_old_pausemodes
+					<< " m_paused=" << found_it->m_paused
+					<< " m_numModes=" << it->m_numModes
+					<< " m_numFiles=" << found_it->m_numFiles
+					<< " m_numPauseFiles=" << found_it->m_numPauseFiles
+					<< " m_pendingFiles.size()="
+						<< it->m_pendingFiles.size()
+					<< " m_lastPrologueFile="
+					<< ( ( found_it->m_lastPrologueFile ) ?
+						found_it->m_lastPrologueFile->path() : "(null)" )
+					<< " - Btw, the PauseMode Stack has "
+					<< m_pauseModeStack.size() << " elements");
+			}
 
 			// Step Past Current PauseMode,
 			// No Need to Check Its Expiration Yet...
@@ -486,29 +491,32 @@ void StorageContainer::getPauseModeByTime(
 				|| compareTimeStamps( it->m_maxTime, ts ) >= 0 ) )
 		{
 			// REMOVEME
-			DEBUG("getPauseModeByTime():"
-				<< " Found PauseMode " << it->m_numModes
-				<< " for ts=" << ts.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< ts.tv_nsec << std::setw(0)
-				<< " in [" << it->m_minTime.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< it->m_minTime.tv_nsec << std::setw(0)
-				<< ", " << it->m_maxTime.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
-				<< " check_old_pausemodes=" << check_old_pausemodes
-				<< " m_paused=" << it->m_paused
-				<< " m_numModes=" << it->m_numModes
-				<< " m_numFiles=" << it->m_numFiles
-				<< " m_numPauseFiles=" << it->m_numPauseFiles
-				<< " m_pendingFiles.size()="
-					<< it->m_pendingFiles.size()
-				<< " m_lastPrologueFile="
-				<< ( ( it->m_lastPrologueFile ) ?
-					it->m_lastPrologueFile->path() : "(null)" )
-				<< " - Btw, the PauseMode Stack has "
-				<< m_pauseModeStack.size() << " elements");
+			if ( ctrl->verbose() )
+			{
+				DEBUG("getPauseModeByTime():"
+					<< " Found PauseMode " << it->m_numModes
+					<< " for ts=" << ts.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec << std::setw(0)
+					<< " in [" << it->m_minTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< it->m_minTime.tv_nsec << std::setw(0)
+					<< ", " << it->m_maxTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+					<< " check_old_pausemodes=" << check_old_pausemodes
+					<< " m_paused=" << it->m_paused
+					<< " m_numModes=" << it->m_numModes
+					<< " m_numFiles=" << it->m_numFiles
+					<< " m_numPauseFiles=" << it->m_numPauseFiles
+					<< " m_pendingFiles.size()="
+						<< it->m_pendingFiles.size()
+					<< " m_lastPrologueFile="
+					<< ( ( it->m_lastPrologueFile ) ?
+						it->m_lastPrologueFile->path() : "(null)" )
+					<< " - Btw, the PauseMode Stack has "
+					<< m_pauseModeStack.size() << " elements");
+			}
 
 			// Found It! :-D
 			found_it = it;
@@ -527,7 +535,6 @@ void StorageContainer::getPauseModeByTime(
 
 		// Get "Oldest" Max DataSource Time,
 		// to Use as Furthest "Safe" Time Advancement for Comparison...
-		SMSControl *ctrl = SMSControl::getInstance();
 		struct timespec old_ts =
 			ctrl->oldestMaxDataSourceTime(); // EPICS Time...!
 
@@ -569,32 +576,35 @@ void StorageContainer::getPauseModeByTime(
 			}
 
 			// REMOVEME
-			DEBUG("getPauseModeByTime():"
-				<< " PauseMode " << it->m_numModes
-				<< " in [" << it->m_minTime.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< it->m_minTime.tv_nsec << std::setw(0)
-				<< ", " << it->m_maxTime.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
-				<< " has Expiration Time = "
-				<< pausemode_expire.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< pausemode_expire.tv_nsec << std::setw(0)
-				<< ", old_ts=" << old_ts.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< old_ts.tv_nsec << std::setw(0)
-				<< " m_paused=" << it->m_paused
-				<< " m_numModes=" << it->m_numModes
-				<< " m_numFiles=" << it->m_numFiles
-				<< " m_numPauseFiles=" << it->m_numPauseFiles
-				<< " m_pendingFiles.size()="
-					<< it->m_pendingFiles.size()
-				<< " m_lastPrologueFile="
-				<< ( ( it->m_lastPrologueFile ) ?
-					it->m_lastPrologueFile->path() : "(null)" )
-				<< " - Btw, the PauseMode Stack has "
-				<< m_pauseModeStack.size() << " elements");
+			if ( ctrl->verbose() )
+			{
+				DEBUG("getPauseModeByTime():"
+					<< " PauseMode " << it->m_numModes
+					<< " in [" << it->m_minTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< it->m_minTime.tv_nsec << std::setw(0)
+					<< ", " << it->m_maxTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+					<< " has Expiration Time = "
+					<< pausemode_expire.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< pausemode_expire.tv_nsec << std::setw(0)
+					<< ", old_ts=" << old_ts.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< old_ts.tv_nsec << std::setw(0)
+					<< " m_paused=" << it->m_paused
+					<< " m_numModes=" << it->m_numModes
+					<< " m_numFiles=" << it->m_numFiles
+					<< " m_numPauseFiles=" << it->m_numPauseFiles
+					<< " m_pendingFiles.size()="
+						<< it->m_pendingFiles.size()
+					<< " m_lastPrologueFile="
+					<< ( ( it->m_lastPrologueFile ) ?
+						it->m_lastPrologueFile->path() : "(null)" )
+					<< " - Btw, the PauseMode Stack has "
+					<< m_pauseModeStack.size() << " elements");
+			}
 
 			// Is It Time to Close Down This PauseMode?
 			// Note: old_ts = 0.0 When Uninitialized...
