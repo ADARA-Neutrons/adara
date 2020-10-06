@@ -2150,6 +2150,8 @@ StorageManager::findContainerByTime(
 {
 	static uint32_t cnt = 0;
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// Update Storage Container Cleanup Timeout PV...
 	// (Infrequently, maybe once per minute...?)
 	if ( !( ++cnt % 9999 ) )
@@ -2172,6 +2174,9 @@ StorageManager::findContainerByTime(
 				<< " -> (" << m_container_cleanup_timeout.tv_sec
 					<< ", " << m_container_cleanup_timeout.tv_nsec << ")");
 		}
+
+		// Update SMSControl SMS Verbose Value from PV...
+		ctrl->updateVerbose();
 	}
 
 	std::list<StorageContainer::SharedPtr>::iterator found_it;
@@ -2186,21 +2191,26 @@ StorageManager::findContainerByTime(
 		// REMOVEME
 		if ( found_it != m_containerStack.end() )
 		{
-			DEBUG("findContainerByTime(): " << label
-				<< " Ignore Packet TimeStamp,"
-				<< " Use Current Container "
-				<< (*found_it)->name() << " for ts=" << ts.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< ts.tv_nsec << std::setw(0)
-				<< " in [" << (*found_it)->minTime().tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< (*found_it)->minTime().tv_nsec << std::setw(0)
-				<< ", " << (*found_it)->maxTime().tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< (*found_it)->maxTime().tv_nsec << std::setw(0) << "]"
-				<< " check_old_containers=" << check_old_containers
-				<< " - Btw, the Container Stack has "
-				<< m_containerStack.size() << " elements");
+			if ( ctrl->verbose() )
+			{
+				DEBUG("findContainerByTime(): " << label
+					<< " Ignore Packet TimeStamp,"
+					<< " Use Current Container "
+					<< (*found_it)->name()
+					<< " for ts=" << ts.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec << std::setw(0)
+					<< " in [" << (*found_it)->minTime().tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< (*found_it)->minTime().tv_nsec << std::setw(0)
+					<< ", " << (*found_it)->maxTime().tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< (*found_it)->maxTime().tv_nsec
+					<< std::setw(0) << "]"
+					<< " check_old_containers=" << check_old_containers
+					<< " - Btw, the Container Stack has "
+					<< m_containerStack.size() << " elements");
+			}
 
 			// Step Past Current Container,
 			// No Need to Check Its Expiration Yet...
@@ -2226,20 +2236,23 @@ StorageManager::findContainerByTime(
 					|| compareTimeStamps( (*it)->maxTime(), ts ) >= 0 ) )
 			{
 				// REMOVEME
-				DEBUG("findContainerByTime():"
-					<< " Found " << label << " Container "
-					<< (*it)->name() << " for ts=" << ts.tv_sec << "."
-					<< std::setfill('0') << std::setw(9)
-					<< ts.tv_nsec << std::setw(0)
-					<< " in [" << (*it)->minTime().tv_sec << "."
-					<< std::setfill('0') << std::setw(9)
-					<< (*it)->minTime().tv_nsec << std::setw(0)
-					<< ", " << (*it)->maxTime().tv_sec << "."
-					<< std::setfill('0') << std::setw(9)
-					<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
-					<< " check_old_containers=" << check_old_containers
-					<< " - Btw, the Container Stack has "
-					<< m_containerStack.size() << " elements");
+				if ( ctrl->verbose() )
+				{
+					DEBUG("findContainerByTime():"
+						<< " Found " << label << " Container "
+						<< (*it)->name() << " for ts=" << ts.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< ts.tv_nsec << std::setw(0)
+						<< " in [" << (*it)->minTime().tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< (*it)->minTime().tv_nsec << std::setw(0)
+						<< ", " << (*it)->maxTime().tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+						<< " check_old_containers=" << check_old_containers
+						<< " - Btw, the Container Stack has "
+						<< m_containerStack.size() << " elements");
+				}
 
 				// Found It! :-D
 				found_it = it;
@@ -2285,28 +2298,30 @@ StorageManager::findContainerByTime(
 				container_expire.tv_sec++;
 			}
 
-			SMSControl *ctrl = SMSControl::getInstance();
 			struct timespec old_ts =
 				ctrl->oldestMaxDataSourceTime(); // EPICS Time...!
 
 			// REMOVEME
-			DEBUG("findContainerByTime(): " << label
-				<< " Container " << (*it)->name()
-				<< " in [" << (*it)->minTime().tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< (*it)->minTime().tv_nsec << std::setw(0)
-				<< ", " << (*it)->maxTime().tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
-				<< " has Expiration Time = "
-				<< container_expire.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< container_expire.tv_nsec << std::setw(0)
-				<< ", old_ts=" << old_ts.tv_sec << "."
-				<< std::setfill('0') << std::setw(9)
-				<< old_ts.tv_nsec << std::setw(0)
-				<< " - Btw, the Container Stack has "
-				<< m_containerStack.size() << " elements");
+			if ( ctrl->verbose() )
+			{
+				DEBUG("findContainerByTime(): " << label
+					<< " Container " << (*it)->name()
+					<< " in [" << (*it)->minTime().tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< (*it)->minTime().tv_nsec << std::setw(0)
+					<< ", " << (*it)->maxTime().tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
+					<< " has Expiration Time = "
+					<< container_expire.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< container_expire.tv_nsec << std::setw(0)
+					<< ", old_ts=" << old_ts.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< old_ts.tv_nsec << std::setw(0)
+					<< " - Btw, the Container Stack has "
+					<< m_containerStack.size() << " elements");
+			}
 
 			// Is It Time to Close Down This Container?
 			// Note: old_ts = 0.0 When Uninitialized...
