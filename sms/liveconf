@@ -324,6 +324,14 @@ option_label[$num_options]="[Number of Chopper TOF Bits]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
+option_name[$num_options]="verbose"
+option_pv[$num_options]="SMS:Control:Verbose"
+option_value_type[$num_options]="UINT32_VALUE(verbose_logging_level)"
+option_default[$num_options]="0"
+option_label[$num_options]="[SMS Verbose Logging Level Value]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
 option_name[$num_options]="always_send_bmon_config"
 option_pv[$num_options]="SMS:Control:AlwaysSendBMConfig"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
@@ -1654,6 +1662,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:Control:BeamMonitorTOFBits
 		caget $WAIT ${PRE}:SMS:Control:ChopperTOFBits
 		caget $WAIT ${PRE}:SMS:Control:AlwaysSendBMConfig
+		caget $WAIT ${PRE}:SMS:Control:Verbose
 
 		echo
 
