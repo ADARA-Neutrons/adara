@@ -1895,13 +1895,21 @@ for run in ${RUN_NUMBERS} ; do
 					--regexp "^m[0-9]+-f[0-9]+-run-${run}.adara$" \
 					--regexp "^f[0-9]+-run-${run}.adara$" \
 				| ${HEAD} -${index} | ${TAIL} -1`
-		else
+		else # "${SMS_WHICH_DATA_FILE}" == "LAST"...
 			echo -e -n "\nLocating ${SMS_WHICH_DATA_FILE} Data File "
 			echo "for Run ${run}."
+			if [[ $SEND_PAUSED_DATA == "--send-paused-data" ]]; then
+				INCL_PAUSE_NEW="--regexp ^m[0-9]+-f[0-9]+-p[0-9]+-run-${run}.adara$"
+				INCL_PAUSE_OLD="--regexp ^f[0-9]+-p[0-9]+-run-${run}.adara$"
+			else
+				INCL_PAUSE_NEW=""
+				INCL_PAUSE_OLD=""
+			fi
 			datafile=`${LS} "${rundir}" \
 				| ${GREP} -E \
 					--regexp "^m[0-9]+-f[0-9]+-run-${run}.adara$" \
 					--regexp "^f[0-9]+-run-${run}.adara$" \
+					${INCL_PAUSE_NEW} ${INCL_PAUSE_OLD} \
 				| ${TAIL} -${index} | ${HEAD} -1`
 		fi
 		ckdatafile=$?
