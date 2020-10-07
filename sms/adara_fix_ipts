@@ -1891,13 +1891,17 @@ for run in ${RUN_NUMBERS} ; do
 			echo -e -n "\nLocating ${SMS_WHICH_DATA_FILE} Data File "
 			echo "for Run ${run}."
 			datafile=`${LS} "${rundir}" \
-				| ${GREP} -E "^f[0-9]+-run-${run}.adara$" \
+				| ${GREP} -E \
+					--regexp "^m[0-9]+-f[0-9]+-run-${run}.adara$" \
+					--regexp "^f[0-9]+-run-${run}.adara$" \
 				| ${HEAD} -${index} | ${TAIL} -1`
 		else
 			echo -e -n "\nLocating ${SMS_WHICH_DATA_FILE} Data File "
 			echo "for Run ${run}."
 			datafile=`${LS} "${rundir}" \
-				| ${GREP} -E "^f[0-9]+-run-${run}.adara$" \
+				| ${GREP} -E \
+					--regexp "^m[0-9]+-f[0-9]+-run-${run}.adara$" \
+					--regexp "^f[0-9]+-run-${run}.adara$" \
 				| ${TAIL} -${index} | ${HEAD} -1`
 		fi
 		ckdatafile=$?
