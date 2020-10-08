@@ -597,7 +597,22 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 				pkt.runNumber(), pkt.runStart() );
 			if (pkt.status() != ADARA::RunStatus::STATE
 					&& pkt.status() != ADARA::RunStatus::PROLOGUE)
-				fprintf( stderr, "    File index %u\n", pkt.fileNumber() );
+			{
+				uint32_t fileNum = pkt.fileNumber();
+				uint32_t modeNum = 0;
+				// Embedded Mode Number...?
+				if ( fileNum > 0xfff )
+				{
+					modeNum = ( fileNum >> 12 ) & 0xfff;
+					fileNum &= 0xfff;
+					fprintf( stderr, "    Mode index %u, File index %u\n",
+						modeNum, fileNum );
+				}
+				else
+				{
+					fprintf( stderr, "    File index %u\n", fileNum );
+				}
+			}
 #if 0
 			if (pkt.version() == 0x01) {
 				fprintf( stderr,
@@ -636,6 +651,8 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 					<< "- Run Start Epoch = " << m_run_start_epoch
 						<< std::endl
 					<< "- Run File Number = " << m_run_file_number
+						<< " (0x" << std::hex << m_run_file_number
+							<< std::dec << ")"
 						<< std::endl;
 			}
 
@@ -1790,6 +1807,8 @@ void MungeParser::parse(int argc, char **argv)
 				<< "- Run Number = " << m_run_number << std::endl
 				<< "- Run Start Epoch = " << m_run_start_epoch << std::endl
 				<< "- Run File Number = " << m_run_file_number
+					<< " (0x" << std::hex << m_run_file_number
+						<< std::dec << ")"
 				<< std::endl;
 
 			addRunStatus( m_run_number, m_run_start_epoch,
@@ -1805,6 +1824,8 @@ void MungeParser::parse(int argc, char **argv)
 				<< "- Run Number = " << m_run_number << std::endl
 				<< "- Run Start Epoch = " << m_run_start_epoch << std::endl
 				<< "- Run File Number = " << m_run_file_number << std::endl
+					<< " (0x" << std::hex << m_run_file_number
+						<< std::dec << ")"
 				<< "Can't Add Final Run Status Packet..."
 				<< std::endl;
 		}

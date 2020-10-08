@@ -788,7 +788,22 @@ bool Parser::rxPacket(const ADARA::RunStatusPkt &pkt)
 				pkt.runNumber(), pkt.runStart());
 			if (pkt.status() != ADARA::RunStatus::STATE
 					&& pkt.status() != ADARA::RunStatus::PROLOGUE)
-				printf("    File index %u\n", pkt.fileNumber());
+			{
+				uint32_t fileNum = pkt.fileNumber();
+				uint32_t modeNum = 0;
+				// Embedded Mode Number...?
+				if ( fileNum > 0xfff )
+				{
+					modeNum = ( fileNum >> 12 ) & 0xfff;
+					fileNum &= 0xfff;
+					printf("    Mode index %u, File index %u\n",
+						modeNum, fileNum);
+				}
+				else
+				{
+					printf("    File index %u\n", fileNum);
+				}
+			}
 #if 0
 			if (pkt.version() == 0x01) {
 				printf("    Paused 0x%x Pause File index %u\n",
