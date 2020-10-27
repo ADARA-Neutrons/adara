@@ -103,6 +103,8 @@ uint32_t SMSControl::m_monitorTOFMask;
 uint32_t SMSControl::m_chopperTOFBits;
 uint32_t SMSControl::m_chopperTOFMask;
 
+uint32_t SMSControl::m_verbose;
+
 class PopPulseBufferPV : public smsInt32PV {
 public:
 	PopPulseBufferPV(const std::string &name) :
@@ -321,6 +323,9 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	m_chopperTOFMask = ((uint32_t) -1) >> (32 - m_chopperTOFBits);
 	INFO("Setting Chopper TOF Mask to 0x"
 		<< std::hex << m_chopperTOFMask << std::dec << ".");
+
+	m_verbose = conf.get<uint32_t>("sms.verbose", 0);
+	INFO("Setting SMS Verbose Value to " << m_verbose << ".");
 
 	if (!m_beamlineId.length())
 		throw std::runtime_error("Missing beamline ID");
@@ -548,6 +553,12 @@ void SMSControl::addSource(const std::string &name,
 							 save_input_stream));
 	m_dataSources.push_back(src);
 
+	// Add Another DataSource Max Time Entry
+	struct timespec init_ts;
+	init_ts.tv_sec = 0; // EPICS Time...!
+	init_ts.tv_nsec = 0;
+	m_dataSourcesMaxTimes.push_back(init_ts);
+
 	// Update Number of Data Sources PV...
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
@@ -560,6 +571,7 @@ void SMSControl::addSource(const std::string &name,
 
 SMSControl::SMSControl() :
 	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
+	m_numConnectedDataSources(0),
 	m_noRegisteredEventSources(true), m_noRegisteredEventSourcesCount(0),
 	m_lastPulseId(0), m_lastRingPeriod(0),
 	m_monitorReserve(1024), m_bankReserve(4096),
@@ -649,6 +661,11 @@ SMSControl::SMSControl() :
 							+ "ChopperTOFBits", 0, INT32_MAX,
 						/* AutoSave */ true));
 
+	m_pvVerbose = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(prefix + ":Control:"
+							+ "Verbose", 0, INT32_MAX,
+						/* AutoSave */ true));
+
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(prefix + ":Control:"
 							+ "NumDataSources"));
@@ -679,6 +696,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvIgnoreInterleavedSawtooth);
 	addPV(m_pvMonitorTOFBits);
 	addPV(m_pvChopperTOFBits);
+	addPV(m_pvVerbose);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
 	addPV(m_pvCleanShutdown);
@@ -714,6 +732,20 @@ SMSControl::SMSControl() :
 	// - "true": Do Log Status as Error
 	// - "true": Major Error
 	setSummaryReason( false, true, true );
+
+	// Initialize "Oldest" DataSource Max Time
+	m_oldestMaxDataSourceTime.tv_sec = 0; // EPICS Time...!
+	m_oldestMaxDataSourceTime.tv_nsec = 0;
+
+	// Initialize "Newest" DataSource Max Time
+	m_newestMaxDataSourceTime.tv_sec = 0; // EPICS Time...!
+	m_newestMaxDataSourceTime.tv_nsec = 0;
+
+	// Push "Zero-Index" DataSource Max Time Entry (We Count From 1)
+	struct timespec init_ts;
+	init_ts.tv_sec = 0; // EPICS Time...!
+	init_ts.tv_nsec = 0;
+	m_dataSourcesMaxTimes.push_back(init_ts);
 
 	// Initialize No End-of-Pulse Buffer Size PV from Config Value...
 	m_pvNoEoPPulseBufferSize->update(m_noEoPPulseBufferSize, &now);
@@ -757,6 +789,9 @@ SMSControl::SMSControl() :
 
 	// Initialize Chopper TOF Bits PV...
 	m_pvChopperTOFBits->update( m_chopperTOFBits, &now);
+
+	// Initialize SMS Verbose Value PV...
+	m_pvVerbose->update( m_verbose, &now);
 
 	// Initialize Fast "Last Pulse" Lookup...
 	PulseIdentifier m_lastPid(-1,-1);
@@ -855,6 +890,12 @@ SMSControl::SMSControl() :
 			<< std::hex << m_chopperTOFMask << std::dec << ".");
 	}
 
+	if ( StorageManager::getAutoSavePV(
+			m_pvVerbose->getName(), uvalue, ts ) ) {
+		m_verbose = uvalue;
+		m_pvVerbose->update(uvalue, &ts);
+	}
+
 	// Initialize Next Run Number...
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
@@ -948,6 +989,21 @@ SMSControl::SMSControl() :
 
 SMSControl::~SMSControl()
 {
+}
+
+// Update SMS Verbose Value from PV...
+void SMSControl::updateVerbose(void)
+{
+	// Get Latest SMS Verbose Value from PV...
+	uint32_t tmp = m_pvVerbose->value();
+
+	// Check if SMS Verbose Value Changed, Log It...
+	if ( tmp != m_verbose )
+	{
+		DEBUG("updateVerbose(): SMS Verbose Value Changed from "
+			<< m_verbose << " to " << tmp);
+		m_verbose = tmp;
+	}
 }
 
 void SMSControl::show(unsigned level) const
@@ -1096,11 +1152,12 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 				// Let our Marker Control code have a shot at
 				// fixing up current state before we start recording
 				// in a new container.
-				m_markers->beforeNewRun( m_currentRunNumber );
+				m_markers->beforeNewRun( m_currentRunNumber,
+					ts ); // Wallclock Time...!
 
 				// Actually Start a New Recording...
-				StorageManager::startRecording( m_currentRunNumber,
-					m_runInfo->getPropId() );
+				StorageManager::startRecording( (*ts), // Wallclock Time
+					m_currentRunNumber, m_runInfo->getPropId() );
 			}
 			// Logic Error...! ;-O
 			catch ( std::logic_error e ) {
@@ -1213,10 +1270,10 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 
 				// Let our Marker Control code have a shot at
 				// fixing up current state before we stop recording.
-				m_markers->runStop();
+				m_markers->runStop( ts ); // Wallclock Time...!
 
 				// Actually Stop Recording...
-				StorageManager::stopRecording();
+				StorageManager::stopRecording( (*ts) ); // Wallclock Time
 			}
 			// Logic Error...! ;-O
 			catch ( std::logic_error e ) {
@@ -1313,24 +1370,36 @@ bool SMSControl::getRecording(void)
 	return m_recording;
 }
 
-void SMSControl::pauseRecording(void)
+void SMSControl::pauseRecording( struct timespec *ts ) // Wallclock Time
 {
 	if ( m_currentRunNumber )
-		INFO("Pausing Run " << m_currentRunNumber);
+		INFO("Pausing Run " << m_currentRunNumber
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 	else
-		INFO("Pausing Data Collection (Not Currently Recording)");
+		INFO("Pausing Data Collection (Not Currently Recording)"
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 
-	StorageManager::pauseRecording();
+	StorageManager::pauseRecording( ts ); // Wallclock Time...!
 }
 
-void SMSControl::resumeRecording(void)
+void SMSControl::resumeRecording( struct timespec *ts ) // Wallclock Time
 {
 	if ( m_currentRunNumber )
-		INFO("Resuming Run " << m_currentRunNumber);
+		INFO("Resuming Run " << m_currentRunNumber
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 	else
-		INFO("Resuming Data Collection (Not Currently Recording)");
+		INFO("Resuming Data Collection (Not Currently Recording)"
+			<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
 
-	StorageManager::resumeRecording();
+	StorageManager::resumeRecording( ts ); // Wallclock Time...!
 }
 
 void SMSControl::externalRunControl( struct timespec *ts,
@@ -1432,6 +1501,8 @@ bool SMSControl::checkRequiredDataSources( std::string & why )
 {
 	std::stringstream why_ss;
 
+	uint32_t connected = 0;
+
 	bool okToGo = true;
 
 	for ( uint32_t i=0 ; i < m_dataSources.size() ; i++ )
@@ -1452,8 +1523,25 @@ bool SMSControl::checkRequiredDataSources( std::string & why )
 
 				okToGo = false;
 			}
+			else
+				connected++;
 		}
+		else if ( m_dataSources[i]->isConnected() )
+			connected++;
 	}
+
+	// Sneaky Trigger for Stacked Storage Container Cleanup...
+	// - Among Other Things, This Gets Called When A Data Source Goes Down
+	// If We (Now) Don't Have _Any_ Connected Data Sources,
+	// Then Now Would Be A Good Time to Clean Up
+	// Any Old Stacked Storage Containers... ;-D
+	// (Since They Can't "Time Out" When There's No Data Flowing... :-)
+	// Note: This is Also Necessary for the ADARA Test Harness to Work!
+	if ( !connected )
+		StorageManager::cleanContainerStack();
+
+	// Update Connected DataSource Count...
+	m_numConnectedDataSources = connected;
 
 	if ( okToGo )
 		why_ss << "All Required DataSources are Present";
@@ -1767,6 +1855,7 @@ done:
 
 	// Check for "No Registered Event Sources" State Change...
 	if ( m_eventSources.none() ) {
+
 		// Log/Notify on State Change...
 		ERROR( ( m_recording ? "[RECORDING] " : "" )
 			<< "unregisterEventSource():"
@@ -2139,6 +2228,143 @@ void SMSControl::resetPacketStats(void)
 	if (m_dataSources.size() > 0) {
 		m_dataSources[0]->resetPacketStats();
 	}
+}
+
+void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
+		struct timespec *ts ) // Wallclock Time...!
+{
+	// REMOVEME
+	if ( m_verbose > 1 )
+	{
+		DEBUG("updateMaxDataSourceTime(): srcId=" << srcId
+			<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
+	}
+
+	if ( srcId >= m_dataSourcesMaxTimes.size() )
+	{
+		ERROR("updateMaxDataSourceTime():"
+			<< " Invalid DataSource srcId=" << srcId
+			<< ", Out of Range"
+			<< " m_dataSourcesMaxTimes.size()="
+			<< m_dataSourcesMaxTimes.size()
+			<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
+		return;
+	}
+
+	// Set Max Time for This DataSource
+	m_dataSourcesMaxTimes[ srcId ] = *ts; // Wallclock Time...!
+
+	// Reset DataSource Max Time...
+	if ( ts->tv_sec == 0 && ts->tv_nsec == 0 )
+	{
+		ERROR("updateMaxDataSourceTime():"
+			<< " Reset DataSource Max Time srcId=" << srcId
+			<< " m_dataSourcesMaxTimes[" << srcId << "]="
+			<< m_dataSourcesMaxTimes[ srcId ].tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< m_dataSourcesMaxTimes[ srcId ].tv_nsec);
+	}
+
+	else
+	{
+		// Convert Wallclock to EPICS Time...
+		m_dataSourcesMaxTimes[ srcId ].tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+	}
+
+	// Update Overall Oldest Max DataSource Time...
+
+	struct timespec oldest; // EPICS Time...!
+	oldest.tv_sec = 0;
+	oldest.tv_nsec = 0;
+
+	struct timespec newest; // EPICS Time...!
+	newest.tv_sec = 0;
+	newest.tv_nsec = 0;
+
+	for ( uint32_t i=0 ; i < m_dataSourcesMaxTimes.size() ; i++ )
+	{
+		// REMOVEME
+		if ( m_verbose > 1 )
+		{
+			DEBUG("updateMaxDataSourceTime():"
+				<< " m_dataSourcesMaxTimes[" << i << "]="
+				<< m_dataSourcesMaxTimes[i].tv_sec
+				<< "." << std::setfill('0') << std::setw(9)
+				<< m_dataSourcesMaxTimes[i].tv_nsec
+				<< " oldest=" << oldest.tv_sec
+				<< "." << std::setfill('0') << std::setw(9)
+				<< oldest.tv_nsec
+				<< " newest=" << newest.tv_sec
+				<< "." << std::setfill('0') << std::setw(9)
+				<< newest.tv_nsec);
+		}
+
+		if ( m_dataSourcesMaxTimes[i].tv_sec != 0
+				|| m_dataSourcesMaxTimes[i].tv_nsec != 0 )
+		{
+			// Update "Oldest" Max DataSource Time...
+			if ( oldest.tv_sec == 0 && oldest.tv_nsec == 0 )
+			{
+				if ( m_verbose > 1 )
+					DEBUG("updateMaxDataSourceTime(): FIRST Oldest...");
+				oldest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
+			}
+			else if ( compareTimeStamps(
+					m_dataSourcesMaxTimes[i], oldest ) < 0 )
+			{
+				if ( m_verbose > 1 )
+					DEBUG("updateMaxDataSourceTime(): OLDER Oldest...");
+				oldest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
+			}
+
+			// Update "Newest" Max DataSource Time...
+			if ( newest.tv_sec == 0 && newest.tv_nsec == 0 )
+			{
+				if ( m_verbose > 1 )
+					DEBUG("updateMaxDataSourceTime(): FIRST Newest...");
+				newest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
+			}
+			else if ( compareTimeStamps(
+					m_dataSourcesMaxTimes[i], newest ) > 0 )
+			{
+				if ( m_verbose > 1 )
+					DEBUG("updateMaxDataSourceTime(): NEWER Newest...");
+				newest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
+			}
+		}
+	}
+
+	// REMOVEME
+	if ( m_verbose )
+	{
+		DEBUG("updateMaxDataSourceTime():"
+			<< " oldest=" << oldest.tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< oldest.tv_nsec
+			<< " newest=" << newest.tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< newest.tv_nsec);
+	}
+
+	// Save "Oldest" Max DataSource Time
+	m_oldestMaxDataSourceTime = oldest; // EPICS Time...!
+
+	// Save "Newest" Max DataSource Time
+	m_newestMaxDataSourceTime = newest; // EPICS Time...!
+}
+
+struct timespec &SMSControl::oldestMaxDataSourceTime(void)
+{
+	return( m_oldestMaxDataSourceTime ); // EPICS Time...!
+}
+
+struct timespec &SMSControl::newestMaxDataSourceTime(void)
+{
+	return( m_newestMaxDataSourceTime ); // EPICS Time...!
 }
 
 int32_t SMSControl::registerLiveClient(std::string clientName,
@@ -3201,7 +3427,9 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			 */
 			StorageManager::addPacket(pulse->m_rtdl->packet(),
 						pulse->m_rtdl->packet_length(),
-						false);
+						false /* ignore_pkt_timestamp */,
+						true /* check_old_containers */,
+						false /* notify */);
 		}
 
 		// NO RTDL for Pulse!

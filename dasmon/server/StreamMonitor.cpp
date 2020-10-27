@@ -649,6 +649,9 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
     case ADARA::RunStatus::NO_RUN:
     case ADARA::RunStatus::END_RUN:
         break;
+
+    case ADARA::RunStatus::PROLOGUE:
+        return false;
     }
 
     m_in_prolog = true;

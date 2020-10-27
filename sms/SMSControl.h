@@ -87,6 +87,13 @@ public:
 
 	void resetPacketStats(void);
 
+	void updateMaxDataSourceTime( uint32_t srcId,
+			struct timespec *ts ); // Wallclock Time...!
+
+	struct timespec &oldestMaxDataSourceTime(void); // EPICS Time...!
+
+	struct timespec &newestMaxDataSourceTime(void); // EPICS Time...!
+
 	int32_t registerLiveClient(std::string clientName,
 			boost::shared_ptr<smsStringPV> & pvName,
 			boost::shared_ptr<smsUint32PV> & pvRequestedStartTime,
@@ -110,8 +117,8 @@ public:
 
 	bool getRecording(void);
 
-	void pauseRecording(void);
-	void resumeRecording(void);
+	void pauseRecording( struct timespec *ts ); // Wallclock Time...!
+	void resumeRecording( struct timespec *ts ); // Wallclock Time...!
 
 	void externalRunControl( struct timespec *ts,
 			uint32_t scanIndex, std::string command );
@@ -121,7 +128,14 @@ public:
 
 	void updateDataSourceConnectivity(void);
 
+	uint32_t numConnectedDataSources(void)
+		{ return m_numConnectedDataSources; }
+
 	boost::shared_ptr<Markers> getMarkers(void) { return m_markers; }
+
+	void updateVerbose(void);
+
+	uint32_t verbose(void) { return m_verbose; }
 
 	static void config(const boost::property_tree::ptree &conf);
 	static void init(void);
@@ -235,6 +249,14 @@ private:
 
 	std::vector<boost::shared_ptr<DataSource> > m_dataSources;
 
+	std::vector<struct timespec> m_dataSourcesMaxTimes; // EPICS Time...!
+
+	struct timespec m_oldestMaxDataSourceTime; // EPICS Time...!
+
+	struct timespec m_newestMaxDataSourceTime; // EPICS Time...!
+
+	uint32_t m_numConnectedDataSources;
+
 	uint32_t m_eventSourcesIndex[ SOURCE_SET_SIZE ];
 	SourceSet m_eventSources;
 	bool m_noRegisteredEventSources;
@@ -329,6 +351,9 @@ private:
 	boost::shared_ptr<smsUint32PV> m_pvChopperTOFBits;
 	static uint32_t m_chopperTOFBits;
 	static uint32_t m_chopperTOFMask;
+
+	boost::shared_ptr<smsUint32PV> m_pvVerbose;
+	static uint32_t m_verbose;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumDataSources;
 

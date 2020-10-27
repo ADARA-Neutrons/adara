@@ -51,7 +51,7 @@
 
 namespace ADARA {
 
-const std::string VERSION = "1.9.6";
+const std::string VERSION = "1.9.7";
 const std::string TAG_NAME = "XXX_TAG_NAME_XXX";
 
 const std::string ATTRIB = "ADARA Data Acquisition System, Neutron Sciences Directorate, Oak Ridge National Laboratory (ORNL), UT-Battelle LLC";
@@ -149,12 +149,13 @@ namespace DataFlags {
 
 namespace RunStatus {
 	enum Enum {
-		NO_RUN	= 0,
-		NEW_RUN	= 1,
-		RUN_EOF	= 2,
-		RUN_BOF	= 3,
-		END_RUN	= 4,
-		STATE	= 5,
+		NO_RUN		= 0,
+		NEW_RUN		= 1,
+		RUN_EOF		= 2,
+		RUN_BOF		= 3,
+		END_RUN		= 4,
+		STATE		= 5,
+		PROLOGUE	= 6,
 	};
 }
 

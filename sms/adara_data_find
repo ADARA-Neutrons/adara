@@ -46,7 +46,7 @@ USAGE()
 	echo "    [--epics=<EPICSTimeInSeconds>] \\"
 	echo "    [--secs=<TimeInSeconds>] \\"
 	echo "    [--human=\"<DateString>\"] \\"
-	echo "    [--SMS|--sms] \\"
+	echo "    [--SMS|--sms] [--OLDSMS|--oldsms] \\"
 	echo "    [--nED|--ned|--ds=1] \\"
 	echo "    [--PVSD|--pvsd|--ds=3] \\"
 	echo "    [--ds=<N>] [--pkt=\"RTDL|VARIABLE|DATA\"] \\"
@@ -243,7 +243,7 @@ GET_DATA_START_TIME()
 #
 
 FILE_TYPE="SMS"
-FILE_PREFIX="f"
+FILE_PREFIX="m"
 FILE_PACKET=""
 
 EXTRA_PARSER_ARGS=""
@@ -290,6 +290,17 @@ for arg in "$@" ; do
 		fi
 	elif [[ "#$key#" == '#--SMS#' || "#$key#" == '#--sms#' ]]; then
 		FILE_TYPE="SMS"
+		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		FILE_PREFIX="m"
+		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+		if [[ -z "${FILE_PACKET}" ]]; then
+			FILE_PACKET="RTDL"
+			echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		else
+			echo -e "\n\tLEAVING File Packet Type As: \"${FILE_PACKET}\""
+		fi
+	elif [[ "#$key#" == '#--OLDSMS#' || "#$key#" == '#--oldsms#' ]]; then
+		FILE_TYPE="OLDSMS"
 		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
 		FILE_PREFIX="f"
 		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""

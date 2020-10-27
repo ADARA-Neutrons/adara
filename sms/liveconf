@@ -324,6 +324,14 @@ option_label[$num_options]="[Number of Chopper TOF Bits]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
+option_name[$num_options]="verbose"
+option_pv[$num_options]="SMS:Control:Verbose"
+option_value_type[$num_options]="UINT32_VALUE(verbose_logging_level)"
+option_default[$num_options]="0"
+option_label[$num_options]="[SMS Verbose Logging Level Value]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
 option_name[$num_options]="always_send_bmon_config"
 option_pv[$num_options]="SMS:Control:AlwaysSendBMConfig"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
@@ -551,6 +559,14 @@ option_pv[$num_options]="SMS:StorageManager:ComBusVerbose"
 option_value_type[$num_options]="BOOL_VALUE(ComBus is Verbose)"
 option_default[$num_options]="true"
 option_label[$num_options]="[ComBus Verbosity (for Run Pause/Resume)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="container_cleanup_timeout"
+option_pv[$num_options]="SMS:StorageManager:ContainerCleanupTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_default[$num_options]="1"
+option_label[$num_options]="[Storage Container Cleanup Timeout]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="stc"
@@ -1501,6 +1517,10 @@ if [[ "$command" == "status" \
 
 		echo
 
+		caget $WAIT -S ${PRE}:SMS:LogLevel
+
+		echo
+
 	fi
 
 	if [[ "$command" == "status" \
@@ -1642,6 +1662,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:Control:BeamMonitorTOFBits
 		caget $WAIT ${PRE}:SMS:Control:ChopperTOFBits
 		caget $WAIT ${PRE}:SMS:Control:AlwaysSendBMConfig
+		caget $WAIT ${PRE}:SMS:Control:Verbose
 
 		echo
 
@@ -1656,6 +1677,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:SMS:StorageManager:BlockSize
 		caget $WAIT -S ${PRE}:SMS:StorageManager:RescanRunDir
 		caget $WAIT ${PRE}:SMS:StorageManager:ComBusVerbose
+		caget $WAIT ${PRE}:SMS:StorageManager:ContainerCleanupTimeout
 
 		echo
 

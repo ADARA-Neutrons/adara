@@ -618,6 +618,37 @@ calcDiffSeconds
 }
 
 
+/*! \brief Precisely Compares Two TimeSpec TimeStamps, Via "Time1 - Time2"
+ *  \return Comparison: "Less Than" (-1), "Equal" (0) or "Greater Than" (+1)
+ */
+inline int32_t
+compareTimeStamps
+(
+	const struct timespec &a_Time1,		///< [in] First Time value
+	const struct timespec &a_Time2		///< [in] Second Time value
+)
+{
+	uint64_t t1_nsec, t2_nsec;
+
+	t1_nsec = ( a_Time1.tv_sec * NANO_PER_SECOND_LL ) + a_Time1.tv_nsec;
+	t2_nsec = ( a_Time2.tv_sec * NANO_PER_SECOND_LL ) + a_Time2.tv_nsec;
+
+	// Time1 is:
+
+	// "Less Than" (-1)
+	if ( t1_nsec < t2_nsec )
+		return( -1 );
+
+	// "Greater Than" (+1)
+	else if ( t1_nsec > t2_nsec )
+		return( 1 );
+
+	// "Equal" (0)
+	else
+		return( 0 );
+}
+
+
 /*! \brief Converts timespec to ISO8601 string format
  *  \return ISO8601 time in UTC with local offset as a string
  */

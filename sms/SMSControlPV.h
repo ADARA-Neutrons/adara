@@ -65,7 +65,7 @@ public:
 					  const char * const user,
 					  const char * const host);
 
-	void timestamp(struct timespec &ts);
+	void timestamp(struct timespec &ts); // Wallclock Time...!
 
 	void destroy(void);
 
@@ -112,7 +112,7 @@ public:
 private:
 	gddAppFuncTableStatus getValue(gdd &value);
 
-	void update(uint32_t run, struct timespec *ts);
+	void update(uint32_t run, struct timespec *ts); // Wallclock Time...!
 
 	friend class SMSControl;
 };
@@ -124,7 +124,7 @@ public:
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
 
-	void update(bool recording, struct timespec *ts);
+	void update(bool recording, struct timespec *ts); // Wallclock Time...!
 
 	virtual aitEnum bestExternalType(void) const;
 
@@ -146,14 +146,15 @@ public:
 	caStatus read(const casCtx &ctx, gdd &prototype);
 	caStatus write(const casCtx &ctx, const gdd &value);
 
-	void update(const std::string str, struct timespec *ts);
+	void update(const std::string str,
+		struct timespec *ts); // Wallclock Time...!
 
 	virtual unsigned int maxDimension(void) const;
 	virtual aitIndex maxBound(unsigned int dim) const;
 	virtual aitEnum bestExternalType(void) const;
 
 	void unset(bool init = false,
-		struct timespec *ts = (struct timespec *) NULL);
+		struct timespec *ts = (struct timespec *) NULL); // Wallclock Time
 
 	bool valid(void);
 	std::string value(void);
@@ -181,7 +182,7 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	virtual void update(bool val, struct timespec *ts,
+	virtual void update(bool val, struct timespec *ts, // Wallclock Time...!
 		bool force_changed = false);
 
 	bool valid(void);
@@ -207,7 +208,8 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(bool val, struct timespec *ts, bool force_changed = false);
+	void update(bool val, struct timespec *ts, // Wallclock Time...!
+		bool force_changed = false);
 
 	gddAppFuncTableStatus getEnums(gdd &value);
 
@@ -224,7 +226,8 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(bool val, bool major, struct timespec *ts);
+	void update(bool val, bool major,
+		struct timespec *ts); // Wallclock Time...!
 
 	void set(void);
 	void reset(void);
@@ -251,7 +254,9 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(uint32_t val, struct timespec *ts, bool no_log = false);
+	void update(uint32_t val, struct timespec *ts, // Wallclock Time...!
+		bool no_log = false);
+
 	bool valid(void);
 	uint32_t value(void);
 
@@ -289,7 +294,7 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(int32_t val, struct timespec *ts);
+	void update(int32_t val, struct timespec *ts); // Wallclock Time...!
 	bool valid(void);
 	int32_t value(void);
 
@@ -309,7 +314,7 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(uint16_t val, struct timespec *ts);
+	void update(uint16_t val, struct timespec *ts); // Wallclock Time...!
 
 	void connected(void);
 	void disconnected(void);
@@ -337,7 +342,7 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(uint16_t val, struct timespec *ts);
+	void update(uint16_t val, struct timespec *ts); // Wallclock Time...!
 
 	void ignore(void);
 	void passthru(void);
@@ -374,7 +379,7 @@ public:
 	gddAppFuncTableStatus getValue(gdd &value);
 	gddAppFuncTableStatus getEnums(gdd &value);
 
-	virtual void triggered(struct timespec *ts) = 0;
+	virtual void triggered(struct timespec *ts) = 0; // Wallclock Time...!
 };
 
 class smsFloat64PV : public smsPV {
@@ -389,7 +394,7 @@ public:
 
 	virtual aitEnum bestExternalType(void) const;
 
-	void update(double val, struct timespec *ts);
+	void update(double val, struct timespec *ts); // Wallclock Time...!
 	bool valid(void);
 	double value(void);
 

@@ -38,7 +38,7 @@ RateLimitedLogging::History RLLHistory_MetaDataMgr;
 MetaDataMgr::MetaDataMgr() : m_nextMappedDevId(1)
 {
 	m_connection = StorageManager::onPrologue(
-				boost::bind( &MetaDataMgr::onPrologue, this ) );
+				boost::bind( &MetaDataMgr::onPrologue, this, _1 ) );
 }
 
 MetaDataMgr::~MetaDataMgr()
@@ -84,7 +84,10 @@ void MetaDataMgr::upstreamDisconnected(
 		 *
 		 * We'll push the whole batch out at once when we are done.
 		 */
-		StorageManager::addPacket( pkt, len, false );
+		StorageManager::addPacket( pkt, len,
+			true /* ignore_pkt_timestamp */,
+			false /* check_old_containers */,
+			false /* notify */ );
 
 		// Add Variable Id to Log List...
 		if ( var_log_ss.str().empty() )
@@ -375,7 +378,9 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 			if ( reconnected ) {
 				StorageManager::addPacket(
 					dev.m_descriptorPkt->packet(),
-					dev.m_descriptorPkt->packet_length() );
+					dev.m_descriptorPkt->packet_length(),
+					true /* ignore_pkt_timestamp */,
+					false /* check_old_containers */ );
 			}
 
 			return;
@@ -411,7 +416,9 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 	 * keeps us from writing it twice in close proximity if we start
 	 * a new file with it.
 	 */
-	StorageManager::addPacket( pkt->packet(), pkt->packet_length() );
+	StorageManager::addPacket( pkt->packet(), pkt->packet_length(),
+		true /* ignore_pkt_timestamp */,
+		false /* check_old_containers */ );
 	m_devices[mapped_dev].m_descriptorPkt = pkt;
 	m_devices[mapped_dev].m_devId = inPkt.devId();
 	m_devices[mapped_dev].m_srcTag = srcTag;
@@ -481,8 +488,11 @@ void MetaDataMgr::addFastMetaDDP( const timespec &ts, uint32_t mapped_dev,
 	 * our tracking structures; we'll put it in the stream when it gets
 	 * started.
 	 */
-	if ( StorageManager::streaming() )
-		StorageManager::addPacket( pkt, size );
+	if ( StorageManager::streaming() ) {
+		StorageManager::addPacket( pkt, size,
+			true /* ignore_pkt_timestamp */,
+			false /* check_old_containers */ );
+	}
 	m_devices[mapped_dev].m_descriptorPkt =
 		boost::make_shared<ADARA::Packet>(wrapped);
 	m_devices[mapped_dev].m_devId = -1; // FastMetaDDP...!
@@ -726,11 +736,17 @@ void MetaDataMgr::updateVariable( uint32_t dev, uint32_t varId,
 	if ( vit != varPktMap.end() )
 		varPktMap.erase(vit);
 
-	StorageManager::addPacket( inPkt->packet(), inPkt->packet_length() );
+	// Since PV Value Update TimeStamps can be "Old" Relative to
+	// the Current Run Time (because they haven't changed in a while),
+	// We Need to "Ignore the Packet TimeStamp" when Writing Them;
+	// They Need to Just Go into the "Current" Storage Container.
+	StorageManager::addPacket( inPkt->packet(), inPkt->packet_length(),
+		true /* ignore_pkt_timestamp */ );
+
 	varPktMap[varId] = inPkt;
 }
 
-void MetaDataMgr::onPrologue(void)
+void MetaDataMgr::onPrologue( bool UNUSED(capture_last) )
 {
 	DeviceMap::iterator dit, dend = m_devices.end();
 	for ( dit = m_devices.begin(); dit != dend; ++dit ) {

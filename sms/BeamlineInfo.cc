@@ -2,6 +2,7 @@
 #include <stdint.h>
 
 #include "ADARA.h"
+#include "ADARAUtils.h"
 #include "BeamlineInfo.h"
 #include "StorageManager.h"
 
@@ -62,7 +63,7 @@ BeamlineInfo::BeamlineInfo(const uint32_t targetStationNumber,
 	memcpy(fields + 5, data.data(), data.size());
 
 	m_connection = StorageManager::onPrologue(
-				boost::bind(&BeamlineInfo::onPrologue, this));
+				boost::bind(&BeamlineInfo::onPrologue, this, _1));
 }
 
 BeamlineInfo::~BeamlineInfo()
@@ -71,7 +72,7 @@ BeamlineInfo::~BeamlineInfo()
 	m_connection.disconnect();
 }
 
-void BeamlineInfo::onPrologue(void)
+void BeamlineInfo::onPrologue( bool UNUSED(capture_last) )
 {
 	StorageManager::addPrologue(m_packet, m_packetSize);
 }

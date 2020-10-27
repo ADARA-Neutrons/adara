@@ -905,7 +905,9 @@ echo -e "\t[${rundir}]"
 
 echo -e "\nLocating Last Data File for Run ${RUN_NUMBER}."
 datafile=`${LS} "${rundir}" \
-	| ${GREP} -E "^f[0-9]+-run-${RUN_NUMBER}.adara$" \
+	| ${GREP} -E \
+		--regexp "^m[0-9]+-f[0-9]+-run-${RUN_NUMBER}.adara$" \
+		--regexp "^f[0-9]+-run-${RUN_NUMBER}.adara$" \
 	| ${TAIL} -1`
 ckdatafile=$?
 

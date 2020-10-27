@@ -12,6 +12,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.BeamMonitorConfig"));
 #include <boost/bind.hpp>
 
 #include "ADARA.h"
+#include "ADARAUtils.h"
 #include "EPICS.h"
 #include "SMSControl.h"
 #include "SMSControlPV.h"
@@ -741,7 +742,7 @@ BeamMonitorConfig::BeamMonitorConfig(
 
 	// Set Up Callback for Adding Beam Monitor Config to Prologue...
 	m_connection = StorageManager::onPrologue(
-				boost::bind(&BeamMonitorConfig::onPrologue, this));
+				boost::bind(&BeamMonitorConfig::onPrologue, this, _1));
 }
 
 BeamMonitorConfig::~BeamMonitorConfig()
@@ -792,7 +793,7 @@ void BeamMonitorConfig::resetPacketTime(void)
 	fields[3] = ts.tv_nsec;
 }
 
-void BeamMonitorConfig::onPrologue(void)
+void BeamMonitorConfig::onPrologue( bool UNUSED(capture_last) )
 {
 	// TODO: *Only* Send New Beam Monitor Config on New Run Boundary!
 

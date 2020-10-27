@@ -8,6 +8,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.Geometry"));
 #include <stdint.h>
 
 #include "ADARA.h"
+#include "ADARAUtils.h"
 #include "Geometry.h"
 #include "StorageManager.h"
 
@@ -66,7 +67,7 @@ Geometry::Geometry(const std::string &path)
 	}
 
 	m_connection = StorageManager::onPrologue(
-				boost::bind(&Geometry::onPrologue, this));
+				boost::bind(&Geometry::onPrologue, this, _1));
 }
 
 Geometry::~Geometry()
@@ -75,7 +76,7 @@ Geometry::~Geometry()
 	m_connection.disconnect();
 }
 
-void Geometry::onPrologue(void)
+void Geometry::onPrologue( bool UNUSED(capture_last) )
 {
 	StorageManager::addPrologue(m_packet, m_packetSize);
 }

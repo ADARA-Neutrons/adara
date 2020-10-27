@@ -48,7 +48,7 @@ private:
 
 	boost::signals2::connection m_connection;
 
-	void onPrologue(void);
+	void onPrologue( bool capture_last );
 };
 
 #endif /* __BEAMMONITORCONFIG_H */

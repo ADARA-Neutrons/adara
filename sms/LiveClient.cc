@@ -342,6 +342,8 @@ void LiveClient::writable(void)
 		/* We finished this file, and there will be no more data
 		 * coming for it; close it out and go to the next one.
 		 */
+		DEBUG("writable(): Done with file=" << f->path()
+			<< " wrote " << cur_offset << " of size=" << f->size());
 		if (m_file_fd >= 0) {
 			f->put_fd();
 			m_file_fd = -1;
@@ -409,6 +411,8 @@ void LiveClient::historicalFile(StorageFile::SharedPtr &f, off_t start)
 {
 	/* This is an old file, so just put it on the list to be sent.
 	 */
+	DEBUG("historicalFile(): Add File " << f->path()
+		<< " f->active()=" << f->active());
 	m_files.push_back(std::make_pair(f, start));
 }
 
@@ -418,6 +422,8 @@ void LiveClient::fileAdded(StorageFile::SharedPtr &f)
 	 * (assuming it is the front of our list), as we'll get an update
 	 * notification very soon.
 	 */
+	DEBUG("fileAdded(): Add File " << f->path()
+		<< " f->active()=" << f->active());
 	m_files.push_back(std::make_pair(f, 0));
 	m_fileConnection = f->connect(boost::bind(&LiveClient::fileUpdated,
 						  this, _1));

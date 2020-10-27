@@ -29,7 +29,10 @@ int main(int UNUSED(argc), char **UNUSED(argv))
 		clock_gettime(CLOCK_REALTIME, &ts);
 		hdr->ts_sec = ts.tv_sec;
 		hdr->ts_nsec = ts.tv_nsec;
-		StorageManager::addPacket(pkt, sizeof(pkt), false);
+		StorageManager::addPacket(pkt, sizeof(pkt),
+			false /* ignore_pkt_timestamp */,
+			true /* check_old_containers */,
+			false /* notify */);
 	}
 
 	StorageManager::startRecording(12345, "IPTS-0000");
@@ -38,7 +41,10 @@ int main(int UNUSED(argc), char **UNUSED(argv))
 		clock_gettime(CLOCK_REALTIME, &ts);
 		hdr->ts_sec = ts.tv_sec;
 		hdr->ts_nsec = ts.tv_nsec;
-		StorageManager::addPacket(pkt, sizeof(pkt), false);
+		StorageManager::addPacket(pkt, sizeof(pkt),
+			false /* ignore_pkt_timestamp */,
+			true /* check_old_containers */,
+			false /* notify */);
 	}
 
 	StorageManager::stopRecording();
@@ -47,9 +53,13 @@ int main(int UNUSED(argc), char **UNUSED(argv))
 		clock_gettime(CLOCK_REALTIME, &ts);
 		hdr->ts_sec = ts.tv_sec;
 		hdr->ts_nsec = ts.tv_nsec;
-		StorageManager::addPacket(pkt, sizeof(pkt), false);
+		StorageManager::addPacket(pkt, sizeof(pkt),
+			false /* ignore_pkt_timestamp */,
+			true /* check_old_containers */,
+			false /* notify */);
 	}
 
-	StorageManager::stop();
+	clock_gettime(CLOCK_REALTIME, &ts);
+	StorageManager::stop(ts);
 	return 0;
 }

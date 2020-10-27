@@ -363,7 +363,14 @@ DUMP_ARRAY()
 
 declare -a rawFiles
 
-rawFilesCmd="/bin/ls \"${RunDirectory}\"/f+([0-9])-run-${RunNumber}.adara"
+# New Raw Data File Naming Convention...
+rawFilePattern="m+([0-9])-f+([0-9])-run-${RunNumber}.adara"
+
+# Old Raw Data File Naming Convention...
+rawFileOldPattern="f+([0-9])-run-${RunNumber}.adara"
+
+rawFilesCmd="/bin/ls \"${RunDirectory}\"/${rawFilePattern} \
+	\"${RunDirectory}\"/${rawFileOldPattern}"
 
 rawFiles=( `eval $rawFilesCmd 2>/dev/null` )
 
@@ -390,9 +397,14 @@ if [ $SendPausedData == $AlwaysSendPausedData ]; then
 
 	declare -a pausedFiles
 
-	pausedFilePattern="f+([0-9])-p+([0-9])-run-${RunNumber}.adara"
+	# New Raw Data File Naming Convention...
+	pausedFilePattern="m+([0-9])-f+([0-9])-p+([0-9])-run-${RunNumber}.adara"
 
-	pausedFilesCmd="/bin/ls \"${RunDirectory}\"/${pausedFilePattern}"
+	# Old Raw Data File Naming Convention...
+	pausedFileOldPattern="f+([0-9])-p+([0-9])-run-${RunNumber}.adara"
+
+	pausedFilesCmd="/bin/ls \"${RunDirectory}\"/${pausedFilePattern} \
+		\"${RunDirectory}\"/${pausedFileOldPattern}"
 
 	pausedFiles=( `eval $pausedFilesCmd 2>/dev/null` )
 
@@ -422,7 +434,15 @@ if [ $SendPausedData == $AlwaysSendPausedData ]; then
 	# Prime the Pump! Get Next Paused Data File's File Number...
 	if [[ $p -lt $numPaused ]]; then
 		pausedFile=`basename ${pausedFiles[$p]}`
-		pausedFileNo=`echo $pausedFile | awk -F - '{print $1}'`
+		# New Raw Data File Naming Convention...
+		if [[ $pausedFile =~ ^m[0-9]+ ]]; then
+			pausedFileNo=`echo $pausedFile | awk -F - '{print $1"-"$2}'`
+		# Old Raw Data File Naming Convention...
+		else
+			pausedFileNo=`echo $pausedFile | awk -F - '{print $1}'`
+		fi
+		echo "pausedFile=[${pausedFile}]"
+		echo "pausedFileNo=[${pausedFileNo}]"
 	else
 		pausedFile=""
 		pausedFileNo="XXX_DONE_XXX"
@@ -441,7 +461,15 @@ if [ $SendPausedData == $AlwaysSendPausedData ]; then
 
 			# Get This Raw Data File's File Number...
 			rawFile=`basename ${rawFiles[$r]}`
-			fileNo=`echo $rawFile | awk -F - '{print $1}'`
+			# New Raw Data File Naming Convention...
+			if [[ $rawFile =~ ^m[0-9]+ ]]; then
+				fileNo=`echo $rawFile | awk -F - '{print $1"-"$2}'`
+			# Old Raw Data File Naming Convention...
+			else
+				fileNo=`echo $rawFile | awk -F - '{print $1}'`
+			fi
+			echo "rawFile=[${rawFile}]"
+			echo "fileNo=[${fileNo}]"
 
 			# Is the Next Paused Data File Associated with This Raw File?
 			while [[ $pausedFileNo == $fileNo ]]; do
@@ -457,7 +485,17 @@ if [ $SendPausedData == $AlwaysSendPausedData ]; then
 				# Get Next Paused Data File's File Number...
 				if [[ $p -lt $numPaused ]]; then
 					pausedFile=`basename ${pausedFiles[$p]}`
-					pausedFileNo=`echo $pausedFile | awk -F - '{print $1}'`
+					# New Raw Data File Naming Convention...
+					if [[ $pausedFile =~ ^m[0-9]+ ]]; then
+						pausedFileNo=`echo $pausedFile \
+							| awk -F - '{print $1"-"$2}'`
+					# Old Raw Data File Naming Convention...
+					else
+						pausedFileNo=`echo $pausedFile \
+							| awk -F - '{print $1}'`
+					fi
+					echo "pausedFile=[${pausedFile}]"
+					echo "pausedFileNo=[${pausedFileNo}]"
 				else
 					pausedFile=""
 					pausedFileNo="XXX_DONE_XXX"

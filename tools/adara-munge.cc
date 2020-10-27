@@ -287,9 +287,9 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 	if ( !m_skip_pkt )
 	{
 		if ( ( m_filterafter
-				&& calcDiffSeconds( m_lastpkttime, m_threshtime ) > 0.0  )
+				&& compareTimeStamps( m_lastpkttime, m_threshtime ) > 0  )
 			|| ( m_filterbefore
-				&& calcDiffSeconds( m_lastpkttime, m_threshtime ) < 0.0 )
+				&& compareTimeStamps( m_lastpkttime, m_threshtime ) < 0 )
 			|| ( !m_filterafter && !m_filterbefore ) )
 		{
 			m_out.write( (const char *)pkt.packet(), pkt.packet_length() );
@@ -587,13 +587,32 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 		case ADARA::RunStatus::END_RUN:
 			fprintf( stderr, "    End of run\n" );
 			break;
+		case ADARA::RunStatus::PROLOGUE:
+			fprintf( stderr, "    [PROLOGUE]\n" );
+			break;
 		}
 
 		if (pkt.runNumber()) {
 			fprintf( stderr, "    Run %u started at epoch %u\n",
 				pkt.runNumber(), pkt.runStart() );
-			if (pkt.status() != ADARA::RunStatus::STATE)
-				fprintf( stderr, "    File index %u\n", pkt.fileNumber() );
+			if (pkt.status() != ADARA::RunStatus::STATE
+					&& pkt.status() != ADARA::RunStatus::PROLOGUE)
+			{
+				uint32_t fileNum = pkt.fileNumber();
+				uint32_t modeNum = 0;
+				// Embedded Mode Number...?
+				if ( fileNum > 0xfff )
+				{
+					modeNum = ( fileNum >> 12 ) & 0xfff;
+					fileNum &= 0xfff;
+					fprintf( stderr, "    Mode index %u, File index %u\n",
+						modeNum, fileNum );
+				}
+				else
+				{
+					fprintf( stderr, "    File index %u\n", fileNum );
+				}
+			}
 #if 0
 			if (pkt.version() == 0x01) {
 				fprintf( stderr,
@@ -632,6 +651,8 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 					<< "- Run Start Epoch = " << m_run_start_epoch
 						<< std::endl
 					<< "- Run File Number = " << m_run_file_number
+						<< " (0x" << std::hex << m_run_file_number
+							<< std::dec << ")"
 						<< std::endl;
 			}
 
@@ -1108,7 +1129,7 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 		uint32_t nsec = (uint32_t) pkt.pulseId();
 		sec += 667;
 		nsec += 908933229;
-		if ( nsec > NANO_PER_SECOND_LL )
+		if ( nsec >= NANO_PER_SECOND_LL )
 		{
 			sec++;
 			nsec -= NANO_PER_SECOND_LL;
@@ -1786,6 +1807,8 @@ void MungeParser::parse(int argc, char **argv)
 				<< "- Run Number = " << m_run_number << std::endl
 				<< "- Run Start Epoch = " << m_run_start_epoch << std::endl
 				<< "- Run File Number = " << m_run_file_number
+					<< " (0x" << std::hex << m_run_file_number
+						<< std::dec << ")"
 				<< std::endl;
 
 			addRunStatus( m_run_number, m_run_start_epoch,
@@ -1801,6 +1824,8 @@ void MungeParser::parse(int argc, char **argv)
 				<< "- Run Number = " << m_run_number << std::endl
 				<< "- Run Start Epoch = " << m_run_start_epoch << std::endl
 				<< "- Run File Number = " << m_run_file_number << std::endl
+					<< " (0x" << std::hex << m_run_file_number
+						<< std::dec << ")"
 				<< "Can't Add Final Run Status Packet..."
 				<< std::endl;
 		}

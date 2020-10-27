@@ -8,7 +8,7 @@
 #include <boost/thread.hpp>
 #include <stdint.h>
 #include <string>
-#include <vector>
+#include <list>
 
 #include "ADARA.h"
 #include "Storage.h"
@@ -16,8 +16,6 @@
 #include "StorageFile.h"
 
 #include "ComBusSMSMon.h"
-
-static struct timespec combuszerotime = {0,0};
 
 class EventFd;
 
@@ -27,44 +25,57 @@ class MaxBlocksPV;
 class BlockSizePV;
 class RescanRunDirPV;
 class smsBooleanPV;
+class smsFloat64PV;
 
 class StorageManager {
 public:
 	typedef boost::signals2::signal<void (StorageContainer::SharedPtr &,
 					bool)> ContainerSignal;
-	typedef boost::signals2::signal<void (void)> PrologueSignal;
+	typedef boost::signals2::signal<void (bool)> PrologueSignal;
+
 	typedef boost::function<void (StorageFile::SharedPtr &, off_t)>
 								FileOffSetFunc;
 
 	static void init(void);
 	static void lateInit(void);
-	static void stop(void);
+	static void stop(const struct timespec &stopTime); // EPICS Time...!
 
-	static void startRecording(uint32_t run, std::string propId);
-	static void stopRecording(void);
+	static void startRecording(
+			const struct timespec &runStart, // Wallclock Time...!
+			uint32_t run, std::string propId);
+	static void stopRecording(
+			const struct timespec &runStop); // Wallclock Time...!
 
-	static void pauseRecording(void);
-	static void resumeRecording(void);
+	static void pauseRecording( struct timespec *ts ); // Wallclock Time...
+	static void resumeRecording( struct timespec *ts ); // Wallclock Time...
 
 	static void iterateHistory(uint32_t startSeconds, FileOffSetFunc cb);
 
-	static void addPacket(IoVector &iovec, bool notify = true);
-	static void addPacket(const void *pkt, uint32_t len, bool notify = true)
+	static void addPacket(IoVector &iovec,
+			bool ignore_pkt_timestamp = false,
+			bool check_old_containers = true,
+			bool notify = true);
+	static void addPacket(const void *pkt, uint32_t len,
+			bool ignore_pkt_timestamp = false,
+			bool check_old_containers = true,
+			bool notify = true)
 	{
 		IoVector iovec(1);
 		iovec[0].iov_base = (void *) pkt;
 		iovec[0].iov_len = len;
-		addPacket(iovec, notify);
+		addPacket(iovec,
+			ignore_pkt_timestamp, check_old_containers, notify);
 	}
 
-	static void savePacket(IoVector &iovec, uint32_t dataSourceId);
+	static void savePacket(IoVector &iovec,
+			uint32_t dataSourceId, ADARA::PacketType::Type pkt_base_type );
 	static void savePacket(const void *pkt, uint32_t len,
-			uint32_t dataSourceId)
+			uint32_t dataSourceId, ADARA::PacketType::Type pkt_base_type )
 	{
 		IoVector iovec(1);
 		iovec[0].iov_base = (void *) pkt;
 		iovec[0].iov_len = len;
-		savePacket(iovec, dataSourceId);
+		savePacket(iovec, dataSourceId, pkt_base_type);
 	}
 
 	static void notify(void);
@@ -112,18 +123,34 @@ public:
 	}
 
 	static StorageContainer::SharedPtr &container(void) {
-		return m_cur_container;
+		std::list<StorageContainer::SharedPtr>::iterator it;
+		it = m_containerStack.begin();
+		return (*it);
 	}
 
+	static std::list<StorageContainer::SharedPtr>::iterator
+		findContainerByTime( std::string label,
+					bool ignore_pkt_timestamp,
+					struct timespec &ts, // EPICS Time...!
+					bool check_old_containers = true );
+
+	static struct timespec &getContainerCleanupTimeout(void) {
+		return m_container_cleanup_timeout;
+	}
+
+	static void cleanContainerStack(void);
+
 	static bool streaming(void) {
-		return !!m_cur_container;
+		std::list<StorageContainer::SharedPtr>::iterator it;
+		it = m_containerStack.begin();
+		return !!(*it);
 	}
 
 	static uint32_t getNextRun(void);
 	static bool updateNextRun(uint32_t run);
 
 	static const struct timespec &scanStart(void) {
-		return m_scanStart;
+		return m_scanStart; // Wallclock Time...!
 	}
 
 	static void encodeAutoSaveString( std::string str_in,
@@ -159,7 +186,7 @@ public:
 
 	static void sendComBus(uint32_t a_run_num, std::string a_proposal_id,
 		std::string a_run_state,
-		const struct timespec & a_start_time = combuszerotime);
+		const struct timespec & a_start_time = m_default_time);
 
 private:
 	typedef boost::signals2::connection connection;
@@ -201,11 +228,16 @@ private:
 	static boost::shared_ptr<smsBooleanPV> m_pvComBusVerbose;
 	static bool m_combus_verbose;
 
-	static struct timespec m_scanStart;
+	static boost::shared_ptr<smsFloat64PV> m_pvContainerCleanupTimeout;
+	static struct timespec m_container_cleanup_timeout;
+	static double m_container_cleanup_timeout_double;
+
+	static struct timespec m_scanStart; // Wallclock Time...!
 	static uint64_t m_scannedBlocks;
 	static std::list<StorageContainer::SharedPtr> m_pendingRuns;
 
-	static StorageContainer::SharedPtr m_cur_container;
+	static std::list<StorageContainer::SharedPtr> m_containerStack;
+
 	static StorageFile::SharedPtr m_prologueFile;
 
 	static ContainerSignal m_contChange;
@@ -248,7 +280,9 @@ private:
 	static uint32_t readRunFile(const char *path, bool notify);
 	static bool cleanupRunFiles(void);
 
-	static void stateSnapshot(StorageFile::SharedPtr &f);
+	static void stateSnapshot(StorageFile::SharedPtr &f,
+				bool capture_last = false);
+
 	static bool retireIndexDir(bool remove = true);
 	static bool cleanupIndexes(void);
 	static void indexState(StorageFile::SharedPtr &state,
@@ -274,13 +308,34 @@ private:
 				const std::string &dir, uint64_t &total_size);
 
 	static void addBaseStorage(uint64_t size);
-	static void startContainer(bool paused = false, uint32_t run = 0,
-				std::string propId = std::string("UNKNOWN"));
-	static void endCurrentContainer(void);
-	static void fileCreated(StorageFile::SharedPtr &f);
+
+	static struct timespec m_default_time;
+
+	static StorageFile::SharedPtr dummyFile;
+	static std::vector<StorageFile::SharedPtr> dummySaveFiles;
+
+	static void startContainer(
+				std::list<StorageContainer::SharedPtr>::iterator &it,
+				const struct timespec &minTime = m_default_time, // EPICS
+				bool paused = false, uint32_t run = 0,
+				std::string propId = std::string("UNKNOWN"),
+				std::string lastName = std::string("<LastContainer>"),
+				StorageFile::SharedPtr &lastPrologueFile = dummyFile,
+				std::vector<StorageFile::SharedPtr> &lastSavePrologueFiles
+					= dummySaveFiles );
+
+	static void endCurrentContainer(
+				std::list<StorageContainer::SharedPtr>::iterator &it,
+				const struct timespec &newStart, // EPICS Time...!
+				bool do_terminate);
+
+	static void fileCreated(StorageFile::SharedPtr &f,
+				bool capture_last = false);
+
 	static uint32_t validatePacket(const IoVector &iovec);
 
-	static void saveCreated(uint32_t dataSourceId);
+	static void saveCreated(uint32_t dataSourceId,
+				bool capture_last = false);
 
 	friend class StorageContainer;
 };
