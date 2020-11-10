@@ -719,11 +719,18 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         boost::lock_guard<boost::mutex> lock(m_mutex);
 
         m_recording = true;
+
         m_run_num = a_pkt.runNumber();
         m_run_timestamp = a_pkt.timestamp().tv_sec;
         m_run_timestamp_nanosec = a_pkt.timestamp().tv_nsec;
 
         m_pixbankmap_processed = false;
+
+        // Subtract Run Status Packet from Total Bytes...
+        // - This Packet is (Almost) the "First" One in the Run...
+        // (We Can't "Know" to Deduct the Preceding "SYNC" Packet Size
+        // (44 bytes) Here... ;-)
+        m_run_metrics.m_total_bytes_count -= a_pkt.packet_length();
 
         // Log Pre-Run Run Stats...
         stringstream ssr;
@@ -739,6 +746,12 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
 
         resetRunStats();
 
+        // Now Add Run Status Packet Size to New Total Bytes...
+        // - This Packet is (Almost) the "First" One in the Run...
+        // (We Can't "Know" to Add the Preceding "SYNC" Packet Size
+        // (44 bytes) Here... ;-)
+        m_run_metrics.m_total_bytes_count += a_pkt.packet_length();
+
         m_notify.runStatus( true, m_run_num,
             m_run_timestamp, m_run_timestamp_nanosec );
 
@@ -750,9 +763,13 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         boost::lock_guard<boost::mutex> lock(m_mutex);
 
         m_recording = false;
+
         m_run_num = 0;
         m_run_timestamp = a_pkt.timestamp().tv_sec;
         m_run_timestamp_nanosec = a_pkt.timestamp().tv_nsec;
+
+        // Note: Ok to Leave Run Status Packet Size in Run Total Bytes...
+        // - This Packet is Indeed the "Last" One in the Run...
 
         // Log Pre-Run Run Stats...
         stringstream ssr;
