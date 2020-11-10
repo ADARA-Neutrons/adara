@@ -82,6 +82,8 @@ public:
 
     bool verbose(void) { return m_verbose; }
 
+    uint64_t m_total_bytes_count;   ///< Total Input Stream Byte Count of ADARA packets
+
 private:
 
     typedef std::pair<uint32_t, uint32_t> BankIndex;

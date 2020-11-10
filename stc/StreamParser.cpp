@@ -58,6 +58,7 @@ StreamParser::StreamParser
 )
 :
     POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
+    m_total_bytes_count(0),
     m_fd(a_fd_in),
     m_processing_state(PROCESSING_NOT_STARTED),
     m_pkt_recvd(0),
@@ -492,6 +493,9 @@ StreamParser::rxPacket
             m_adara_queue.push_back( new ADARA::Packet( a_pkt ) );
         }
     }
+
+    // Accumulate Total Input Stream Byte Count (for Testing/Diagnostics)
+    m_total_bytes_count += a_pkt.packet_length();
 
     switch (a_pkt.base_type())
     {
