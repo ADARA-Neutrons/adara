@@ -1,5 +1,6 @@
 #include "StreamMonitor.h"
 #include <iostream>
+#include <sstream>
 #include <string.h>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
@@ -422,8 +423,21 @@ StreamMonitor::handleLostConnection()
     // Clear data from input ADARA buffer
     reset();
 
-    resetStreamStats();
+    // Log Pre-Disconnect Run Stats...
+    stringstream ssr;
+    m_run_metrics.print( ssr );
+    syslog( LOG_ERR, "%s: Lost SMS Connection - %s",
+        "handleLostConnection()", ssr.str().c_str() );
+
+    // Log Pre-Disconnect Stream Stats...
+    stringstream ssm;
+    m_stream_metrics.print( ssm );
+    syslog( LOG_ERR, "%s: Lost SMS Connection - %s",
+        "handleLostConnection()", ssm.str().c_str() );
+
     resetRunStats();
+
+    resetStreamStats();
 
     // Lock here as clearPVs does not provide gaurded access
     boost::lock_guard<boost::mutex> lock(m_mutex);
@@ -458,7 +472,6 @@ StreamMonitor::resetStreamStats()
     m_mon_count_info.clear();
     m_pcharge.reset();
     m_pfreq.reset();
-    //m_beam_metrics.clear();
     m_stream_rate = 0;
 }
 
@@ -488,7 +501,7 @@ StreamMonitor::metricsThread()
         ++m_metrics_ticker;
         sleep(1);
 
-        // If connected, send beam info and beam metrics
+        // If connected to the SMS, send beam info and beam metrics
         if ( m_fd_in > -1 )
         {
             m_metrics_state = TS_RUNNING;
@@ -511,9 +524,14 @@ StreamMonitor::metricsThread()
             beam_metrics.m_pulse_freq =  m_pfreq.average();
             beam_metrics.m_stream_bps = m_stream_size; // Size = rate so long as polling is at 1 second
 
+            map<uint32_t,CountInfo<uint64_t> >::iterator im;
             beam_metrics.m_monitor_count_rate.clear();
-            for ( map<uint32_t,CountInfo<uint64_t> >::iterator im = m_mon_count_info.begin(); im != m_mon_count_info.end(); ++im )
-                beam_metrics.m_monitor_count_rate[im->first] = im->second.average() * 60;
+            for ( im = m_mon_count_info.begin();
+                    im != m_mon_count_info.end(); ++im )
+            {
+                beam_metrics.m_monitor_count_rate[im->first] =
+                    im->second.average() * 60;
+            }
 
             // Update total charge
             if ( m_recording )
@@ -523,6 +541,7 @@ StreamMonitor::metricsThread()
             }
 
             stream_metrics = m_stream_metrics;
+
             m_stream_size = 0;
             m_bnk_pkt_count = 0;
             m_bnk_state_pkt_count = 0;
@@ -530,14 +549,51 @@ StreamMonitor::metricsThread()
 
             // Release lock and notify listeners
             lock.unlock();
+
+            // Pre-Increment Send/Log Counter
+            ++count;
+
+            // Log Beam Metrics Every 8 Seconds
+            if ( !(count & 0x7) )
+            {
+                stringstream ssb;
+                beam_metrics.print( ssb );
+                syslog( LOG_ERR, "%s: %s",
+                    "metricsThread()", ssb.str().c_str() );
+            }
+
+            // Send Beam Metrics Every Second
             m_notify.beamMetrics( beam_metrics );
 
+            // If Recording, Send Run Metrics Every Second
             if ( m_recording )
-                m_notify.runMetrics( run_metrics );
+            {
+                // Log Run Metrics Every 8 Seconds
+                if ( !(count & 0x7) )
+                {
+                    stringstream ssr;
+                    run_metrics.print( ssr );
+                    syslog( LOG_ERR, "%s: %s",
+                        "metricsThread()", ssr.str().c_str() );
+                }
 
-            // Send stream metrics every 4 seconds
-            if ( !(++count & 0x3 ))
-                m_notify.streamMetrics( m_stream_metrics );
+                m_notify.runMetrics( run_metrics );
+            }
+
+            // Send Stream Metrics Every 4 Seconds
+            if ( !(count & 0x3) )
+            {
+                // Log Stream Metrics Every 16 Seconds
+                if ( !(count & 0xf) )
+                {
+                    stringstream ssm;
+                    stream_metrics.print( ssm );
+                    syslog( LOG_ERR, "%s: %s",
+                        "metricsThread()", ssm.str().c_str() );
+                }
+
+                m_notify.streamMetrics( stream_metrics );
+            }
         }
     }
 
@@ -564,6 +620,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
 
     boost::unique_lock<boost::mutex> lock(m_mutex);
     m_stream_size += a_pkt.packet_length();
+    m_run_metrics.m_total_bytes_count += a_pkt.packet_length();
     lock.unlock();
 
     try
@@ -667,6 +724,19 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         m_run_timestamp_nanosec = a_pkt.timestamp().tv_nsec;
 
         m_pixbankmap_processed = false;
+
+        // Log Pre-Run Run Stats...
+        stringstream ssr;
+        m_run_metrics.print( ssr );
+        syslog( LOG_ERR, "%s: Pre-Run Stats - %s",
+            "rxPacket(RunStatusPkt)", ssr.str().c_str() );
+
+        // Log Pre-Disconnect Stream Stats...
+        stringstream ssm;
+        m_stream_metrics.print( ssm );
+        syslog( LOG_ERR, "%s: Pre-Run Stats - %s",
+            "rxPacket(RunStatusPkt)", ssm.str().c_str() );
+
         resetRunStats();
 
         m_notify.runStatus( true, m_run_num,
@@ -683,6 +753,18 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         m_run_num = 0;
         m_run_timestamp = a_pkt.timestamp().tv_sec;
         m_run_timestamp_nanosec = a_pkt.timestamp().tv_nsec;
+
+        // Log Pre-Run Run Stats...
+        stringstream ssr;
+        m_run_metrics.print( ssr );
+        syslog( LOG_ERR, "%s: Final Run Stats - %s",
+            "rxPacket(RunStatusPkt)", ssr.str().c_str() );
+
+        // Log Pre-Disconnect Stream Stats...
+        stringstream ssm;
+        m_stream_metrics.print( ssm );
+        syslog( LOG_ERR, "%s: Final Run Stats - %s",
+            "rxPacket(RunStatusPkt)", ssm.str().c_str() );
 
         resetRunStats();
 
