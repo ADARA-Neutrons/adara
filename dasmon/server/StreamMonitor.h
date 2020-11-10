@@ -464,7 +464,6 @@ private:
     bool                            m_paused;
     short                           m_info_rcv;
     BeamInfo                        m_beam_info;
-    BeamMetrics                     m_beam_metrics;
     RunInfo                         m_run_info;
     RunMetrics                      m_run_metrics;
     StreamMetrics                   m_stream_metrics;
