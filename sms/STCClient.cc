@@ -41,9 +41,9 @@ void STCClient::config(const boost::property_tree::ptree &conf)
 	}
 }
 
-STCClient::STCClient(int fd, StorageContainer::SharedPtr &run,
-		STCClientMgr &mgr) :
-	ADARA::POSIXParser(INITIAL_BUFFER_SIZE, MAX_PACKET_SIZE),
+STCClient::STCClient( int fd, StorageContainer::SharedPtr &run,
+		STCClientMgr &mgr ) :
+	ADARA::POSIXParser( INITIAL_BUFFER_SIZE, MAX_PACKET_SIZE ),
 	m_mgr(mgr), m_stc_fd(fd), m_file_fd(-1), m_cur_offset(0), m_run(run),
 	m_send_paused_data(m_mgr.m_send_paused_data),
 	m_read(NULL), m_write(NULL), m_timer(NULL),
@@ -54,19 +54,25 @@ STCClient::STCClient(int fd, StorageContainer::SharedPtr &run,
 
 	std::list<StorageFile::SharedPtr>::iterator it;
 
-	m_timer = new TimerAdapter<STCClient>(this, &STCClient::sendHeartbeat);
+	m_timer = new TimerAdapter<STCClient>( this,
+		&STCClient::sendHeartbeat );
 
 	std::stringstream ss;
-	try {
-		m_read = new ReadyAdapter(m_stc_fd, fdrRead,
-			boost::bind(&STCClient::readable, this));
-	} catch (std::exception &e) {
+	try
+	{
+		m_read = new ReadyAdapter( m_stc_fd, fdrRead,
+			boost::bind( &STCClient::readable, this ) );
+	}
+	catch ( std::exception &e )
+	{
 		ss << "Exception Creating ReadyAdapter Read"
 			<< " for Run " << m_run->runNumber() << " - " << e.what();
 		ERROR( ss.str() );
 		m_read = NULL; // just to be sure... ;-b
 		goto exception;
-	} catch (...) {
+	}
+	catch (...)
+	{
 		ss << "Unknown Exception Creating ReadyAdapter Read"
 			<< " for Run " << m_run->runNumber();
 		ERROR( ss.str() );
@@ -74,16 +80,21 @@ STCClient::STCClient(int fd, StorageContainer::SharedPtr &run,
 		goto exception;
 	}
 
-	try {
-		m_write = new ReadyAdapter(m_stc_fd, fdrWrite,
-			boost::bind(&STCClient::writable, this));
-	} catch (std::exception &e) {
+	try
+	{
+		m_write = new ReadyAdapter( m_stc_fd, fdrWrite,
+			boost::bind( &STCClient::writable, this ) );
+	}
+	catch ( std::exception &e )
+	{
 		ss << "Exception Creating ReadyAdapter Write"
 			<< " for Run " << m_run->runNumber() << " - " << e.what();
 		ERROR( ss.str() );
 		m_write = NULL; // just to be sure... ;-b
 		goto exception;
-	} catch (...) {
+	}
+	catch (...)
+	{
 		ss << "Unknown Exception Creating ReadyAdapter Write"
 			<< " for Run " << m_run->runNumber();
 		ERROR( ss.str() );
@@ -91,21 +102,39 @@ STCClient::STCClient(int fd, StorageContainer::SharedPtr &run,
 		goto exception;
 	}
 
-	run->getFiles(m_files);
+	// Capture Any Existing Run Container Files...
+	run->getFiles( m_files );
 
-	DEBUG("STCClient(): m_files.size() = " << m_files.size()
+	DEBUG("STCClient(): Starting m_files.size() = " << m_files.size()
+		<< " for Run Container " << run->name()
 		<< " for Run " << m_run->runNumber());
-	for ( it = m_files.begin() ; it != m_files.end() ; ++it ) {
+	for ( it = m_files.begin() ; it != m_files.end() ; ++it )
+	{
 		DEBUG("STCClient(): m_files[]: " << (*it)->path()
+			<< " for Run Container " << run->name()
 			<< " for Run " << m_run->runNumber());
 	}
 
-	if (run->active()) {
+	// Is This An Active Run Container That We Need to Connect
+	// for File Added Notify...?
+	if ( run->active() )
+	{
+		DEBUG("STCClient(): Connecting File Added Notify " << run->name()
+			<< " for Active Run " << m_run->runNumber());
+
 		m_contConnection = run->connect(
-			boost::bind(&STCClient::fileAdded, this, _1));
-		if (run->file()) {
-			m_fileConnection = run->file()->connect(
-				boost::bind(&STCClient::fileUpdated, this, _1));
+			boost::bind( &STCClient::fileAdded, this, _1 ) );
+
+		if ( m_files.size() > 0 && m_files.front()->active() )
+		{
+			DEBUG("STCClient(): Connecting First File Updated Notify"
+				<< " file=" << m_files.front()->path()
+				<< " size=" << m_files.front()->size()
+				<< " active=" << m_files.front()->active()
+				<< " for Run " << m_run->runNumber());
+
+			m_fileConnection = m_files.front()->connect(
+				boost::bind( &STCClient::fileUpdated, this, _1 ) );
 		}
 	}
 
@@ -115,20 +144,23 @@ exception:
 
 	// Something Bad Happened Above in Constructor,
 	// Clean Up All the Callback Hooks and Throw...!
-	if (m_read) {
+	if ( m_read )
+	{
 		delete m_read;
 		m_read = NULL;
 	}
-	if (m_write) {
+	if ( m_write )
+	{
 		delete m_write;
 		m_write = NULL;
 	}
-	if (m_timer) {
+	if ( m_timer )
+	{
 		m_timer->cancel();
 		delete m_timer;
 		m_timer = NULL;
 	}
-	throw std::runtime_error(ss.str());
+	throw std::runtime_error( ss.str() );
 }
 
 STCClient::~STCClient()
@@ -185,22 +217,69 @@ void STCClient::writable(void)
 	 */
 	m_timer->cancel();
 
-	for (it = m_files.begin(); it != m_files.end(); ) {
-
+	for ( it = m_files.begin(); it != m_files.end(); )
+	{
 		StorageFile::SharedPtr &f = *it;
 
 		// Ignore Paused Run Files, as Optionally Configured... :-D
-		if ( f->paused() && !m_cur_offset // don't trash a file midstream!
+		if ( f->paused()
+				&& !m_cur_offset // don't trash a file midstream!
 				&& !m_send_paused_data ) // tho shouldn't change during run
 		{
+			DEBUG("writable(): Skipping Paused File"
+				<< " file=" << f->path()
+				<< " size=" << f->size()
+				<< " for Run " << m_run->runNumber());
+
+			// We're Skipping This Paused Mode File Now,
+			// So Disconnect Any File Updated Notifications...
+			if ( m_fileConnection.connected() )
+			{
+				// REMOVEME or Verbose Level 1
+				DEBUG("writable(): Disconnecting Paused"
+						<< " File Updated Notify"
+					<< " file=" << f->path()
+					<< " size=" << f->size()
+					<< " for Run " << m_run->runNumber());
+
+				m_fileConnection.disconnect();
+			}
+
+			// Remove File from List...
 			it = m_files.erase(it);
+
+			// Is There is Another File on the List?
+			if ( it != m_files.end() )
+			{
+				// IF No File is Already Connected to File Updated,
+				// And If This Next File Is an Active File,
+				// Then Connect Up to File Updated Notifications... ;-D
+				if ( !(m_fileConnection.connected())
+						&& (*it)->active() )
+				{
+					// REMOVEME or Verbose Level 1
+					DEBUG("writable():"
+						<< " Connecting Next File Updated Notify"
+						<< " file=" << (*it)->path()
+						<< " size=" << (*it)->size()
+						<< " for Run " << m_run->runNumber());
+
+					m_fileConnection = (*it)->connect(
+						boost::bind( &STCClient::fileUpdated, this, _1 ) );
+				}
+			}
+
 			continue;
 		}
 
-		if (m_file_fd < 0) {
-			try {
+		if ( m_file_fd < 0 )
+		{
+			try
+			{
 				m_file_fd = f->get_fd();
-			} catch (std::runtime_error re) {
+			}
+			catch ( std::runtime_error re )
+			{
 				std::stringstream ss;
 				ss << "Unable to open file number " << f->fileNumber()
 					<< " (pause file number " << f->pauseFileNumber() << ")"
@@ -218,16 +297,19 @@ void STCClient::writable(void)
 		}
 
 		len = f->size() - m_cur_offset;
-		if (len > m_max_send_chunk)
+		if ( len > m_max_send_chunk )
 			len = m_max_send_chunk;
 
-		if (!m_cur_offset) {
-			DEBUG("writable(): sending new file=" << f->path()
-				<< " size=" << f->size());
+		if ( !m_cur_offset )
+		{
+			DEBUG("writable(): Sending New file=" << f->path()
+				<< " size=" << f->size()
+				<< " for Run " << m_run->runNumber());
 		}
 
 		// Check Client File Descriptor...
-		if (m_stc_fd < 0) {
+		if ( m_stc_fd < 0 )
+		{
 			std::stringstream ss;
 			ss << "Invalid Client File Descriptor in writable()"
 				<< " for Run " << m_run->runNumber()
@@ -240,7 +322,8 @@ void STCClient::writable(void)
 		}
 
 		// Check Data File Descriptor...
-		if (m_file_fd < 0) {
+		if ( m_file_fd < 0 )
+		{
 			std::stringstream ss;
 			ss << "Invalid Data File Descriptor in writable()"
 				<< " for Run " << m_run->runNumber()
@@ -252,20 +335,27 @@ void STCClient::writable(void)
 			return;
 		}
 
-		rc = sendfile(m_stc_fd, m_file_fd, &m_cur_offset, len);
-		if (rc < 0) {
-			if (errno == EAGAIN || errno == EINTR)
+		rc = sendfile( m_stc_fd, m_file_fd, &m_cur_offset, len );
+		if ( rc < 0 )
+		{
+			if ( errno == EAGAIN || errno == EINTR )
 				goto more;
 
 			std::stringstream ss;
 
-			if (errno == EPIPE || errno == ECONNRESET) {
+			if ( errno == EPIPE || errno == ECONNRESET )
+			{
 				ss << "Lost Connection to STC for Run "
 					<< m_run->runNumber()
-					<< " in writable()"
-					<< " (m_stc_fd=" << m_stc_fd << ")";
+					<< " in writable():"
+					<< " [m_stc_fd=" << m_stc_fd
+					<< " m_file_fd=" << m_file_fd
+					<< " m_cur_offset=" << m_cur_offset
+					<< " len=" << len << "]";
 				ERROR( ss.str() );
-			} else {
+			}
+			else
+			{
 				int e = errno;
 				ss << "Run " << m_run->runNumber()
 					<< " had fatal sendfile error in writable():"
@@ -291,34 +381,75 @@ void STCClient::writable(void)
 		 */
 
 		/* Did we catch up to the current EOF? */
-		if (m_cur_offset != f->size())
+		if ( m_cur_offset != f->size() )
 			goto more;
 
 		/* At EOF, do we expect to get more? */
-		if (f->active())
+		if ( f->active() )
 			goto idle;
 
 		/* We finished this file, and there will be no more data
 		 * coming for it; close it out and go to the next one.
 		 */
+
 		DEBUG("writable(): Done with file=" << f->path()
-			<< " wrote " << m_cur_offset << " of size=" << f->size());
-		if (m_file_fd >= 0) {
+			<< " wrote " << m_cur_offset << " of size=" << f->size()
+			<< " for Run " << m_run->runNumber());
+
+		if ( m_file_fd >= 0 )
+		{
 			f->put_fd();
 			m_file_fd = -1;
 		}
+
 		m_cur_offset = 0;
+
+		// So Disconnect Any File Updated Notifications...
+		if ( m_fileConnection.connected() )
+		{
+			// REMOVEME or Verbose Level 1
+			DEBUG("writable(): Disconnecting File Updated Notify"
+				<< " file=" << f->path()
+				<< " size=" << f->size()
+				<< " for Run " << m_run->runNumber());
+
+			m_fileConnection.disconnect();
+		}
+
+		// Remove File from List...
 		it = m_files.erase(it);
+
+		// Is There is Another File on the List?
+		if ( it != m_files.end() )
+		{
+			// IF No File is Already Connected to File Updated,
+			// And If This Next File Is an Active File,
+			// Then Connect Up to File Updated Notifications... ;-D
+			if ( !(m_fileConnection.connected())
+					&& (*it)->active() )
+			{
+				// REMOVEME or Verbose Level 1
+				DEBUG("writable(): Connecting Next File Updated Notify"
+					<< " file=" << (*it)->path()
+					<< " size=" << (*it)->size()
+					<< " for Run " << m_run->runNumber());
+
+				m_fileConnection = (*it)->connect(
+					boost::bind( &STCClient::fileUpdated, this, _1 ) );
+			}
+		}
 	}
 
-	if (!m_run->active()) {
+	if ( !m_run->active() )
+	{
 		/* We've sent everything from this file, so shutdown the
 		 * write side of our socket. This will signal an EOF to
 		 * STC, so we'll notice if we're trying to resend a
 		 * corrupted file without a proper ending RunStatus packet.
 		 */
 #if 0
-		if (shutdown(m_stc_fd, SHUT_WR)) {
+		if ( shutdown( m_stc_fd, SHUT_WR ) )
+		{
 			int e = errno;
 			WARN("shutdown() failed: " << strerror(e));
 		}
@@ -332,11 +463,12 @@ idle:
 	 * have data waiting to be sent. Go ahead and start the heartbeat
 	 * as well, as we have no guarantees when we'll see more data.
 	 */
-	if (m_write) {
+	if ( m_write )
+	{
 		delete m_write;
 		m_write = NULL;
 	}
-	m_timer->start(m_heartbeat_interval);
+	m_timer->start( m_heartbeat_interval );
 	// DEBUG("writable() idle exit");
 	return;
 
@@ -345,11 +477,15 @@ more:
 	 * there is room in the socket buffer. We also do not need to send
 	 * any heartbeat packets, as we have a full pipe.
 	 */
-	if (!m_write) {
-		try {
-			m_write = new ReadyAdapter(m_stc_fd, fdrWrite,
-				boost::bind(&STCClient::writable, this));
-		} catch (std::exception &e) {
+	if ( !m_write )
+	{
+		try
+		{
+			m_write = new ReadyAdapter( m_stc_fd, fdrWrite,
+				boost::bind( &STCClient::writable, this ) );
+		}
+		catch ( std::exception &e )
+		{
 			std::stringstream ss;
 			ss << "Exception Creating ReadyAdapter in writable()"
 				<< " for Run " << m_run->runNumber()
@@ -360,7 +496,9 @@ more:
 			m_reason = ss.str();
 			delete this;
 			return;
-		} catch (...) {
+		}
+		catch (...)
+		{
 			std::stringstream ss;
 			ss << "Exception Creating ReadyAdapter in writable()"
 				<< " for Run " << m_run->runNumber();
@@ -414,21 +552,45 @@ void STCClient::sendDataDone(void)
 	}
 }
 
-void STCClient::fileAdded(StorageFile::SharedPtr &f)
+void STCClient::fileAdded( StorageFile::SharedPtr &f )
 {
 	/* We don't need to try to start sending from this file just yet
 	 * (assuming it is the front of our list), as we'll get an update
 	 * notification very soon.
 	 */
+
 	DEBUG("fileAdded(): Add File " << f->path()
 		<< " f->active()=" << f->active()
 		<< " for Run " << m_run->runNumber());
-	m_files.push_back(f);
-	m_fileConnection = f->connect(boost::bind(&STCClient::fileUpdated,
-						  this, _1));
+
+	m_files.push_back( f );
+
+	// Note: We Can't Immediately Subscribe to fileUpdated() for This File,
+	// We Need to Wait Until We're Done with Any Previous File...
+	// (Formerly, We would _Only_ Have One Open File/Container...)
+
+	// Is This the First/Only File on the List?
+	if ( m_files.size() == 1 )
+	{
+		// IF No File is Already Connected to File Updated,
+		// And If This Is an Active File,
+		// Then Connect Up to File Updated Notifications... ;-D
+		if ( !(m_fileConnection.connected())
+				&& f->active() )
+		{
+			// REMOVEME or Verbose Level 1
+			DEBUG("fileAdded(): Connecting File Updated Notify"
+				<< " file=" << f->path()
+				<< " size=" << f->size()
+				<< " for Run " << m_run->runNumber());
+
+			m_fileConnection = f->connect(
+				boost::bind( &STCClient::fileUpdated, this, _1 ) );
+		}
+	}
 }
 
-void STCClient::fileUpdated(const StorageFile &f)
+void STCClient::fileUpdated( const StorageFile &f )
 {
 	// DEBUG("fileUpdated() entry");
 
@@ -436,14 +598,26 @@ void STCClient::fileUpdated(const StorageFile &f)
 		// << " f.active()=" << f.active()
 		// << " for Run " << m_run->runNumber());
 
-	/* The current file just got updated; if we're not already waiting
-	 * for buffer space in the socket, try to send the new data
-	 */
-	if (!m_write)
-		writable();
+	// The current file just got updated...
 
-	if (!f.active())
+	// If the File is No Longer Active, Cancel the File Updated Notifies...
+
+	if ( !f.active() )
+	{
+		// REMOVEME or Verbose Level 1
+		DEBUG("fileUpdated(): Disconnecting Inactive File Updated Notify"
+			<< " file=" << f.path()
+			<< " size=" << f.size()
+			<< " for Run " << m_run->runNumber());
+
 		m_fileConnection.disconnect();
+	}
+
+	// If we're not already waiting for buffer space in the socket,
+	// try to send the new data...
+
+	if ( !m_write )
+		writable();
 
 	// DEBUG("fileUpdated() exit");
 }
