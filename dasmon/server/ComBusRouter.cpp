@@ -1,5 +1,6 @@
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 #include "ComBusRouter.h"
 #include "ComBusMessages.h"
 #include "DASMonMessages.h"
@@ -113,12 +114,16 @@ ComBusRouter::run()
             if ( ++proc_stall == 3 )
             {
                 syslog( LOG_ERR, "StreamMonitor stream processing thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getProcState(), m_monitor.getNotifyState() );
+                usleep(30000); // give syslog a chance...
             }
         }
         else
         {
             if ( proc_stall >= 3 )
+            {
                 syslog( LOG_ERR, "StreamMonitor stream processing thread appears to have recovered." );
+                usleep(30000); // give syslog a chance...
+            }
 
             last_proc_ticker = m_monitor.getProcTicker();
             proc_stall = 0;
@@ -127,12 +132,18 @@ ComBusRouter::run()
         if ( last_metrics_ticker == m_monitor.getMetricsTicker() )
         {
             if ( ++metrics_stall == 3 )
+            {
                 syslog( LOG_ERR, "StreamMonitor metrics thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getMetricsState(), m_monitor.getNotifyState() );
+                usleep(30000); // give syslog a chance...
+            }
         }
         else
         {
             if ( metrics_stall >= 3 )
+            {
                 syslog( LOG_ERR, "StreamMonitor metrics thread appears to have recovered." );
+                usleep(30000); // give syslog a chance...
+            }
 
             last_metrics_ticker = m_monitor.getMetricsTicker();
             metrics_stall = 0;
@@ -144,12 +155,18 @@ ComBusRouter::run()
             if ( last_db_ticker == m_monitor.getDbTicker() )
             {
                 if ( ++db_stall == 3 )
+                {
                     syslog( LOG_ERR, "StreamMonitor DB thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getDbState(), m_monitor.getNotifyState() );
+                    usleep(30000); // give syslog a chance...
+                }
             }
             else
             {
                 if ( db_stall >= 3 )
+                {
                     syslog( LOG_ERR, "StreamMonitor DB thread appears to have recovered." );
+                    usleep(30000); // give syslog a chance...
+                }
 
                 last_db_ticker = m_monitor.getDbTicker();
                 db_stall = 0;
@@ -178,6 +195,8 @@ ComBusRouter::run()
             if ( ip->second.status == ADARA::ComBus::STATUS_UNRESPONSIVE && t > ( ip->second.last_updated + PROC_TIMEOUT_INACTIVE ))
             {
                 syslog( LOG_INFO, "Process %s has become INACTIVE.", ip->first.c_str() );
+                usleep(30000); // give syslog a chance...
+
                 ip->second.status = ADARA::ComBus::STATUS_INACTIVE;
                 m_analyzer.retractFact( string("PROC_") + ip->first );
 
@@ -188,6 +207,8 @@ ComBusRouter::run()
                 if (( ip->second.status == ADARA::ComBus::STATUS_OK || ip->second.status == ADARA::ComBus::STATUS_FAULT ) && t > ( ip->second.last_updated + PROC_TIMEOUT_UNRESPONSIVE ))
                 {
                     syslog( LOG_INFO, "Process %s has become UNRESPONSIVE.", ip->first.c_str() );
+                    usleep(30000); // give syslog a chance...
+
                     ip->second.status = ADARA::ComBus::STATUS_UNRESPONSIVE;
                     m_analyzer.assertFact( string("PROC_") + ip->first, (int)ip->second.status );
                 }
@@ -649,10 +670,12 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
         // On reconnect, resend all asserted signals in case some fired while disconnected
         m_resend_state = true;
         syslog( LOG_NOTICE, "ComBus connection active." );
+        usleep(30000); // give syslog a chance...
     }
     else if ( !a_connected && m_combus_connected )
     {
         syslog( LOG_ERR, "ComBus connection lost." );
+        usleep(30000); // give syslog a chance...
     }
 
     m_combus_connected = a_connected;
@@ -731,11 +754,13 @@ ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
 
         case ADARA::ComBus::MSG_DASMON_SET_RULES:
             syslog( LOG_INFO, "Received request to set rules" );
+            usleep(30000); // give syslog a chance...
             setRuleDefinitions( &a_msg );
             break;
 
         case ADARA::ComBus::MSG_DASMON_RESTORE_DEFAULT_RULES:
             syslog( LOG_INFO, "Received request to restore default rules" );
+            usleep(30000); // give syslog a chance...
             m_analyzer.restoreDefaultConfig();
             sendRuleDefinitions( a_msg.getSourceID(), a_msg.getCorrelationID() );
             break;
@@ -755,10 +780,12 @@ ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
     catch ( exception &e )
     {
         syslog( LOG_ERR, "Exception while processing command: %s", e.what() );
+        usleep(30000); // give syslog a chance...
     }
     catch ( ... )
     {
         syslog( LOG_ERR, "Unkown exception while processing command" );
+        usleep(30000); // give syslog a chance...
     }
 }
 
