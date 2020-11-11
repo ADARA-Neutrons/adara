@@ -54,7 +54,8 @@ void LiveClient::config(const boost::property_tree::ptree &conf)
 
 LiveClient::LiveClient(LiveServer *server, int fd) : 
 	ADARA::POSIXParser(MAX_PKT_SIZE, MAX_PKT_SIZE),
-	m_server(server), m_read(NULL), m_write(NULL), m_hello_received(false),
+	m_server(server), m_starting_new_file(true), m_bytes_written(0),
+	m_read(NULL), m_write(NULL), m_hello_received(false),
 	m_client_fd(fd), m_file_fd(-1), m_client_flags(0)
 {
 	char hostname[1024], service[256];
@@ -123,7 +124,8 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 		throw;
 	}
 	catch (...) {
-		ERROR("Unknown Exception in LiveClient() Creating ReadyAdapter Read"
+		ERROR("Unknown Exception in LiveClient()"
+			<< " Creating ReadyAdapter Read"
 			<< " client=" << m_clientName);
 		m_read = NULL; // just to be sure... ;-b
 		throw;
@@ -221,36 +223,95 @@ void LiveClient::writable(void)
 	FileList::iterator it;
 	ssize_t len, rc;
 
-	for (it = m_files.begin(); it != m_files.end(); ) {
-
+	for ( it = m_files.begin(); it != m_files.end(); )
+	{
 		StorageFile::SharedPtr &f = it->first;
 
 		off_t &cur_offset = it->second;
 
 		// Allow Client Override to Force Inclusion of Paused Data...
-		if ( !(m_client_flags & ADARA::ClientHelloPkt::SEND_PAUSE_DATA) ) {
-			if ( !(++cnt % freq) ) {
+		if ( !(m_client_flags & ADARA::ClientHelloPkt::SEND_PAUSE_DATA) )
+		{
+			if ( !(++cnt % freq) )
+			{
 				m_send_paused_data = m_server->getSendPausedData();
 			}
+
 			// Ignore Paused Run Files as Configured (by SMS or Client)...
-			if ( f->paused() && !cur_offset // don't trash a file midstream!
+			if ( f->paused()
+					&& !cur_offset // don't trash a file midstream!
 					&& ( !m_send_paused_data
 						|| m_client_flags
-							& ADARA::ClientHelloPkt::NO_PAUSE_DATA ) ) {
+							& ADARA::ClientHelloPkt::NO_PAUSE_DATA ) )
+			{
+				DEBUG("writable(): Skipping Paused File"
+					<< " file=" << f->path()
+					<< " size=" << f->size()
+					<< " for client " << m_clientName
+					<< " (m_client_fd=" << m_client_fd << ")");
+
+				// We're Skipping This Paused Mode File Now,
+				// So Disconnect Any File Updated Notifications...
+				if ( m_fileConnection.connected() )
+				{
+					// REMOVEME or Verbose Level 1
+					DEBUG("writable(): Disconnecting Paused"
+							<< " File Updated Notify"
+						<< " file=" << f->path()
+						<< " size=" << f->size()
+						<< " for client " << m_clientName
+						<< " (m_client_fd=" << m_client_fd << ")");
+
+					m_fileConnection.disconnect();
+				}
+
+				// Remove File from List...
 				it = m_files.erase(it);
+
+				// Is There is Another File on the List?
+				if ( it != m_files.end() )
+				{
+					// Starting a New File...
+					m_starting_new_file = true;
+					m_bytes_written = 0;
+
+					// IF No File is Already Connected to File Updated,
+					// And If This Next File Is an Active File,
+					// Then Connect Up to File Updated Notifications... ;-D
+					if ( !(m_fileConnection.connected())
+							&& it->first->active() )
+					{
+						// REMOVEME or Verbose Level 1
+						DEBUG("writable():"
+							<< " Connecting Next File Updated Notify"
+							<< " file=" << it->first->path()
+							<< " size=" << it->first->size()
+							<< " for client " << m_clientName
+							<< " (m_client_fd=" << m_client_fd << ")");
+
+						m_fileConnection = it->first->connect(
+							boost::bind( &LiveClient::fileUpdated,
+								this, _1 ) );
+					}
+				}
+
 				continue;
 			}
 		}
 
-		if (m_file_fd < 0) {
-			try {
+		if ( m_file_fd < 0 )
+		{
+			try
+			{
 				m_file_fd = f->get_fd();
-			} catch (std::runtime_error re) {
+			}
+			catch ( std::runtime_error re )
+			{
 				std::string cname;
 				StorageContainer::SharedPtr c;
 
 				c = f->owner().lock();
-				if (c)
+				if ( c )
 					cname = c->name();
 				else
 					cname = "(unknown)";
@@ -269,21 +330,26 @@ void LiveClient::writable(void)
 		}
 
 		len = f->size() - cur_offset;
-		if (len > m_max_send_chunk)
+		if ( len > m_max_send_chunk )
 			len = m_max_send_chunk;
 
-		if (!cur_offset) {
-			DEBUG("writable(): sending new file=" << f->path()
-				<< " size=" << f->size() << " to client " << m_clientName);
+		if ( m_starting_new_file )
+		{
+			DEBUG("writable(): Sending New file=" << f->path()
+				<< " cur_offset=" << cur_offset
+				<< " size=" << f->size() << " to client " << m_clientName
+				<< " (m_client_fd=" << m_client_fd << ")");
 			if ( m_clientId >= 0 ) {
 				struct timespec now;
 				clock_gettime(CLOCK_REALTIME, &now);
 				m_pvCurrentFilePath->update(f->path(), &now);
 			}
+			m_starting_new_file = false;
 		}
 
 		// Check Client File Descriptor...
-		if ( m_client_fd < 0 ) {
+		if ( m_client_fd < 0 )
+		{
 			ERROR("Invalid Client File Descriptor in writable() for "
 				<< m_clientName << " before sendfile()"
 				<< " (m_client_fd=" << m_client_fd << ")");
@@ -292,7 +358,8 @@ void LiveClient::writable(void)
 		}
 
 		// Check Data File Descriptor...
-		if ( m_file_fd < 0 ) {
+		if ( m_file_fd < 0 )
+		{
 			ERROR("Invalid Data File Descriptor in writable() for "
 				<< m_clientName << " before sendfile()"
 				<< " (m_file_fd=" << m_file_fd << ")");
@@ -301,19 +368,22 @@ void LiveClient::writable(void)
 		}
 
 		rc = sendfile(m_client_fd, m_file_fd, &cur_offset, len);
-		if (rc < 0) {
-			if (errno == EAGAIN || errno == EINTR)
+		if ( rc < 0 )
+		{
+			if ( errno == EAGAIN || errno == EINTR )
 				goto more;
 
 			/* Only complain if it's not the client going away */
 			int e = errno;
-			if (errno != EPIPE && errno != ECONNRESET) {
+			if ( errno != EPIPE && errno != ECONNRESET )
+			{
 				ERROR("client " << m_clientName
 					<< ": Fatal error during sendfile: "
 					<< "(m_client_fd=" << m_client_fd << ") - "
 					<< strerror(e));
 			}
-			else {
+			else
+			{
 				ERROR("client " << m_clientName << " connection broken: "
 					<< "(m_client_fd=" << m_client_fd << ") - "
 					<< strerror(e));
@@ -330,32 +400,79 @@ void LiveClient::writable(void)
 		 * away on read or via an error return above. We'll just
 		 * pretend we got a non-zero rc.
 		 */
+		m_bytes_written += rc;
 
 		/* Did we catch up to the current EOF? */
-		if (cur_offset != f->size())
+		if ( cur_offset != f->size() )
 			goto more;
 
 		/* At EOF, do we expect to get more? */
-		if (f->active())
+		if ( f->active() )
 			goto idle;
 
 		/* We finished this file, and there will be no more data
 		 * coming for it; close it out and go to the next one.
 		 */
+
 		DEBUG("writable(): Done with file=" << f->path()
-			<< " wrote " << cur_offset << " of size=" << f->size());
-		if (m_file_fd >= 0) {
+			<< " wrote " << m_bytes_written << " of size=" << f->size()
+			<< " for client " << m_clientName
+			<< " (m_client_fd=" << m_client_fd << ")");
+
+		if ( m_file_fd >= 0 )
+		{
 			f->put_fd();
 			m_file_fd = -1;
 		}
+
+		// So Disconnect Any File Updated Notifications...
+		if ( m_fileConnection.connected() )
+		{
+			// REMOVEME or Verbose Level 1
+			DEBUG("writable(): Disconnecting File Updated Notify"
+				<< " file=" << f->path()
+				<< " size=" << f->size()
+				<< " for client " << m_clientName
+				<< " (m_client_fd=" << m_client_fd << ")");
+
+			m_fileConnection.disconnect();
+		}
+
+		// Remove File from List...
 		it = m_files.erase(it);
+
+		// Is There is Another File on the List?
+		if ( it != m_files.end() )
+		{
+			// Starting a New File...
+			m_starting_new_file = true;
+			m_bytes_written = 0;
+
+			// IF No File is Already Connected to File Updated,
+			// And If This Next File Is an Active File,
+			// Then Connect Up to File Updated Notifications... ;-D
+			if ( !(m_fileConnection.connected())
+					&& it->first->active() )
+			{
+				// REMOVEME or Verbose Level 1
+				DEBUG("writable(): Connecting Next File Updated Notify"
+					<< " file=" << it->first->path()
+					<< " size=" << it->first->size()
+					<< " for client " << m_clientName
+					<< " (m_client_fd=" << m_client_fd << ")");
+
+				m_fileConnection = it->first->connect(
+					boost::bind( &LiveClient::fileUpdated, this, _1 ) );
+			}
+		}
 	}
 
 idle:
 	/* We don't need to know when the socket is writable unless we
 	 * have data waiting to be sent.
 	 */
-	if (m_write) {
+	if ( m_write )
+	{
 		delete m_write;
 		m_write = NULL;
 	}
@@ -366,27 +483,33 @@ more:
 	/* We have more data to write, so make sure we get notified when
 	 * there is room in the socket buffer.
 	 */
-	if (!m_write) {
-
+	if ( !m_write )
+	{
 		// Check Client File Descriptor...
-		if ( m_client_fd < 0 ) {
+		if ( m_client_fd < 0 )
+		{
 			ERROR("Invalid Client File Descriptor in writable() for "
 				<< m_clientName << " (m_client_fd=" << m_client_fd << ")");
 			delete this;
 			return;
 		}
 
-		try {
-			m_write = new ReadyAdapter(m_client_fd, fdrWrite,
-				boost::bind(&LiveClient::writable, this));
-		} catch (std::exception &e) {
+		try
+		{
+			m_write = new ReadyAdapter( m_client_fd, fdrWrite,
+				boost::bind( &LiveClient::writable, this ) );
+		}
+		catch ( std::exception &e )
+		{
 			ERROR("Exception in writable()"
 				<< " Creating ReadyAdapter Write for "
 				<< m_clientName << ": " << e.what());
 			m_write = NULL; // just to be sure... ;-b
 			delete this;
 			return;
-		} catch (...) {
+		}
+		catch (...)
+		{
 			ERROR("Unknown Exception in writable()"
 				<< " Creating ReadyAdapter Write for "
 				<< m_clientName);
@@ -398,49 +521,319 @@ more:
 	// DEBUG("writable() more exit");
 }
 
-void LiveClient::containerChange(StorageContainer::SharedPtr &c, bool starting)
+void LiveClient::containerChange( StorageContainer::SharedPtr &c,
+		bool starting )
 {
-	if (starting)
-		m_contConnection = c->connect(
-				boost::bind(&LiveClient::fileAdded, this, _1));
+	// New Container Starting Up...
+	if ( starting )
+	{
+		// Connect to Container File Added Notify...
+		if ( !(m_contConnection.connected()) )
+		{
+			// REMOVEME or Verbose Level 1
+			DEBUG("containerChange():"
+				<< " Connecting New Container File Added Notify "
+					<< c->name()
+				<< " starting=" << starting
+				<< " for " << m_clientName
+				<< " (m_client_fd=" << m_client_fd << ")");
+
+			m_contConnection = c->connect(
+				boost::bind( &LiveClient::fileAdded, this, _1 ) );
+		}
+
+		// _Always_ Track Each Container on List...
+		m_conts.push_back( std::make_pair( c, starting ) );
+	}
+
+	// Existing Container Closing Down...
 	else
-		m_contConnection.disconnect();
+	{
+		// Find Container on List, Set "Starting" Flag to False...
+		// - If Container is at Front of List, Then Actually Disconnect(),
+		// Remove That ContEntry From List, And Then Connect the Next Cont
+
+		ContList::iterator it;
+
+		for ( it = m_conts.begin(); it != m_conts.end(); ++it )
+		{
+			StorageContainer::SharedPtr &list_c = it->first;
+			bool &list_starting = it->second;
+
+			// Is This the Closing Container...?
+			if ( !(list_c->name().compare( c->name() )) )
+			{
+				// Mark Container as Closed...
+				if ( list_starting )
+				{
+					DEBUG("containerChange():"
+						<< " Marking Container Closed " << list_c->name()
+						<< " list_starting=" << list_starting
+						<< " for " << m_clientName
+						<< " (m_client_fd=" << m_client_fd << ")");
+
+					list_starting = starting;
+				}
+				else
+				{
+					ERROR("containerChange():"
+						<< " Container Already Marked Closed? "
+							<< list_c->name()
+						<< " list_starting=" << list_starting
+						<< " for " << m_clientName
+						<< " (m_client_fd=" << m_client_fd << ")");
+				}
+
+				// Check if This is the Current/Connected Container,
+				// If So Then Actually Close It, and Remove It From List...
+				if ( it == m_conts.begin() )
+				{
+					if ( m_contConnection.connected() )
+					{
+						// REMOVEME or Verbose Level 1
+						DEBUG("containerChange():"
+							<< " Disconnecting Current Container "
+								<< list_c->name()
+							<< " list_starting=" << list_starting
+							<< " for " << m_clientName
+							<< " (m_client_fd=" << m_client_fd << ")");
+
+						m_contConnection.disconnect();
+					}
+					else
+					{
+						ERROR("containerChange():"
+							<< " Current Container Already Disconnected? "
+								<< list_c->name()
+							<< " list_starting=" << list_starting
+							<< " for " << m_clientName
+							<< " (m_client_fd=" << m_client_fd << ")");
+					}
+
+					// Remove Container from List...
+					// (Iterator Left Pointing to _Next_ Container in List)
+					it = m_conts.erase( it );
+
+					// Is There Another Container on the List...?
+					if ( it != m_conts.end() )
+					{
+						// Get Next Container on List...
+						StorageContainer::SharedPtr &next_c = it->first;
+						bool &next_starting = it->second;
+
+						DEBUG("containerChange():"
+							<< " Choosing Next Container "
+								<< next_c->name()
+							<< " next_starting=" << next_starting
+							<< " for " << m_clientName
+							<< " (m_client_fd=" << m_client_fd << ")");
+
+						// Capture Any Existing Container Files...
+						std::list<StorageFile::SharedPtr> file_list;
+						next_c->getFiles( file_list );
+
+						// Append Next Container File List
+						// to LiveClient List...
+						std::list<StorageFile::SharedPtr>::iterator fit;
+						for ( fit = file_list.begin();
+								fit != file_list.end(); ++fit )
+						{
+							DEBUG("containerChange():"
+								<< " Adding File for Next Container "
+									<< next_c->name()
+								<< " next_starting=" << next_starting
+								<< " file=" << (*fit)->path()
+								<< " size=" << (*fit)->size()
+								<< " active=" << (*fit)->active()
+								<< " for " << m_clientName
+								<< " (m_client_fd=" << m_client_fd << ")");
+
+							m_files.push_back(
+								std::make_pair( *fit, 0 ) );
+
+							// Is This the First/Only File on the List?
+							if ( m_files.size() == 1 )
+							{
+								// Starting a New File...
+								m_starting_new_file = true;
+								m_bytes_written = 0;
+
+								// IF No File is Already Connected to
+								//    File Updated,
+								// And If This Is an Active File,
+								// Then Connect Up to
+								//    File Updated Notifications... ;-D
+								if ( !(m_fileConnection.connected())
+										&& (*fit)->active() )
+								{
+									// REMOVEME or Verbose Level 1
+									DEBUG("containerChange():"
+										<< " Connecting Next Container"
+											<< " File Updated Notify "
+											<< next_c->name()
+										<< " next_starting="
+											<< next_starting
+										<< " file=" << (*fit)->path()
+										<< " size=" << (*fit)->size()
+										<< " active=" << (*fit)->active()
+										<< " for " << m_clientName
+										<< " (m_client_fd="
+											<< m_client_fd << ")");
+
+									m_fileConnection = (*fit)->connect(
+										boost::bind(
+											&LiveClient::fileUpdated,
+						  						this, _1 ) );
+								}
+							}
+						}
+
+						// Connect _Next_ Container File Added Notify...
+						if ( next_starting )
+						{
+							// REMOVEME or Verbose Level 1
+							DEBUG("containerChange():"
+								<< " Connecting Next Container"
+									<< " File Added Notify "
+									<< next_c->name()
+								<< " next_starting=" << next_starting
+								<< " for " << m_clientName
+								<< " (m_client_fd=" << m_client_fd << ")");
+
+							m_contConnection = next_c->connect(
+								boost::bind( &LiveClient::fileAdded,
+									this, _1 ) );
+						}
+
+						// If we're not already waiting for buffer space
+						// in the socket, try to send the new data...
+						if ( !m_write )
+							writable();
+					}
+					else
+					{
+						DEBUG("containerChange():"
+							<< " No More Containers on List"
+							<< " for " << m_clientName
+							<< " (m_client_fd=" << m_client_fd << ")");
+					}
+				}
+
+				break;
+			}
+		}
+	}
 }
 
-void LiveClient::historicalFile(StorageFile::SharedPtr &f, off_t start)
+void LiveClient::historicalFile( StorageFile::SharedPtr &f, off_t start )
 {
 	/* This is an old file, so just put it on the list to be sent.
 	 */
 	DEBUG("historicalFile(): Add File " << f->path()
-		<< " f->active()=" << f->active());
-	m_files.push_back(std::make_pair(f, start));
+		<< " start=" << start
+		<< " f->active()=" << f->active()
+		<< " for client " << m_clientName
+		<< " (m_client_fd=" << m_client_fd << ")");
+	m_files.push_back( std::make_pair( f, start ) );
+
+	// Note: We Can't Immediately Subscribe to fileUpdated() for This File,
+	// We Need to Wait Until We're Done with Any Previous File...
+	// (Formerly, We would _Only_ Have One Open File/Container...)
+
+	// Is This the First/Only File on the List?
+	if ( m_files.size() == 1 )
+	{
+		// Starting a New File...
+		m_starting_new_file = true;
+		m_bytes_written = 0;
+
+		// IF No File is Already Connected to File Updated,
+		// And If This Is an Active File,
+		// Then Connect Up to File Updated Notifications... ;-D
+		if ( !(m_fileConnection.connected())
+				&& f->active() )
+		{
+			// REMOVEME or Verbose Level 1
+			DEBUG("historicalFile(): Connecting File Updated Notify"
+				<< " file=" << f->path()
+				<< " size=" << f->size()
+				<< " for client " << m_clientName
+				<< " (m_client_fd=" << m_client_fd << ")");
+
+			m_fileConnection = f->connect(
+				boost::bind( &LiveClient::fileUpdated, this, _1 ) );
+		}
+	}
 }
 
-void LiveClient::fileAdded(StorageFile::SharedPtr &f)
+void LiveClient::fileAdded( StorageFile::SharedPtr &f )
 {
 	/* We don't need to try to start sending from this file just yet
 	 * (assuming it is the front of our list), as we'll get an update
 	 * notification very soon.
 	 */
 	DEBUG("fileAdded(): Add File " << f->path()
-		<< " f->active()=" << f->active());
-	m_files.push_back(std::make_pair(f, 0));
-	m_fileConnection = f->connect(boost::bind(&LiveClient::fileUpdated,
-						  this, _1));
+		<< " start=0"
+		<< " f->active()=" << f->active()
+		<< " for client " << m_clientName
+		<< " (m_client_fd=" << m_client_fd << ")");
+	m_files.push_back( std::make_pair( f, 0 ) );
+
+	// Note: We Can't Immediately Subscribe to fileUpdated() for This File,
+	// We Need to Wait Until We're Done with Any Previous File...
+	// (Formerly, We would _Only_ Have One Open File/Container...)
+
+	// Is This the First/Only File on the List?
+	if ( m_files.size() == 1 )
+	{
+		// Starting a New File...
+		m_starting_new_file = true;
+		m_bytes_written = 0;
+
+		// IF No File is Already Connected to File Updated,
+		// And If This Is an Active File,
+		// Then Connect Up to File Updated Notifications... ;-D
+		if ( !(m_fileConnection.connected())
+				&& f->active() )
+		{
+			// REMOVEME or Verbose Level 1
+			DEBUG("fileAdded(): Connecting File Updated Notify"
+				<< " file=" << f->path()
+				<< " size=" << f->size()
+				<< " for client " << m_clientName
+				<< " (m_client_fd=" << m_client_fd << ")");
+
+			m_fileConnection = f->connect(
+				boost::bind( &LiveClient::fileUpdated, this, _1 ) );
+		}
+	}
 }
 
-void LiveClient::fileUpdated(const StorageFile &f)
+void LiveClient::fileUpdated( const StorageFile &f )
 {
 	// DEBUG("fileUpdated() entry");
 
-	/* The current file just got updated; if we're not already waiting
-	 * for buffer space in the socket, try to send the new data
-	 */
-	if (!m_write)
-		writable();
+	// The current file just got updated...
 
-	if (!f.active())
+	// If the File is No Longer Active, Cancel the File Updated Notifies...
+
+	if ( !f.active() )
+	{
+		// REMOVEME or Verbose Level 1
+		DEBUG("fileUpdated(): Disconnecting Inactive File Updated Notify"
+			<< " file=" << f.path()
+			<< " size=" << f.size()
+			<< " for client " << m_clientName
+			<< " (m_client_fd=" << m_client_fd << ")");
+
 		m_fileConnection.disconnect();
+	}
+
+	// If we're not already waiting for buffer space in the socket,
+	// try to send the new data...
+
+	if ( !m_write )
+		writable();
 
 	// DEBUG("fileUpdated() exit");
 }
@@ -521,27 +914,29 @@ bool LiveClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 	 * this stream and close the connection.
 	 */
 	if (hdr) {
-		ERROR("LiveClient " << m_clientName << " sent us an Oversize Packet"
-			<< " at " << hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET
+		ERROR("LiveClient "
+			<< m_clientName << " sent us an Oversize Packet at "
+			<< hdr->timestamp().tv_sec - ADARA::EPICS_EPOCH_OFFSET
 			<< "." << std::setfill('0') << std::setw(9)
 			<< hdr->timestamp().tv_nsec << std::setw(0)
 			<< " of type 0x" << std::hex << hdr->type() << std::dec
 			<< " payload_length=" << hdr->payload_length()
 			<< " max=" << MAX_PKT_SIZE);
 	} else {
-		ERROR("LiveClient " << m_clientName << " sent us an Oversize Packet"
+		ERROR("LiveClient "
+			<< m_clientName << " sent us an Oversize Packet"
 			<< " chunk_len=" << chunk_len
 			<< " max=" << MAX_PKT_SIZE);
 	}
 	return true;
 }
 
-bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
+bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 {
 	StorageContainer::SharedPtr cur_cont;
-	StorageFile::SharedPtr cur_file;
 
 	m_timer->cancel();
+
 	m_hello_received = true;
 
 	m_client_flags = pkt.clientFlags();  // Available in Version 1, else 0.
@@ -565,40 +960,60 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 	if ( m_clientId >= 0 ) {
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
-		m_pvRequestedStartTime->update(pkt.requestedStartTime(), &now);
+		m_pvRequestedStartTime->update( pkt.requestedStartTime(), &now );
 		m_pvStatus->connected();
 	}
 
 	m_mgrConnection = StorageManager::onContainerChange(
-		boost::bind(&LiveClient::containerChange, this, _1, _2));
+		boost::bind( &LiveClient::containerChange, this, _1, _2 ) );
 
-	/* Request the system state at the given timestamp, or just prior.
-	 */
-	StorageManager::iterateHistory(pkt.requestedStartTime(),
-				boost::bind(&LiveClient::historicalFile,
-						this, _1, _2));
+	// Request the system state at the given timestamp, or just prior.
+	StorageManager::iterateHistory( pkt.requestedStartTime(),
+				boost::bind( &LiveClient::historicalFile,
+						this, _1, _2 ) );
 
-	/* Register for updates and notification of new files if we
-	 * have anything active.
-	 */
+	// Register for updates and notification of new files if we
+	// have anything active.
+
 	cur_cont = StorageManager::container();
-	if (cur_cont) {
-		m_contConnection = cur_cont->connect(
-				boost::bind(&LiveClient::fileAdded, this, _1));
-		cur_file = cur_cont->file();
-		if (cur_file) {
-			/* StorageManager::iterateHistory() will have already
-			 * added this file to our list with the appropriate
-			 * offset, so just register for new updates.
-			 */
-			m_fileConnection = cur_file->connect(
-					boost::bind(&LiveClient::fileUpdated,
-						    this, _1));
+
+	if ( cur_cont )
+	{
+		// Connect to Container File Added Notify...
+		if ( !(m_contConnection.connected()) )
+		{
+			// REMOVEME or Verbose Level 1
+			DEBUG("rxPacket(ClientHelloPkt):"
+				<< " Connecting New Container File Added Notify "
+					<< cur_cont->name()
+				<< " starting=true"
+				<< " for " << m_clientName
+				<< " (m_client_fd=" << m_client_fd << ")");
+			m_contConnection = cur_cont->connect(
+					boost::bind( &LiveClient::fileAdded, this, _1 ) );
 		}
+		else
+		{
+			ERROR("rxPacket(ClientHelloPkt):"
+				<< " Hmmm... Another Container Already Connected"
+					<< " for File Added Notify? "
+					<< cur_cont->name()
+				<< " starting=true"
+				<< " for " << m_clientName
+				<< " (m_client_fd=" << m_client_fd << ")");
+		}
+
+		// _Always_ Track Each Container on List...
+		m_conts.push_back(
+			std::make_pair( cur_cont, true /* starting */ ) );
+
+		// Note: No Need to Redundantly Connect the Current/Front File
+		// to the File Updated Notifications, This has Already Been Done
+		// in Either LiveClient::historicalFile() or when the
+		// Next Active File is Added via the File Added Notification.
 	}
 
-	/* And try to send the data we've queued up.
-	 */
+	// And try to send the data we've queued up.
 
 	// Note: If Anything Goes Wrong Here, Just Let it Go...
 	// The LiveClient connection will Time Out and Clean Itself Up. ;-D
@@ -611,10 +1026,13 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 		return false;
 	}
 
-	try {
-		m_write = new ReadyAdapter(m_client_fd, fdrWrite,
-			boost::bind(&LiveClient::writable, this));
-	} catch (std::exception &e) {
+	try
+	{
+		m_write = new ReadyAdapter( m_client_fd, fdrWrite,
+			boost::bind( &LiveClient::writable, this ) );
+	}
+	catch ( std::exception &e )
+	{
 		ERROR("Exception in rxPacket(ClientHelloPkt)"
 			<< " Creating ReadyAdapter Write for "
 			<< m_clientName << ": " << e.what());
@@ -626,7 +1044,9 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 			m_client_fd = -1;
 		}
 		return false;
-	} catch (...) {
+	}
+	catch (...)
+	{
 		ERROR("Unknown Exception in rxPacket(ClientHelloPkt)"
 			<< " Creating ReadyAdapter Write for "
 			<< m_clientName);
@@ -642,3 +1062,4 @@ bool LiveClient::rxPacket(const ADARA::ClientHelloPkt &pkt)
 
 	return false;
 }
+
