@@ -555,6 +555,8 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 
 		ContList::iterator it;
 
+		bool found = false;
+
 		for ( it = m_conts.begin(); it != m_conts.end(); ++it )
 		{
 			StorageContainer::SharedPtr &list_c = it->first;
@@ -563,6 +565,9 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 			// Is This the Closing Container...?
 			if ( !(list_c->name().compare( c->name() )) )
 			{
+				// Found It
+				found = true;
+
 				// Mark Container as Closed...
 				if ( list_starting )
 				{
@@ -713,7 +718,8 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 					else
 					{
 						DEBUG("containerChange():"
-							<< " No More Containers on List"
+							<< " No More Containers on List After "
+								<< c->name()
 							<< " for " << m_clientName
 							<< " (m_client_fd=" << m_client_fd << ")");
 					}
@@ -721,6 +727,15 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 
 				break;
 			}
+		}
+
+		// Log If Container Not Found...!
+		if ( !found )
+		{
+			ERROR("containerChange():"
+				<< " Inactive Container Not Found on List! " << c->name()
+				<< " for " << m_clientName
+				<< " (m_client_fd=" << m_client_fd << ")");
 		}
 	}
 }
