@@ -607,6 +607,7 @@ StreamParser::rxPacket
             bad_state = true;
         }
     }
+
     else if ( a_pkt.status() == ADARA::RunStatus::END_RUN )
     {
         if ( m_processing_state == PROCESSING_EVENTS )
@@ -639,14 +640,34 @@ StreamParser::rxPacket
             bad_state = true;
         }
     }
+
     else if ( a_pkt.status() == ADARA::RunStatus::RUN_BOF )
     {
-        syslog( LOG_INFO,
-            "[%i] Run Status, Run File #%d, %s = %s.",
-            g_pid, a_pkt.fileNumber(),
-            "Processing State", getProcessingStateString().c_str() );
-        usleep(30000); // give syslog a chance...
+        // Decode Any Mode Index from the File Index (SMS After 1.7.0)
+        uint32_t fileNum = a_pkt.fileNumber();
+        uint32_t modeNum = 0;
+
+        // Embedded Mode Number...?
+        if ( fileNum > 0xfff )
+        {
+            modeNum = ( fileNum >> 12 ) & 0xfff;
+            fileNum &= 0xfff;
+
+            syslog( LOG_INFO,
+                "[%i] %s, Mode Index #%d, File Index #%d, %s = %s.",
+                g_pid, "Run Status", modeNum, fileNum,
+                "Processing State", getProcessingStateString().c_str() );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_INFO, "[%i] %s, File Index #%d, %s = %s.",
+                g_pid, "Run Status", fileNum,
+                "Processing State", getProcessingStateString().c_str() );
+            usleep(30000); // give syslog a chance...
+        }
     }
+
     // We don't really need to log the _End_ of the file...
     // Just log the Start of the _Next_ file... ;-D
     // ( a_pkt.status() == ADARA::RunStatus::RUN_EOF )
