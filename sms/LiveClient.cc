@@ -216,6 +216,8 @@ void LiveClient::writable(void)
 
 	static uint32_t cnt = 0;
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// [LESS FREQUENTLY] Update Send Paused Data PV,
 	// Once Every 100 Calls...
 	uint32_t freq = 100;
@@ -254,13 +256,15 @@ void LiveClient::writable(void)
 				// So Disconnect Any File Updated Notifications...
 				if ( m_fileConnection.connected() )
 				{
-					// REMOVEME or Verbose Level 1
-					DEBUG("writable(): Disconnecting Paused"
-							<< " File Updated Notify"
-						<< " file=" << f->path()
-						<< " size=" << f->size()
-						<< " for client " << m_clientName
-						<< " (m_client_fd=" << m_client_fd << ")");
+					if ( ctrl->verbose() )
+					{
+						DEBUG("writable(): Disconnecting Paused"
+								<< " File Updated Notify"
+							<< " file=" << f->path()
+							<< " size=" << f->size()
+							<< " for client " << m_clientName
+							<< " (m_client_fd=" << m_client_fd << ")");
+					}
 
 					m_fileConnection.disconnect();
 				}
@@ -281,13 +285,15 @@ void LiveClient::writable(void)
 					if ( !(m_fileConnection.connected())
 							&& it->first->active() )
 					{
-						// REMOVEME or Verbose Level 1
-						DEBUG("writable():"
-							<< " Connecting Next File Updated Notify"
-							<< " file=" << it->first->path()
-							<< " size=" << it->first->size()
-							<< " for client " << m_clientName
-							<< " (m_client_fd=" << m_client_fd << ")");
+						if ( ctrl->verbose() )
+						{
+							DEBUG("writable():"
+								<< " Connecting Next File Updated Notify"
+								<< " file=" << it->first->path()
+								<< " size=" << it->first->size()
+								<< " for client " << m_clientName
+								<< " (m_client_fd=" << m_client_fd << ")");
+						}
 
 						m_fileConnection = it->first->connect(
 							boost::bind( &LiveClient::fileUpdated,
@@ -428,12 +434,14 @@ void LiveClient::writable(void)
 		// So Disconnect Any File Updated Notifications...
 		if ( m_fileConnection.connected() )
 		{
-			// REMOVEME or Verbose Level 1
-			DEBUG("writable(): Disconnecting File Updated Notify"
-				<< " file=" << f->path()
-				<< " size=" << f->size()
-				<< " for client " << m_clientName
-				<< " (m_client_fd=" << m_client_fd << ")");
+			if ( ctrl->verbose() )
+			{
+				DEBUG("writable(): Disconnecting File Updated Notify"
+					<< " file=" << f->path()
+					<< " size=" << f->size()
+					<< " for client " << m_clientName
+					<< " (m_client_fd=" << m_client_fd << ")");
+			}
 
 			m_fileConnection.disconnect();
 		}
@@ -454,12 +462,14 @@ void LiveClient::writable(void)
 			if ( !(m_fileConnection.connected())
 					&& it->first->active() )
 			{
-				// REMOVEME or Verbose Level 1
-				DEBUG("writable(): Connecting Next File Updated Notify"
-					<< " file=" << it->first->path()
-					<< " size=" << it->first->size()
-					<< " for client " << m_clientName
-					<< " (m_client_fd=" << m_client_fd << ")");
+				if ( ctrl->verbose() )
+				{
+					DEBUG("writable(): Connecting Next File Updated Notify"
+						<< " file=" << it->first->path()
+						<< " size=" << it->first->size()
+						<< " for client " << m_clientName
+						<< " (m_client_fd=" << m_client_fd << ")");
+				}
 
 				m_fileConnection = it->first->connect(
 					boost::bind( &LiveClient::fileUpdated, this, _1 ) );
@@ -524,19 +534,23 @@ more:
 void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 		bool starting )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// New Container Starting Up...
 	if ( starting )
 	{
 		// Connect to Container File Added Notify...
 		if ( !(m_contConnection.connected()) )
 		{
-			// REMOVEME or Verbose Level 1
-			DEBUG("containerChange():"
-				<< " Connecting New Container File Added Notify "
-					<< c->name()
-				<< " starting=" << starting
-				<< " for " << m_clientName
-				<< " (m_client_fd=" << m_client_fd << ")");
+			if ( ctrl->verbose() )
+			{
+				DEBUG("containerChange():"
+					<< " Connecting New Container File Added Notify "
+						<< c->name()
+					<< " starting=" << starting
+					<< " for " << m_clientName
+					<< " (m_client_fd=" << m_client_fd << ")");
+			}
 
 			m_contConnection = c->connect(
 				boost::bind( &LiveClient::fileAdded, this, _1 ) );
@@ -595,13 +609,15 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 				{
 					if ( m_contConnection.connected() )
 					{
-						// REMOVEME or Verbose Level 1
-						DEBUG("containerChange():"
-							<< " Disconnecting Current Container "
-								<< list_c->name()
-							<< " list_starting=" << list_starting
-							<< " for " << m_clientName
-							<< " (m_client_fd=" << m_client_fd << ")");
+						if ( ctrl->verbose() )
+						{
+							DEBUG("containerChange():"
+								<< " Disconnecting Current Container "
+									<< list_c->name()
+								<< " list_starting=" << list_starting
+								<< " for " << m_clientName
+								<< " (m_client_fd=" << m_client_fd << ")");
+						}
 
 						m_contConnection.disconnect();
 					}
@@ -671,19 +687,22 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 								if ( !(m_fileConnection.connected())
 										&& (*fit)->active() )
 								{
-									// REMOVEME or Verbose Level 1
-									DEBUG("containerChange():"
-										<< " Connecting Next Container"
-											<< " File Updated Notify "
-											<< next_c->name()
-										<< " next_starting="
-											<< next_starting
-										<< " file=" << (*fit)->path()
-										<< " size=" << (*fit)->size()
-										<< " active=" << (*fit)->active()
-										<< " for " << m_clientName
-										<< " (m_client_fd="
-											<< m_client_fd << ")");
+									if ( ctrl->verbose() )
+									{
+										DEBUG("containerChange():"
+											<< " Connecting Next Container"
+												<< " File Updated Notify "
+												<< next_c->name()
+											<< " next_starting="
+												<< next_starting
+											<< " file=" << (*fit)->path()
+											<< " size=" << (*fit)->size()
+											<< " active="
+												<< (*fit)->active()
+											<< " for " << m_clientName
+											<< " (m_client_fd="
+												<< m_client_fd << ")");
+									}
 
 									m_fileConnection = (*fit)->connect(
 										boost::bind(
@@ -696,14 +715,17 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 						// Connect _Next_ Container File Added Notify...
 						if ( next_starting )
 						{
-							// REMOVEME or Verbose Level 1
-							DEBUG("containerChange():"
-								<< " Connecting Next Container"
-									<< " File Added Notify "
-									<< next_c->name()
-								<< " next_starting=" << next_starting
-								<< " for " << m_clientName
-								<< " (m_client_fd=" << m_client_fd << ")");
+							if ( ctrl->verbose() )
+							{
+								DEBUG("containerChange():"
+									<< " Connecting Next Container"
+										<< " File Added Notify "
+										<< next_c->name()
+									<< " next_starting=" << next_starting
+									<< " for " << m_clientName
+									<< " (m_client_fd="
+										<< m_client_fd << ")");
+							}
 
 							m_contConnection = next_c->connect(
 								boost::bind( &LiveClient::fileAdded,
@@ -742,6 +764,8 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 
 void LiveClient::historicalFile( StorageFile::SharedPtr &f, off_t start )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	/* This is an old file, so just put it on the list to be sent.
 	 */
 	DEBUG("historicalFile(): Add File " << f->path()
@@ -768,12 +792,14 @@ void LiveClient::historicalFile( StorageFile::SharedPtr &f, off_t start )
 		if ( !(m_fileConnection.connected())
 				&& f->active() )
 		{
-			// REMOVEME or Verbose Level 1
-			DEBUG("historicalFile(): Connecting File Updated Notify"
-				<< " file=" << f->path()
-				<< " size=" << f->size()
-				<< " for client " << m_clientName
-				<< " (m_client_fd=" << m_client_fd << ")");
+			if ( ctrl->verbose() )
+			{
+				DEBUG("historicalFile(): Connecting File Updated Notify"
+					<< " file=" << f->path()
+					<< " size=" << f->size()
+					<< " for client " << m_clientName
+					<< " (m_client_fd=" << m_client_fd << ")");
+			}
 
 			m_fileConnection = f->connect(
 				boost::bind( &LiveClient::fileUpdated, this, _1 ) );
@@ -783,6 +809,8 @@ void LiveClient::historicalFile( StorageFile::SharedPtr &f, off_t start )
 
 void LiveClient::fileAdded( StorageFile::SharedPtr &f )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	/* We don't need to try to start sending from this file just yet
 	 * (assuming it is the front of our list), as we'll get an update
 	 * notification very soon.
@@ -811,12 +839,14 @@ void LiveClient::fileAdded( StorageFile::SharedPtr &f )
 		if ( !(m_fileConnection.connected())
 				&& f->active() )
 		{
-			// REMOVEME or Verbose Level 1
-			DEBUG("fileAdded(): Connecting File Updated Notify"
-				<< " file=" << f->path()
-				<< " size=" << f->size()
-				<< " for client " << m_clientName
-				<< " (m_client_fd=" << m_client_fd << ")");
+			if ( ctrl->verbose() )
+			{
+				DEBUG("fileAdded(): Connecting File Updated Notify"
+					<< " file=" << f->path()
+					<< " size=" << f->size()
+					<< " for client " << m_clientName
+					<< " (m_client_fd=" << m_client_fd << ")");
+			}
 
 			m_fileConnection = f->connect(
 				boost::bind( &LiveClient::fileUpdated, this, _1 ) );
@@ -828,18 +858,23 @@ void LiveClient::fileUpdated( const StorageFile &f )
 {
 	// DEBUG("fileUpdated() entry");
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// The current file just got updated...
 
 	// If the File is No Longer Active, Cancel the File Updated Notifies...
 
 	if ( !f.active() )
 	{
-		// REMOVEME or Verbose Level 1
-		DEBUG("fileUpdated(): Disconnecting Inactive File Updated Notify"
-			<< " file=" << f.path()
-			<< " size=" << f.size()
-			<< " for client " << m_clientName
-			<< " (m_client_fd=" << m_client_fd << ")");
+		if ( ctrl->verbose() )
+		{
+			DEBUG("fileUpdated():"
+				<< " Disconnecting Inactive File Updated Notify"
+				<< " file=" << f.path()
+				<< " size=" << f.size()
+				<< " for client " << m_clientName
+				<< " (m_client_fd=" << m_client_fd << ")");
+		}
 
 		m_fileConnection.disconnect();
 	}
@@ -948,6 +983,8 @@ bool LiveClient::rxOversizePkt(const ADARA::PacketHeader *hdr,
 
 bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	StorageContainer::SharedPtr cur_cont;
 
 	m_timer->cancel();
@@ -997,13 +1034,16 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 		// Connect to Container File Added Notify...
 		if ( !(m_contConnection.connected()) )
 		{
-			// REMOVEME or Verbose Level 1
-			DEBUG("rxPacket(ClientHelloPkt):"
-				<< " Connecting New Container File Added Notify "
-					<< cur_cont->name()
-				<< " starting=true"
-				<< " for " << m_clientName
-				<< " (m_client_fd=" << m_client_fd << ")");
+			if ( ctrl->verbose() )
+			{
+				DEBUG("rxPacket(ClientHelloPkt):"
+					<< " Connecting New Container File Added Notify "
+						<< cur_cont->name()
+					<< " starting=true"
+					<< " for " << m_clientName
+					<< " (m_client_fd=" << m_client_fd << ")");
+			}
+
 			m_contConnection = cur_cont->connect(
 					boost::bind( &LiveClient::fileAdded, this, _1 ) );
 		}

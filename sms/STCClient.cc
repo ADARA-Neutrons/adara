@@ -18,6 +18,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.STCClient"));
 #include "STCClient.h"
 #include "STCClientMgr.h"
 #include "ReadyAdapter.h"
+#include "SMSControl.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
 #include "utils.h"
@@ -53,6 +54,8 @@ STCClient::STCClient( int fd, StorageContainer::SharedPtr &run,
 		<< " SendPausedData=" << m_send_paused_data);
 
 	std::list<StorageFile::SharedPtr>::iterator it;
+
+	SMSControl *ctrl = SMSControl::getInstance();
 
 	m_timer = new TimerAdapter<STCClient>( this,
 		&STCClient::sendHeartbeat );
@@ -111,7 +114,6 @@ STCClient::STCClient( int fd, StorageContainer::SharedPtr &run,
 	for ( it = m_files.begin() ; it != m_files.end() ; ++it )
 	{
 		DEBUG("STCClient(): m_files[]: " << (*it)->path()
-			<< " for Run Container " << run->name()
 			<< " for Run " << m_run->runNumber());
 	}
 
@@ -119,19 +121,26 @@ STCClient::STCClient( int fd, StorageContainer::SharedPtr &run,
 	// for File Added Notify...?
 	if ( run->active() )
 	{
-		DEBUG("STCClient(): Connecting File Added Notify " << run->name()
-			<< " for Active Run " << m_run->runNumber());
+		if ( ctrl->verbose() )
+		{
+			DEBUG("STCClient():"
+				<< " Connecting File Added Notify " << run->name()
+				<< " for Active Run " << m_run->runNumber());
+		}
 
 		m_contConnection = run->connect(
 			boost::bind( &STCClient::fileAdded, this, _1 ) );
 
 		if ( m_files.size() > 0 && m_files.front()->active() )
 		{
-			DEBUG("STCClient(): Connecting First File Updated Notify"
-				<< " file=" << m_files.front()->path()
-				<< " size=" << m_files.front()->size()
-				<< " active=" << m_files.front()->active()
-				<< " for Run " << m_run->runNumber());
+			if ( ctrl->verbose() )
+			{
+				DEBUG("STCClient(): Connecting First File Updated Notify"
+					<< " file=" << m_files.front()->path()
+					<< " size=" << m_files.front()->size()
+					<< " active=" << m_files.front()->active()
+					<< " for Run " << m_run->runNumber());
+			}
 
 			m_fileConnection = m_files.front()->connect(
 				boost::bind( &STCClient::fileUpdated, this, _1 ) );
@@ -209,6 +218,8 @@ void STCClient::writable(void)
 {
 	// DEBUG("writable() entry");
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	std::list<StorageFile::SharedPtr>::iterator it;
 	ssize_t len, rc;
 
@@ -235,12 +246,14 @@ void STCClient::writable(void)
 			// So Disconnect Any File Updated Notifications...
 			if ( m_fileConnection.connected() )
 			{
-				// REMOVEME or Verbose Level 1
-				DEBUG("writable(): Disconnecting Paused"
-						<< " File Updated Notify"
-					<< " file=" << f->path()
-					<< " size=" << f->size()
-					<< " for Run " << m_run->runNumber());
+				if ( ctrl->verbose() )
+				{
+					DEBUG("writable(): Disconnecting Paused"
+							<< " File Updated Notify"
+						<< " file=" << f->path()
+						<< " size=" << f->size()
+						<< " for Run " << m_run->runNumber());
+				}
 
 				m_fileConnection.disconnect();
 			}
@@ -257,12 +270,14 @@ void STCClient::writable(void)
 				if ( !(m_fileConnection.connected())
 						&& (*it)->active() )
 				{
-					// REMOVEME or Verbose Level 1
-					DEBUG("writable():"
-						<< " Connecting Next File Updated Notify"
-						<< " file=" << (*it)->path()
-						<< " size=" << (*it)->size()
-						<< " for Run " << m_run->runNumber());
+					if ( ctrl->verbose() )
+					{
+						DEBUG("writable():"
+							<< " Connecting Next File Updated Notify"
+							<< " file=" << (*it)->path()
+							<< " size=" << (*it)->size()
+							<< " for Run " << m_run->runNumber());
+					}
 
 					m_fileConnection = (*it)->connect(
 						boost::bind( &STCClient::fileUpdated, this, _1 ) );
@@ -407,11 +422,13 @@ void STCClient::writable(void)
 		// So Disconnect Any File Updated Notifications...
 		if ( m_fileConnection.connected() )
 		{
-			// REMOVEME or Verbose Level 1
-			DEBUG("writable(): Disconnecting File Updated Notify"
-				<< " file=" << f->path()
-				<< " size=" << f->size()
-				<< " for Run " << m_run->runNumber());
+			if ( ctrl->verbose() )
+			{
+				DEBUG("writable(): Disconnecting File Updated Notify"
+					<< " file=" << f->path()
+					<< " size=" << f->size()
+					<< " for Run " << m_run->runNumber());
+			}
 
 			m_fileConnection.disconnect();
 		}
@@ -428,11 +445,13 @@ void STCClient::writable(void)
 			if ( !(m_fileConnection.connected())
 					&& (*it)->active() )
 			{
-				// REMOVEME or Verbose Level 1
-				DEBUG("writable(): Connecting Next File Updated Notify"
-					<< " file=" << (*it)->path()
-					<< " size=" << (*it)->size()
-					<< " for Run " << m_run->runNumber());
+				if ( ctrl->verbose() )
+				{
+					DEBUG("writable(): Connecting Next File Updated Notify"
+						<< " file=" << (*it)->path()
+						<< " size=" << (*it)->size()
+						<< " for Run " << m_run->runNumber());
+				}
 
 				m_fileConnection = (*it)->connect(
 					boost::bind( &STCClient::fileUpdated, this, _1 ) );
@@ -554,6 +573,8 @@ void STCClient::sendDataDone(void)
 
 void STCClient::fileAdded( StorageFile::SharedPtr &f )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	/* We don't need to try to start sending from this file just yet
 	 * (assuming it is the front of our list), as we'll get an update
 	 * notification very soon.
@@ -578,11 +599,13 @@ void STCClient::fileAdded( StorageFile::SharedPtr &f )
 		if ( !(m_fileConnection.connected())
 				&& f->active() )
 		{
-			// REMOVEME or Verbose Level 1
-			DEBUG("fileAdded(): Connecting File Updated Notify"
-				<< " file=" << f->path()
-				<< " size=" << f->size()
-				<< " for Run " << m_run->runNumber());
+			if ( ctrl->verbose() )
+			{
+				DEBUG("fileAdded(): Connecting File Updated Notify"
+					<< " file=" << f->path()
+					<< " size=" << f->size()
+					<< " for Run " << m_run->runNumber());
+			}
 
 			m_fileConnection = f->connect(
 				boost::bind( &STCClient::fileUpdated, this, _1 ) );
@@ -594,6 +617,8 @@ void STCClient::fileUpdated( const StorageFile &f )
 {
 	// DEBUG("fileUpdated() entry");
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// DEBUG("fileUpdated(): Update File " << f.path()
 		// << " f.active()=" << f.active()
 		// << " for Run " << m_run->runNumber());
@@ -604,11 +629,14 @@ void STCClient::fileUpdated( const StorageFile &f )
 
 	if ( !f.active() )
 	{
-		// REMOVEME or Verbose Level 1
-		DEBUG("fileUpdated(): Disconnecting Inactive File Updated Notify"
-			<< " file=" << f.path()
-			<< " size=" << f.size()
-			<< " for Run " << m_run->runNumber());
+		if ( ctrl->verbose() )
+		{
+			DEBUG("fileUpdated():"
+				<< " Disconnecting Inactive File Updated Notify"
+				<< " file=" << f.path()
+				<< " size=" << f.size()
+				<< " for Run " << m_run->runNumber());
+		}
 
 		m_fileConnection.disconnect();
 	}
