@@ -64,7 +64,8 @@ STCClient::STCClient( int fd, StorageContainer::SharedPtr &run,
 	try
 	{
 		m_read = new ReadyAdapter( m_stc_fd, fdrRead,
-			boost::bind( &STCClient::readable, this ) );
+			boost::bind( &STCClient::readable, this ),
+			ctrl->verbose() );
 	}
 	catch ( std::exception &e )
 	{
@@ -86,7 +87,8 @@ STCClient::STCClient( int fd, StorageContainer::SharedPtr &run,
 	try
 	{
 		m_write = new ReadyAdapter( m_stc_fd, fdrWrite,
-			boost::bind( &STCClient::writable, this ) );
+			boost::bind( &STCClient::writable, this ),
+			ctrl->verbose() );
 	}
 	catch ( std::exception &e )
 	{
@@ -501,7 +503,8 @@ more:
 		try
 		{
 			m_write = new ReadyAdapter( m_stc_fd, fdrWrite,
-				boost::bind( &STCClient::writable, this ) );
+				boost::bind( &STCClient::writable, this ),
+				ctrl->verbose() );
 		}
 		catch ( std::exception &e )
 		{

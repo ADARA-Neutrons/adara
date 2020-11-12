@@ -115,7 +115,8 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 	// File Descriptor Already Checked Above...
 	try {
 		m_read = new ReadyAdapter(m_client_fd, fdrRead,
-			boost::bind(&LiveClient::readable, this));
+			boost::bind(&LiveClient::readable, this),
+			ctrl->verbose());
 	}
 	catch (std::exception &e) {
 		ERROR("Exception in LiveClient() Creating ReadyAdapter Read"
@@ -507,7 +508,8 @@ more:
 		try
 		{
 			m_write = new ReadyAdapter( m_client_fd, fdrWrite,
-				boost::bind( &LiveClient::writable, this ) );
+				boost::bind( &LiveClient::writable, this ),
+				ctrl->verbose() );
 		}
 		catch ( std::exception &e )
 		{
@@ -1084,7 +1086,8 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 	try
 	{
 		m_write = new ReadyAdapter( m_client_fd, fdrWrite,
-			boost::bind( &LiveClient::writable, this ) );
+			boost::bind( &LiveClient::writable, this ),
+			ctrl->verbose() );
 	}
 	catch ( std::exception &e )
 	{
