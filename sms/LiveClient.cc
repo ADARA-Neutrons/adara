@@ -766,15 +766,16 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 
 void LiveClient::historicalFile( StorageFile::SharedPtr &f, off_t start )
 {
+	// This is an old file, so just put it on the list to be sent.
+
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	/* This is an old file, so just put it on the list to be sent.
-	 */
 	DEBUG("historicalFile(): Add File " << f->path()
 		<< " start=" << start
 		<< " f->active()=" << f->active()
 		<< " for client " << m_clientName
 		<< " (m_client_fd=" << m_client_fd << ")");
+
 	m_files.push_back( std::make_pair( f, start ) );
 
 	// Note: We Can't Immediately Subscribe to fileUpdated() for This File,
@@ -806,6 +807,11 @@ void LiveClient::historicalFile( StorageFile::SharedPtr &f, off_t start )
 			m_fileConnection = f->connect(
 				boost::bind( &LiveClient::fileUpdated, this, _1 ) );
 		}
+
+		// If we're not already waiting for buffer space
+		// in the socket, try to send the new data...
+		if ( !m_write )
+			writable();
 	}
 }
 
@@ -813,15 +819,12 @@ void LiveClient::fileAdded( StorageFile::SharedPtr &f )
 {
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	/* We don't need to try to start sending from this file just yet
-	 * (assuming it is the front of our list), as we'll get an update
-	 * notification very soon.
-	 */
 	DEBUG("fileAdded(): Add File " << f->path()
 		<< " start=0"
 		<< " f->active()=" << f->active()
 		<< " for client " << m_clientName
 		<< " (m_client_fd=" << m_client_fd << ")");
+
 	m_files.push_back( std::make_pair( f, 0 ) );
 
 	// Note: We Can't Immediately Subscribe to fileUpdated() for This File,
@@ -853,6 +856,11 @@ void LiveClient::fileAdded( StorageFile::SharedPtr &f )
 			m_fileConnection = f->connect(
 				boost::bind( &LiveClient::fileUpdated, this, _1 ) );
 		}
+
+		// If we're not already waiting for buffer space
+		// in the socket, try to send the new data...
+		if ( !m_write )
+			writable();
 	}
 }
 
@@ -860,12 +868,11 @@ void LiveClient::fileUpdated( const StorageFile &f )
 {
 	// DEBUG("fileUpdated() entry");
 
-	SMSControl *ctrl = SMSControl::getInstance();
-
 	// The current file just got updated...
 
-	// If the File is No Longer Active, Cancel the File Updated Notifies...
+	SMSControl *ctrl = SMSControl::getInstance();
 
+	// If the File is No Longer Active, Cancel the File Updated Notifies...
 	if ( !f.active() )
 	{
 		if ( ctrl->verbose() )
@@ -881,9 +888,8 @@ void LiveClient::fileUpdated( const StorageFile &f )
 		m_fileConnection.disconnect();
 	}
 
-	// If we're not already waiting for buffer space in the socket,
-	// try to send the new data...
-
+	// If we're not already waiting for buffer space
+	// in the socket, try to send the new data...
 	if ( !m_write )
 		writable();
 

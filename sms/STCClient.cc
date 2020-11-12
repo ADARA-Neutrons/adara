@@ -578,11 +578,6 @@ void STCClient::fileAdded( StorageFile::SharedPtr &f )
 {
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	/* We don't need to try to start sending from this file just yet
-	 * (assuming it is the front of our list), as we'll get an update
-	 * notification very soon.
-	 */
-
 	DEBUG("fileAdded(): Add File " << f->path()
 		<< " f->active()=" << f->active()
 		<< " for Run " << m_run->runNumber());
@@ -613,6 +608,12 @@ void STCClient::fileAdded( StorageFile::SharedPtr &f )
 			m_fileConnection = f->connect(
 				boost::bind( &STCClient::fileUpdated, this, _1 ) );
 		}
+
+		// If we're not already waiting for buffer space in the socket,
+		// try to send the new data...
+
+		if ( !m_write )
+			writable();
 	}
 }
 
