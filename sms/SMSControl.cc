@@ -2233,7 +2233,6 @@ void SMSControl::resetPacketStats(void)
 void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
 		struct timespec *ts ) // Wallclock Time...!
 {
-	// REMOVEME
 	if ( m_verbose > 1 )
 	{
 		DEBUG("updateMaxDataSourceTime(): srcId=" << srcId
@@ -2287,7 +2286,6 @@ void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
 
 	for ( uint32_t i=0 ; i < m_dataSourcesMaxTimes.size() ; i++ )
 	{
-		// REMOVEME
 		if ( m_verbose > 1 )
 		{
 			DEBUG("updateMaxDataSourceTime():"
@@ -2309,14 +2307,14 @@ void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
 			// Update "Oldest" Max DataSource Time...
 			if ( oldest.tv_sec == 0 && oldest.tv_nsec == 0 )
 			{
-				if ( m_verbose > 1 )
+				if ( m_verbose > 2 )
 					DEBUG("updateMaxDataSourceTime(): FIRST Oldest...");
 				oldest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
 			}
 			else if ( compareTimeStamps(
 					m_dataSourcesMaxTimes[i], oldest ) < 0 )
 			{
-				if ( m_verbose > 1 )
+				if ( m_verbose > 2 )
 					DEBUG("updateMaxDataSourceTime(): OLDER Oldest...");
 				oldest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
 			}
@@ -2324,21 +2322,20 @@ void SMSControl::updateMaxDataSourceTime( uint32_t srcId,
 			// Update "Newest" Max DataSource Time...
 			if ( newest.tv_sec == 0 && newest.tv_nsec == 0 )
 			{
-				if ( m_verbose > 1 )
+				if ( m_verbose > 2 )
 					DEBUG("updateMaxDataSourceTime(): FIRST Newest...");
 				newest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
 			}
 			else if ( compareTimeStamps(
 					m_dataSourcesMaxTimes[i], newest ) > 0 )
 			{
-				if ( m_verbose > 1 )
+				if ( m_verbose > 2 )
 					DEBUG("updateMaxDataSourceTime(): NEWER Newest...");
 				newest = m_dataSourcesMaxTimes[i]; // EPICS Time...!
 			}
 		}
 	}
 
-	// REMOVEME
 	if ( m_verbose )
 	{
 		DEBUG("updateMaxDataSourceTime():"

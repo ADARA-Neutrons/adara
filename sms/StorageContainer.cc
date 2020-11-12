@@ -437,8 +437,7 @@ void StorageContainer::getPauseModeByTime(
 		found_it = m_pauseModeStack.begin();
 		if ( found_it != m_pauseModeStack.end() )
 		{
-			// REMOVEME
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 1 )
 			{
 				DEBUG("getPauseModeByTime():"
 					<< " Ignore Packet TimeStamp,"
@@ -490,8 +489,7 @@ void StorageContainer::getPauseModeByTime(
 					&& it->m_maxTime.tv_nsec == 0 )
 				|| compareTimeStamps( it->m_maxTime, ts ) >= 0 ) )
 		{
-			// REMOVEME
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 1 )
 			{
 				DEBUG("getPauseModeByTime():"
 					<< " Found PauseMode " << it->m_numModes
@@ -575,8 +573,7 @@ void StorageContainer::getPauseModeByTime(
 				pausemode_expire.tv_sec++;
 			}
 
-			// REMOVEME
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 2 )
 			{
 				DEBUG("getPauseModeByTime():"
 					<< " PauseMode " << it->m_numModes
