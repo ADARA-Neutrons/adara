@@ -107,7 +107,8 @@ public:
 	void wantWrite(void) {
 		if (!ready)
 			ready = new ReadyAdapter(fd, fdrWrite,
-					boost::bind(&Client::writable, this));
+					boost::bind(&Client::writable, this),
+					1 /* verbose */);
 	}
 
 	void idle(void) {
@@ -278,8 +279,8 @@ Listener::Listener()
 
 	try {
 		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
-					boost::bind(&Listener::newConnection,
-						    this));
+					boost::bind(&Listener::newConnection, this),
+					1 /* verbose */);
 	} catch(...) {
 		close(m_fd);
 		freeaddrinfo(ai);
