@@ -4744,18 +4744,18 @@ StreamParser::pvValueUpdate
                 << " [" << pvinfo->m_connection << "]" << ")";
             ssinfo << " = " << pvinfo->valueToString( a_value ) << " @";
             syslog( LOG_ERR,
-            "[%i] %s %s%s %s %s %lu.%09lu (%lu) < %lu.%09lu (%lu) %s %s",
+        "[%i] %s %s%s %s %s %lu.%09lu (%s=%lu) < %lu.%09lu (%s=%lu) %s %s",
                 g_pid, "STC Error:", log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Variable Value Update SAWTOOTH",
                 ssinfo.str().c_str(),
                 a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                 a_timestamp.tv_nsec,
-                ts_nano,
+                "ts_nano", ts_nano,
                 (unsigned long)(pvinfo->m_last_time / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(pvinfo->m_last_time % NANO_PER_SECOND_LL),
-                pvinfo->m_last_time,
+                "ts_nano", pvinfo->m_last_time,
                 ( ( value_changed ) ? "(Value Changed)"
                     : ( ( new_value ) ? "(New Value)" : "(Same Value)" ) ),
                 "- Pass Thru Anyway..."
@@ -4836,19 +4836,19 @@ StreamParser::pvValueUpdate
                     ss2 << " - Keep New Value";
                     ss2 << ": " << ssinfo.str();
                     syslog( log_type,
-                    "[%i] %s%s%s %s %lu.%09lu (%lu) < %lu.%09lu (%lu) %s",
+               "[%i] %s%s%s %s %lu.%09lu (%s=%lu) < %lu.%09lu (%s=%lu) %s",
                         g_pid, log_hdr.c_str(), log_info.c_str(),
                         "StreamParser::pvValueUpdate()",
                         ss2.str().c_str(),
                         a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                         a_timestamp.tv_nsec,
-                        ts_nano,
+                        "ts_nano", ts_nano,
                         (unsigned long)(m_pulse_info.start_time
                                 / NANO_PER_SECOND_LL)
                             - ADARA::EPICS_EPOCH_OFFSET,
                         (unsigned long)(m_pulse_info.start_time
                             % NANO_PER_SECOND_LL),
-                        m_pulse_info.start_time,
+                        "ts_nano", m_pulse_info.start_time,
                         ( ( value_changed ) ? "(Value Changed)"
                             : ( ( new_value )
                                 ? "(New Value)" : "(Same Value)" ) )
@@ -4881,19 +4881,19 @@ StreamParser::pvValueUpdate
                         log_hdr = "STC Error: ";
                     }
                     syslog( log_type,
-                    "[%i] %s%s%s %s %lu.%09lu (%lu) < %lu.%09lu (%lu) %s",
+               "[%i] %s%s%s %s %lu.%09lu (%s=%lu) < %lu.%09lu (%s=%lu) %s",
                         g_pid, log_hdr.c_str(), log_info.c_str(),
                         "StreamParser::pvValueUpdate()",
                         ssinfo.str().c_str(),
                         a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                         a_timestamp.tv_nsec,
-                        ts_nano,
+                        "ts_nano", ts_nano,
                         (unsigned long)(m_pulse_info.start_time
                                 / NANO_PER_SECOND_LL)
                             - ADARA::EPICS_EPOCH_OFFSET,
                         (unsigned long)(m_pulse_info.start_time
                             % NANO_PER_SECOND_LL),
-                        m_pulse_info.start_time,
+                        "ts_nano", m_pulse_info.start_time,
                         ( ( value_changed ) ? "(Value Changed)"
                             : ( ( new_value )
                                 ? "(New Value)" : "(Same Value)" ) )
@@ -4925,7 +4925,7 @@ StreamParser::pvValueUpdate
             ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
                 << " [" << pvinfo->m_connection << "]" << ")";
             syslog( LOG_INFO,
-                "[%i] %s%s %s %s = %s @ %lu.%09lu (%lu) %s",
+                "[%i] %s%s %s %s = %s @ %lu.%09lu (%s=%lu) %s",
                 g_pid, log_info.c_str(),
                 "StreamParser::pvValueUpdate()",
                 "Got Pre-Pulse Variable Value Update",
@@ -4933,7 +4933,7 @@ StreamParser::pvValueUpdate
                 pvinfo->valueToString( a_value ).c_str(),
                 a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                 a_timestamp.tv_nsec,
-                ts_nano,
+                "ts_nano", ts_nano,
                 ( ( value_changed ) ? "(Value Changed)"
                     : ( ( new_value ) ? "(New Value)" : "(Same Value)" ) )
             );
@@ -5153,7 +5153,7 @@ StreamParser::rxPacket
                     60, 10, 100, log_info ) )
             {
                 syslog( LOG_ERR,
-            "[%i] %s %s%s %s %s=%d [%s] %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+      "[%i] %s %s%s %s %s=%d [%s] %lu.%09lu (%s=%lu) < %lu.%09lu (%s=%lu)",
                     g_pid, "STC Error:", log_info.c_str(),
                     "StreamParser::rxPacket(AnnotationPkt)",
                     "Truncate Negative Annotation Timestamp to Zero",
@@ -5161,13 +5161,13 @@ StreamParser::rxPacket
                     a_pkt.comment().c_str(),
                     timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                     timestamp.tv_nsec,
-                    ts_nano,
+                    "ts_nano", ts_nano,
                     (unsigned long)(m_pulse_info.start_time
                             / NANO_PER_SECOND_LL)
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(m_pulse_info.start_time
                         % NANO_PER_SECOND_LL),
-                    m_pulse_info.start_time );
+                    "ts_nano", m_pulse_info.start_time );
                 usleep(30000); // give syslog a chance...
             }
         }
@@ -5187,7 +5187,7 @@ StreamParser::rxPacket
                 60, 10, 100, log_info ) )
         {
             syslog( LOG_ERR,
-            "[%i] %s %s%s %s %s=%d [%s] %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+      "[%i] %s %s%s %s %s=%d [%s] %lu.%09lu (%s=%lu) < %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", log_info.c_str(),
                 "StreamParser::rxPacket(AnnotationPkt)",
                 "Got Pre-Pulse Annotation Timestamp",
@@ -5195,13 +5195,13 @@ StreamParser::rxPacket
                 a_pkt.comment().c_str(),
                 timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
                 timestamp.tv_nsec,
-                ts_nano,
+                "ts_nano", ts_nano,
                 (unsigned long)(m_pulse_info.start_time
                         / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(m_pulse_info.start_time
                     % NANO_PER_SECOND_LL),
-                m_pulse_info.start_time );
+                "ts_nano", m_pulse_info.start_time );
             usleep(30000); // give syslog a chance...
         }
 
@@ -5231,13 +5231,13 @@ StreamParser::rxPacket
         break;
     case ADARA::MarkerType::SYSTEM:
         // Just Log System Comments, Don't Insert Into NeXus...
-        syslog( LOG_INFO, "[%i] %s %s %lu.%09lu (%lu) [%s]",
+        syslog( LOG_INFO, "[%i] %s %s %lu.%09lu (%s=%lu) [%s]",
             g_pid, "StreamParser::rxPacket(AnnotationPkt)",
             "System Annotation Comment",
             (unsigned long)(ts_nano / NANO_PER_SECOND_LL)
                 - ADARA::EPICS_EPOCH_OFFSET,
             (unsigned long)(ts_nano % NANO_PER_SECOND_LL),
-            ts_nano,
+            "ts_nano", ts_nano,
             a_pkt.comment().c_str() );
         usleep(30000); // give syslog a chance...
         break;
@@ -5273,14 +5273,14 @@ StreamParser::markerPause
     // Starting Pause/Resume State is Always "Not Paused"...
     else state_changed = true;
     // REMOVEME
-    syslog( LOG_ERR, "[%i] %s %s %s 1=[%s] %lu.%09lu (%lu) %s=%d",
+    syslog( LOG_ERR, "[%i] %s %s %s 1=[%s] %lu.%09lu (%s=%lu) %s=%d",
         g_pid, "STC Error:", "StreamParser::markerPause()",
         "Note Pause Annotation",
         a_comment.c_str(),
         (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
             - ADARA::EPICS_EPOCH_OFFSET,
         (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-        a_ts_nano,
+        "ts_nano", a_ts_nano,
         "state_changed", state_changed );
     usleep(30000); // give syslog a chance...
 
@@ -5293,14 +5293,14 @@ StreamParser::markerPause
                 && !m_last_pause_comment.compare( a_comment )
                 && !state_changed )
         {
-            syslog( LOG_ERR, "[%i] %s %s %s 1=[%s] %lu.%09lu (%lu)",
+            syslog( LOG_ERR, "[%i] %s %s %s 1=[%s] %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", "StreamParser::markerPause()",
                 "Ignoring Duplicate Pause Annotation with Identical Time",
                 a_comment.c_str(),
                 (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano );
+                "ts_nano", a_ts_nano );
             usleep(30000); // give syslog a chance...
             return;
         }
@@ -5316,7 +5316,7 @@ StreamParser::markerPause
                     60, 10, 100, log_info ) )
             {
                 syslog( LOG_ERR,
-        "[%i] %s %s%s %s 1=[%s] %lu.%09lu (%lu) < %d=[%s] %lu.%09lu (%lu)",
+  "[%i] %s %s%s %s 1=[%s] %lu.%09lu (%s=%lu) < %d=[%s] %lu.%09lu (%s=%lu)",
                     g_pid, "STC Error:", log_info.c_str(),
                     "StreamParser::markerPause()",
                     "Pause Annotation SAWTOOTH",
@@ -5324,7 +5324,7 @@ StreamParser::markerPause
                     (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                    a_ts_nano,
+                    "ts_nano", a_ts_nano,
                     m_last_pause_multimap_it->second.second,
                     m_last_pause_comment.c_str(),
                     (unsigned long)(m_last_pause_multimap_it->first
@@ -5332,7 +5332,7 @@ StreamParser::markerPause
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(m_last_pause_multimap_it->first
                         % NANO_PER_SECOND_LL),
-                    m_last_pause_multimap_it->first );
+                    "ts_nano", m_last_pause_multimap_it->first );
                 usleep(30000); // give syslog a chance...
             }
         }
@@ -5341,14 +5341,14 @@ StreamParser::markerPause
         else
         {
             syslog( LOG_ERR,
-        "[%i] %s %s %s 1=[%s] %lu.%09lu (%lu) vs. %d=[%s] %lu.%09lu (%lu)",
+  "[%i] %s %s %s 1=[%s] %lu.%09lu (%s=%lu) vs. %d=[%s] %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", "StreamParser::markerPause()",
                 "Note Distinct Pause Annotation and/or Time",
                 a_comment.c_str(),
                 (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano,
+                "ts_nano", a_ts_nano,
                 m_last_pause_multimap_it->second.second,
                 m_last_pause_comment.c_str(),
                 (unsigned long)(m_last_pause_multimap_it->first
@@ -5356,7 +5356,7 @@ StreamParser::markerPause
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(m_last_pause_multimap_it->first
                     % NANO_PER_SECOND_LL),
-                m_last_pause_multimap_it->first );
+                "ts_nano", m_last_pause_multimap_it->first );
             usleep(30000); // give syslog a chance...
         }
         */
@@ -5408,14 +5408,14 @@ StreamParser::markerResume
     // Starting Pause/Resume State is Always "Not Paused"...
     else state_changed = true;
     // REMOVEME
-    syslog( LOG_ERR, "[%i] %s %s %s 0=[%s] %lu.%09lu (%lu) %s=%d",
+    syslog( LOG_ERR, "[%i] %s %s %s 0=[%s] %lu.%09lu (%s=%lu) %s=%d",
         g_pid, "STC Error:", "StreamParser::markerResume()",
         "Note Pause Annotation",
         a_comment.c_str(),
         (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
             - ADARA::EPICS_EPOCH_OFFSET,
         (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-        a_ts_nano,
+        "ts_nano", a_ts_nano,
         "state_changed", state_changed );
     usleep(30000); // give syslog a chance...
 
@@ -5429,14 +5429,14 @@ StreamParser::markerResume
                 && !state_changed )
         {
             // For now, Just Log It...! ;-D
-            syslog( LOG_ERR, "[%i] %s %s %s 0=[%s] %lu.%09lu (%lu)",
+            syslog( LOG_ERR, "[%i] %s %s %s 0=[%s] %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", "StreamParser::markerResume()",
                 "Ignoring Duplicate Pause Annotation with Identical Time",
                 a_comment.c_str(),
                 (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano );
+                "ts_nano", a_ts_nano );
             usleep(30000); // give syslog a chance...
             return;
         }
@@ -5452,7 +5452,7 @@ StreamParser::markerResume
                     60, 10, 100, log_info ) )
             {
                 syslog( LOG_ERR,
-        "[%i] %s %s%s %s 0=[%s] %lu.%09lu (%lu) < %d=[%s] %lu.%09lu (%lu)",
+  "[%i] %s %s%s %s 0=[%s] %lu.%09lu (%s=%lu) < %d=[%s] %lu.%09lu (%s=%lu)",
                     g_pid, "STC Error:", log_info.c_str(),
                     "StreamParser::markerResume()",
                     "Resume Annotation SAWTOOTH",
@@ -5460,7 +5460,7 @@ StreamParser::markerResume
                     (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                    a_ts_nano,
+                    "ts_nano", a_ts_nano,
                     m_last_pause_multimap_it->second.second,
                     m_last_pause_comment.c_str(),
                     (unsigned long)(m_last_pause_multimap_it->first
@@ -5468,7 +5468,7 @@ StreamParser::markerResume
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(m_last_pause_multimap_it->first
                         % NANO_PER_SECOND_LL),
-                    m_last_pause_multimap_it->first );
+                    "ts_nano", m_last_pause_multimap_it->first );
                 usleep(30000); // give syslog a chance...
             }
         }
@@ -5477,14 +5477,14 @@ StreamParser::markerResume
         else
         {
             syslog( LOG_ERR,
-        "[%i] %s %s %s 0=[%s] %lu.%09lu (%lu) vs. %d=[%s] %lu.%09lu (%lu)",
+  "[%i] %s %s %s 0=[%s] %lu.%09lu (%s=%lu) vs. %d=[%s] %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", "StreamParser::markerResume()",
                 "Note Distinct Pause Annotation and/or Time",
                 a_comment.c_str(),
                 (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano,
+                "ts_nano", a_ts_nano,
                 m_last_pause_multimap_it->second.second,
                 m_last_pause_comment.c_str(),
                 (unsigned long)(m_last_pause_multimap_it->first
@@ -5492,7 +5492,7 @@ StreamParser::markerResume
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(m_last_pause_multimap_it->first
                     % NANO_PER_SECOND_LL),
-                m_last_pause_multimap_it->first );
+                "ts_nano", m_last_pause_multimap_it->first );
             usleep(30000); // give syslog a chance...
         }
         */
@@ -5547,14 +5547,14 @@ StreamParser::markerScanStart
     else if ( a_scan_index != 0 )
         state_changed = true;
     // REMOVEME
-    syslog( LOG_ERR, "[%i] %s %s %s %u=[%s] %lu.%09lu (%lu) %s=%d",
+    syslog( LOG_ERR, "[%i] %s %s %s %u=[%s] %lu.%09lu (%s=%lu) %s=%d",
         g_pid, "STC Error:", "StreamParser::markerScanStart()",
         "Note Scan Annotation",
         a_scan_index, a_comment.c_str(),
         (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
             - ADARA::EPICS_EPOCH_OFFSET,
         (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-        a_ts_nano,
+        "ts_nano", a_ts_nano,
         "state_changed", state_changed );
     usleep(30000); // give syslog a chance...
 
@@ -5568,14 +5568,14 @@ StreamParser::markerScanStart
                 && !state_changed )
         {
             // For now, Just Log It...! ;-D
-            syslog( LOG_ERR, "[%i] %s %s %s %u=[%s] %lu.%09lu (%lu)",
+            syslog( LOG_ERR, "[%i] %s %s %s %u=[%s] %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", "StreamParser::markerScanStart()",
                 "Ignoring Duplicate Scan Annotation with Identical Time",
                 a_scan_index, a_comment.c_str(),
                 (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano );
+                "ts_nano", a_ts_nano );
             usleep(30000); // give syslog a chance...
             return;
         }
@@ -5591,7 +5591,7 @@ StreamParser::markerScanStart
                     60, 10, 100, log_info ) )
             {
                 syslog( LOG_ERR,
-       "[%i] %s %s%s %s %u=[%s] %lu.%09lu (%lu) < %u=[%s] %lu.%09lu (%lu)",
+ "[%i] %s %s%s %s %u=[%s] %lu.%09lu (%s=%lu) < %u=[%s] %lu.%09lu (%s=%lu)",
                     g_pid, "STC Error:", log_info.c_str(),
                     "StreamParser::markerScanStart()",
                     "Scan Start Annotation SAWTOOTH",
@@ -5599,7 +5599,7 @@ StreamParser::markerScanStart
                     (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                    a_ts_nano,
+                    "ts_nano", a_ts_nano,
                     m_last_scan_multimap_it->second.second,
                     m_last_scan_comment.c_str(),
                     (unsigned long)(m_last_scan_multimap_it->first
@@ -5607,7 +5607,7 @@ StreamParser::markerScanStart
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(m_last_scan_multimap_it->first
                         % NANO_PER_SECOND_LL),
-                    m_last_scan_multimap_it->first );
+                    "ts_nano", m_last_scan_multimap_it->first );
                 usleep(30000); // give syslog a chance...
             }
         }
@@ -5616,14 +5616,14 @@ StreamParser::markerScanStart
         else
         {
             syslog( LOG_ERR,
-       "[%i] %s %s %s %u=[%s] %lu.%09lu (%lu) vs. %u=[%s] %lu.%09lu (%lu)",
+ "[%i] %s %s %s %u=[%s] %lu.%09lu (%s=%lu) vs. %u=[%s] %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", "StreamParser::markerScanStart()",
                 "Note Distinct Scan Annotation, Index and/or Time",
                 a_scan_index, a_comment.c_str(),
                 (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano,
+                "ts_nano", a_ts_nano,
                 m_last_scan_multimap_it->second.second,
                 m_last_scan_comment.c_str(),
                 (unsigned long)(m_last_scan_multimap_it->first
@@ -5631,7 +5631,7 @@ StreamParser::markerScanStart
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(m_last_scan_multimap_it->first
                     % NANO_PER_SECOND_LL),
-                m_last_scan_multimap_it->first );
+                "ts_nano", m_last_scan_multimap_it->first );
             usleep(30000); // give syslog a chance...
         }
         */
@@ -5684,14 +5684,14 @@ StreamParser::markerScanStop
     }
     // Starting Scan State is Always "Stopped"...
     // REMOVEME
-    syslog( LOG_ERR, "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%lu) %s=%d",
+    syslog( LOG_ERR, "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%s=%lu) %s=%d",
         g_pid, "STC Error:", "StreamParser::markerScanStop()",
         "Note Scan Annotation",
         a_scan_index, a_comment.c_str(),
         (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
             - ADARA::EPICS_EPOCH_OFFSET,
         (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-        a_ts_nano,
+        "ts_nano", a_ts_nano,
         "state_changed", state_changed );
     usleep(30000); // give syslog a chance...
 
@@ -5705,14 +5705,14 @@ StreamParser::markerScanStop
                 && !state_changed )
         {
             // For now, Just Log It...! ;-D
-            syslog( LOG_ERR, "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%lu)",
+            syslog( LOG_ERR, "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", "StreamParser::markerScanStop()",
                 "Ignoring Duplicate Scan Annotation with Identical Time",
                 a_scan_index, a_comment.c_str(),
                 (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano );
+                "ts_nano", a_ts_nano );
             usleep(30000); // give syslog a chance...
             return;
         }
@@ -5728,7 +5728,7 @@ StreamParser::markerScanStop
                     60, 10, 100, log_info ) )
             {
                 syslog( LOG_ERR,
-    "[%i] %s %s%s %s %u(0)=[%s] %lu.%09lu (%lu) < %u=[%s] %lu.%09lu (%lu)",
+                "[%i] %s %s%s %s %u(0)=[%s] %lu.%09lu (%s=%lu) < %u=[%s] %lu.%09lu (%s=%lu)",
                     g_pid, "STC Error:", log_info.c_str(),
                     "StreamParser::markerScanStop()",
                     "Scan Stop Annotation SAWTOOTH",
@@ -5736,7 +5736,7 @@ StreamParser::markerScanStop
                     (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                    a_ts_nano,
+                    "ts_nano", a_ts_nano,
                     m_last_scan_multimap_it->second.second,
                     m_last_scan_comment.c_str(),
                     (unsigned long)(m_last_scan_multimap_it->first
@@ -5744,7 +5744,7 @@ StreamParser::markerScanStop
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(m_last_scan_multimap_it->first
                         % NANO_PER_SECOND_LL),
-                    m_last_scan_multimap_it->first );
+                    "ts_nano", m_last_scan_multimap_it->first );
                 usleep(30000); // give syslog a chance...
             }
         }
@@ -5753,14 +5753,14 @@ StreamParser::markerScanStop
         else
         {
             syslog( LOG_ERR,
-    "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%lu) vs. %u=[%s] %lu.%09lu (%lu)",
+            "[%i] %s %s %s %u(0)=[%s] %lu.%09lu (%s=%lu) vs. %u=[%s] %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", "StreamParser::markerScanStop()",
                 "Note Distinct Scan Annotation, Index and/or Time",
                 a_scan_index, a_comment.c_str(),
                 (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano,
+                "ts_nano", a_ts_nano,
                 m_last_scan_multimap_it->second.second,
                 m_last_scan_comment.c_str(),
                 (unsigned long)(m_last_scan_multimap_it->first
@@ -5768,7 +5768,7 @@ StreamParser::markerScanStop
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(m_last_scan_multimap_it->first
                     % NANO_PER_SECOND_LL),
-                m_last_scan_multimap_it->first );
+                "ts_nano", m_last_scan_multimap_it->first );
             usleep(30000); // give syslog a chance...
         }
         */
@@ -5820,14 +5820,14 @@ StreamParser::markerComment
                     a_comment ) )
         {
             // For now, Just Log It...! ;-D
-            syslog( LOG_ERR, "[%i] %s %s %s [%s] %lu.%09lu (%lu)",
+            syslog( LOG_ERR, "[%i] %s %s %s [%s] %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", "StreamParser::markerComment()",
                 "Ignoring Duplicate Annotation with Identical Time",
                 a_comment.c_str(),
                 (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano );
+                "ts_nano", a_ts_nano );
             usleep(30000); // give syslog a chance...
             return;
         }
@@ -5843,7 +5843,7 @@ StreamParser::markerComment
                     60, 10, 100, log_info ) )
             {
                 syslog( LOG_ERR,
-             "[%i] %s %s%s %s [%s] %lu.%09lu (%lu) < [%s] %lu.%09lu (%lu)",
+       "[%i] %s %s%s %s [%s] %lu.%09lu (%s=%lu) < [%s] %lu.%09lu (%s=%lu)",
                     g_pid, "STC Error:", log_info.c_str(),
                     "StreamParser::markerComment()",
                     "Comment Annotation SAWTOOTH",
@@ -5851,14 +5851,14 @@ StreamParser::markerComment
                     (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                    a_ts_nano,
+                    "ts_nano", a_ts_nano,
                     m_last_comment_multimap_it->second.second.c_str(),
                     (unsigned long)(m_last_comment_multimap_it->first
                             / NANO_PER_SECOND_LL)
                         - ADARA::EPICS_EPOCH_OFFSET,
                     (unsigned long)(m_last_comment_multimap_it->first
                         % NANO_PER_SECOND_LL),
-                    m_last_comment_multimap_it->first );
+                    "ts_nano", m_last_comment_multimap_it->first );
                 usleep(30000); // give syslog a chance...
             }
         }
@@ -5867,21 +5867,21 @@ StreamParser::markerComment
         else
         {
             syslog( LOG_ERR,
-             "[%i] %s %s %s [%s] %lu.%09lu (%lu) vs. [%s] %lu.%09lu (%lu)",
+       "[%i] %s %s %s [%s] %lu.%09lu (%s=%lu) vs. [%s] %lu.%09lu (%s=%lu)",
                 g_pid, "STC Error:", "StreamParser::markerComment()",
                 "Note Distinct Annotation and/or Time",
                 a_comment.c_str(),
                 (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
-                a_ts_nano,
+                "ts_nano", a_ts_nano,
                 m_last_comment_multimap_it->second.second.c_str(),
                 (unsigned long)(m_last_comment_multimap_it->first
                         / NANO_PER_SECOND_LL)
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(m_last_comment_multimap_it->first
                     % NANO_PER_SECOND_LL),
-                m_last_comment_multimap_it->first );
+                "ts_nano", m_last_comment_multimap_it->first );
             usleep(30000); // give syslog a chance...
         }
         */
