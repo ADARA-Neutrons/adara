@@ -323,13 +323,26 @@ void LiveClient::writable(void)
 				else
 					cname = "(unknown)";
 
-				ERROR(m_clientName << ": Unable to open file number "
+				// Decode Any Mode Index from the File Index
+				// (SMS After 1.7.0)
+				uint32_t fileNum = f->fileNumber();
+				uint32_t modeNum = 0;
+
+				// Embedded Mode Number...?
+				if ( fileNum > 0xfff )
+				{
+					modeNum = ( fileNum >> 12 ) & 0xfff;
+					fileNum &= 0xfff;
+				}
+
+				ERROR(m_clientName << ": Unable to Open File Number "
 				      << f->fileNumber()
-					  << " (pause file number "
-					  << f->pauseFileNumber() << ")"
-					  << " (addendum file number "
-					  << f->addendumFileNumber() << ")"
-					  << " for container "
+					  << " (Mode Index #" << modeNum
+					  << ", File Index #" << fileNum << ")"
+					  << ", Pause File Number " << f->pauseFileNumber()
+					  << ", Addendum File Number "
+					  	<< f->addendumFileNumber()
+					  << " for Container "
 				      << cname << ": " << re.what());
 				delete this;
 				return;
