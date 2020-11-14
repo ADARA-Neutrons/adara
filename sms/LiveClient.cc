@@ -1102,39 +1102,42 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 		return false;
 	}
 
-	try
+	if ( !m_write )
 	{
-		m_write = new ReadyAdapter( m_client_fd, fdrWrite,
-			boost::bind( &LiveClient::writable, this ),
-			ctrl->verbose() );
-	}
-	catch ( std::exception &e )
-	{
-		ERROR("Exception in rxPacket(ClientHelloPkt)"
-			<< " Creating ReadyAdapter Write for "
-			<< m_clientName << ": " << e.what());
-		m_write = NULL; // just to be sure... ;-b
-		// Close Our Client Socket to Allow Graceful Cleanup...
-		if ( m_client_fd >= 0 ) {
-			DEBUG("Close m_client_fd=" << m_client_fd);
-			close(m_client_fd);
-			m_client_fd = -1;
+		try
+		{
+			m_write = new ReadyAdapter( m_client_fd, fdrWrite,
+				boost::bind( &LiveClient::writable, this ),
+				ctrl->verbose() );
 		}
-		return false;
-	}
-	catch (...)
-	{
-		ERROR("Unknown Exception in rxPacket(ClientHelloPkt)"
-			<< " Creating ReadyAdapter Write for "
-			<< m_clientName);
-		m_write = NULL; // just to be sure... ;-b
-		// Close Our Client Socket to Allow Graceful Cleanup...
-		if ( m_client_fd >= 0 ) {
-			DEBUG("Close m_client_fd=" << m_client_fd);
-			close(m_client_fd);
-			m_client_fd = -1;
+		catch ( std::exception &e )
+		{
+			ERROR("Exception in rxPacket(ClientHelloPkt)"
+				<< " Creating ReadyAdapter Write for "
+				<< m_clientName << ": " << e.what());
+			m_write = NULL; // just to be sure... ;-b
+			// Close Our Client Socket to Allow Graceful Cleanup...
+			if ( m_client_fd >= 0 ) {
+				DEBUG("Close m_client_fd=" << m_client_fd);
+				close(m_client_fd);
+				m_client_fd = -1;
+			}
+			return false;
 		}
-		return false;
+		catch (...)
+		{
+			ERROR("Unknown Exception in rxPacket(ClientHelloPkt)"
+				<< " Creating ReadyAdapter Write for "
+				<< m_clientName);
+			m_write = NULL; // just to be sure... ;-b
+			// Close Our Client Socket to Allow Graceful Cleanup...
+			if ( m_client_fd >= 0 ) {
+				DEBUG("Close m_client_fd=" << m_client_fd);
+				close(m_client_fd);
+				m_client_fd = -1;
+			}
+			return false;
+		}
 	}
 
 	return false;
