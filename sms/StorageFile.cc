@@ -731,7 +731,7 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		const std::string &path, bool &saved_file, uint64_t &saved_size)
 {
 	fs::path p(path);
-	uint32_t modeNumber = 0, fileNumber = 0, saveFileNumber = 0;
+	uint32_t modeIndex = 0, fileIndex = 0, saveFileNumber = 0;
 	uint32_t pauseFileNumber = 0, addendumFileNumber = 0;
 	uint32_t runNumber = 0;
 	uint32_t sourceId = 0;
@@ -741,23 +741,23 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	bool paused_file = false;
 	bool addendum_file = false;
 	if ( sscanf(p.filename().c_str(), "m%u-f%u-p%u-run-%u.adara",
-			&modeNumber, &fileNumber, &pauseFileNumber, &runNumber)
+			&modeIndex, &fileIndex, &pauseFileNumber, &runNumber)
 				== 4 ) {
 		// DEBUG("Ignoring ADARA Paused Run file: " << p);
 		paused_file = true;
 	}
 	else if ( sscanf(p.filename().c_str(), "f%u-p%u-run-%u.adara",
-			&fileNumber, &pauseFileNumber, &runNumber) == 3 ) {
+			&fileIndex, &pauseFileNumber, &runNumber) == 3 ) {
 		// DEBUG("Ignoring ADARA Paused Run file: " << p);
 		paused_file = true;
 	}
 	else if ( sscanf(p.filename().c_str(), "m%u-f%u-p%u.adara",
-			&modeNumber, &fileNumber, &pauseFileNumber) == 3 ) {
+			&modeIndex, &fileIndex, &pauseFileNumber) == 3 ) {
 		// DEBUG("Ignoring ADARA Paused Non-Run file: " << p);
 		paused_file = true;
 	}
 	else if ( sscanf(p.filename().c_str(), "f%u-p%u.adara",
-			&fileNumber, &pauseFileNumber) == 2 ) {
+			&fileIndex, &pauseFileNumber) == 2 ) {
 		// DEBUG("Ignoring ADARA Paused Non-Run file: " << p);
 		paused_file = true;
 	}
@@ -773,7 +773,7 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	}
 	// *Only* Support Addendums to Run Containers, Not Between Runs...
 	else if ( sscanf(p.filename().c_str(), "m%u-f%u-add%u-run-%u.adara",
-			&modeNumber, &fileNumber, &addendumFileNumber,
+			&modeIndex, &fileIndex, &addendumFileNumber,
 			&runNumber) == 4 ) {
 		// Verify Valid Addendum File Number...
 		if ( !addendumFileNumber ) {
@@ -787,7 +787,7 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	}
 	// *Only* Support Addendums to Run Containers, Not Between Runs...
 	else if ( sscanf(p.filename().c_str(), "f%u-add%u-run-%u.adara",
-			&fileNumber, &addendumFileNumber, &runNumber) == 3 ) {
+			&fileIndex, &addendumFileNumber, &runNumber) == 3 ) {
 		// Verify Valid Addendum File Number...
 		if ( !addendumFileNumber ) {
 			WARN("Improperly named ADARA file"
@@ -809,23 +809,23 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		saved_file = true; // Categorize All Prologue Files as "Saved"
 	}
 	else if ( sscanf(p.filename().c_str(), "prologue-m%u-run-%u.adara",
-			&modeNumber, &runNumber) == 2 ) {
+			&modeIndex, &runNumber) == 2 ) {
 		save_type = "Run Prologue";
 		saved_file = true; // Categorize All Prologue Files as "Saved"
 	}
 	else if ( sscanf(p.filename().c_str(), "prologue-m%u.adara",
-			&modeNumber ) == 1 ) {
+			&modeIndex ) == 1 ) {
 		save_type = "Non-Run Prologue";
 		saved_file = true; // Categorize All Prologue Files as "Saved"
 	}
 	else if ( sscanf(p.filename().c_str(), "m%u-f%u-run-%u.adara",
-				&modeNumber, &fileNumber, &runNumber) != 3
+				&modeIndex, &fileIndex, &runNumber) != 3
 			&& sscanf(p.filename().c_str(), "f%u-run-%u.adara",
-				&fileNumber, &runNumber) != 2
+				&fileIndex, &runNumber) != 2
 			&& sscanf(p.filename().c_str(), "m%u-f%u.adara",
-				&modeNumber, &fileNumber) != 2
+				&modeIndex, &fileIndex) != 2
 			&& sscanf(p.filename().c_str(), "f%u.adara",
-				&fileNumber) != 1 ) {
+				&fileIndex) != 1 ) {
 		WARN("Improperly named ADARA file: " << p);
 		return StorageFile::SharedPtr();
 	}
@@ -836,7 +836,7 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 		saved_size = fileSize( path );
 		
 		// DEBUG("Ignoring ADARA Data Source " << sourceId
-			// << " PauseMode " << modeNumber
+			// << " PauseMode Mode Index " << modeIndex
 			// << " Saved Input Stream " << save_type << " file: " << p
 			// << " (" << saved_size << " bytes)");
 
@@ -846,7 +846,7 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	// Ok to Have Omitted PauseMode Number == 0... (For Backwards Compat)
 
 	// Verify Valid File Number...
-	if ( !fileNumber ) {
+	if ( !fileIndex ) {
 		WARN("Improperly named ADARA file (Zero File Number): " << p);
 		return StorageFile::SharedPtr();
 	}
@@ -867,7 +867,7 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 
 	// (Fyi, Non-Zero Paused File Number Forces File to Paused State...!)
 	StorageFile::SharedPtr f(
-		new StorageFile(owner, paused_file, modeNumber, fileNumber,
+		new StorageFile(owner, paused_file, modeIndex, fileIndex,
 			pauseFileNumber) );
 	f->m_path = path;
 
