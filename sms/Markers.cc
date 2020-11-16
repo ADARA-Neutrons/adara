@@ -1314,10 +1314,11 @@ void Markers::onPrologue( bool capture_last )
 	{
 		std::stringstream ss;
 		ss << "[NEW RUN FILE CONTINUATION] ";
-		if ( !inRun )
-			ss << "[PRE-RUN] ";
-		ss << "Run ";
-		if ( inRun ) ss << runNumber << " ";
+		if ( !inRun ) {
+			ss << "[PRE-RUN] Data Collection ";
+		} else {
+			ss << "Run " << runNumber << " ";
+		}
 		ss << "Paused.";
 		DEBUG("onPrologue() " << ss.str());
 		emitPrologue( ADARA::MarkerType::PAUSE, ss.str() );
