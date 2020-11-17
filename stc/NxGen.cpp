@@ -1180,6 +1180,20 @@ NxGen::dumpProcessingStatistics(void)
     syslog( LOG_INFO, "[%i] %s = %lf",
         g_pid, "STC Overhead Ratio", overhead_ratio );
     usleep(30000); // give syslog a chance...
+
+    // StreamParser Testing/Diagnostic Statistics
+
+    syslog( LOG_INFO, "[%i] %s = %ld",
+        g_pid, "Total Input Stream Byte Count of ADARA packets",
+        m_total_bytes_count );
+    usleep(30000); // give syslog a chance...
+
+    double stream_bandwidth = (double) m_total_bytes_count
+        / (double) stc_duration;
+
+    syslog( LOG_INFO, "[%i] %s = %lf bytes/sec",
+        g_pid, "Average Stream Bandwidth", stream_bandwidth );
+    usleep(30000); // give syslog a chance...
 }
 
 

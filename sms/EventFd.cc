@@ -34,7 +34,7 @@ EventFd::EventFd( callback cb )
 	init( EFD_NONBLOCK );
 	// File Descriptor Created in init() (or std::runtime_error thrown...)
 	try {
-		m_ready = new ReadyAdapter( m_fd, fdrRead, cb );
+		m_ready = new ReadyAdapter( m_fd, fdrRead, cb, 1 /* verbose */ );
 	} catch (std::exception &e) {
 		ERROR("EventFd(): Exception Creating ReadyAdapter: " << e.what());
 		m_ready = NULL; // just to be sure... ;-b

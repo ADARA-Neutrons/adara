@@ -2188,10 +2188,10 @@ StorageManager::findContainerByTime(
 	if ( ignore_pkt_timestamp )
 	{
 		found_it = m_containerStack.begin();
-		// REMOVEME
+
 		if ( found_it != m_containerStack.end() )
 		{
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 1 )
 			{
 				DEBUG("findContainerByTime(): " << label
 					<< " Ignore Packet TimeStamp,"
@@ -2235,8 +2235,7 @@ StorageManager::findContainerByTime(
 						&& (*it)->maxTime().tv_nsec == 0 )
 					|| compareTimeStamps( (*it)->maxTime(), ts ) >= 0 ) )
 			{
-				// REMOVEME
-				if ( ctrl->verbose() )
+				if ( ctrl->verbose() > 1 )
 				{
 					DEBUG("findContainerByTime():"
 						<< " Found " << label << " Container "
@@ -2301,8 +2300,7 @@ StorageManager::findContainerByTime(
 			struct timespec old_ts =
 				ctrl->oldestMaxDataSourceTime(); // EPICS Time...!
 
-			// REMOVEME
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 2 )
 			{
 				DEBUG("findContainerByTime(): " << label
 					<< " Container " << (*it)->name()

@@ -26,16 +26,24 @@ private:
 	typedef boost::signals2::connection connection;
 
 	STCClientMgr &m_mgr;
+
 	int m_stc_fd;
 	int m_file_fd;
+
 	off_t m_cur_offset;
+
 	StorageContainer::SharedPtr m_run;
+
 	bool m_send_paused_data;
+
 	ReadyAdapter *m_read;
 	ReadyAdapter *m_write;
+
 	TimerAdapter<STCClient> *m_timer;
+
 	connection m_contConnection;
 	connection m_fileConnection;
+
 	STCClientMgr::Disposition m_disp;
 	std::string m_reason;
 
@@ -43,6 +51,7 @@ private:
 
 	void readable(void);
 	void writable(void);
+
 	bool sendHeartbeat(void);
 
 	void sendDataDone(void);

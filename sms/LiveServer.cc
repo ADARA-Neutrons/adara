@@ -219,6 +219,8 @@ void LiveServer::setupListener(void)
 
 	// Set Up New Listener Connection
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	struct addrinfo hints;
 	int val, rc, flags;
 	char *node;
@@ -324,8 +326,8 @@ void LiveServer::setupListener(void)
 
 	try {
 		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
-			boost::bind(&LiveServer::newConnection,
-				this));
+			boost::bind(&LiveServer::newConnection, this),
+			ctrl->verbose());
 	}
 	catch (std::exception &e) {
 		ERROR("setupListener(): Exception in Ready Adapter - " << e.what());

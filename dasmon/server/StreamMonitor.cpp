@@ -1,5 +1,6 @@
 #include "StreamMonitor.h"
 #include <iostream>
+#include <sstream>
 #include <string.h>
 #include <boost/bind.hpp>
 #include <boost/algorithm/string.hpp>
@@ -11,6 +12,7 @@
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
 #include <syslog.h>
+#include <unistd.h>
 
 
 // Only count pulses with pixel errors - not individual pixel errors
@@ -102,6 +104,7 @@ void
 StreamMonitor::start()
 {
     syslog( LOG_INFO, "Start processing request." );
+    usleep(30000); // give syslog a chance...
 
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
@@ -116,6 +119,7 @@ void
 StreamMonitor::stop()
 {
     syslog( LOG_INFO, "Stop processing request." );
+    usleep(30000); // give syslog a chance...
 
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
@@ -256,7 +260,7 @@ StreamMonitor::processThread()
     std::string log_info;
 
     syslog( LOG_INFO, "Stream monitor process thread started." );
-
+    usleep(30000); // give syslog a chance...
 
     m_notify.connectionStatus( false, m_sms_host, m_sms_port );
     m_proc_state = TS_RUNNING;
@@ -287,6 +291,7 @@ StreamMonitor::processThread()
                 else if ( !read( m_fd_in, log_info, 0, ADARA_IN_BUF_SIZE ))
                 {
                     syslog( LOG_WARNING, "ADARA::POSIXParser::read() returned 0 (%s). Dropping connection.", log_info.c_str() );
+                    usleep(30000); // give syslog a chance...
                     // Connection lost due to source closing socket
                     handleLostConnection();
                 }
@@ -298,6 +303,7 @@ StreamMonitor::processThread()
 
             // TODO Really need to notify someone that something BAD has happened!
             syslog( LOG_WARNING, "In processThread(): std::exception caught. Dropping connection. Exception = %s", e.what() );
+            usleep(30000); // give syslog a chance...
             // Connection lost
             handleLostConnection();
             // This is probably a misbehaving data source, wait a bit before retrying
@@ -314,6 +320,7 @@ StreamMonitor::processThread()
 
             // TODO Really need to notify someone that something BAD has happened!
             syslog( LOG_WARNING, "In processThread(): Unknown exception type caught. Dropping connection." );
+            usleep(30000); // give syslog a chance...
             // Connection lost
             handleLostConnection();
             // This is probably a misbehaving data source, wait a bit before retrying
@@ -327,6 +334,7 @@ StreamMonitor::processThread()
     }
 
     syslog( LOG_INFO, "Stream monitor process thread stopping." );
+    usleep(30000); // give syslog a chance...
     m_proc_state = TS_EXIT;
 }
 
@@ -349,6 +357,7 @@ StreamMonitor::connect()
     if ( sms_socket < 0 )
     {
         syslog( LOG_ERR, "Failed to Create SMS Socket!" );
+        usleep(30000); // give syslog a chance...
         return -1;
     }
 
@@ -383,24 +392,28 @@ StreamMonitor::connect()
             if ( write( sms_socket, data, sizeof(data)) == sizeof( data ))
             {
                 syslog( LOG_NOTICE, "Connected to SMS." );
+                usleep(30000); // give syslog a chance...
                 return sms_socket;
             }
             else
             {
                 syslog( LOG_ERR, "Failed to Write Hello to SMS at %s!",
                     m_sms_host.c_str() );
+                usleep(30000); // give syslog a chance...
             }
         }
         else
         {
             syslog( LOG_ERR, "Failed to Connect to SMS at %s!",
                 m_sms_host.c_str() );
+            usleep(30000); // give syslog a chance...
         }
     }
     else
     {
         syslog( LOG_ERR, "Failed to Get Host by Name for %s!",
             m_sms_host.c_str() );
+        usleep(30000); // give syslog a chance...
     }
 
     close( sms_socket );
@@ -422,8 +435,23 @@ StreamMonitor::handleLostConnection()
     // Clear data from input ADARA buffer
     reset();
 
-    resetStreamStats();
+    // Log Pre-Disconnect Run Stats...
+    stringstream ssr;
+    m_run_metrics.print( ssr );
+    syslog( LOG_ERR, "%s: Lost SMS Connection - %s",
+        "handleLostConnection()", ssr.str().c_str() );
+    usleep(30000); // give syslog a chance...
+
+    // Log Pre-Disconnect Stream Stats...
+    stringstream ssm;
+    m_stream_metrics.print( ssm );
+    syslog( LOG_ERR, "%s: Lost SMS Connection - %s",
+        "handleLostConnection()", ssm.str().c_str() );
+    usleep(30000); // give syslog a chance...
+
     resetRunStats();
+
+    resetStreamStats();
 
     // Lock here as clearPVs does not provide gaurded access
     boost::lock_guard<boost::mutex> lock(m_mutex);
@@ -458,7 +486,6 @@ StreamMonitor::resetStreamStats()
     m_mon_count_info.clear();
     m_pcharge.reset();
     m_pfreq.reset();
-    //m_beam_metrics.clear();
     m_stream_rate = 0;
 }
 
@@ -481,6 +508,7 @@ StreamMonitor::metricsThread()
     StreamMetrics   stream_metrics;
 
     syslog( LOG_INFO, "Stream metrics thread started." );
+    usleep(30000); // give syslog a chance...
 
     while( m_process_stream )
     {
@@ -488,7 +516,7 @@ StreamMonitor::metricsThread()
         ++m_metrics_ticker;
         sleep(1);
 
-        // If connected, send beam info and beam metrics
+        // If connected to the SMS, send beam info and beam metrics
         if ( m_fd_in > -1 )
         {
             m_metrics_state = TS_RUNNING;
@@ -511,9 +539,14 @@ StreamMonitor::metricsThread()
             beam_metrics.m_pulse_freq =  m_pfreq.average();
             beam_metrics.m_stream_bps = m_stream_size; // Size = rate so long as polling is at 1 second
 
+            map<uint32_t,CountInfo<uint64_t> >::iterator im;
             beam_metrics.m_monitor_count_rate.clear();
-            for ( map<uint32_t,CountInfo<uint64_t> >::iterator im = m_mon_count_info.begin(); im != m_mon_count_info.end(); ++im )
-                beam_metrics.m_monitor_count_rate[im->first] = im->second.average() * 60;
+            for ( im = m_mon_count_info.begin();
+                    im != m_mon_count_info.end(); ++im )
+            {
+                beam_metrics.m_monitor_count_rate[im->first] =
+                    im->second.average() * 60;
+            }
 
             // Update total charge
             if ( m_recording )
@@ -523,6 +556,7 @@ StreamMonitor::metricsThread()
             }
 
             stream_metrics = m_stream_metrics;
+
             m_stream_size = 0;
             m_bnk_pkt_count = 0;
             m_bnk_state_pkt_count = 0;
@@ -530,18 +564,59 @@ StreamMonitor::metricsThread()
 
             // Release lock and notify listeners
             lock.unlock();
+
+            // Pre-Increment Send/Log Counter
+            ++count;
+
+            // Log Beam Metrics Every 8 Seconds
+            if ( !(count & 0x7) )
+            {
+                stringstream ssb;
+                beam_metrics.print( ssb );
+                syslog( LOG_ERR, "%s: %s",
+                    "metricsThread()", ssb.str().c_str() );
+                usleep(30000); // give syslog a chance...
+            }
+
+            // Send Beam Metrics Every Second
             m_notify.beamMetrics( beam_metrics );
 
+            // If Recording, Send Run Metrics Every Second
             if ( m_recording )
-                m_notify.runMetrics( run_metrics );
+            {
+                // Log Run Metrics Every 8 Seconds
+                if ( !(count & 0x7) )
+                {
+                    stringstream ssr;
+                    run_metrics.print( ssr );
+                    syslog( LOG_ERR, "%s: %s",
+                        "metricsThread()", ssr.str().c_str() );
+                    usleep(30000); // give syslog a chance...
+                }
 
-            // Send stream metrics every 4 seconds
-            if ( !(++count & 0x3 ))
-                m_notify.streamMetrics( m_stream_metrics );
+                m_notify.runMetrics( run_metrics );
+            }
+
+            // Send Stream Metrics Every 4 Seconds
+            if ( !(count & 0x3) )
+            {
+                // Log Stream Metrics Every 16 Seconds
+                if ( !(count & 0xf) )
+                {
+                    stringstream ssm;
+                    stream_metrics.print( ssm );
+                    syslog( LOG_ERR, "%s: %s",
+                        "metricsThread()", ssm.str().c_str() );
+                    usleep(30000); // give syslog a chance...
+                }
+
+                m_notify.streamMetrics( stream_metrics );
+            }
         }
     }
 
     syslog( LOG_INFO, "Stream metrics thread stopping." );
+    usleep(30000); // give syslog a chance...
 
     ++m_metrics_ticker;
     m_metrics_state = TS_EXIT;
@@ -564,6 +639,7 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
 
     boost::unique_lock<boost::mutex> lock(m_mutex);
     m_stream_size += a_pkt.packet_length();
+    m_run_metrics.m_total_bytes_count += a_pkt.packet_length();
     lock.unlock();
 
     try
@@ -662,12 +738,40 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         boost::lock_guard<boost::mutex> lock(m_mutex);
 
         m_recording = true;
+
         m_run_num = a_pkt.runNumber();
         m_run_timestamp = a_pkt.timestamp().tv_sec;
         m_run_timestamp_nanosec = a_pkt.timestamp().tv_nsec;
 
         m_pixbankmap_processed = false;
+
+        // Subtract Run Status Packet from Total Bytes...
+        // - This Packet is (Almost) the "First" One in the Run...
+        // (We Can't "Know" to Deduct the Preceding "SYNC" Packet Size
+        // (44 bytes) Here... ;-)
+        m_run_metrics.m_total_bytes_count -= a_pkt.packet_length();
+
+        // Log Pre-Run Run Stats...
+        stringstream ssr;
+        m_run_metrics.print( ssr );
+        syslog( LOG_ERR, "%s: Pre-Run Stats - %s",
+            "rxPacket(RunStatusPkt)", ssr.str().c_str() );
+        usleep(30000); // give syslog a chance...
+
+        // Log Pre-Disconnect Stream Stats...
+        stringstream ssm;
+        m_stream_metrics.print( ssm );
+        syslog( LOG_ERR, "%s: Pre-Run Stats - %s",
+            "rxPacket(RunStatusPkt)", ssm.str().c_str() );
+        usleep(30000); // give syslog a chance...
+
         resetRunStats();
+
+        // Now Add Run Status Packet Size to New Total Bytes...
+        // - This Packet is (Almost) the "First" One in the Run...
+        // (We Can't "Know" to Add the Preceding "SYNC" Packet Size
+        // (44 bytes) Here... ;-)
+        m_run_metrics.m_total_bytes_count += a_pkt.packet_length();
 
         m_notify.runStatus( true, m_run_num,
             m_run_timestamp, m_run_timestamp_nanosec );
@@ -680,9 +784,27 @@ StreamMonitor::rxPacket( const ADARA::RunStatusPkt &a_pkt )
         boost::lock_guard<boost::mutex> lock(m_mutex);
 
         m_recording = false;
+
         m_run_num = 0;
         m_run_timestamp = a_pkt.timestamp().tv_sec;
         m_run_timestamp_nanosec = a_pkt.timestamp().tv_nsec;
+
+        // Note: Ok to Leave Run Status Packet Size in Run Total Bytes...
+        // - This Packet is Indeed the "Last" One in the Run...
+
+        // Log Pre-Run Run Stats...
+        stringstream ssr;
+        m_run_metrics.print( ssr );
+        syslog( LOG_ERR, "%s: Final Run Stats - %s",
+            "rxPacket(RunStatusPkt)", ssr.str().c_str() );
+        usleep(30000); // give syslog a chance...
+
+        // Log Pre-Disconnect Stream Stats...
+        stringstream ssm;
+        m_stream_metrics.print( ssm );
+        syslog( LOG_ERR, "%s: Final Run Stats - %s",
+            "rxPacket(RunStatusPkt)", ssm.str().c_str() );
+        usleep(30000); // give syslog a chance...
 
         resetRunStats();
 
@@ -765,6 +887,7 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingAltPkt &a_pkt )
 
         syslog( LOG_ERR, "%s: Max Logical PixelId = %u",
             "ADARA::PixelMappingAltPkt", max_pid );
+        usleep(30000); // give syslog a chance...
 
         // Build Logical-Pid-to-Bank Index
         rpos = (const uint32_t *) a_pkt.mappingData();
@@ -1939,6 +2062,7 @@ StreamMonitor::dbThread()
     m_db_state = TS_ENTER;
 
     syslog( LOG_INFO, "Database update thread started." );
+    usleep(30000); // give syslog a chance...
 
     // Attempt to connect
     string connect_string;
@@ -1986,6 +2110,7 @@ StreamMonitor::dbThread()
         if ( conn )
         {
             syslog( LOG_INFO, "Database Connected." );
+            usleep(30000); // give syslog a chance...
             ++m_db_ticker;
             m_db_state = TS_RUNNING;
 
@@ -2083,8 +2208,11 @@ StreamMonitor::dbThread()
                     {
                         syslog( LOG_ERR,
                             "Database Double Update Call Failed." );
+                        usleep(30000); // give syslog a chance...
                         syslog( LOG_ERR, PQresultErrorMessage( res ));
+                        usleep(30000); // give syslog a chance...
                         syslog( LOG_ERR, buf );
+                        usleep(30000); // give syslog a chance...
 
                         PQclear( res );
                         update = false;
@@ -2116,8 +2244,11 @@ StreamMonitor::dbThread()
                     {
                         syslog( LOG_ERR,
                             "Database Int Update Call Failed." );
+                        usleep(30000); // give syslog a chance...
                         syslog( LOG_ERR, PQresultErrorMessage( res ));
+                        usleep(30000); // give syslog a chance...
                         syslog( LOG_ERR, buf );
+                        usleep(30000); // give syslog a chance...
 
                         PQclear( res );
                         update = false;
@@ -2149,8 +2280,11 @@ StreamMonitor::dbThread()
                     {
                         syslog( LOG_ERR,
                             "Database String Update Call Failed." );
+                        usleep(30000); // give syslog a chance...
                         syslog( LOG_ERR, PQresultErrorMessage( res ));
+                        usleep(30000); // give syslog a chance...
                         syslog( LOG_ERR, buf );
+                        usleep(30000); // give syslog a chance...
 
                         PQclear( res );
                         update = false;
@@ -2165,18 +2299,21 @@ StreamMonitor::dbThread()
             }
             PQfinish( conn );
             syslog( LOG_INFO, "Database Disconnected." );
+            usleep(30000); // give syslog a chance...
             m_db_state = TS_DB_ERROR;
             ++m_db_ticker;
         }
         else
         {
             syslog( LOG_INFO, "Database Connect FAILED!" );
+            usleep(30000); // give syslog a chance...
         }
 
         // Error may have been caused by DB being off-line,
         // or network error...
         // wait a bit and try connecting again
         syslog( LOG_INFO, "Sleeping Before Database Connection Attempt." );
+        usleep(30000); // give syslog a chance...
         for ( i = 0; i < 15; ++i )
         {
             sleep( 1 );
@@ -2185,6 +2322,7 @@ StreamMonitor::dbThread()
     }
 
     syslog( LOG_INFO, "Database update thread stopping." );
+    usleep(30000); // give syslog a chance...
     m_db_state = TS_EXIT;
 }
 #endif

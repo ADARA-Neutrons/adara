@@ -44,12 +44,13 @@
 #include "StreamMonitor.h"
 #include <boost/program_options.hpp>
 #include <syslog.h>
+#include <unistd.h>
 #include "ADARAUtils.h"
 
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.6.2"
+#define DASMON_VERSION "1.6.3"
 
 
 bool g_child_signal = false;
@@ -78,6 +79,7 @@ signalParent( int ret_code )
     {
         int e = errno;
         syslog( LOG_ERR, "Unable to signal parent: %s", strerror(e));
+        usleep(30000); // give syslog a chance...
     }
 }
 
@@ -91,6 +93,7 @@ daemonize()
     {
         int e = errno;
         syslog( LOG_ERR, "Unable to fork: %s", strerror(e));
+        usleep(30000); // give syslog a chance...
         exit(1);
     }
 
@@ -110,6 +113,7 @@ daemonize()
     {
         int e = errno;
         syslog( LOG_ERR, "Unable to setsid: %s", strerror(e));
+        usleep(30000); // give syslog a chance...
         exit(1);
     }
 
@@ -118,6 +122,7 @@ daemonize()
     {
         int e = errno;
         syslog( LOG_ERR, "Second fork failed: %s", strerror(e));
+        usleep(30000); // give syslog a chance...
         exit(1);
     }
     else if ( pid )
@@ -142,12 +147,14 @@ daemonize()
     // Reopen log
     openlog( "dasmond", 0, LOG_DAEMON );
     syslog( LOG_INFO, "dasmond daemon starting" );
+    usleep(30000); // give syslog a chance...
 
     // Chdir to "/"
     if ( chdir("/") < 0 )
     {
         int e = errno;
         syslog( LOG_ERR, "Chdir failed: %s", strerror(e));
+        usleep(30000); // give syslog a chance...
         exit(1);
     }
 }
@@ -225,8 +232,8 @@ int main(int argc, char *argv[])
     else if ( opt_map.count( "version" ) && !daemon )
     {
         cout << DASMON_VERSION
-			<< " (ADARA Common " << ADARA::VERSION
-			<< ", ComBus " << ADARA::ComBus::VERSION << ")" << endl;
+            << " (ADARA Common " << ADARA::VERSION
+            << ", ComBus " << ADARA::ComBus::VERSION << ")" << endl;
         return 0;
     }
 
@@ -234,13 +241,15 @@ int main(int argc, char *argv[])
 
     openlog( "dasmond", 0, LOG_DAEMON );
     syslog( LOG_INFO,
-		"Dasmon Daemon %s Started. (%s %s, %s %s)", DASMON_VERSION,
-		"ADARA Common", ADARA::VERSION.c_str(),
-		"ComBus", ADARA::ComBus::VERSION.c_str() );
+        "Dasmon Daemon %s Started. (%s %s, %s %s)", DASMON_VERSION,
+        "ADARA Common", ADARA::VERSION.c_str(),
+        "ComBus", ADARA::ComBus::VERSION.c_str() );
+    usleep(30000); // give syslog a chance...
 
     if ( !opt_map.count( "domain" ))
     {
         syslog( LOG_WARNING, "No communication domain specified - probably an error." );
+        usleep(30000); // give syslog a chance...
         cout << "No communication domain specified - probably an error."  << endl;
     }
 
@@ -249,15 +258,21 @@ int main(int argc, char *argv[])
         daemonize();
 
     ADARA::ComBus::Connection *combus = new ADARA::ComBus::Connection(
-		domain, "DASMON", 0, broker_uri, broker_user, broker_pass,
-		"Dasmon Daemon ComBus", "Dasmon Daemon Error ComBus" );
+        domain, "DASMON", 0, broker_uri, broker_user, broker_pass,
+        "Dasmon Daemon ComBus", "Dasmon Daemon Error ComBus" );
 
     try
     {
         if ( !combus->waitForConnect( 5 ) )
+        {
             syslog( LOG_ERR, "ComBus: Failed to Connect to AMQP!" );
+            usleep(30000); // give syslog a chance...
+        }
         else
+        {
             syslog( LOG_NOTICE, "ComBus: Connected to AMQP." );
+            usleep(30000); // give syslog a chance...
+        }
 
 #ifndef NO_DB
         StreamMonitor   monitor( sms_host, sms_port, db_info.name.empty()?0:&db_info, max_tof );
@@ -286,11 +301,14 @@ int main(int argc, char *argv[])
     catch( exception &e )
     {
         syslog( LOG_ERR, "Unhandled exception: %s", e.what());
+        usleep(30000); // give syslog a chance...
     }
 
     delete combus;
 
     syslog( LOG_INFO, "Dasmon service stopping." );
+    usleep(30000); // give syslog a chance...
+
     closelog();
 
     return res;

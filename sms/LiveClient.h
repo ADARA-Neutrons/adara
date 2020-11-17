@@ -31,21 +31,37 @@ private:
 	typedef std::pair<StorageFile::SharedPtr, off_t> FileEntry;
 	typedef std::list<FileEntry> FileList;
 
+	typedef std::pair<StorageContainer::SharedPtr, bool> ContEntry;
+	typedef std::list<ContEntry> ContList;
+
 	LiveServer *m_server;
 
+	ContList m_conts;
+
 	FileList m_files;
+
+	bool m_starting_new_file;
+
+	off_t m_bytes_written;
+
 	ReadyAdapter *m_read;
 	ReadyAdapter *m_write;
+
 	bool m_hello_received;
+
 	int m_client_fd;
 	int m_file_fd;
+
 	bool m_send_paused_data;
+
 	uint32_t m_client_flags;
 
 	TimerAdapter<LiveClient> *m_timer;
+
 	connection m_mgrConnection;
 	connection m_contConnection;
 	connection m_fileConnection;
+
 	std::string m_clientName;
 	int32_t m_clientId;
 
@@ -55,8 +71,10 @@ private:
 	boost::shared_ptr<smsConnectedPV> m_pvStatus;
 
 	void containerChange(StorageContainer::SharedPtr &, bool);
+
 	void historicalFile(StorageFile::SharedPtr &f, off_t start);
 	void fileAdded(StorageFile::SharedPtr &f);
+
 	void fileUpdated(const StorageFile &f);
 
 	void writable(void);

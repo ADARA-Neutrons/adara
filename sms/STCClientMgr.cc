@@ -468,6 +468,8 @@ void STCClientMgr::startConnect(void)
 
 void STCClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	struct addrinfo *ai;
 	int flags, rc;
 
@@ -622,7 +624,8 @@ void STCClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	// File Descriptor Already Checked Above...
 	try {
 		m_fdreg = new ReadyAdapter(m_fd, fdrWrite,
-			boost::bind(&STCClientMgr::connectComplete, this));
+			boost::bind(&STCClientMgr::connectComplete, this),
+			ctrl->verbose());
 	} catch (std::exception &e) {
 		ERROR("Exception in lookupComplete()"
 			<< " Creating ReadyAdapter Write - " << e.what());

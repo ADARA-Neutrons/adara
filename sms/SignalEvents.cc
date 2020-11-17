@@ -63,7 +63,8 @@ void SignalEvents::check_init(void)
 
 	try {
 		m_read = new ReadyAdapter(m_fd, fdrRead,
-			boost::bind(&SignalEvents::signaled, this));
+			boost::bind(&SignalEvents::signaled, this),
+			1 /* verbose */);
 	} catch (std::exception &e) {
 		std::string msg(
 			"Exception Creating ReadyAdapter in check_init() - ");

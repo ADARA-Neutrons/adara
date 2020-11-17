@@ -73,7 +73,7 @@ static LoggerPtr logger(Logger::getLogger("SMS"));
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-std::string SMSD_VERSION = "1.7.0";
+std::string SMSD_VERSION = "1.7.1";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;

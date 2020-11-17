@@ -3,6 +3,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/tokenizer.hpp>
 #include <syslog.h>
+#include <unistd.h>
 
 #include "ADARA.h"
 #include "ComBus.h"
@@ -129,6 +130,7 @@ StreamAnalyzer::loadConfig()
     if ( !inf.is_open())
     {
         syslog( LOG_ERR, "Could not open configuration file: %s", cfg.c_str() );
+        usleep(30000); // give syslog a chance...
     }
     else
     {
@@ -207,15 +209,20 @@ StreamAnalyzer::loadConfig()
             if ( !setDefinitions( loaded_rules, loaded_signals, errors ))
             {
                 syslog( LOG_ERR, "Failed setting rules from configuration file: %s", cfg.c_str() );
+                usleep(30000); // give syslog a chance...
 
                 for ( map<string,string>::iterator ie = errors.begin(); ie != errors.end(); ++ie )
+                {
                     syslog( LOG_ERR, "Config error on %s: %s", ie->first.c_str(), ie->second.c_str() );
+                    usleep(30000); // give syslog a chance...
+                }
             }
         }
         catch ( ... )
         {
             inf.close();
             syslog( LOG_ERR, "Error at line %i in configuration file: %s", line_no, cfg.c_str() );
+            usleep(30000); // give syslog a chance...
         }
     }
 }
@@ -235,6 +242,7 @@ StreamAnalyzer::saveConfig()
     if ( !outf.is_open())
     {
         syslog( LOG_ERR, "Could not open configuration file: %s", cfg.c_str() );
+        usleep(30000); // give syslog a chance...
         return;
     }
 
@@ -304,6 +312,7 @@ StreamAnalyzer::restoreDefaultConfig()
     catch ( ... )
     {
         syslog( LOG_ERR, "Could not restore default rule configuration file." );
+        usleep(30000); // give syslog a chance...
     }
 }
 
@@ -330,6 +339,7 @@ StreamAnalyzer::setDefaultConfig()
     catch ( ... )
     {
         syslog( LOG_ERR, "Could not set default rule configuration file." );
+        usleep(30000); // give syslog a chance...
     }
 }
 

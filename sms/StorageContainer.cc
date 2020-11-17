@@ -437,8 +437,7 @@ void StorageContainer::getPauseModeByTime(
 		found_it = m_pauseModeStack.begin();
 		if ( found_it != m_pauseModeStack.end() )
 		{
-			// REMOVEME
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 1 )
 			{
 				DEBUG("getPauseModeByTime():"
 					<< " Ignore Packet TimeStamp,"
@@ -490,8 +489,7 @@ void StorageContainer::getPauseModeByTime(
 					&& it->m_maxTime.tv_nsec == 0 )
 				|| compareTimeStamps( it->m_maxTime, ts ) >= 0 ) )
 		{
-			// REMOVEME
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 1 )
 			{
 				DEBUG("getPauseModeByTime():"
 					<< " Found PauseMode " << it->m_numModes
@@ -575,8 +573,7 @@ void StorageContainer::getPauseModeByTime(
 				pausemode_expire.tv_sec++;
 			}
 
-			// REMOVEME
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 2 )
 			{
 				DEBUG("getPauseModeByTime():"
 					<< " PauseMode " << it->m_numModes
@@ -1667,7 +1664,7 @@ uint64_t StorageContainer::blocks(void) const
 
 bool StorageContainer::validate(void)
 {
-	if (m_files.empty()) {
+	if ( m_files.empty() ) {
 		WARN("Container " << m_name << " has no data files");
 		return true;
 	}
@@ -1676,30 +1673,88 @@ bool StorageContainer::validate(void)
 
 	uint32_t addendumExpected = 0;
 	uint32_t pauseExpected = 0;
-	uint32_t expected = 0;
+	uint32_t fileExpected = 0;
+	uint32_t modeExpected = 0;
+
+	bool use_mode_index = false;  // default to Pre-1.7.0 naming convention
 
 	bool last_paused = true;   // funny logic...! ;-D
 
-	for (it = m_files.begin(); it != end; ++it) {
+	for ( it = m_files.begin() ; it != end ; ++it ) {
 
 		// DEBUG("validate(): " << (*it)->path());
+
+		// File Names Contain Distinct Mode Index and File Index
+		// (SMS After 1.7.0)
+		uint32_t modeNum = (*it)->modeNumber();
+		uint32_t fileNum = (*it)->fileNumber();
+
+		// Check Which File Naming Convention We Have...
+		if ( modeNum > 0 )
+		{
+			// Did We Switch Modes Mid-Stream...?!
+			if ( !use_mode_index && it != m_files.begin() )
+			{
+				WARN("validate(): Container " << m_name
+					<< " Switched to Mode Index Bookkeeping Mid-Stream!"
+					<< " [" << (*it)->path() << "]");
+				return true;
+			}
+
+			use_mode_index = true;
+		}
+		else
+		{
+			// Did We Switch Modes Mid-Stream...?!
+			if ( use_mode_index && it != m_files.begin() )
+			{
+				WARN("validate(): Container " << m_name
+					<< " Switched to File Index Bookkeeping Mid-Stream!"
+					<< " [" << (*it)->path() << "]");
+				return true;
+			}
+
+			use_mode_index = false;
+		}
+
+		// REMOVEME
+		// DEBUG("validate(): Container " << m_name
+			// << " Mode Index " << modeNum
+			// << " File Index " << fileNum
+			// << " Pause Index " << (*it)->pauseFileNumber()
+			// << " Addendum Index " << (*it)->addendumFileNumber()
+			// << " [" << (*it)->path() << "]");
 
 		// Paused Run File...
 		if ( (*it)->paused() ) {
 			// Reset Expected Addendum File Number for Any Paused File...
 			addendumExpected = 0;
-			if (!last_paused)
-				expected--;
-			if ( (*it)->fileNumber() != expected
+			// Changed Paused State...?
+			if ( !last_paused ) {
+				// New Mode Index File Naming Convention Case...
+				if ( use_mode_index ) {
+					modeExpected++;
+					fileExpected = 1;
+				}
+				// Former Pre-1.7.0 File Naming Convention Case...
+				else {
+					fileExpected--;
+				}
+			}
+			if ( modeNum != modeExpected
+					|| fileNum != fileExpected
 					|| (*it)->addendumFileNumber() != addendumExpected
 					|| (*it)->pauseFileNumber() != ++pauseExpected ) {
-				WARN("Container " << m_name
-					<< " missing Paused Run File number " << pauseExpected
-					<< " (expected Run File number " << expected
-					<< ", got " << (*it)->fileNumber() << ")"
-					<< " (expected Addendum Run File number "
-						<< addendumExpected
-					<< ", got " << (*it)->addendumFileNumber() << ")"
+				WARN("validate(): Container " << m_name
+					<< " Missing Paused Run File:"
+					<< " Expected Mode Index " << modeExpected
+					<< ", got " << modeNum << ";"
+					<< " Expected File Index " << fileExpected
+					<< ", got " << fileNum << ";"
+					<< " Expected Pause Index " << pauseExpected
+					<< ", got " << (*it)->pauseFileNumber() << ";"
+					<< " Expected Addendum Index " << addendumExpected
+					<< ", got " << (*it)->addendumFileNumber() << ";"
 					<< " [" << (*it)->path() << "]");
 				return true;
 			}
@@ -1710,32 +1765,46 @@ bool StorageContainer::validate(void)
 		else {
 			// Reset Expected Paused File Number for Any Non-Pause File...
 			pauseExpected = 0;
-			if (last_paused)
-				expected++;
+			// Changed Paused State...?
+			if ( last_paused ) {
+				// New Mode Index File Naming Convention Case...
+				if ( use_mode_index ) {
+					modeExpected++;
+					fileExpected = 1; // just to be sure...
+				}
+				// Former Pre-1.7.0 File Naming Convention Case...
+				else {
+					fileExpected++;
+				}
+			}
 			if ( (*it)->addendum() ) {
 				// Log Here, In Sorted Order, Rather than in importFile()
-				DEBUG("Including ADARA Run Addendum file: "
+				DEBUG("validate(): Including ADARA Run Addendum file: "
 					<< (*it)->path());
 				addendumExpected++;
-				expected--;
+				fileExpected--;
 			} else {
 				addendumExpected = 0;
 			}
-			if ( (*it)->fileNumber() != expected
+			if ( modeNum != modeExpected
+					|| fileNum != fileExpected
 					|| (*it)->addendumFileNumber() != addendumExpected
 					|| (*it)->pauseFileNumber() != pauseExpected ) {
-				WARN("Container " << m_name
-					<< " missing Run File number " << expected
-					<< " (expected Pause Run File number " << pauseExpected
-					<< ", got " << (*it)->pauseFileNumber() << ")"
-					<< " (expected Addendum Run File number "
-						<< addendumExpected
-					<< ", got " << (*it)->addendumFileNumber() << ")"
+				WARN("validate(): Container " << m_name
+					<< " Missing Run File:"
+					<< " Expected Mode Index " << modeExpected
+					<< ", got " << modeNum << ";"
+					<< " Expected File Index " << fileExpected
+					<< ", got " << fileNum << ";"
+					<< " Expected Pause Index " << pauseExpected
+					<< ", got " << (*it)->pauseFileNumber() << ";"
+					<< " Expected Addendum Index " << addendumExpected
+					<< ", got " << (*it)->addendumFileNumber() << ";"
 					<< " [" << (*it)->path() << "]");
 				return true;
 			}
 			last_paused = false;
-			expected++;
+			fileExpected++;
 		}
 	}
 
@@ -1746,7 +1815,9 @@ bool StorageContainer::validate(void)
 static bool order_by_filenumber(StorageFile::SharedPtr &a,
 				StorageFile::SharedPtr &b)
 {
-	// O.K., Sort First by File Number...
+	// Since ADARA/SMS Version 1.7.0:
+	// - Sort First by Mode Index...
+	// - then by File Index...
 	// - then Any Paused Files, by Pause File Number...
 	// - then Any Addendum Files by Addendum File Number...
 	// (so the Addendum Files can "Resume" Any Preceding Paused State...!)
@@ -1759,11 +1830,22 @@ static bool order_by_filenumber(StorageFile::SharedPtr &a,
 	// (which will All be 0 for the full Paused File sequence... ;-D)
 	// Whew! Clear as mud... ;-Q
 
-	return ( a->fileNumber() == b->fileNumber() ) ?
-		( ( a->addendumFileNumber() || b->addendumFileNumber() ) ?
-			( a->addendumFileNumber() < b->addendumFileNumber() )
-			: ( a->pauseFileNumber() < b->pauseFileNumber() ) )
-		: ( a->fileNumber() < b->fileNumber() );
+	// File Names Contain Distinct Mode Index and File Index
+	// (SMS After 1.7.0)
+
+	uint32_t modeNumA = a->modeNumber();
+	uint32_t fileNumA = a->fileNumber();
+
+	uint32_t modeNumB = b->modeNumber();
+	uint32_t fileNumB = b->fileNumber();
+
+	return( ( modeNumA == modeNumB ) ?
+		( ( fileNumA == fileNumB ) ?
+			( ( a->addendumFileNumber() || b->addendumFileNumber() ) ?
+				( a->addendumFileNumber() < b->addendumFileNumber() )
+				: ( a->pauseFileNumber() < b->pauseFileNumber() ) )
+			: ( fileNumA < fileNumB ) ) :
+		( modeNumA < modeNumB ) );
 }
 
 bool StorageContainer::validatePath(const std::string &in_path,

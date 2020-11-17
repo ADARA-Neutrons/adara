@@ -211,10 +211,11 @@ void Markers::beforeNewRun( uint32_t runNumber,
 	 * -> Do the Un-Pause/Resume _First_ so any Scan Stop Marker will be
 	 * seen for sure in a regular Un-Paused stream data file...
 	 */
-	if ( m_pausedPV->value() ) {
+
+	if ( m_isPaused || m_pausedPV->value() ) {
 		// Set Paused State _Before_ Resume,
 		// for Next Prologue to Use Queued...
-		m_lastIsPaused = m_isPaused;
+		m_lastIsPaused = true;
 		m_isPaused = false;
 		// Clean Up Container before Actual Start!
 		// NOTE: Triggers New File/Prologue with _Current_ State...!
@@ -224,12 +225,17 @@ void Markers::beforeNewRun( uint32_t runNumber,
 		emitPacket( *ts, ADARA::MarkerType::RESUME, m_scanIndex,
 			"", comment );
 		// _This_ update() _Doesn't_ trigger changed()...!
-		m_pausedPV->update(false, ts); // Wallclock Time...!
+		if ( m_pausedPV->value() )
+			m_pausedPV->update(false, ts); // Wallclock Time...!
 		// _Also_ Queue This Resume Comment for _After_ Run Start...
 		// (just use generic Annotation Comment... ;-)
 		resumeQueue.push_back(
 			std::pair<struct timespec, std::string>( *ts,
 				"[PRE-RUN] " + comment ) );
+	}
+	// Still Need to Reset "Last Paused State"...
+	else {
+		m_lastIsPaused = false;
 	}
 
 	if ( m_scanIndex ) {
@@ -245,6 +251,10 @@ void Markers::beforeNewRun( uint32_t runNumber,
 		m_indexPV->update(0, ts); // Wallclock Time...!
 		m_lastScanIndex = m_scanIndex;
 		m_scanIndex = 0;
+	}
+	// Still Need to Reset "Last Scan Index"...
+	else {
+		m_lastScanIndex = 0;
 	}
 
 	// Don't Unset Comment PV(s) on Run Start, _Only_ on Run Stop...
@@ -286,10 +296,11 @@ void Markers::runStop( struct timespec *ts ) // Wallclock Time...!
 	 * -> so any Scan Stop Marker will be seen for sure in a regular
 	 * Un-Paused stream data file...
 	 */
-	if ( m_pausedPV->value() ) {
+
+	if ( m_isPaused || m_pausedPV->value() ) {
 		// Set Paused State _Before_ Resume,
 		// for Next Prologue to Use Queued...
-		m_lastIsPaused = m_isPaused;
+		m_lastIsPaused = true;
 		m_isPaused = false;
 		// Clean Up Container before Full Stop!
 		// Thwart Impending "Scan Start Continuation" Packet
@@ -309,7 +320,12 @@ void Markers::runStop( struct timespec *ts ) // Wallclock Time...!
 		emitPacket( *ts, ADARA::MarkerType::RESUME, m_scanIndex,
 			"", "Warning: Run Resumed at Run Stop!" );
 		// _This_ update() _Doesn't_ trigger changed()...!
-		m_pausedPV->update( false, ts ); // Wallclock Time...!
+		if ( m_pausedPV->value() )
+			m_pausedPV->update( false, ts ); // Wallclock Time...!
+	}
+	// Still Need to Reset "Last Paused State"...
+	else {
+		m_lastIsPaused = false;
 	}
 
 	// (Possibly Redundant _Second_ Queued Dump Attempt, Ok if Empty Now.)
@@ -322,8 +338,12 @@ void Markers::runStop( struct timespec *ts ) // Wallclock Time...!
 		emitPacket( *ts, ADARA::MarkerType::SCAN_STOP, m_scanIndex,
 			"", "Warning: Scan Stopped at Run Stop!" );
 		m_indexPV->update( 0, ts ); // Wallclock Time...!
+		m_lastScanIndex = m_scanIndex;
 		m_scanIndex = 0;
-		m_lastScanIndex = m_scanIndex; // Mirror Run Stop Scan Index Reset
+	}
+	// Still Need to Reset "Last Scan Index"...
+	else {
+		m_lastScanIndex = 0;
 	}
 
 	// Add Run Stop Comment...
@@ -384,9 +404,13 @@ void Markers::pause( struct timespec *ts, // Wallclock Time...!
 
 	if ( passthru != PASSTHRU )
 	{
+		// Save Last Pause/Resume Mode Run State Even If Not At All Changed
+		m_lastRunNumber = m_runNumber;
+		m_lastIsPaused = m_isPaused;
+		m_lastScanIndex = scanIndex;
+		m_lastInRun = m_inRun;
 		// Set Paused State _Before_ Pause for Next Prologue to Skip Queued
 		m_isPaused = true;
-		m_lastIsPaused = m_isPaused; // Mirror Explicit Pause State Change
 		// NOTE: Triggers New File/Prologue with _Current_ State...!
 		m_ctrl->pauseRecording( ts ); // Wallclock Time...!
 	}
@@ -432,9 +456,13 @@ void Markers::resume( struct timespec *ts, // Wallclock Time...!
 
 	if ( passthru != PASSTHRU )
 	{
+		// Save Last Pause/Resume Mode Run State Even If Not At All Changed
+		m_lastRunNumber = m_runNumber;
+		m_lastIsPaused = m_isPaused;
+		m_lastScanIndex = scanIndex;
+		m_lastInRun = m_inRun;
 		// Set Paused State _Before_ Resume for Next Prologue to Use Queued
 		m_isPaused = false;
-		m_lastIsPaused = m_isPaused; // Mirror Explicit Pause State Change
 		// NOTE: Triggers New File/Prologue with _Current_ State...!
 		m_ctrl->resumeRecording( ts ); // Wallclock Time...!
 	}
@@ -473,6 +501,10 @@ void Markers::startScan( struct timespec *ts, // Wallclock Time...!
 		m_lastScanIndex = m_scanIndex; // Mirror Explicit Scan Index Change
 		scanIndex = m_scanIndex;
 	}
+
+	// Note: There's No Need to Save Last Pause/Resume Mode Run State Here,
+	// As Scan Start/Stop and Scan Index _Do Not_ Affect Pause/Resume Mode
+	// Or Affect the Captured Prologues...!
 
 	std::stringstream ss;
 	if ( !m_inRun )
@@ -519,6 +551,10 @@ void Markers::stopScan( struct timespec *ts, // Wallclock Time...!
 		m_scanIndex = 0;
 		m_lastScanIndex = m_scanIndex; // Mirror Explicit Scan Index Change
 	}
+
+	// Note: There's No Need to Save Last Pause/Resume Mode Run State Here,
+	// As Scan Start/Stop and Scan Index _Do Not_ Affect Pause/Resume Mode
+	// Or Affect the Captured Prologues...!
 
 	std::stringstream ss;
 	if ( !m_inRun )
@@ -1278,10 +1314,11 @@ void Markers::onPrologue( bool capture_last )
 	{
 		std::stringstream ss;
 		ss << "[NEW RUN FILE CONTINUATION] ";
-		if ( !inRun )
-			ss << "[PRE-RUN] ";
-		ss << "Run ";
-		if ( inRun ) ss << runNumber << " ";
+		if ( !inRun ) {
+			ss << "[PRE-RUN] Data Collection ";
+		} else {
+			ss << "Run " << runNumber << " ";
+		}
 		ss << "Paused.";
 		DEBUG("onPrologue() " << ss.str());
 		emitPrologue( ADARA::MarkerType::PAUSE, ss.str() );
