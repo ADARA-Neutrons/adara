@@ -102,6 +102,8 @@ ComBusRouter::run()
     uint32_t last_db_ticker = 0;
     uint32_t db_stall = 0;
 
+    uint32_t TIMEOUT = 300;
+
     while(1)
     {
 
@@ -111,7 +113,7 @@ ComBusRouter::run()
 
         if ( last_proc_ticker == m_monitor.getProcTicker() )
         {
-            if ( ++proc_stall == 3 )
+            if ( ++proc_stall == TIMEOUT )
             {
                 syslog( LOG_ERR, "StreamMonitor stream processing thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getProcState(), m_monitor.getNotifyState() );
                 usleep(30000); // give syslog a chance...
@@ -119,7 +121,7 @@ ComBusRouter::run()
         }
         else
         {
-            if ( proc_stall >= 3 )
+            if ( proc_stall >= TIMEOUT )
             {
                 syslog( LOG_ERR, "StreamMonitor stream processing thread appears to have recovered." );
                 usleep(30000); // give syslog a chance...
@@ -131,7 +133,7 @@ ComBusRouter::run()
 
         if ( last_metrics_ticker == m_monitor.getMetricsTicker() )
         {
-            if ( ++metrics_stall == 3 )
+            if ( ++metrics_stall == TIMEOUT )
             {
                 syslog( LOG_ERR, "StreamMonitor metrics thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getMetricsState(), m_monitor.getNotifyState() );
                 usleep(30000); // give syslog a chance...
@@ -139,7 +141,7 @@ ComBusRouter::run()
         }
         else
         {
-            if ( metrics_stall >= 3 )
+            if ( metrics_stall >= TIMEOUT )
             {
                 syslog( LOG_ERR, "StreamMonitor metrics thread appears to have recovered." );
                 usleep(30000); // give syslog a chance...
@@ -154,7 +156,7 @@ ComBusRouter::run()
         {
             if ( last_db_ticker == m_monitor.getDbTicker() )
             {
-                if ( ++db_stall == 3 )
+                if ( ++db_stall == TIMEOUT )
                 {
                     syslog( LOG_ERR, "StreamMonitor DB thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getDbState(), m_monitor.getNotifyState() );
                     usleep(30000); // give syslog a chance...
@@ -162,7 +164,7 @@ ComBusRouter::run()
             }
             else
             {
-                if ( db_stall >= 3 )
+                if ( db_stall >= TIMEOUT )
                 {
                     syslog( LOG_ERR, "StreamMonitor DB thread appears to have recovered." );
                     usleep(30000); // give syslog a chance...
@@ -181,10 +183,20 @@ ComBusRouter::run()
             // Check to be sure all threads are running (i.e. ticker values should be changing)
             // If a thread is stuck, set fault condition and log failed thread state
 
-            if ( proc_stall < 3 && metrics_stall < 3 && db_stall < 3 )
+            if ( proc_stall < TIMEOUT && metrics_stall < TIMEOUT && db_stall < TIMEOUT )
                 m_combus.status( ADARA::ComBus::STATUS_OK );
             else
+            {
+                syslog( LOG_ERR,
+                    "StreamMonitor %s - %s: %s=%u %s=%u %s=%u %s=%u",
+                    "SYSTEM STALLED", "STATUS FAULT",
+                    "proc_stall", proc_stall,
+                    "metrics_stall", metrics_stall,
+                    "db_stall", db_stall,
+                    "TIMEOUT", TIMEOUT);
+                usleep(30000); // give syslog a chance...
                 m_combus.status( ADARA::ComBus::STATUS_FAULT );
+            }
         }
 
         // Watch for unresponsive / inactive processes
