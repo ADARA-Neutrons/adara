@@ -102,6 +102,9 @@ ComBusRouter::run()
     uint32_t last_db_ticker = 0;
     uint32_t db_stall = 0;
 
+    // Need Sufficient Time for Worst-Case Scenario
+    // With Latest ADARA/SMS Container/PauseMode Stack
+    // Timeout/Cleanup Delays...
     uint32_t TIMEOUT = 300;
 
     while(1)
