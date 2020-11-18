@@ -227,6 +227,8 @@ declare -A nHostSMSDLocalSAWTOOTHData
 declare -A nHostSMSDLocalSAWTOOTHDataREC
 declare -A nHostSMSDGlobalSAWTOOTH
 declare -A nHostSMSDGlobalSAWTOOTHREC
+declare -A nHostSMSDContainerSAWTOOTH
+declare -A nHostSMSDPauseModeSAWTOOTH
 declare -A nHostSMSDPulseBufferOverflow
 declare -A nHostSMSDPulseBufferOverflowREC
 declare -A nHostSMSDPulseNoRegEvent
@@ -463,6 +465,8 @@ PARSE_LOG()
 		nHostSMSDLocalSAWTOOTHDataREC[$host]=0
 		nHostSMSDGlobalSAWTOOTH[$host]=0
 		nHostSMSDGlobalSAWTOOTHREC[$host]=0
+		nHostSMSDContainerSAWTOOTH[$host]=0
+		nHostSMSDPauseModeSAWTOOTH[$host]=0
 		nHostSMSDPulseBufferOverflow[$host]=0
 		nHostSMSDPulseBufferOverflowREC[$host]=0
 		nHostSMSDPulseNoRegEvent[$host]=0
@@ -1408,6 +1412,18 @@ PARSE_LOG()
 					nHostSMSDGlobalSAWTOOTHREC[$host] + 1 ))
 				nRecording=$(( nRecording + 1 ))
 			fi
+
+		# "Container SAWTOOTH" Log
+		elif [[ "$log" =~ Container${S}SAWTOOTH ]]; then
+			#echo "Container SAWTOOTH Pulse..."
+			nHostSMSDContainerSAWTOOTH[$host]=$(( \
+				nHostSMSDContainerSAWTOOTH[$host] + 1 ))
+
+		# "PauseMode SAWTOOTH" Log
+		elif [[ "$log" =~ PauseMode${S}SAWTOOTH ]]; then
+			#echo "PauseMode SAWTOOTH Pulse..."
+			nHostSMSDPauseModeSAWTOOTH[$host]=$(( \
+				nHostSMSDPauseModeSAWTOOTH[$host] + 1 ))
 
 		# "Internal Pulse Buffer Overflow" Log
 		elif [[ "$log" =~ Internal${S}Pulse${S}Buffer${S}Overflow ]]; then
@@ -2519,6 +2535,14 @@ for h in ${HostList} ; do
 		else REC=""; fi
 		echo -n "   ${nHostSMSDGlobalSAWTOOTH[$h]} "
 		echo "SMSD \"Global SAWTOOTH Pulse\" Logs${REC}"
+	fi
+	if [[ ${nHostSMSDContainerSAWTOOTH[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDContainerSAWTOOTH[$h]} "
+		echo "SMSD \"Container SAWTOOTH\" Logs"
+	fi
+	if [[ ${nHostSMSDPauseModeSAWTOOTH[$h]} -gt 0 ]]; then
+		echo -n "   ${nHostSMSDPauseModeSAWTOOTH[$h]} "
+		echo "SMSD \"PauseMode SAWTOOTH\" Logs"
 	fi
 	if [[ ${nHostSMSDPulseNoRegEvent[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDPulseNoRegEventREC[$h]} -gt 0 ]]; then
