@@ -250,6 +250,7 @@ void LiveClient::writable(void)
 				DEBUG("writable(): Skipping Paused File"
 					<< " file=" << f->path()
 					<< " size=" << f->size()
+					<< " m_files.size()=" << m_files.size()
 					<< " for client " << m_clientName
 					<< " (m_client_fd=" << m_client_fd << ")");
 
@@ -263,6 +264,7 @@ void LiveClient::writable(void)
 								<< " File Updated Notify"
 							<< " file=" << f->path()
 							<< " size=" << f->size()
+							<< " m_files.size()=" << m_files.size()
 							<< " for client " << m_clientName
 							<< " (m_client_fd=" << m_client_fd << ")");
 					}
@@ -292,6 +294,7 @@ void LiveClient::writable(void)
 								<< " Connecting Next File Updated Notify"
 								<< " file=" << it->first->path()
 								<< " size=" << it->first->size()
+								<< " m_files.size()=" << m_files.size()
 								<< " for client " << m_clientName
 								<< " (m_client_fd=" << m_client_fd << ")");
 						}
@@ -453,6 +456,7 @@ void LiveClient::writable(void)
 				DEBUG("writable(): Disconnecting File Updated Notify"
 					<< " file=" << f->path()
 					<< " size=" << f->size()
+					<< " m_files.size()=" << m_files.size()
 					<< " for client " << m_clientName
 					<< " (m_client_fd=" << m_client_fd << ")");
 			}
@@ -463,7 +467,7 @@ void LiveClient::writable(void)
 		// Remove File from List...
 		it = m_files.erase(it);
 
-		// Is There is Another File on the List?
+		// Is There Another File on the List?
 		if ( it != m_files.end() )
 		{
 			// Starting a New File...
@@ -481,6 +485,7 @@ void LiveClient::writable(void)
 					DEBUG("writable(): Connecting Next File Updated Notify"
 						<< " file=" << it->first->path()
 						<< " size=" << it->first->size()
+						<< " m_files.size()=" << m_files.size()
 						<< " for client " << m_clientName
 						<< " (m_client_fd=" << m_client_fd << ")");
 				}
@@ -554,6 +559,9 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 	// New Container Starting Up...
 	if ( starting )
 	{
+		// _Always_ Track Each Container on List...
+		m_conts.push_back( std::make_pair( c, starting ) );
+
 		// Connect to Container File Added Notify...
 		if ( !(m_contConnection.connected()) )
 		{
@@ -563,6 +571,7 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 					<< " Connecting New Container File Added Notify "
 						<< c->name()
 					<< " starting=" << starting
+					<< " m_conts.size()=" << m_conts.size()
 					<< " for " << m_clientName
 					<< " (m_client_fd=" << m_client_fd << ")");
 			}
@@ -570,9 +579,17 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 			m_contConnection = c->connect(
 				boost::bind( &LiveClient::fileAdded, this, _1 ) );
 		}
-
-		// _Always_ Track Each Container on List...
-		m_conts.push_back( std::make_pair( c, starting ) );
+		else
+		{
+			DEBUG("containerChange():"
+				<< " New Container Starting Up "
+					<< c->name()
+				<< " Added to Queue"
+				<< " starting=" << starting
+				<< " m_conts.size()=" << m_conts.size()
+				<< " for " << m_clientName
+				<< " (m_client_fd=" << m_client_fd << ")");
+		}
 	}
 
 	// Existing Container Closing Down...
@@ -601,8 +618,11 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 				if ( list_starting )
 				{
 					DEBUG("containerChange():"
-						<< " Marking Container Closed " << list_c->name()
+						<< " Marking"
+						<< ( ( it == m_conts.begin() ) ? " Current" : "" )
+						<< " Container Closed " << list_c->name()
 						<< " list_starting=" << list_starting
+						<< " m_conts.size()=" << m_conts.size()
 						<< " for " << m_clientName
 						<< " (m_client_fd=" << m_client_fd << ")");
 
@@ -611,9 +631,11 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 				else
 				{
 					ERROR("containerChange():"
+						<< ( ( it == m_conts.begin() ) ? " Current" : "" )
 						<< " Container Already Marked Closed? "
 							<< list_c->name()
 						<< " list_starting=" << list_starting
+						<< " m_conts.size()=" << m_conts.size()
 						<< " for " << m_clientName
 						<< " (m_client_fd=" << m_client_fd << ")");
 				}
@@ -630,6 +652,7 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 								<< " Disconnecting Current Container "
 									<< list_c->name()
 								<< " list_starting=" << list_starting
+								<< " m_conts.size()=" << m_conts.size()
 								<< " for " << m_clientName
 								<< " (m_client_fd=" << m_client_fd << ")");
 						}
@@ -642,6 +665,7 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 							<< " Current Container Already Disconnected? "
 								<< list_c->name()
 							<< " list_starting=" << list_starting
+							<< " m_conts.size()=" << m_conts.size()
 							<< " for " << m_clientName
 							<< " (m_client_fd=" << m_client_fd << ")");
 					}
@@ -653,99 +677,142 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 					// Is There Another Container on the List...?
 					if ( it != m_conts.end() )
 					{
-						// Get Next Container on List...
-						StorageContainer::SharedPtr &next_c = it->first;
-						bool &next_starting = it->second;
+						bool next_starting; // not a ref!
 
-						DEBUG("containerChange():"
-							<< " Choosing Next Container "
-								<< next_c->name()
-							<< " next_starting=" << next_starting
-							<< " for " << m_clientName
-							<< " (m_client_fd=" << m_client_fd << ")");
-
-						// Capture Any Existing Container Files...
-						std::list<StorageFile::SharedPtr> file_list;
-						next_c->getFiles( file_list );
-
-						// Append Next Container File List
-						// to LiveClient List...
-						std::list<StorageFile::SharedPtr>::iterator fit;
-						for ( fit = file_list.begin();
-								fit != file_list.end(); ++fit )
+						do
 						{
+							// Get Next Container on List...
+							StorageContainer::SharedPtr &next_c =
+								it->first;
+							next_starting = it->second;
+
 							DEBUG("containerChange():"
-								<< " Adding File for Next Container "
+								<< " Choosing Next Container "
 									<< next_c->name()
 								<< " next_starting=" << next_starting
-								<< " file=" << (*fit)->path()
-								<< " size=" << (*fit)->size()
-								<< " active=" << (*fit)->active()
+								<< " m_conts.size()=" << m_conts.size()
 								<< " for " << m_clientName
 								<< " (m_client_fd=" << m_client_fd << ")");
 
-							m_files.push_back(
-								std::make_pair( *fit, 0 ) );
+							// Capture Any Existing Container Files...
+							std::list<StorageFile::SharedPtr> file_list;
+							next_c->getFiles( file_list );
 
-							// Is This the First/Only File on the List?
-							if ( m_files.size() == 1 )
+							// Append Next Container File List
+							// to LiveClient List...
+							std::list<StorageFile::SharedPtr>
+								::iterator fit;
+							for ( fit = file_list.begin();
+									fit != file_list.end(); ++fit )
 							{
-								// Starting a New File...
-								m_starting_new_file = true;
-								m_bytes_written = 0;
+								m_files.push_back(
+									std::make_pair( *fit, 0 ) );
 
-								// IF No File is Already Connected to
-								//    File Updated,
-								// And If This Is an Active File,
-								// Then Connect Up to
-								//    File Updated Notifications... ;-D
-								if ( !(m_fileConnection.connected())
-										&& (*fit)->active() )
-								{
-									if ( ctrl->verbose() )
-									{
-										DEBUG("containerChange():"
-											<< " Connecting Next Container"
-												<< " File Updated Notify "
-												<< next_c->name()
-											<< " next_starting="
-												<< next_starting
-											<< " file=" << (*fit)->path()
-											<< " size=" << (*fit)->size()
-											<< " active="
-												<< (*fit)->active()
-											<< " for " << m_clientName
-											<< " (m_client_fd="
-												<< m_client_fd << ")");
-									}
-
-									m_fileConnection = (*fit)->connect(
-										boost::bind(
-											&LiveClient::fileUpdated,
-						  						this, _1 ) );
-								}
-							}
-						}
-
-						// Connect _Next_ Container File Added Notify...
-						if ( next_starting )
-						{
-							if ( ctrl->verbose() )
-							{
 								DEBUG("containerChange():"
-									<< " Connecting Next Container"
-										<< " File Added Notify "
+									<< " Added File for Next Container "
 										<< next_c->name()
 									<< " next_starting=" << next_starting
+									<< " m_conts.size()=" << m_conts.size()
+									<< " file=" << (*fit)->path()
+									<< " size=" << (*fit)->size()
+									<< " active=" << (*fit)->active()
+									<< " m_files.size()=" << m_files.size()
 									<< " for " << m_clientName
 									<< " (m_client_fd="
 										<< m_client_fd << ")");
+
+								// Is This the First/Only File on the List?
+								if ( m_files.size() == 1 )
+								{
+									// Starting a New File...
+									m_starting_new_file = true;
+									m_bytes_written = 0;
+
+									// IF No File is Already Connected to
+									//    File Updated,
+									// And If This Is an Active File,
+									// Then Connect Up to
+									//    File Updated Notifications... ;-D
+									if ( !(m_fileConnection.connected())
+											&& (*fit)->active() )
+									{
+										if ( ctrl->verbose() )
+										{
+											DEBUG("containerChange():"
+												<< " Connecting"
+												<< " Next Container"
+												<< " File Updated Notify "
+													<< next_c->name()
+												<< " next_starting="
+													<< next_starting
+												<< " m_conts.size()="
+													<< m_conts.size()
+												<< " file="
+													<< (*fit)->path()
+												<< " size="
+													<< (*fit)->size()
+												<< " active="
+													<< (*fit)->active()
+												<< " m_files.size()="
+													<< m_files.size()
+												<< " for " << m_clientName
+												<< " (m_client_fd="
+													<< m_client_fd << ")");
+										}
+
+										m_fileConnection = (*fit)->connect(
+											boost::bind(
+												&LiveClient::fileUpdated,
+						  							this, _1 ) );
+									}
+								}
 							}
 
-							m_contConnection = next_c->connect(
-								boost::bind( &LiveClient::fileAdded,
-									this, _1 ) );
+							// Connect _Next_ Active Container
+							//    to File Added Notify
+							if ( next_starting )
+							{
+								if ( ctrl->verbose() )
+								{
+									DEBUG("containerChange():"
+										<< " Connecting Next Container"
+											<< " File Added Notify "
+											<< next_c->name()
+										<< " next_starting="
+											<< next_starting
+										<< " m_conts.size()="
+											<< m_conts.size()
+										<< " for " << m_clientName
+										<< " (m_client_fd="
+											<< m_client_fd << ")");
+								}
+
+								m_contConnection = next_c->connect(
+									boost::bind( &LiveClient::fileAdded,
+										this, _1 ) );
+							}
+							// This Container is Already Closed,
+							// So We're Done With It - Go On to Any Next...
+							else
+							{
+								DEBUG("containerChange():"
+									<< " This Container is Already Closed "
+										<< next_c->name()
+									<< " Add Any Next Container Files Too"
+									<< " next_starting=" << next_starting
+									<< " m_conts.size()=" << m_conts.size()
+										<< " (pre-delete)"
+									<< " for " << m_clientName
+									<< " (m_client_fd="
+										<< m_client_fd << ")");
+
+								// Remove Container from List...
+								// (Iterator Left Pointing
+								//    to _Next_ Container in List)
+								it = m_conts.erase( it );
+							}
 						}
+						while ( !next_starting && it != m_conts.end() );
 
 						// If we're not already waiting for buffer space
 						// in the socket, try to send the new data...
@@ -757,6 +824,7 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 						DEBUG("containerChange():"
 							<< " No More Containers on List After "
 								<< c->name()
+							<< " m_conts.size()=" << m_conts.size()
 							<< " for " << m_clientName
 							<< " (m_client_fd=" << m_client_fd << ")");
 					}
@@ -771,6 +839,7 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 		{
 			ERROR("containerChange():"
 				<< " Inactive Container Not Found on List! " << c->name()
+				<< " m_conts.size()=" << m_conts.size()
 				<< " for " << m_clientName
 				<< " (m_client_fd=" << m_client_fd << ")");
 		}
@@ -783,13 +852,14 @@ void LiveClient::historicalFile( StorageFile::SharedPtr &f, off_t start )
 
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	DEBUG("historicalFile(): Add File " << f->path()
+	m_files.push_back( std::make_pair( f, start ) );
+
+	DEBUG("historicalFile(): Added File " << f->path()
 		<< " start=" << start
 		<< " f->active()=" << f->active()
+		<< " m_files.size()=" << m_files.size()
 		<< " for client " << m_clientName
 		<< " (m_client_fd=" << m_client_fd << ")");
-
-	m_files.push_back( std::make_pair( f, start ) );
 
 	// Note: We Can't Immediately Subscribe to fileUpdated() for This File,
 	// We Need to Wait Until We're Done with Any Previous File...
@@ -813,6 +883,7 @@ void LiveClient::historicalFile( StorageFile::SharedPtr &f, off_t start )
 				DEBUG("historicalFile(): Connecting File Updated Notify"
 					<< " file=" << f->path()
 					<< " size=" << f->size()
+					<< " m_files.size()=" << m_files.size()
 					<< " for client " << m_clientName
 					<< " (m_client_fd=" << m_client_fd << ")");
 			}
@@ -820,25 +891,26 @@ void LiveClient::historicalFile( StorageFile::SharedPtr &f, off_t start )
 			m_fileConnection = f->connect(
 				boost::bind( &LiveClient::fileUpdated, this, _1 ) );
 		}
-
-		// If we're not already waiting for buffer space
-		// in the socket, try to send the new data...
-		if ( !m_write )
-			writable();
 	}
+
+	// If we're not already waiting for buffer space
+	// in the socket, try to send the new data...
+	if ( !m_write )
+		writable();
 }
 
 void LiveClient::fileAdded( StorageFile::SharedPtr &f )
 {
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	DEBUG("fileAdded(): Add File " << f->path()
+	m_files.push_back( std::make_pair( f, 0 ) );
+
+	DEBUG("fileAdded(): Added File " << f->path()
 		<< " start=0"
 		<< " f->active()=" << f->active()
+		<< " m_files.size()=" << m_files.size()
 		<< " for client " << m_clientName
 		<< " (m_client_fd=" << m_client_fd << ")");
-
-	m_files.push_back( std::make_pair( f, 0 ) );
 
 	// Note: We Can't Immediately Subscribe to fileUpdated() for This File,
 	// We Need to Wait Until We're Done with Any Previous File...
@@ -862,6 +934,7 @@ void LiveClient::fileAdded( StorageFile::SharedPtr &f )
 				DEBUG("fileAdded(): Connecting File Updated Notify"
 					<< " file=" << f->path()
 					<< " size=" << f->size()
+					<< " m_files.size()=" << m_files.size()
 					<< " for client " << m_clientName
 					<< " (m_client_fd=" << m_client_fd << ")");
 			}
@@ -869,12 +942,12 @@ void LiveClient::fileAdded( StorageFile::SharedPtr &f )
 			m_fileConnection = f->connect(
 				boost::bind( &LiveClient::fileUpdated, this, _1 ) );
 		}
-
-		// If we're not already waiting for buffer space
-		// in the socket, try to send the new data...
-		if ( !m_write )
-			writable();
 	}
+
+	// If we're not already waiting for buffer space
+	// in the socket, try to send the new data...
+	if ( !m_write )
+		writable();
 }
 
 void LiveClient::fileUpdated( const StorageFile &f )
@@ -894,6 +967,7 @@ void LiveClient::fileUpdated( const StorageFile &f )
 				<< " Disconnecting Inactive File Updated Notify"
 				<< " file=" << f.path()
 				<< " size=" << f.size()
+				<< " m_files.size()=" << m_files.size()
 				<< " for client " << m_clientName
 				<< " (m_client_fd=" << m_client_fd << ")");
 		}
@@ -1052,6 +1126,10 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 
 	if ( cur_cont )
 	{
+		// _Always_ Track Each Container on List...
+		m_conts.push_back(
+			std::make_pair( cur_cont, true /* starting */ ) );
+
 		// Connect to Container File Added Notify...
 		if ( !(m_contConnection.connected()) )
 		{
@@ -1061,6 +1139,7 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 					<< " Connecting New Container File Added Notify "
 						<< cur_cont->name()
 					<< " starting=true"
+					<< " m_conts.size()=" << m_conts.size()
 					<< " for " << m_clientName
 					<< " (m_client_fd=" << m_client_fd << ")");
 			}
@@ -1075,13 +1154,10 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 					<< " for File Added Notify? "
 					<< cur_cont->name()
 				<< " starting=true"
+				<< " m_conts.size()=" << m_conts.size()
 				<< " for " << m_clientName
 				<< " (m_client_fd=" << m_client_fd << ")");
 		}
-
-		// _Always_ Track Each Container on List...
-		m_conts.push_back(
-			std::make_pair( cur_cont, true /* starting */ ) );
 
 		// Note: No Need to Redundantly Connect the Current/Front File
 		// to the File Updated Notifications, This has Already Been Done
