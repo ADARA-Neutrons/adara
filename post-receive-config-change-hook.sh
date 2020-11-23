@@ -15,6 +15,8 @@ echo "Entry post-receive-config-change-hook.sh"
 KEY_CONFIG_TARGETS="beamline\.xml \
 	sms/deployment\.history\.txt stc\.deployment\.history\.txt"
 
+NO_CONFIG_CHANGE_NOTIFY_KEY="NO_NOTIFY"
+
 KEYS_FOUND=0
 
 EMAIL_SUBJECT="SNS/HFIR Configuration Change Notification"
@@ -63,7 +65,9 @@ PROCESS_REVISIONS()
 
 			#echo "Key: [${key}]"
 
-			if [[ ${revstat} =~ ${key} ]]; then
+			if [[ ${revstat} =~ ${key} \
+					&& ! ${revstat} =~ ${NO_CONFIG_CHANGE_NOTIFY_KEY} \
+			]]; then
 
 				echo "Found '${key}' File Reference."
 
