@@ -174,7 +174,7 @@ void StorageContainer::newFile(
 {
 	if ( it->m_file )
 	{
-		DEBUG("newFile(): StorageFile Already Exists "
+		ERROR("newFile(): StorageFile Already Exists "
 			<< it->m_file->path()
 			<< " in PauseMode " << it->m_numModes
 			<< " [" << it->m_minTime.tv_sec << "."
@@ -201,6 +201,7 @@ void StorageContainer::newFile(
 		return;
 	}
 
+	// REMOVEME
 	DEBUG("newFile(): Create New StorageFile"
 		<< " minTime=" << minTime.tv_sec << "."
 		<< std::setfill('0') << std::setw(9)
@@ -248,7 +249,6 @@ void StorageContainer::newFile(
 				/* it->m_numPauseFiles = */ 0, status );
 	}
 
-	// REMOVEME
 	DEBUG("newFile(): New StorageFile Created "
 		<< it->m_file->path()
 		<< " in PauseMode " << it->m_numModes
@@ -288,7 +288,7 @@ void StorageContainer::newFile(
 					<< (*fit)->path()
 					<< " Onto Container File List"
 					<< " (and Notifying FileAdded)"
-					<< " from PauseMode " << it->m_numModes
+					<< " from Oldest PauseMode " << it->m_numModes
 					<< " in [" << it->m_minTime.tv_sec << "."
 					<< std::setfill('0') << std::setw(9)
 					<< it->m_minTime.tv_nsec << std::setw(0)
@@ -318,13 +318,15 @@ void StorageContainer::newFile(
 			<< it->m_file->path());
 
 		m_files.push_back( it->m_file );
+
+		// Note: FileAdded Notify Signaled for This New File Below... ;-D
 	}
 	else
 	{
 		// We're _Not_ at the "Bottom" of the PauseMode Stack,
 		// So Push This New File Onto the _End_ of the Pending Files List
 		it->m_pendingFiles.push_back( it->m_file );
-		// REMOVEME
+
 		DEBUG("newFile(): Defer Adding File from New Stacked PauseMode"
 			<< " to Container File List "
 			<< it->m_file->path() << ","
@@ -388,6 +390,8 @@ void StorageContainer::newFile(
 	{
 		DEBUG("newFile(): FileAdded Notify for "
 			<< it->m_file->path());
+
+		// Note: New File Already Pushed Onto Container File List Above...
 
 		m_newFile( it->m_file );
 	}
@@ -551,7 +555,7 @@ void StorageContainer::getPauseModeByTime(
 			if ( pausemode_expire.tv_sec == 0
 					&& pausemode_expire.tv_nsec == 0 )
 			{
-				DEBUG("getPauseModeByTime():"
+				ERROR("getPauseModeByTime():"
 					<< " No Max Time for PauseMode " << it->m_numModes
 					<< " in [" << it->m_minTime.tv_sec << "."
 					<< std::setfill('0') << std::setw(9)
@@ -576,7 +580,7 @@ void StorageContainer::getPauseModeByTime(
 			if ( ctrl->verbose() > 2 )
 			{
 				DEBUG("getPauseModeByTime():"
-					<< " PauseMode " << it->m_numModes
+					<< " Check Expire PauseMode " << it->m_numModes
 					<< " in [" << it->m_minTime.tv_sec << "."
 					<< std::setfill('0') << std::setw(9)
 					<< it->m_minTime.tv_nsec << std::setw(0)
@@ -609,13 +613,13 @@ void StorageContainer::getPauseModeByTime(
 			{
 				DEBUG("getPauseModeByTime():"
 					<< " PauseMode " << it->m_numModes
+					<< " has EXPIRED"
 					<< " in [" << it->m_minTime.tv_sec << "."
 					<< std::setfill('0') << std::setw(9)
 					<< it->m_minTime.tv_nsec << std::setw(0)
 					<< ", " << it->m_maxTime.tv_sec << "."
 					<< std::setfill('0') << std::setw(9)
 					<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
-					<< " has EXPIRED: "
 					<< " old_ts=" << old_ts.tv_sec << "."
 					<< std::setfill('0') << std::setw(9)
 					<< old_ts.tv_nsec << std::setw(0)
@@ -649,7 +653,7 @@ void StorageContainer::getPauseModeByTime(
 						<< (*fit)->path()
 						<< " Onto Container File List"
 						<< " (and Notifying FileAdded)"
-						<< " from PauseMode " << it->m_numModes
+						<< " from Expired PauseMode " << it->m_numModes
 						<< " in [" << it->m_minTime.tv_sec << "."
 						<< std::setfill('0') << std::setw(9)
 						<< it->m_minTime.tv_nsec << std::setw(0)
@@ -696,6 +700,72 @@ void StorageContainer::getPauseModeByTime(
 				// Which is Fine Because We're Iterating "Backwards"...!
 				it = m_pauseModeStack.erase( it );
 			}
+		}
+
+		// Also Check the Oldest PauseMode on the Stack
+		// For Any Previously Deferred Pending Files...
+		// We Can Always Go Ahead and Push Them
+		// Onto the Container File List Now...
+
+		// Get "Latest" Oldest PauseMode on the Stack...
+		// (We May Have Just Closed Some Expired PauseModes Above...)
+		it = m_pauseModeStack.end();
+		if ( it != m_pauseModeStack.begin() )
+			it--;
+
+		// Note: Btw, It's Ok If This "Latest" Oldest PauseMode
+		// is Actually the "Found" One, Because We Need to
+		// Get/Keep That PauseMode Up-to-Date with the
+		// FileAdded Notifies, Too...!
+		// (a.k.a. the SMS Version 1.7.2 DASMON Delay/Timeout Bug... ;-b)
+
+		// Make Sure We Actually Have a PauseMode Left Here... ;-D
+		if ( it != m_pauseModeStack.end() )
+		{
+			// If We Have Some Previously Deferred Pending Files
+			// on Our List, Go Ahead and Push Them Onto the
+			// Container File List Now...
+			if ( it->m_pendingFiles.size() > 0 )
+			{
+				std::list<StorageFile::SharedPtr>::iterator fit;
+				for ( fit = it->m_pendingFiles.begin() ;
+						fit != it->m_pendingFiles.end() ; ++fit )
+				{
+					DEBUG("getPauseModeByTime():"
+						<< " Pushing Previously Pending File "
+						<< (*fit)->path()
+						<< " Onto Container File List"
+						<< " (and Notifying FileAdded)"
+						<< " from Oldest PauseMode " << it->m_numModes
+						<< " in [" << it->m_minTime.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< it->m_minTime.tv_nsec << std::setw(0)
+						<< ", " << it->m_maxTime.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+						<< " m_paused=" << it->m_paused
+						<< " m_numModes=" << it->m_numModes
+						<< " m_numFiles=" << it->m_numFiles
+						<< " m_numPauseFiles=" << it->m_numPauseFiles
+						<< " m_pendingFiles.size()="
+						<< it->m_pendingFiles.size()
+						<< " m_lastPrologueFile="
+						<< ( ( it->m_lastPrologueFile ) ?
+							it->m_lastPrologueFile->path() : "(null)" )
+						<< " - Btw, the PauseMode Stack has "
+						<< m_pauseModeStack.size() << " elements");
+
+					m_files.push_back( *fit );
+					m_newFile( *fit );
+				}
+
+				it->m_pendingFiles.clear();
+			}
+
+			// Note: Any Probably-Active "Current" Open File
+			// for This PauseMode Should Have Already Been Added
+			// to Container File List and Signaled a FileAdded Notify
+			// As Part of the Pending File List Above... ;-D
 		}
 	}
 
@@ -909,7 +979,7 @@ void StorageContainer::terminate(void)
 				<< " - Pushing Pending File " << (*fit)->path()
 				<< " onto Container File List"
 				<< " and Notifying FileAdded"
-				<< " for PauseMode " << it->m_numModes
+				<< " for Closing PauseMode " << it->m_numModes
 				<< " [" << it->m_minTime.tv_sec << "."
 				<< std::setfill('0') << std::setw(9)
 				<< it->m_minTime.tv_nsec << std::setw(0)
@@ -996,7 +1066,7 @@ void StorageContainer::terminate(void)
 				<< " - Pushing Pending File " << (*fit)->path()
 				<< " onto Container File List"
 				<< " and Notifying FileAdded"
-				<< " for Current PauseMode " << it->m_numModes
+				<< " for Closing Current PauseMode " << it->m_numModes
 				<< " [" << it->m_minTime.tv_sec << "."
 				<< std::setfill('0') << std::setw(9)
 				<< it->m_minTime.tv_nsec << std::setw(0)
