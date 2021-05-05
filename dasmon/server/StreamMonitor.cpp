@@ -2056,6 +2056,8 @@ struct PVInfoLite
     uint16_t    m_status;
 };
 
+#define BUF_SIZE 5000
+
 void
 StreamMonitor::dbThread()
 {
@@ -2085,7 +2087,7 @@ StreamMonitor::dbThread()
     PGresult *res;
     map<PVKey,PVInfoBase*>::iterator ipvm;
     string arr_str;
-    char buf[5000];
+    char buf[BUF_SIZE];
     bool send_all =  true;
     bool update;
     int  i;
@@ -2096,6 +2098,9 @@ StreamMonitor::dbThread()
     vector<pair<PVInfoLite,double> >::iterator      idblpv;
     vector<pair<PVInfoLite,string> >                str_pvs;
     vector<pair<PVInfoLite,string> >::iterator      istrpv;
+
+    vector<uint32_t> int_vec;
+    vector<double> dbl_vec;
 
     int_pvs.reserve(200);
     dbl_pvs.reserve(200);
@@ -2167,20 +2172,62 @@ StreamMonitor::dbThread()
                             break;
                         // Pass Integer or Double Arrays as Strings...!
                         case PVT_DOUBLE_ARRAY:
-                            Utils::printArrayString(
-                                ((PVInfo< vector<double> >*)
-                                    (ipvm->second))->m_value,
-                                arr_str );
-                            str_pvs.push_back( make_pair(
-                                PVInfoLite( ipvm->second ), arr_str ) );
+                            dbl_vec = ((PVInfo< vector<double> >*)
+                                (ipvm->second))->m_value;
+                            Utils::printArrayString( dbl_vec, arr_str );
+                            if ( arr_str.size() >= BUF_SIZE )
+                            {
+                                stringstream ss;
+                                ss << "[" << dbl_vec.size() << "] = ( ";
+                                ss << dbl_vec[0] << ", ";
+                                ss << dbl_vec[1] << ", ";
+                                ss << dbl_vec[2] << " ... ";
+                                ss << dbl_vec[ dbl_vec.size() - 1 ]
+                                    << " )";
+                                str_pvs.push_back( make_pair(
+                                    PVInfoLite( ipvm->second ),
+                                        ss.str() ) );
+
+                                syslog( LOG_ERR, "%s - Trimmed to [%s].",
+                                    "Double Array Too Long",
+                                    ss.str().c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
+                            else
+                            {
+                                str_pvs.push_back( make_pair(
+                                    PVInfoLite( ipvm->second ),
+                                        arr_str ) );
+                            }
                             break;
                         case PVT_UINT_ARRAY:
-                            Utils::printArrayString(
-                                ((PVInfo< vector<uint32_t> >*)
-                                    (ipvm->second))->m_value,
-                                arr_str );
-                            str_pvs.push_back( make_pair(
-                                PVInfoLite( ipvm->second ), arr_str ) );
+                            int_vec = ((PVInfo< vector<uint32_t> >*)
+                                (ipvm->second))->m_value;
+                            Utils::printArrayString( int_vec, arr_str );
+                            if ( arr_str.size() >= BUF_SIZE )
+                            {
+                                stringstream ss;
+                                ss << "[" << int_vec.size() << "] = ( ";
+                                ss << int_vec[0] << ", ";
+                                ss << int_vec[1] << ", ";
+                                ss << int_vec[2] << " ... ";
+                                ss << int_vec[ int_vec.size() - 1 ]
+                                    << " )";
+                                str_pvs.push_back( make_pair(
+                                    PVInfoLite( ipvm->second ),
+                                        ss.str() ) );
+
+                                syslog( LOG_ERR, "%s - Trimmed to [%s].",
+                                    "UInt Array Too Long",
+                                    ss.str().c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
+                            else
+                            {
+                                str_pvs.push_back( make_pair(
+                                    PVInfoLite( ipvm->second ),
+                                        arr_str ) );
+                            }
                             break;
                         }
                     }
@@ -2267,13 +2314,44 @@ StreamMonitor::dbThread()
                 for ( istrpv = str_pvs.begin();
                         istrpv != str_pvs.end(); ++istrpv )
                 {
-                    sprintf( buf,
-                        "select \"pvStringUpdate\"('%s','%s','%s',%u,%u)",
-                        m_beam_info.m_beam_sname.c_str(),
-                        istrpv->first.m_name.c_str(),
-                        istrpv->second.c_str(),
-                        istrpv->first.m_status,
-                        istrpv->first.m_time );
+                    string cmd_prefix = "select \"pvStringUpdate\"";
+
+                    size_t sz = cmd_prefix.size() + 1
+                        + 1 + m_beam_info.m_beam_sname.size() + 1 + 1
+                        + 1 + istrpv->first.m_name.size() + 1 + 1
+                        + 1 + istrpv->second.size() + 1 + 1
+                        + 10 + 1 + 10 + 1 + 1; // Trailing '\0'...
+                        // Note: Max UInt32 = 4294967295 (10 Digits)...
+
+                    if ( sz >= BUF_SIZE )
+                    {
+                        // Too Big, Scrunch It Down... ;-b
+                        stringstream ss;
+                        ss << cmd_prefix << "("
+                            << "'" << m_beam_info.m_beam_sname << "',"
+                            << "'" << istrpv->first.m_name << "',"
+                            << "'" << istrpv->second.substr(0,99)
+                                << "..." << "',"
+                            << istrpv->first.m_status << ","
+                            << istrpv->first.m_time << ")";
+
+                        sprintf( buf, "%s", ss.str().c_str() );
+
+                        syslog( LOG_ERR, "%s - Trimmed to [%s].",
+                            "Database String Command Too Long", buf );
+                        usleep(30000); // give syslog a chance...
+                    }
+                    else
+                    {
+                        sprintf( buf,
+                            "%s('%s','%s','%s',%u,%u)",
+                            cmd_prefix.c_str(),
+                            m_beam_info.m_beam_sname.c_str(),
+                            istrpv->first.m_name.c_str(),
+                            istrpv->second.c_str(),
+                            istrpv->first.m_status,
+                            istrpv->first.m_time );
+                    }
 
                     res = PQexec( conn, buf );
                     if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
