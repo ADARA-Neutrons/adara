@@ -4824,10 +4824,12 @@ StreamParser::pvValueUpdate
                     // every PV in the run! ;-D)
                     std::string log_hdr = "";
                     int log_type = LOG_INFO;
-                    if ( pvinfo->m_last_value_set ) {
-                        log_type = LOG_ERR;
-                        log_hdr = "STC Error: ";
-                    }
+                    // Don't Log _Any_ of These as "Errors",
+                    // Just Too Much Spam...! ;-b
+                    // if ( pvinfo->m_last_value_set ) {
+                        // log_type = LOG_ERR;
+                        // log_hdr = "STC Error: ";
+                    // }
                     std::stringstream ss2;
                     ss2 << "Discard Previous Pre-First-Pulse Value ";
                     ss2 << pvinfo->valueToString(
@@ -4876,10 +4878,12 @@ StreamParser::pvValueUpdate
                     // every PV in the run! ;-D)
                     std::string log_hdr = "";
                     int log_type = LOG_INFO;
-                    if ( pvinfo->m_last_value_set ) {
-                        log_type = LOG_ERR;
-                        log_hdr = "STC Error: ";
-                    }
+                    // Don't Log _Any_ of These as "Errors",
+                    // Just Too Much Spam...! ;-b
+                    // if ( pvinfo->m_last_value_set ) {
+                        // log_type = LOG_ERR;
+                        // log_hdr = "STC Error: ";
+                    // }
                     syslog( log_type,
                "[%i] %s%s%s %s %lu.%09lu (%s=%lu) < %lu.%09lu (%s=%lu) %s",
                         g_pid, log_hdr.c_str(), log_info.c_str(),
