@@ -2154,8 +2154,18 @@ NxGen::monitorTOFBuffersReady
             {
                 // Chunk Size Override: If There's _No_ TOF Values,
                 //    Then Create Dummy Empty Dataset (Chunk Size = 1)
+
                 unsigned long chunk_size = ( a_monitor.m_tof_buffer_size )
                     ? ( a_monitor.m_tof_buffer_size ) : 1;
+
+                syslog( LOG_INFO,
+                    "[%i] Creating %s%s Dataset for %s/%s %s=%lu",
+                    g_pid,
+                    ( ( a_monitor.m_tof_buffer_size ) ? "" : "Dummy " ),
+                    "Monitor TOF",
+                    mi->m_path.c_str(), m_tof_name.c_str(),
+                    "chunk_size", chunk_size );
+                usleep(30000); // give syslog a chance...
 
                 makeDataset( mi->m_path, m_tof_name,
                     NeXus::FLOAT32, TIME_USEC_UNITS, chunk_size );
@@ -2240,6 +2250,16 @@ NxGen::monitorIndexBuffersReady
                     //    Then Create Dummy Empty Dataset (Chunk Size = 1)
                     chunk_size = ( a_monitor.m_index_buffer.size() )
                         ? ( a_monitor.m_index_buffer.size() ) : 1;
+
+                    syslog( LOG_INFO,
+                        "[%i] Creating %s%s Dataset for %s/%s %s=%lu",
+                        g_pid,
+                        ( ( a_monitor.m_index_buffer.size() )
+                            ? "" : "Dummy " ),
+                        "Monitor Event Index",
+                        mi->m_path.c_str(), m_index_name.c_str(),
+                        "chunk_size", chunk_size );
+                    usleep(30000); // give syslog a chance...
                 }
 
                 makeDataset( mi->m_path, m_index_name,
@@ -2384,6 +2404,13 @@ NxGen::monitorFinalize
                 "total_counts", mi->m_event_count, "" );
             writeScalar( m_entry_path + "/" + mi->m_name,
                 "total_uncounted_counts", mi->m_event_uncounted, "" );
+
+            syslog( LOG_INFO,
+                "[%i] Wrote Histogram Monitor for %s/%s %s=%lu %s=%lu",
+                g_pid, m_entry_path.c_str(), mi->m_name.c_str(),
+                "total_counts", mi->m_event_count,
+                "total_uncounted_counts", mi->m_event_uncounted );
+            usleep(30000); // give syslog a chance...
         }
 
         // Event-based Monitor
@@ -2392,6 +2419,12 @@ NxGen::monitorFinalize
             // Write Final Monitor Total Counts
             writeScalar( m_entry_path + "/" + mi->m_name,
                 "total_counts", mi->m_event_count, "" );
+
+            syslog( LOG_INFO,
+                "[%i] Wrote Event Monitor for %s/%s %s=%lu",
+                g_pid, m_entry_path.c_str(), mi->m_name.c_str(),
+                "total_counts", mi->m_event_count );
+            usleep(30000); // give syslog a chance...
 
             // NOW Link Pulse Time to this Monitor...
             //    - the Pulse Time Dataset Must have been Created by Now!
