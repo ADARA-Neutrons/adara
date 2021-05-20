@@ -50,7 +50,7 @@
 using namespace std;
 using namespace ADARA::DASMON;
 
-#define DASMON_VERSION "1.6.4"
+#define DASMON_VERSION "1.6.5"
 
 
 bool g_child_signal = false;
