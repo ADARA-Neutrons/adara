@@ -237,6 +237,22 @@ private:
         bool                                hasIndex;
     };
 
+    // (STC Config) Command Structure to specify a handy
+    // (possibly "Conditional"!) Post-Translation (NeXus File Done)
+    // and Pre-Post-Autoreduction Triggered "Command Script" for
+    // execution, e.g. for Imaging beamlines to handle the final
+    // "Post-Translation" Copying of Image Files from the beamline.
+    struct CommandInfo
+    {
+        std::string                         name;
+        std::string                         path;
+        std::vector<struct ElementInfo>     elements;
+        std::vector<struct ConditionInfo>   conditions;
+        std::set<std::string>               createdIndices;
+        bool                                created;
+        bool                                hasIndex;
+    };
+
     /// PVInfo subclass that adds Nexus-required attributes and virtual method implementations.
     template<class T>
     class NxPVInfo : public STC::PVInfo<T>
@@ -2558,6 +2574,8 @@ public:
 
     void dumpProcessingStatistics(void);
 
+    void executePrePostCommands(void);
+
 protected:
 
     bool                initialize( bool a_force_init = false,
@@ -2761,9 +2779,14 @@ private:
     bool                m_nexus_init;           ///< Has the Nexus file been Initialized yet or not?
     bool                m_nexus_beamline_init;  ///< Has the Nexus BeamlineInfo been Initialized yet or not?
     std::string         m_nexus_filename;       ///< Name of Nexus file
+
     std::string         m_config_file;          ///< Name of STC Config file
     std::vector<struct GroupInfo>
                         m_config_groups;        ///< Vector of STC Config Group Containers
+    std::vector<struct CommandInfo>
+                        m_config_commands;      ///< Vector of STC Config Pre-Post-Autoreduction Commands
+
+
     std::string         m_entry_path;           ///< Path to Nexus NXentry
     std::string         m_instrument_path;      ///< Path to Nexus NXinstrument
     std::string         m_daslogs_path;         ///< Path to Nexus DAS Logs
