@@ -752,6 +752,14 @@ int main( int argc, char** argv )
         cout << sms_reason << endl;
     }
 
+    // Now Execute Any Pre-Post-Autoreduction Commands
+    // As Specified in the STC Config File...! ;-D
+
+    if ( nxgen )
+        nxgen->executePrePostCommands();
+
+    // Clean Up, We're Done...! :-D
+
     syslog( LOG_INFO, "[%i] Cleaning up", g_pid );
     usleep(30000); // give syslog a chance...
 
