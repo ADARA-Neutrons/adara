@@ -4,9 +4,9 @@
 
 echo -e "\nSTC Pre-Post AutoReduction Command Script Entry.\n"
 
-echo -e "\t[$0]\n"
+echo -e "   [$0]\n"
 
-echo -e "\t[$@]\n"
+echo -e "   [$@]\n"
 
 # Dump Command Line Parameters...
 
