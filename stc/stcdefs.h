@@ -1395,6 +1395,7 @@ public:
                                 std::vector<STC::PVEnumeratedType>
                                     &a_enumVec ) = 0;
     virtual void            checkSTCConfigElementUnitsPaths(void) = 0;
+    virtual void            executePrePostCommands(void) = 0;
 };
 
 
