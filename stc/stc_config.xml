@@ -600,5 +600,31 @@
 		</condition>
 	</group>
 
+	<!-- Basic Pre-Post-Auto-Reduction Command Test (Dummy) -->
+	<command>
+		<name>DummyCommand</name>
+		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_dummy.bash</path>
+	</command>
+
+	<!-- Pre-Post-Auto-Reduction Command Interface (for Image Files) -->
+	<command>
+		<name>ImagingCommand</name>
+		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_imaging.bash</path>
+		<!-- Imaging Mode Conditional PV Check -->
+		<condition>
+			<name>Imaging Mode</name>
+			<pattern>:Exp:Mode$</pattern>
+			<value>1</value><!-- Imaging Mode Activated -->
+		</condition>
+		<element>
+			<pattern>:Exp:IM:FileName$</pattern>
+			<name>FileName</name>
+		</element>
+		<element>
+			<pattern>:Exp:IM:SubDir$</pattern>
+			<name>SubDir</name>
+		</element>
+	</command>
+
 </stc_config>
 
