@@ -6,13 +6,13 @@ echo -e "\nSTC Pre-Post AutoReduction Command Script Entry.\n"
 
 echo -e "   [$0]\n"
 
-echo -e "   [$@]\n"
+echo -e "   [$@]"
 
 # Dump Command Line Parameters...
 
 for arg in "$@" ; do
 
-	echo "arg=$arg"
+	echo -e "\narg=$arg"
 
 	key=`echo "$arg" | awk -F = '{print $1}'`
 	value=`echo "$arg" | awk -F = '{print $2}'`
