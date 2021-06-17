@@ -1112,11 +1112,17 @@ NxGen::writeSTCConfigUnitsAttributes(
 }
 
 
-/*! \brief Dump Overall STC Processing Statistics
+/*! \brief Execute Any Pre-Post-Autoreduction Command Scripts
  *
- * This method dump the overall processing time/event bandwidth
- * for Nexus-specific output generation, including statistics
- * for the _Run Itself_ and how long the STC took to process it.
+ * This method checks any conditional STC Config Commands
+ * and otherwise Executes Everything that has been specified;
+ * prepend the command with a Bash "pipefail" setting to
+ * capture error codes from the Bash Pipeline, and append
+ * a "logger" command to Re-direct Command Script output
+ * to the local Syslog, along with the proper "stc" tag
+ * (and the current STC Instance Process ID...! ;-D).
+ * Execute the Command via system() and report the Return Status,
+ * using the "correct bits"... ;-D
  */
 void
 NxGen::executePrePostCommands(void)
