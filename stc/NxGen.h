@@ -246,10 +246,10 @@ private:
     {
         std::string                         name;
         std::string                         path;
+        std::string                         args;
         std::vector<struct ElementInfo>     elements;
         std::vector<struct ConditionInfo>   conditions;
         std::set<std::string>               createdIndices;
-        bool                                created;
         bool                                hasIndex;
     };
 
@@ -2333,6 +2333,241 @@ private:
             }
         }
 
+        /// Collect/Append Elements to STC Config Command Line Parameters
+        void appendSTCConfigCommandMatchingElements
+        (
+            struct CommandInfo *CMD,                    ///< Config Command
+            std::vector<struct ElementInfo> &elements,  ///< Elements
+            std::string label                           ///< Logging Label
+        )
+        {
+            //syslog( LOG_INFO,
+                //"[%i] %s: Checking Command \"%s\" for %s%s...",
+                //g_pid, "appendSTCConfigCommandMatchingElements()",
+                //CMD->name.c_str(), label.c_str(),
+                //"Element Command Line Parameters" );
+            //usleep(30000); // give syslog a chance...
+
+            for ( uint32_t e=0 ; e < elements.size() ; e++ )
+            {
+                struct ElementInfo *E = &(elements[e]);
+
+                bool matched = false;
+
+                // Check for Matching Elements to Link...
+                for ( uint32_t p=0 ;
+                        p < E->patterns.size() && !matched ; p++ )
+                {
+                    std::string &P = E->patterns[p];
+
+                    std::string patt_str = label.c_str();
+                    patt_str += "Element Pattern \"" + P + "\"";
+
+                    //syslog( LOG_INFO, "[%i] %s: %s %s Match", g_pid,
+                        //"appendSTCConfigCommandMatchingElements()",
+                        //"Checking for", patt_str.c_str() );
+                    // give syslog a chance...
+                    //usleep(30000);
+
+                    // Does PV Match This Command's Regex Pattern?
+                    boost::regex expr( P );
+                    boost::smatch subs;
+                    if ( boost::regex_search(
+                            this->m_internal_name, subs, expr )
+                        || boost::regex_search(
+                            this->m_internal_connection, subs, expr ) )
+                    {
+                        if ( m_nxgen.verbose() )
+                        {
+                            syslog( LOG_INFO,
+                                "[%i] %s: %s %s in %s \"%s\" %s", g_pid,
+                                "appendSTCConfigCommandMatchingElements()",
+                                "Pattern Match for",
+                                this->m_device_pv_str.c_str(),
+                                "Command", CMD->name.c_str(),
+                                patt_str.c_str() );
+                            // give syslog a chance...
+                            usleep(30000);
+                        }
+
+                        // Indexed Commands...
+                        if ( CMD->hasIndex )
+                        {
+                            std::stringstream ss_index;
+                            ss_index <<
+                               "appendSTCConfigCommandMatchingElements():";
+
+                            std::string indexedName;
+
+                            uint32_t index = -1;
+
+                            bool gotIndex = false;
+
+                            for ( uint32_t i=0 ;
+                                    i < E->indices.size() && !gotIndex ;
+                                    i++ )
+                            {
+                                std::string &I = E->indices[i];
+
+                                if ( sscanf( this->m_internal_name.c_str(),
+                                        I.c_str(), &index ) == 1 )
+                                {
+                                    ss_index << " Index \"" << I << "\""
+                                        << " Matched Internal Name \""
+                                        << this->m_internal_name << "\""
+                                        << " as " << index;
+
+                                    gotIndex = true;
+                                }
+
+                                else if ( sscanf(
+                                        this->m_internal_connection
+                                            .c_str(),
+                                        I.c_str(), &index ) == 1 )
+                                {
+                                    ss_index << " Index \"" << I << "\""
+                                        << " Matched Internal"
+                                        << " Connection \""
+                                        << this->m_internal_connection
+                                        << "\"" << " as " << index;
+
+                                    gotIndex = true;
+                                }
+                            }
+
+                            if ( gotIndex )
+                            {
+                                size_t start =
+                                    CMD->name.find( GroupNameIndex );
+
+                                if ( start == std::string::npos )
+                                {
+                                    syslog( LOG_ERR,
+                                      "[%i] %s %s - %s \"%s\" for %s (%s)",
+                                        g_pid, "STC Error:",
+                                        ss_index.str().c_str(),
+                                        "Index Not Found in Command Name",
+                                        CMD->name.c_str(),
+                                        this->m_device_pv_str.c_str(),
+                                        patt_str.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    continue;
+                                }
+
+                                else
+                                {
+                                    std::stringstream ss;
+                                    ss << index;
+
+                                    indexedName = CMD->name;
+                                    indexedName.replace( start,
+                                        GroupNameIndex.length(),
+                                        ss.str() );
+
+                                    syslog( LOG_INFO,
+                                        "[%i] %s - %s %s as %s \"%s\" %s",
+                                        g_pid, ss_index.str().c_str(),
+                                        "Indexed Command Name Found for",
+                                        this->m_device_pv_str.c_str(),
+                                        "Command", indexedName.c_str(),
+                                        patt_str.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+
+                                    // Capture Indexed Command Name
+                                    // If Not Yet Included...
+                                    if ( CMD->createdIndices.find(
+                                                indexedName )
+                                            == CMD->createdIndices.end() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s: %s \"%s\"", g_pid,
+                                "appendSTCConfigCommandMatchingElements()",
+                                            "Capturing Indexed Group Name",
+                                            indexedName.c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
+
+                                        CMD->createdIndices.insert(
+                                            indexedName );
+                                    }
+                                }
+                            }
+
+                            else
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s: %s %s in %s \"%s\" %s",
+                                    g_pid, "STC Error:",
+                                "appendSTCConfigCommandMatchingElements()",
+                                    "No Index Found for",
+                                    this->m_device_pv_str.c_str(),
+                                    "Command", CMD->name.c_str(),
+                                    patt_str.c_str() );
+                                // give syslog a chance...
+                                usleep(30000);
+
+                                continue;
+                            }
+                        }
+
+                        // Capture *Just Last PV Value*
+                        // as Command Line Parameter...
+                        // - Whether E->linkLastValue or E->linkValue
+                        // or neither (plain "element" reference)... ;-D
+
+                        // Do We Have a "Last PV Value" to Use...?
+                        if ( this->m_last_value_set )
+                        {
+                            std::string pv_value_path =
+                                m_log_path + "/" + "value";
+
+                            syslog( LOG_INFO,
+                             "[%i] %s: %s %s %s for Command %s: %s=%s",
+                                g_pid,
+                                "appendSTCConfigCommandMatchingElements()",
+                                "Append Command Line Parameter for",
+                                "Last PV Value from",
+                                pv_value_path.c_str(),
+                                CMD->name.c_str(), E->name.c_str(),
+                                this->valueToString(
+                                    this->m_last_value ).c_str() );
+                            // give syslog a chance...
+                            usleep(30000);
+
+                            CMD->args += " " + E->name
+                                + "=" + "\""
+                                + this->valueToString(
+                                    this->m_last_value )
+                                + "\"";
+                        }
+
+                        else
+                        {
+                            syslog( LOG_ERR,
+                                "[%i] %s %s: %s %s %s - %s - %s %s",
+                                g_pid, "STC Error:",
+                                "appendSTCConfigCommandMatchingElements()",
+                                "*** NO LAST PV VALUE for",
+                                CMD->name.c_str(), "Command",
+                                "Nothing to Link to Element Path",
+                                "Skipping", m_log_path.c_str() );
+                            // give syslog a chance...
+                            usleep(30000);
+
+                            // Don't Call This A "Match" Yet,
+                            // Let's Give Someone Else A Try...
+                            continue;
+                        }
+
+                        matched = true;
+                    }
+                }
+            }
+        }
+
         /// Search STC Config for Associated Groups & Create...
         void createSTCConfigGroups(void)
         {
@@ -2395,7 +2630,7 @@ private:
                         //syslog( LOG_INFO,
                             //"[%i] %s: %s \"%s\" Pattern Match (%s)",
                             //g_pid, "createSTCConfigGroups()",
-                            //"Checking for Conditional",
+                            //"Checking for Group Conditional",
                             //C->name.c_str(), P.c_str() );
                         // give syslog a chance...
                         //usleep(30000);
@@ -2446,6 +2681,109 @@ private:
                                     info.c_str(),
                                     this->m_device_pv_str.c_str(),
                                     "Group", G->name.c_str(),
+                                    "Conditional Pattern", P.c_str());
+                                // give syslog a chance...
+                                usleep(30000);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check Each Config Command in Turn
+            // for a Pattern Match on This PV...
+            // (Don't Create Groups, Just Set Conditionals! ;-D)
+            for ( uint32_t cmd=0 ;
+                    cmd < m_nxgen.m_config_commands.size() ; cmd++ )
+            {
+                struct CommandInfo *CMD =
+                    &(m_nxgen.m_config_commands[cmd]);
+
+                appendSTCConfigCommandMatchingElements(
+                    CMD, CMD->elements, "" );
+
+                // Skip Command Conditional Values/Checks
+                // If No PV Values Set...
+                if ( !(this->m_last_value_set) )
+                    continue;
+
+                // Check for Conditional Pattern Matches...
+                for ( uint32_t c=0 ; c < CMD->conditions.size() ; c++ )
+                {
+                    struct ConditionInfo *C = &(CMD->conditions[c]);
+
+                    // For now, Just *Always* Append Conditional Elements
+                    // as Command Line Parameters...
+                    // - This isn't terrible, as if a Condition isn't set,
+                    // then we may not execute the Command Script anyway...
+                    // (TODO: "I'm pretty sure I can fix that..." ;-D)
+                    appendSTCConfigCommandMatchingElements(
+                        CMD, C->elements, "Condition" );
+
+                    // Skip If This Condition is Already Set/Satisfied...
+                    if ( C->is_set )
+                        continue;
+
+                    // Check All Conditional Patterns (Until Set...)
+                    for ( uint32_t p=0 ;
+                            p < C->patterns.size() && !(C->is_set) ; p++ )
+                    {
+                        std::string &P = C->patterns[p];
+
+                        //syslog( LOG_INFO,
+                            //"[%i] %s: %s \"%s\" Pattern Match (%s)",
+                            //g_pid, "createSTCConfigGroups()",
+                            //"Checking for Command Conditional",
+                            //C->name.c_str(), P.c_str() );
+                        // give syslog a chance...
+                        //usleep(30000);
+
+                        // Does PV Match This Group's Conditional Pattern?
+                        boost::regex expr( P );
+                        boost::smatch subs;
+                        if ( boost::regex_search(
+                                this->m_internal_name, subs, expr )
+                            || boost::regex_search(
+                                this->m_internal_connection, subs, expr ) )
+                        {
+                            if ( m_nxgen.verbose() )
+                            {
+                                syslog( LOG_INFO,
+                         "[%i] %s: %s %s in %s \"%s\" %s \"%s\" %s \"%s\"",
+                                    g_pid, "createSTCConfigGroups()",
+                                    "Pattern Match for",
+                                    this->m_device_pv_str.c_str(),
+                                    "Command", CMD->name.c_str(),
+                                    "Conditional", C->name.c_str(),
+                                    "Pattern", P.c_str());
+                                // give syslog a chance...
+                                usleep(30000);
+                            }
+
+                            // Check PV Value Against Condition Values...
+                            if ( matchValues( this->m_last_value,
+                                    C->values )
+                                || notMatchValues( this->m_last_value,
+                                    C->not_values )
+                                || matchValueStrings(
+                                    this->m_last_enum_string,
+                                    C->value_strings )
+                                || notMatchValueStrings(
+                                    this->m_last_enum_string,
+                                    C->not_value_strings ) )
+                            {
+                                // Condition Has Been Satisfied...! :-D
+                                C->is_set = true;
+
+                                std::string info = "Condition ";
+                                info += "\"" + C->name + "\"";
+                                info += " Set to True for";
+                                syslog( LOG_INFO,
+                                   "[%i] %s: %s %s in %s \"%s\" %s \"%s\"",
+                                    g_pid, "createSTCConfigGroups()",
+                                    info.c_str(),
+                                    this->m_device_pv_str.c_str(),
+                                    "Command", CMD->name.c_str(),
                                     "Conditional Pattern", P.c_str());
                                 // give syslog a chance...
                                 usleep(30000);
