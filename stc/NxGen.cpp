@@ -1115,14 +1115,15 @@ NxGen::writeSTCConfigUnitsAttributes(
 /*! \brief Execute Any Pre-Post-Autoreduction Command Scripts
  *
  * This method checks any conditional STC Config Commands
- * and otherwise Executes Everything that has been specified;
- * prepend the command with a Bash "pipefail" setting to
- * capture error codes from the Bash Pipeline, and append
- * a "logger" command to Re-direct Command Script output
- * to the local Syslog, along with the proper "stc" tag
- * (and the current STC Instance Process ID...! ;-D).
- * Execute the Command via system() and report the Return Status,
- * using the "correct bits"... ;-D
+ * and otherwise Executes Every Command that has been specified;
+ * append a crazy "logger" and bash command sequence to
+ * Re-direct the Command Script Output to a temp file and then
+ * insert it en masse into the local RSyslog (because when I do it
+ * line by line it blows over the RSyslog Rate Limiter... ;-Q),
+ * along with the proper "stc" tag (and the current STC Instance
+ * Process ID...! ;-D).
+ * Execute the Command via system(), and capture and report the
+ * Return Status using the "correct bits"... ;-D
  */
 void
 NxGen::executePrePostCommands(void)
@@ -1133,62 +1134,69 @@ NxGen::executePrePostCommands(void)
     {
         struct CommandInfo *CMD = &(m_config_commands[cmd]);
 
-        std::stringstream ssargs;
-
-        bool do_cmd = true;
-
-        // Initialize Basic Run Meta-Data Args for Command...
-        ssargs << "facility=" << getFacilityName();
-        ssargs << " beamline=" << getBeamShortName();
-        ssargs << " proposal=" << getProposalID();
-        ssargs << " run_number=" << getRunNumber();
+        bool do_cmd = false;
 
         // Check for Conditions...
         if ( CMD->conditions.size() )
         {
-            do_cmd = false;
-
             for ( uint32_t c=0 ; c < CMD->conditions.size() ; c++ )
             {
                 struct ConditionInfo *C = &(CMD->conditions[c]);
 
                 if ( C->is_set )
-                {
                     do_cmd = true;
-
-                    // Go Collect Elements - PV Log Values to Append...
-                    // XXX writeSTCConfigUnitsAttributes( G, C->elements );
-                }
             }
+        }
+        // Unconditional, Always Execute! :-D
+        else
+        {
+            do_cmd = true;
         }
 
         // Execute Command...
         if ( do_cmd )
         {
-            // Set PipeFail for Bash Shell (Catch Errors in Pipeline)
-            std::stringstream sspipefail;
-            sspipefail << "set -o pipefail ; ";
+            syslog( LOG_INFO,
+           "[%i] %s: Preparing %s Command for Execution - %s=[%s] %s=[%s]",
+                g_pid, "executePrePostCommands()", CMD->name.c_str(),
+                "path", CMD->path.c_str(),
+                "args", CMD->args.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            // Append Basic Run Meta-Data Args for Command...
+            std::stringstream ssargs;
+            ssargs << CMD->args;
+            ssargs << " facility=" << "\"" << getFacilityName() << "\"";
+            ssargs << " beamline=" << "\"" << getBeamShortName() << "\"";
+            ssargs << " proposal=" << "\"" << getProposalID() << "\"";
+            ssargs << " run_number=" << "\"" << getRunNumber() << "\"";
 
             // Construct Logger Pipe Command...
+            // (Use "logger" with the Whole Output File,
+            // lest we blow over the RSyslog Rate Limit and
+            // start to drop precious STC Log Messages, like
+            // the "End of the Translation" ComBus trigger log... ;-D)
             std::stringstream sslogger;
-            sslogger << "/usr/bin/logger";
-            sslogger << " --tag ";
-            sslogger << "\"stc: [" << g_pid << "]\"";
+            sslogger << " > /tmp/stc_cmd_out." << g_pid << ".txt";
+            sslogger << " ; STC_CMD_RC=$?";
+            sslogger << " ; /usr/bin/logger";
+            sslogger << " --tag \"stc: [" << g_pid << "]\"";
+            sslogger << " --file /tmp/stc_cmd_out." << g_pid << ".txt";
+            sslogger << " ; unlink /tmp/stc_cmd_out." << g_pid << ".txt";
+            sslogger << " ; exit ${STC_CMD_RC}";
 
             // Construct Command String...
             std::stringstream sscmd;
-            sscmd << sspipefail.str();
             sscmd << CMD->path;
-            sscmd << " ";
             sscmd << ssargs.str();
-            sscmd << " | " << sslogger.str();
+            sscmd << sslogger.str();
 
             syslog( LOG_INFO,
-                "[%i] %s %s %s: %s=[%s] %s=[%s] %s=[%s] %s=[%s] %s=[%s]",
-                g_pid, "Executing", CMD->name.c_str(), "Command",
+              "[%i] %s: %s %s %s: %s=[%s] %s=[%s] %s=[%s] %s=[%s]",
+                g_pid, "executePrePostCommands()",
+                "Executing", CMD->name.c_str(), "Command",
                 "path", CMD->path.c_str(),
                 "args", ssargs.str().c_str(),
-                "pipefail", sspipefail.str().c_str(),
                 "logger", sslogger.str().c_str(),
                 "cmd", sscmd.str().c_str() );
             usleep(30000); // give syslog a chance...
@@ -1196,8 +1204,8 @@ NxGen::executePrePostCommands(void)
             int rc = system( sscmd.str().c_str() );
 
             syslog( LOG_INFO,
-                "[%i] %s Command rc=%d: %s=[%s]",
-                g_pid, CMD->name.c_str(),
+                "[%i] %s: %s Command rc=%d: %s=[%s]",
+                g_pid, "executePrePostCommands()", CMD->name.c_str(),
                 (char) ( rc >> 8 ), // Grab Correct Bits... ;-D
                 "cmd", sscmd.str().c_str() );
             usleep(30000); // give syslog a chance...
@@ -1205,11 +1213,11 @@ NxGen::executePrePostCommands(void)
         else
         {
             syslog( LOG_INFO,
-              "[%i] NOT Executing %s Command - %s %s=[%s] %s=[%s]",
-                g_pid, CMD->name.c_str(),
+                "[%i] %s: NOT Executing %s Command - %s %s=[%s] %s=[%s]",
+                g_pid, "executePrePostCommands()", CMD->name.c_str(),
                 "Unmet Conditional Requirement(s)",
                 "path", CMD->path.c_str(),
-                "args", ssargs.str().c_str() );
+                "args", CMD->args.c_str() );
             usleep(30000); // give syslog a chance...
         }
     }
@@ -4463,7 +4471,7 @@ NxGen::parseSTCConfigFile
 
                     struct CommandInfo command;
 
-                    command.created = false;
+                    command.hasIndex = false;
 
                     conditionIndex = 0;
 
@@ -5531,9 +5539,11 @@ NxGen::parseSTCConfigFile
             usleep(30000); // give syslog a chance...
         }
 
-        syslog( LOG_INFO, "[%i] Parsed STC Config File: %s - %lu %s",
+        syslog( LOG_INFO,
+            "[%i] Parsed STC Config File: %s - %lu %s, %lu %s",
             g_pid, a_config_file.c_str(),
-            m_config_groups.size(), "Valid Groups Found" );
+            m_config_groups.size(), "Valid Groups Found",
+            m_config_commands.size(), "Valid Commands Found" );
         usleep(30000); // give syslog a chance...
 
         xmlFreeDoc( doc );
