@@ -651,7 +651,7 @@ public:
 	void dumpPulseInvariants( std::string label,
 			const PulseInvariants &pulse )
 	{
-		ERROR("dumpPulseInvariants(): " << label
+		WARN("dumpPulseInvariants(): " << label
 			<< std::hex << " src=0x" << m_hwId
 			<< " pulseId=0x" << pulse.m_pulseId << std::dec
 			<< " dupCount=" << pulse.m_dupCount

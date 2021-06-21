@@ -1112,6 +1112,118 @@ NxGen::writeSTCConfigUnitsAttributes(
 }
 
 
+/*! \brief Execute Any Pre-Post-Autoreduction Command Scripts
+ *
+ * This method checks any conditional STC Config Commands
+ * and otherwise Executes Every Command that has been specified;
+ * append a crazy "logger" and bash command sequence to
+ * Re-direct the Command Script Output to a temp file and then
+ * insert it en masse into the local RSyslog (because when I do it
+ * line by line it blows over the RSyslog Rate Limiter... ;-Q),
+ * along with the proper "stc" tag (and the current STC Instance
+ * Process ID...! ;-D).
+ * Execute the Command via system(), and capture and report the
+ * Return Status using the "correct bits"... ;-D
+ */
+void
+NxGen::executePrePostCommands(void)
+{
+    // Check Each Config Command in Turn,
+    // Execute Any Open or Conditional Commands...
+    for ( uint32_t cmd=0 ; cmd < m_config_commands.size() ; cmd++ )
+    {
+        struct CommandInfo *CMD = &(m_config_commands[cmd]);
+
+        bool do_cmd = false;
+
+        // Check for Conditions...
+        if ( CMD->conditions.size() )
+        {
+            for ( uint32_t c=0 ; c < CMD->conditions.size() ; c++ )
+            {
+                struct ConditionInfo *C = &(CMD->conditions[c]);
+
+                if ( C->is_set )
+                    do_cmd = true;
+            }
+        }
+        // Unconditional, Always Execute! :-D
+        else
+        {
+            do_cmd = true;
+        }
+
+        // Execute Command...
+        if ( do_cmd )
+        {
+            syslog( LOG_INFO,
+           "[%i] %s: Preparing %s Command for Execution - %s=[%s] %s=[%s]",
+                g_pid, "executePrePostCommands()", CMD->name.c_str(),
+                "path", CMD->path.c_str(),
+                "args", CMD->args.c_str() );
+            usleep(30000); // give syslog a chance...
+
+            // Append Basic Run Meta-Data Args for Command...
+            std::stringstream ssargs;
+            ssargs << CMD->args;
+            ssargs << " facility=" << "\"" << getFacilityName() << "\"";
+            ssargs << " beamline=" << "\"" << getBeamShortName() << "\"";
+            ssargs << " proposal=" << "\"" << getProposalID() << "\"";
+            ssargs << " run_number=" << "\"" << getRunNumber() << "\"";
+
+            // Construct Logger Pipe Command...
+            // (Use "logger" with the Whole Output File,
+            // lest we blow over the RSyslog Rate Limit and
+            // start to drop precious STC Log Messages, like
+            // the "End of the Translation" ComBus trigger log... ;-D)
+            std::stringstream sslogger;
+            sslogger << " > /tmp/stc_cmd_out." << g_pid << ".txt";
+            sslogger << " ; STC_CMD_RC=$?";
+            sslogger << " ; /usr/bin/logger";
+            sslogger << " --tag \"stc: [" << g_pid << "]\"";
+            sslogger << " --file /tmp/stc_cmd_out." << g_pid << ".txt";
+            sslogger << " ; unlink /tmp/stc_cmd_out." << g_pid << ".txt";
+            sslogger << " ; exit ${STC_CMD_RC}";
+
+            // Construct Command String...
+            std::stringstream sscmd;
+            sscmd << CMD->path;
+            sscmd << ssargs.str();
+            sscmd << sslogger.str();
+
+            syslog( LOG_INFO,
+              "[%i] %s: %s %s %s: %s=[%s] %s=[%s] %s=[%s] %s=[%s]",
+                g_pid, "executePrePostCommands()",
+                "Executing", CMD->name.c_str(), "Command",
+                "path", CMD->path.c_str(),
+                "args", ssargs.str().c_str(),
+                "logger", sslogger.str().c_str(),
+                "cmd", sscmd.str().c_str() );
+            usleep(30000); // give syslog a chance...
+
+            int rc = system( sscmd.str().c_str() );
+
+            syslog( LOG_INFO,
+                "[%i] %s: %s Command rc=%d: %s=[%s]",
+                g_pid, "executePrePostCommands()", CMD->name.c_str(),
+                (char) ( rc >> 8 ), // Grab Correct Bits... ;-D
+                "cmd", sscmd.str().c_str() );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_INFO,
+                "[%i] %s: NOT Executing %s Command - %s %s=[%s] %s=[%s]",
+                g_pid, "executePrePostCommands()", CMD->name.c_str(),
+                "Unmet Conditional Requirement(s)",
+                "path", CMD->path.c_str(),
+                "args", CMD->args.c_str() );
+            usleep(30000); // give syslog a chance...
+        }
+    }
+}
+
+
 /*! \brief Dump Overall STC Processing Statistics
  *
  * This method dump the overall processing time/event bandwidth
@@ -2154,8 +2266,18 @@ NxGen::monitorTOFBuffersReady
             {
                 // Chunk Size Override: If There's _No_ TOF Values,
                 //    Then Create Dummy Empty Dataset (Chunk Size = 1)
+
                 unsigned long chunk_size = ( a_monitor.m_tof_buffer_size )
                     ? ( a_monitor.m_tof_buffer_size ) : 1;
+
+                syslog( LOG_INFO,
+                    "[%i] Creating %s%s Dataset for %s/%s %s=%lu",
+                    g_pid,
+                    ( ( a_monitor.m_tof_buffer_size ) ? "" : "Dummy " ),
+                    "Monitor TOF",
+                    mi->m_path.c_str(), m_tof_name.c_str(),
+                    "chunk_size", chunk_size );
+                usleep(30000); // give syslog a chance...
 
                 makeDataset( mi->m_path, m_tof_name,
                     NeXus::FLOAT32, TIME_USEC_UNITS, chunk_size );
@@ -2240,6 +2362,16 @@ NxGen::monitorIndexBuffersReady
                     //    Then Create Dummy Empty Dataset (Chunk Size = 1)
                     chunk_size = ( a_monitor.m_index_buffer.size() )
                         ? ( a_monitor.m_index_buffer.size() ) : 1;
+
+                    syslog( LOG_INFO,
+                        "[%i] Creating %s%s Dataset for %s/%s %s=%lu",
+                        g_pid,
+                        ( ( a_monitor.m_index_buffer.size() )
+                            ? "" : "Dummy " ),
+                        "Monitor Event Index",
+                        mi->m_path.c_str(), m_index_name.c_str(),
+                        "chunk_size", chunk_size );
+                    usleep(30000); // give syslog a chance...
                 }
 
                 makeDataset( mi->m_path, m_index_name,
@@ -2384,6 +2516,13 @@ NxGen::monitorFinalize
                 "total_counts", mi->m_event_count, "" );
             writeScalar( m_entry_path + "/" + mi->m_name,
                 "total_uncounted_counts", mi->m_event_uncounted, "" );
+
+            syslog( LOG_INFO,
+                "[%i] Wrote Histogram Monitor for %s/%s %s=%lu %s=%lu",
+                g_pid, m_entry_path.c_str(), mi->m_name.c_str(),
+                "total_counts", mi->m_event_count,
+                "total_uncounted_counts", mi->m_event_uncounted );
+            usleep(30000); // give syslog a chance...
         }
 
         // Event-based Monitor
@@ -2392,6 +2531,12 @@ NxGen::monitorFinalize
             // Write Final Monitor Total Counts
             writeScalar( m_entry_path + "/" + mi->m_name,
                 "total_counts", mi->m_event_count, "" );
+
+            syslog( LOG_INFO,
+                "[%i] Wrote Event Monitor for %s/%s %s=%lu",
+                g_pid, m_entry_path.c_str(), mi->m_name.c_str(),
+                "total_counts", mi->m_event_count );
+            usleep(30000); // give syslog a chance...
 
             // NOW Link Pulse Time to this Monitor...
             //    - the Pulse Time Dataset Must have been Created by Now!
@@ -4312,6 +4457,1054 @@ NxGen::parseSTCConfigFile
                 }
 
                 else if ( xmlStrcmp( lev1->name,
+                        (const xmlChar*)"command" ) == 0 )
+                {
+                    std::stringstream ss_elements;
+                    ss_elements << "elements=[";
+
+                    std::string elem_sep = "";
+
+                    std::stringstream ss_conditions;
+                    ss_conditions << "conditions=[";
+
+                    std::string cond_sep = "";
+
+                    struct CommandInfo command;
+
+                    command.hasIndex = false;
+
+                    conditionIndex = 0;
+
+                    if ( verbose() )
+                    {
+                        syslog( LOG_INFO, "[%i] %s Found Command [%s]",
+                            g_pid, "STC Config", value.c_str() );
+                        usleep(30000); // give syslog a chance...
+                    }
+
+                    for ( xmlNode *lev2 = lev1->children;
+                            lev2 != 0; lev2 = lev2->next )
+                    {
+                        tag = (char*)lev2->name;
+                        getXmlNodeValue( lev2, value );
+
+                        //syslog( LOG_INFO, "[%i] %s Level 2 <%s>=[%s]",
+                            //g_pid, "Parsing STC Config File",
+                            //tag.c_str(), value.c_str() );
+                        //usleep(30000); // give syslog a chance...
+
+                        if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"name" ) == 0 )
+                        {
+                            // Already Got A Command Name...?
+                            if ( command.name.size() )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s [%s] -> [%s] - %s",
+                                    g_pid, "STC Error:",
+                                    "STC Config DUPLICATE Command Name",
+                                    command.name.c_str(), value.c_str(),
+                                    "Using New Command Name..." );
+                                usleep(30000); // give syslog a chance...
+                            }
+                            else if ( verbose() )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s Command Name [%s]",
+                                    g_pid, "STC Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
+
+                            command.name = value;
+
+                            if ( command.name.find( NxGen::GroupNameIndex )
+                                    != std::string::npos )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s Command is Indexed! [%s]",
+                                    g_pid, "STC Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+
+                                command.hasIndex = true;
+                            }
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"path" ) == 0 )
+                        {
+                            // Already Got A Command Path...?
+                            if ( command.path.size() )
+                            {
+                                syslog( LOG_ERR,
+                                    "[%i] %s %s [%s] -> [%s] - %s",
+                                    g_pid, "STC Error:",
+                                    "STC Config DUPLICATE Command Path",
+                                    command.path.c_str(), value.c_str(),
+                                    "Using New Command Path..." );
+                                usleep(30000); // give syslog a chance...
+                            }
+                            else if ( verbose() )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s Command Path [%s]",
+                                    g_pid, "STC Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
+
+                            command.path = value;
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element" ) == 0
+                                || xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_value" ) == 0
+                                || xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_last_value" ) == 0 )
+                        {
+                            struct ElementInfo element;
+
+                            if ( xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_last_value" ) == 0 )
+                            {
+                                element.linkLastValue = true;
+                                element.linkValue = false;
+                            }
+                            else if ( xmlStrcmp( lev2->name,
+                                    (const xmlChar*)
+                                        "element_value" ) == 0 )
+                            {
+                                element.linkLastValue = false;
+                                element.linkValue = true;
+                            }
+                            else
+                            {
+                                element.linkLastValue = false;
+                                element.linkValue = false;
+                            }
+
+                            element.lastIndex = 0;
+
+                            if ( verbose() )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s Command Element [%s]",
+                                    g_pid, "STC Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
+
+                            for ( xmlNode *lev3 = lev2->children;
+                                    lev3 != 0; lev3 = lev3->next )
+                            {
+                                tag = (char*)lev3->name;
+                                getXmlNodeValue( lev3, value );
+
+                                //syslog( LOG_INFO,
+                                    //"[%i] %s Element Level 3 <%s>=[%s]",
+                                    //g_pid, "Parsing STC Config File",
+                                    //tag.c_str(), value.c_str() );
+                                // give syslog a chance...
+                                //usleep(30000);
+
+                                if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"pattern" ) == 0 )
+                                {
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                       "[%i] %s Element Pattern #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            element.patterns.size() + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    element.patterns.push_back( value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"index" ) == 0 )
+                                {
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                        "[%i] %s Element Index #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            element.indices.size() + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    element.indices.push_back( value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"name" ) == 0 )
+                                {
+                                    // Already Got An Element Name...?
+                                    if ( element.name.size() )
+                                    {
+                                        syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                            g_pid, "STC Error:",
+                                            "STC Config DUPLICATE",
+                                            "Element Name",
+                                            element.name.c_str(),
+                                            value.c_str(),
+                                            "Using New Element Name..." );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                    else if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Element Name [%s]",
+                                            g_pid, "STC Config",
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    element.name = value;
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)
+                                            "units_value" ) == 0 )
+                                {
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s %s #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            "Element Units Value Pattern",
+                                            element.unitsPatterns.size()
+                                                + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    element.unitsPatterns.push_back(
+                                        value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"units" ) == 0 )
+                                {
+                                    // Already Got Explicit Element Units?
+                                    if ( element.units.size() )
+                                    {
+                                        syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                            g_pid, "STC Error:",
+                                            "STC Config DUPLICATE",
+                                            "Element Units",
+                                            element.units.c_str(),
+                                            value.c_str(),
+                                            "Using New Element Units..." );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                    else if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s Element Units [%s]",
+                                            g_pid, "STC Config",
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    element.units = value;
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"text" ) != 0
+                                    && xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"comment" ) != 0 )
+                                {
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s at %s <%s>=[%s]",
+                                        g_pid, "STC Error:",
+                                        "Unknown Tag in STC Config",
+                                        "Element Level 3",
+                                        tag.c_str(), value.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+                            }
+
+                            // For Element Pattern Logging...
+                            std::stringstream ss;
+                            ss << "name=[" << element.name << "]";
+
+                            ss << " patterns=[";
+                            for ( uint32_t i=0 ;
+                                    i < element.patterns.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << element.patterns[i];
+                            }
+                            ss << "]";
+
+                            // For Element Index Logging...
+                            ss << " indices=[";
+                            for ( uint32_t i=0 ;
+                                    i < element.indices.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << element.indices[i];
+                            }
+                            ss << "]";
+
+                            // For Element Units Pattern Logging...
+                            ss << " unitsPatterns=[";
+                            for ( uint32_t i=0 ;
+                                    i < element.unitsPatterns.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << element.unitsPatterns[i];
+                            }
+                            ss << "]";
+
+                            // For Element Explicit Units Logging...
+                            ss << " units=[" << element.units << "]";
+
+                            // Add Element to Command Container...
+                            // (If Required Fields are Present, Else Error)
+                            if ( element.patterns.size()
+                                    && ( !(command.hasIndex)
+                                        || element.indices.size() )
+                                    && element.name.size() )
+                            {
+                                // Check for Existing Element by Name...
+                                if ( findGroupElementByName( element.name,
+                                        command.elements ) )
+                                {
+                                    std::string err =
+                                        "Duplicate Element Name ";
+                                    err += "\"" + element.name + "\"";
+                                    err += " in STC Config Command \""
+                                        + command.name + "\"";
+                                    syslog( LOG_ERR, "[%i] %s %s - %s %s",
+                                        g_pid, "STC Error:", err.c_str(),
+                                        "Ignoring", ss.str().c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+                                else
+                                {
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s %s \"%s\" - %s",
+                                            g_pid, "STC Config",
+                                            "Adding Element to Command",
+                                            command.name.c_str(),
+                                            ss.str().c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    command.elements.push_back( element );
+
+                                    ss_elements
+                                        << elem_sep << element.name;
+                                    elem_sep = ", ";
+                                }
+                            }
+                            else
+                            {
+                                std::string err = "Incomplete Element";
+                                err += " in STC Config Command \""
+                                    + command.name + "\"";
+                                syslog( LOG_ERR, "[%i] %s %s - %s %s",
+                                    g_pid, "STC Error:", err.c_str(),
+                                    "Ignoring", ss.str().c_str() );
+                                usleep(30000); // give syslog a chance
+                            }
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"condition" ) == 0 )
+                        {
+                            std::stringstream ss_cond_elems;
+                            ss_cond_elems << "elements=[";
+
+                            std::string cond_elem_sep = "";
+
+                            struct ConditionInfo condition;
+
+                            condition.is_set = false;
+
+                            if ( verbose() )
+                            {
+                                syslog( LOG_INFO,
+                                    "[%i] %s Command Condition [%s]",
+                                    g_pid, "STC Config", value.c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
+
+                            for ( xmlNode *lev3 = lev2->children;
+                                    lev3 != 0; lev3 = lev3->next )
+                            {
+                                tag = (char*)lev3->name;
+                                getXmlNodeValue( lev3, value );
+
+                                //syslog( LOG_INFO,
+                                    //"[%i] %s %s Level 3 <%s>=[%s]",
+                                    //g_pid, "Parsing STC Config File",
+                                    //"Condition",
+                                    //tag.c_str(), value.c_str() );
+                                // give syslog a chance...
+                                //usleep(30000);
+
+                                if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"name" ) == 0 )
+                                {
+                                    // Already Got A Condition Name...?
+                                    if ( condition.name.size() )
+                                    {
+                                        syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                            g_pid, "STC Error:",
+                                            "STC Config DUPLICATE",
+                                            "Condition Name",
+                                            condition.name.c_str(),
+                                            value.c_str(),
+                                            "Using New Condition Name..."
+                                        );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+                                    else if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                           "[%i] %s Condition Name [%s]",
+                                            g_pid, "STC Config",
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    condition.name = value;
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"pattern" ) == 0 )
+                                {
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                          "[%i] %s Condition %s #%ld [%s]",
+                                            g_pid, "STC Config", "Pattern",
+                                            condition.patterns.size() + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    condition.patterns.push_back( value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"value_string" )
+                                            == 0 )
+                                {
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                          "[%i] %s Condition %s #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            "Value String",
+                                        condition.value_strings.size() + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    condition.value_strings.push_back(
+                                        value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"value" ) == 0 )
+                                {
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                          "[%i] %s Condition %s #%ld [%s]",
+                                            g_pid, "STC Config", "Value",
+                                            condition.values.size() + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    condition.values.push_back( value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"not_value_string"
+                                            ) == 0 )
+                                {
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                          "[%i] %s Condition %s #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            "NOT Value String",
+                                        condition.not_value_strings.size()
+                                                + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    condition.not_value_strings.push_back(
+                                        value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"not_value" )
+                                            == 0 )
+                                {
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                          "[%i] %s Condition %s #%ld [%s]",
+                                            g_pid, "STC Config",
+                                            "NOT Value",
+                                            condition.not_values.size()
+                                                + 1,
+                                            value.c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+
+                                    condition.not_values.push_back(
+                                        value );
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                                "element" ) == 0
+                                        || xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                                "element_value" ) == 0
+                                        || xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                              "element_last_value" ) == 0 )
+                                {
+                                    struct ElementInfo element;
+
+                                    if ( xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                              "element_last_value" ) == 0 )
+                                    {
+                                        element.linkLastValue = true;
+                                        element.linkValue = false;
+                                    }
+                                    else if ( xmlStrcmp( lev3->name,
+                                            (const xmlChar*)
+                                                "element_value" ) == 0 )
+                                    {
+                                        element.linkLastValue = false;
+                                        element.linkValue = true;
+                                    }
+                                    else
+                                    {
+                                        element.linkLastValue = false;
+                                        element.linkValue = false;
+                                    }
+
+                                    element.lastIndex = 0;
+
+                                    if ( verbose() )
+                                    {
+                                        syslog( LOG_INFO,
+                                            "[%i] %s %s [%s]",
+                                            g_pid, "STC Config",
+                                            "Command Condition Element",
+                                            value.c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
+
+                                    for ( xmlNode *lev4 = lev3->children;
+                                            lev4 != 0; lev4 = lev4->next )
+                                    {
+                                        tag = (char*)lev4->name;
+                                        getXmlNodeValue( lev4, value );
+
+                                        //syslog( LOG_INFO,
+                                            //"[%i] %s %s <%s>=[%s]",
+                                            //g_pid,
+                                            //"Parsing STC Config File",
+                                            //"Condition Element Level 3",
+                                            //tag.c_str(),
+                                            //value.c_str() );
+                                        // give syslog a chance...
+                                        //usleep(30000);
+
+                                        if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"pattern" )
+                                                    == 0 )
+                                        {
+                                            if ( verbose() )
+                                            {
+                                                syslog( LOG_INFO,
+                                                "[%i] %s %s %s #%ld [%s]",
+                                                    g_pid, "STC Config",
+                                                    "Condition Element",
+                                                    "Pattern",
+                                                    element.patterns.size()
+                                                        + 1,
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
+
+                                            element.patterns.push_back(
+                                                value );
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"index" )
+                                                    == 0 )
+                                        {
+                                            if ( verbose() )
+                                            {
+                                                syslog( LOG_INFO,
+                                                "[%i] %s %s %s #%ld [%s]",
+                                                    g_pid, "STC Config",
+                                                    "Condition Element",
+                                                    "Index",
+                                                    element.indices.size()
+                                                        + 1,
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
+
+                                            element.indices.push_back(
+                                                value );
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"name" )
+                                                    == 0 )
+                                        {
+                                            // Already Got An Element Name?
+                                            if ( element.name.size() )
+                                            {
+                                                syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                                    g_pid, "STC Error:",
+                                                    "STC Config DUPLICATE",
+                                                "Condition Element Name",
+                                                    element.name.c_str(),
+                                                    value.c_str(),
+                                                "Using New Element Name..."
+                                                );
+                                                // give syslog a chance...
+                                                usleep(30000);
+                                            }
+                                            else if ( verbose() )
+                                            {
+                                                syslog( LOG_INFO,
+                                                    "[%i] %s %s [%s]",
+                                                    g_pid, "STC Config",
+                                                  "Condition Element Name",
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
+
+                                            element.name = value;
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)
+                                                    "units_value" ) == 0 )
+                                        {
+                                            if ( verbose() )
+                                            {
+                                                syslog( LOG_INFO,
+                                                    "[%i] %s %s #%ld [%s]",
+                                                    g_pid, "STC Config",
+                                             "Element Units Value Pattern",
+                                                    element.unitsPatterns
+                                                        .size() + 1,
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
+
+                                            element.unitsPatterns
+                                                .push_back( value );
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)
+                                                    "units" ) == 0 )
+                                        {
+                                            // Already Got Explicit
+                                            // Element Units?
+                                            if ( element.units.size() )
+                                            {
+                                                syslog( LOG_ERR,
+                                        "[%i] %s %s %s [%s] -> [%s] - %s",
+                                                    g_pid, "STC Error:",
+                                                    "STC Config DUPLICATE",
+                                                    "Element Units",
+                                                    element.units.c_str(),
+                                                    value.c_str(),
+                                               "Using New Element Units..."
+                                                );
+                                                // give syslog a chance...
+                                                usleep(30000);
+                                            }
+                                            else if ( verbose() )
+                                            {
+                                                syslog( LOG_INFO,
+                                              "[%i] %s Element Units [%s]",
+                                                    g_pid, "STC Config",
+                                                    value.c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
+
+                                            element.units = value;
+                                        }
+
+                                        else if ( xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"text" )
+                                                    != 0
+                                            && xmlStrcmp( lev4->name,
+                                                (const xmlChar*)"comment" )
+                                                    != 0 )
+                                        {
+                                            syslog( LOG_ERR,
+                                            "[%i] %s %s at %s <%s>=[%s]",
+                                                g_pid, "STC Error:",
+                                            "Unknown Tag in STC Config",
+                                            "Condition Element Level 4",
+                                                tag.c_str(), value.c_str()
+                                            );
+                                            // give syslog a chance
+                                            usleep(30000);
+                                        }
+                                    }
+
+                                    // For Element Pattern Logging...
+                                    std::stringstream ss;
+                                    ss << "name=[" << element.name << "]";
+
+                                    ss << " patterns=[";
+                                    for ( uint32_t i=0 ;
+                                            i < element.patterns.size();
+                                            i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << element.patterns[i];
+                                    }
+                                    ss << "]";
+
+                                    // For Element Index Logging...
+                                    ss << " indices=[";
+                                    for ( uint32_t i=0 ;
+                                            i < element.indices.size();
+                                            i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << element.indices[i];
+                                    }
+                                    ss << "]";
+
+                                    // For Element Units Pattern Logging...
+                                    ss << " unitsPatterns=[";
+                                    for ( uint32_t i=0 ;
+                                            i < element.unitsPatterns
+                                                .size(); i++ )
+                                    {
+                                        if ( i ) ss << ", ";
+                                        ss << element.unitsPatterns[i];
+                                    }
+                                    ss << "]";
+
+                                    // For Element Explicit Units Logging
+                                    ss << " units=["
+                                        << element.units << "]";
+
+                                    // Add Element to Command Condition...
+                                    // (If Required Fields are Present,
+                                    // Else Error)
+                                    if ( element.patterns.size()
+                                            && ( !(command.hasIndex)
+                                                || element.indices.size() )
+                                            && element.name.size() )
+                                    {
+                                        // Check for Existing Element
+                                        // in Command by Name?
+                                        if ( findGroupElementByName(
+                                                element.name,
+                                                command.elements ) )
+                                        {
+                                            std::string err =
+                                                "Duplicate Element Name ";
+                                            err += "\"" + element.name
+                                                + "\"";
+                                            err +=
+                                                " in STC Config Command \""
+                                                + command.name + "\"";
+                                            syslog( LOG_ERR,
+                                                "[%i] %s %s - %s %s",
+                                                g_pid, "STC Error:",
+                                                err.c_str(), "Ignoring",
+                                                ss.str().c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+                                        }
+                                        // Check for Existing Element
+                                        // in Condition by Name?
+                                        else if ( findGroupElementByName(
+                                                element.name,
+                                                condition.elements ) )
+                                        {
+                                            std::string err =
+                                                "Duplicate Element Name ";
+                                            err += "\"" + element.name
+                                                + "\"";
+                                            err +=
+                                                " in STC Config Command \""
+                                                + command.name + "\"";
+                                            err += " Condition \""
+                                                + condition.name + "\"";
+                                            syslog( LOG_ERR,
+                                                "[%i] %s %s - %s %s",
+                                                g_pid, "STC Error:",
+                                                err.c_str(), "Ignoring",
+                                                ss.str().c_str() );
+                                            // give syslog a chance
+                                            usleep(30000);
+                                        }
+                                        else
+                                        {
+                                            if ( verbose() )
+                                            {
+                                                std::string info =
+                                                    "STC Config Adding";
+                                                info += " Element";
+                                                info += " to Condition \""
+                                                   + condition.name + "\"";
+                                                info += " for Command \""
+                                                    + command.name + "\"";
+                                                syslog( LOG_INFO,
+                                                    "[%i] %s - %s",
+                                                    g_pid, info.c_str(),
+                                                    ss.str().c_str() );
+                                                // give syslog a chance
+                                                usleep(30000);
+                                            }
+
+                                            condition.elements.push_back(
+                                                element );
+
+                                            ss_cond_elems << cond_elem_sep
+                                                << ss.str();
+                                            cond_elem_sep = "; ";
+                                        }
+                                    }
+                                    else
+                                    {
+                                        std::string err = "Incomplete";
+                                        err += " Condition \""
+                                            + condition.name + "\"";
+                                        err += " Element in STC Config";
+                                        err += " Command \""
+                                            + command.name + "\"";
+                                        syslog( LOG_ERR,
+                                            "[%i] %s %s - %s %s",
+                                            g_pid, "STC Error:",
+                                            err.c_str(), "Ignoring",
+                                            ss.str().c_str() );
+                                        // give syslog a chance
+                                        usleep(30000);
+                                    }
+                                }
+
+                                else if ( xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"text" ) != 0
+                                    && xmlStrcmp( lev3->name,
+                                        (const xmlChar*)"comment" ) != 0 )
+                                {
+                                    syslog( LOG_ERR,
+                                        "[%i] %s %s at %s <%s>=[%s]",
+                                        g_pid, "STC Error:",
+                                        "Unknown Tag in STC Config",
+                                        "Condition Level 3",
+                                        tag.c_str(), value.c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+                            }
+
+                            // Note: the Condition Name is optional, it's
+                            // really only for human readability... ;-D
+                            // So if this Condition doesn't have a Name,
+                            // just assign it the next Unnamed Index...
+                            if ( condition.name.size() == 0 )
+                            {
+                                stringstream ss;
+                                ss << "UnnamedCondition"
+                                    << ++conditionIndex;
+                                condition.name = ss.str();
+                            }
+
+                            // Construct Logging String...
+                            std::stringstream ss;
+                            ss << "patterns=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.patterns.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.patterns[i];
+                            }
+                            ss << "] ";
+                            ss << "value_strings=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.value_strings.size();
+                                    i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.value_strings[i];
+                            }
+                            ss << "] ";
+                            ss << "values=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.values.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.values[i];
+                            }
+                            ss << "] ";
+                            ss << "not_value_strings=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.not_value_strings.size();
+                                    i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.not_value_strings[i];
+                            }
+                            ss << "] ";
+                            ss << "values=[";
+                            for ( uint32_t i=0 ;
+                                    i < condition.not_values.size(); i++ )
+                            {
+                                if ( i ) ss << ", ";
+                                ss << condition.not_values[i];
+                            }
+                            ss << "]";
+
+                            // Add Condition to Command Container...
+                            // (If Required Fields are Present, Else Error)
+                            if ( condition.patterns.size()
+                                && ( condition.value_strings.size()
+                                    || condition.values.size()
+                                    || condition.not_value_strings.size()
+                                    || condition.not_values.size() ) )
+                            {
+                                if ( verbose() )
+                                {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s \"%s\" %s \"%s\" - %s",
+                                        g_pid,
+                                        "STC Config Adding Condition",
+                                        condition.name.c_str(),
+                                        "to Command", command.name.c_str(),
+                                        ss.str().c_str() );
+                                    usleep(30000); // give syslog a chance
+                                }
+
+                                command.conditions.push_back( condition );
+
+                                ss_conditions << cond_sep
+                                    << "\"" << condition.name << "\": "
+                                    << ss.str()
+                                    << " " << ss_cond_elems.str() << "]";
+                                cond_sep = "; ";
+                            }
+                            else
+                            {
+                                std::string err = "Incomplete Condition";
+                                err += " \"" + condition.name + "\"";
+                                err += " in STC Config Command \""
+                                    + command.name + "\"";
+                                syslog( LOG_ERR, "[%i] %s %s - %s %s",
+                                    g_pid, "STC Error:", err.c_str(),
+                                    "Ignoring", ss.str().c_str() );
+                                usleep(30000); // give syslog a chance
+                            }
+                        }
+
+                        else if ( xmlStrcmp( lev2->name,
+                                (const xmlChar*)"text" ) != 0
+                            && xmlStrcmp( lev2->name,
+                                (const xmlChar*)"comment" ) != 0 )
+                        {
+                            syslog( LOG_ERR,
+                                "[%i] %s %s at Level 2 <%s>=[%s]",
+                                g_pid, "STC Error:",
+                                "Unknown Tag in STC Config",
+                                tag.c_str(), value.c_str() );
+                            usleep(30000); // give syslog a chance
+                        }
+                    }
+
+                    // Add Command Container to STC Config...
+                    // (If Required Fields are Present, Else Error)
+                    // Note: For a *Command*, It's Ok to have No Elements,
+                    // and No Conditions! ;-D
+                    if ( command.name.size()
+                            && command.path.size() )
+                    {
+                        std::stringstream ss;
+                        ss << "Adding Command Container"
+                            << " \"" << command.name << "\""
+                            << " to STC Config -"
+                            << " path=[" << command.path << "]"
+                            << " ("
+                            << command.elements.size() << " elements, "
+                            << command.conditions.size() << " conditions)"
+                            << ": " << ss_elements.str() << "]"
+                            << " " << ss_conditions.str() << "]";
+                        syslog( LOG_INFO, "[%i] %s",
+                            g_pid, ss.str().c_str() );
+                        usleep(30000); // give syslog a chance
+
+                        m_config_commands.push_back( command );
+                    }
+                    else
+                    {
+                        std::string err = "Incomplete Command Container \""
+                            + command.name
+                            + "\" in STC Config";
+                        syslog( LOG_ERR,
+                            "[%i] %s %s - %s %s=[%s] (%lu %s, %lu %s)",
+                            g_pid, "STC Error:", err.c_str(),
+                            "Ignoring",
+                            "path", command.path.c_str(),
+                            command.elements.size(), "elements",
+                            command.conditions.size(), "conditions" );
+                        usleep(30000); // give syslog a chance
+                    }
+                }
+
+                else if ( xmlStrcmp( lev1->name,
                         (const xmlChar*)"text" ) != 0
                     && xmlStrcmp( lev1->name,
                         (const xmlChar*)"comment" ) != 0 )
@@ -4346,9 +5539,11 @@ NxGen::parseSTCConfigFile
             usleep(30000); // give syslog a chance...
         }
 
-        syslog( LOG_INFO, "[%i] Parsed STC Config File: %s - %lu %s",
+        syslog( LOG_INFO,
+            "[%i] Parsed STC Config File: %s - %lu %s, %lu %s",
             g_pid, a_config_file.c_str(),
-            m_config_groups.size(), "Valid Groups Found" );
+            m_config_groups.size(), "Valid Groups Found",
+            m_config_commands.size(), "Valid Commands Found" );
         usleep(30000); // give syslog a chance...
 
         xmlFreeDoc( doc );

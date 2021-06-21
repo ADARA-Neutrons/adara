@@ -1056,10 +1056,12 @@ public:
                 {
                     std::string log_hdr = "";
                     int log_type = LOG_INFO;
-                    if ( this->m_last_value_set ) {
-                        log_type = LOG_ERR;
-                        log_hdr = "STC Error: ";
-                    }
+                    // Don't Log _Any_ of These as "Errors",
+                    // Just Too Much Spam...! ;-b
+                    // if ( this->m_last_value_set ) {
+                        // log_type = LOG_ERR;
+                        // log_hdr = "STC Error: ";
+                    // }
                     std::stringstream ss;
                     ss << log_hdr;
                     ss << "PVInfo::normalizeTimestamps() ";
@@ -1393,6 +1395,7 @@ public:
                                 std::vector<STC::PVEnumeratedType>
                                     &a_enumVec ) = 0;
     virtual void            checkSTCConfigElementUnitsPaths(void) = 0;
+    virtual void            executePrePostCommands(void) = 0;
 };
 
 

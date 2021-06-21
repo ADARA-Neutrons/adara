@@ -65,16 +65,20 @@ PROCESS_REVISIONS()
 
 			#echo "Key: [${key}]"
 
-			if [[ ${revstat} =~ ${key} \
-					&& ! ${revstat} =~ ${NO_CONFIG_CHANGE_NOTIFY_KEY} \
-			]]; then
+			if [[ ${revstat} =~ ${key} ]]; then
 
 				echo "Found '${key}' File Reference."
 
+				gitlog=`git show --no-color -s --pretty=medium ${rev}`
+
+				if [[ ${gitlog} =~ ${NO_CONFIG_CHANGE_NOTIFY_KEY} ]]; then
+					echo -n "Found \"No Notify\" Directive in Log"
+					echo " - Ignoring Revision..."
+					continue
+				fi
+
 				EMAIL_BODY="${EMAIL_BODY}\nConfiguration Change"
 				EMAIL_BODY="${EMAIL_BODY} to '${key}':\n"
-
-				gitlog=`git show --no-color -s --pretty=medium ${rev}`
 
 				EMAIL_BODY="${EMAIL_BODY}\n${gitlog}\n"
 

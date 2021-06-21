@@ -504,6 +504,7 @@ int main( int argc, char** argv )
             nxgen->dumpProcessingStatistics();
 
             // If we make it here, translation succeeded
+            // Move or Rename the Destination NeXus/ADARA Files
 
             work_dir = nxgen->getWorkingDirectory();
 
@@ -512,6 +513,8 @@ int main( int argc, char** argv )
             syslog( LOG_INFO, "[%i] Working Directory: [%s] (doRename=%s)",
                 g_pid, work_dir.c_str(), ( doRename ? "true" : "false" ) );
             usleep(30000); // give syslog a chance...
+
+            string cat_nexus_file;
 
             if ( move )
             {
@@ -527,8 +530,7 @@ int main( int argc, char** argv )
                 string cat_name = nxgen->getBeamShortName() + "_"
                     + boost::lexical_cast<string>(nxgen->getRunNumber());
 
-                string cat_nexus_file = cat_path + "nexus/"
-                    + cat_name + ".nxs.h5";
+                cat_nexus_file = cat_path + "nexus/" + cat_name + ".nxs.h5";
 
                 // Try to "move" (rename) files
                 if ( !adara_outfile.empty() )
@@ -579,7 +581,19 @@ int main( int argc, char** argv )
                         usleep(30000); // give syslog a chance...
                     }
                 }
+            }
 
+            // Now Execute Any Pre-Post-Autoreduction Commands
+            // As Specified in the STC Config File...! ;-D
+
+            if ( nxgen )
+                nxgen->executePrePostCommands();
+
+            // NOW Send ComBus Final Notify/Trigger Message...
+            // (_After_ Any Potential Pre-Post-Autoreduction Commands!)
+
+            if ( move )
+            {
                 // Send finished messages to ComBus AND workflow manager
                 if ( monitor )
                     monitor->success( true, cat_nexus_file );
@@ -751,6 +765,8 @@ int main( int argc, char** argv )
     {
         cout << sms_reason << endl;
     }
+
+    // Clean Up, We're Done...! :-D
 
     syslog( LOG_INFO, "[%i] Cleaning up", g_pid );
     usleep(30000); // give syslog a chance...
