@@ -2068,8 +2068,12 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	// ("cnt" already incremented above... :-)
 	if ( !(cnt % freq) )
 	{
-		// Update Max Pulse Buffer Size from PV...
-		m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
+		// Infrequently Check Live Control PV for
+		// Max Pulse Buffer Size...
+		// (Once Per Minute...)
+		if ( !(++cnt % 3600) ) {
+			m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
+		}
 
 		// Now, *Before* Inserting New Pulse, Check Max Pulse Buffer Size!
 		// (Give the "New Guy" a chance to exist before we dump it... ;-D)
