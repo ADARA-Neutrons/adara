@@ -307,6 +307,7 @@ StorageFile::SharedPtr StorageManager::dummyFile;
 std::vector<StorageFile::SharedPtr> StorageManager::dummySaveFiles;
 
 std::list<StorageContainer::SharedPtr> StorageManager::m_containerStack;
+
 StorageFile::SharedPtr StorageManager::m_prologueFile;
 
 StorageManager::ContainerSignal StorageManager::m_contChange;
@@ -314,6 +315,14 @@ StorageManager::PrologueSignal StorageManager::m_prologue;
 
 std::map<uint32_t, boost::shared_ptr<StorageManager::PrologueSignal> >
 	StorageManager::m_savePrologue;
+
+std::list<StorageContainer::SharedPtr>::iterator
+	StorageManager::m_last_found_it = m_containerStack.end();
+
+struct timespec StorageManager::m_last_ts = { -1, -1 };
+
+bool StorageManager::m_last_ignore_pkt_timestamp = true;
+bool StorageManager::m_last_check_old_containers = false;
 
 std::string StorageManager::m_poolsize;
 uint32_t StorageManager::m_percent;
@@ -1293,6 +1302,12 @@ void StorageManager::endCurrentContainer(
 		m_containerStack.push_front( container );
 		it = m_containerStack.begin();
 
+		// Reset "Last Time Stamp" for findContainerByTime()...!
+		// ("Just in Case" Changing Container Stack Here
+		// Invalidates Saved Iterator)
+		m_last_ts.tv_sec = -1;
+		m_last_ts.tv_nsec = -1;
+
 		DEBUG("endCurrentContainer():"
 			<< " Pushed New Empty Current Container onto Stack"
 			<< " do_terminate=" << do_terminate
@@ -2142,6 +2157,38 @@ StorageManager::findContainerByTime(
 {
 	static uint32_t cnt = 0;
 
+	// *** Quick Cached Time Stamp Lookup Shortcut:
+	// If *Everything* is the "Same" for This Time Stamp Lookup,
+	// Then We Can Simply Return the Same "Last Iterator"...!
+	// (Otherwise, We Need to Proceed Fully Through the Logic Here...)
+	if ( ignore_pkt_timestamp == m_last_ignore_pkt_timestamp
+			&& check_old_containers == m_last_check_old_containers
+			&& ts.tv_sec == m_last_ts.tv_sec
+			&& ts.tv_nsec == m_last_ts.tv_nsec )
+	{
+		// REMOVEME...
+		// DEBUG("findContainerByTime(): " << label
+			// << " *** CACHE HIT! SAME Packet TimeStamp,"
+			// << " Re-Use Last Container "
+			// << (*m_last_found_it)->name()
+			// << " for ts=" << ts.tv_sec << "."
+			// << std::setfill('0') << std::setw(9)
+			// << ts.tv_nsec << std::setw(0)
+			// << " in [" << (*m_last_found_it)->minTime().tv_sec << "."
+			// << std::setfill('0') << std::setw(9)
+			// << (*m_last_found_it)->minTime().tv_nsec << std::setw(0)
+			// << ", " << (*m_last_found_it)->maxTime().tv_sec << "."
+			// << std::setfill('0') << std::setw(9)
+			// << (*m_last_found_it)->maxTime().tv_nsec
+			// << std::setw(0) << "]"
+			// << " ignore_pkt_timestamp=" << ignore_pkt_timestamp
+			// << " check_old_containers=" << check_old_containers
+			// << " - Btw, the Container Stack has "
+			// << m_containerStack.size() << " elements");
+
+		return( m_last_found_it );
+	}
+
 	SMSControl *ctrl = SMSControl::getInstance();
 
 	// Update Storage Container Cleanup Timeout PV...
@@ -2347,6 +2394,9 @@ StorageManager::findContainerByTime(
 				// Note: erase() Leaves Iterator Pointing at _Next_ Entry,
 				// So Pre-Decrement Prior to Impending Loop Increment...
 				--it;
+
+				// Note: No Need to Reset "Last Time Stamp" Here,
+				// As We're About to Reset the Last Saved Iterator Anyway.
 			}
 		}
 
@@ -2397,6 +2447,14 @@ StorageManager::findContainerByTime(
 						<< " - Btw, the Container Stack has "
 						<< m_containerStack.size() << " elements");
 
+					// Cache This Bogus Time Stamp Lookup Result
+					// for Next Time...! ;-Q
+					m_last_found_it = it;
+					m_last_ts.tv_sec = ts.tv_sec;
+					m_last_ts.tv_nsec = ts.tv_nsec;
+					m_last_ignore_pkt_timestamp = ignore_pkt_timestamp;
+					m_last_check_old_containers = check_old_containers;
+
 					return( it );
 				}
 			}
@@ -2410,6 +2468,13 @@ StorageManager::findContainerByTime(
 			<< " - Btw, the Container Stack has "
 			<< m_containerStack.size() << " elements");
 	}
+
+	// Cache This Time Stamp Lookup Result for Next Time...! ;-D
+	m_last_found_it = found_it;
+	m_last_ts.tv_sec = ts.tv_sec;
+	m_last_ts.tv_nsec = ts.tv_nsec;
+	m_last_ignore_pkt_timestamp = ignore_pkt_timestamp;
+	m_last_check_old_containers = check_old_containers;
 
 	return( found_it );
 }
@@ -2465,6 +2530,12 @@ void StorageManager::cleanContainerStack(void)
 		// So Pre-Decrement Prior to Impending Loop Increment...
 		--it;
 	}
+
+	// Reset "Last Time Stamp" for findContainerByTime()...!
+	// ("Just in Case" Changing Container Stack Here
+	// Invalidates Saved Iterator)
+	m_last_ts.tv_sec = -1;
+	m_last_ts.tv_nsec = -1;
 }
 
 void StorageManager::scanDaily(const std::string &dir)

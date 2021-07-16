@@ -128,12 +128,6 @@ public:
 		return (*it);
 	}
 
-	static std::list<StorageContainer::SharedPtr>::iterator
-		findContainerByTime( std::string label,
-					bool ignore_pkt_timestamp,
-					struct timespec &ts, // EPICS Time...!
-					bool check_old_containers = true );
-
 	static struct timespec &getContainerCleanupTimeout(void) {
 		return m_container_cleanup_timeout;
 	}
@@ -143,7 +137,8 @@ public:
 	static bool streaming(void) {
 		std::list<StorageContainer::SharedPtr>::iterator it;
 		it = m_containerStack.begin();
-		return !!(*it);
+		return( (*it) ? true : false );
+		//return !!(*it);
 	}
 
 	static uint32_t getNextRun(void);
@@ -313,6 +308,19 @@ private:
 
 	static StorageFile::SharedPtr dummyFile;
 	static std::vector<StorageFile::SharedPtr> dummySaveFiles;
+
+	static std::list<StorageContainer::SharedPtr>::iterator m_last_found_it;
+
+	static struct timespec m_last_ts;
+
+	static bool m_last_ignore_pkt_timestamp;
+	static bool m_last_check_old_containers;
+
+	static std::list<StorageContainer::SharedPtr>::iterator
+		findContainerByTime( std::string label,
+					bool ignore_pkt_timestamp,
+					struct timespec &ts, // EPICS Time...!
+					bool check_old_containers = true );
 
 	static void startContainer(
 				std::list<StorageContainer::SharedPtr>::iterator &it,
