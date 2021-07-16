@@ -489,6 +489,12 @@ void MetaDataMgr::addFastMetaDDP( const timespec &ts, uint32_t mapped_dev,
 	 * started.
 	 */
 	if ( StorageManager::streaming() ) {
+		SMSControl *ctrl = SMSControl::getInstance();
+		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+			<< "addFastMetaDDP(): Already Streaming,"
+			<< " So Add New Device Descriptor Packet Now"
+			<< " mapped_dev=" << mapped_dev
+			<< " (srcTag=0 devId=-1)" );
 		StorageManager::addPacket( pkt, size,
 			true /* ignore_pkt_timestamp */,
 			false /* check_old_containers */ );
