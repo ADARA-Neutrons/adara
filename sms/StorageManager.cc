@@ -319,7 +319,7 @@ std::map<uint32_t, boost::shared_ptr<StorageManager::PrologueSignal> >
 std::list<StorageContainer::SharedPtr>::iterator
 	StorageManager::m_last_found_it = m_containerStack.end();
 
-struct timespec StorageManager::m_last_ts = { -1, -1 };
+struct timespec StorageManager::m_last_ts = { -1, -1 }; // EPICS Time...!
 
 bool StorageManager::m_last_ignore_pkt_timestamp = true;
 bool StorageManager::m_last_check_old_containers = false;
@@ -1305,7 +1305,7 @@ void StorageManager::endCurrentContainer(
 		// Reset "Last Time Stamp" for findContainerByTime()...!
 		// ("Just in Case" Changing Container Stack Here
 		// Invalidates Saved Iterator)
-		m_last_ts.tv_sec = -1;
+		m_last_ts.tv_sec = -1; // EPICS Time...!
 		m_last_ts.tv_nsec = -1;
 
 		DEBUG("endCurrentContainer():"
@@ -2163,7 +2163,7 @@ StorageManager::findContainerByTime(
 	// (Otherwise, We Need to Proceed Fully Through the Logic Here...)
 	if ( ignore_pkt_timestamp == m_last_ignore_pkt_timestamp
 			&& check_old_containers == m_last_check_old_containers
-			&& ts.tv_sec == m_last_ts.tv_sec
+			&& ts.tv_sec == m_last_ts.tv_sec // EPICS Time...!
 			&& ts.tv_nsec == m_last_ts.tv_nsec )
 	{
 		// REMOVEME...
@@ -2450,7 +2450,7 @@ StorageManager::findContainerByTime(
 					// Cache This Bogus Time Stamp Lookup Result
 					// for Next Time...! ;-Q
 					m_last_found_it = it;
-					m_last_ts.tv_sec = ts.tv_sec;
+					m_last_ts.tv_sec = ts.tv_sec; // EPICS Time...!
 					m_last_ts.tv_nsec = ts.tv_nsec;
 					m_last_ignore_pkt_timestamp = ignore_pkt_timestamp;
 					m_last_check_old_containers = check_old_containers;
@@ -2471,7 +2471,7 @@ StorageManager::findContainerByTime(
 
 	// Cache This Time Stamp Lookup Result for Next Time...! ;-D
 	m_last_found_it = found_it;
-	m_last_ts.tv_sec = ts.tv_sec;
+	m_last_ts.tv_sec = ts.tv_sec; // EPICS Time...!
 	m_last_ts.tv_nsec = ts.tv_nsec;
 	m_last_ignore_pkt_timestamp = ignore_pkt_timestamp;
 	m_last_check_old_containers = check_old_containers;
@@ -2534,7 +2534,7 @@ void StorageManager::cleanContainerStack(void)
 	// Reset "Last Time Stamp" for findContainerByTime()...!
 	// ("Just in Case" Changing Container Stack Here
 	// Invalidates Saved Iterator)
-	m_last_ts.tv_sec = -1;
+	m_last_ts.tv_sec = -1; // EPICS Time...!
 	m_last_ts.tv_nsec = -1;
 }
 

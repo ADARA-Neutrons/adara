@@ -311,7 +311,7 @@ private:
 
 	static std::list<StorageContainer::SharedPtr>::iterator m_last_found_it;
 
-	static struct timespec m_last_ts;
+	static struct timespec m_last_ts; // EPICS Time...!
 
 	static bool m_last_ignore_pkt_timestamp;
 	static bool m_last_check_old_containers;
