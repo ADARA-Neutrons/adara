@@ -1752,6 +1752,8 @@ StorageContainer::StorageContainer(
 	m_last_found_it = m_pauseModeStack.end();
 	m_last_ts.tv_sec = -1; // EPICS Time...!
 	m_last_ts.tv_nsec = -1;
+	m_last_old_ts.tv_sec = -1; // EPICS Time...!
+	m_last_old_ts.tv_nsec = -1;
 	m_last_ignore_pkt_timestamp = true;
 	m_last_check_old_pausemodes = false;
 }
@@ -1774,6 +1776,8 @@ StorageContainer::StorageContainer(const std::string &name) :
 	m_last_found_it = m_pauseModeStack.end();
 	m_last_ts.tv_sec = -1; // EPICS Time...!
 	m_last_ts.tv_nsec = -1;
+	m_last_old_ts.tv_sec = -1; // EPICS Time...!
+	m_last_old_ts.tv_nsec = -1;
 	m_last_ignore_pkt_timestamp = true;
 	m_last_check_old_pausemodes = false;
 }
