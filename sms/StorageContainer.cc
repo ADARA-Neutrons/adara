@@ -156,6 +156,12 @@ void StorageContainer::terminateFile(
 
 		it = m_pauseModeStack.begin();
 
+		// Reset "Last Time Stamp" for getPauseModeByTime()...!
+		// ("Just in Case" Changing PauseMode Stack Here
+		// Invalidates Saved Iterator)
+		m_last_ts.tv_sec = -1;
+		m_last_ts.tv_nsec = -1;
+
 		DEBUG("terminateFile():"
 			<< " Pushed New Empty Current PauseMode onto Stack"
 			<< " do_terminate=" << do_terminate
@@ -428,15 +434,137 @@ void StorageContainer::getPauseModeByTime(
 		struct timespec &ts, // EPICS Time...!
 		bool check_old_pausemodes )
 {
-	std::list<struct PauseMode>::iterator found_it;
+	std::list<struct PauseMode>::iterator found_it =
+		m_pauseModeStack.end();
+
+	SMSControl *ctrl = SMSControl::getInstance();
+
+	// *** Quick Cached Time Stamp Lookup Shortcut:
+	// If *Everything* is the "Same" for This Time Stamp Lookup,
+	// Then We Can Simply Return the Same "Last Iterator"...!
+	// (Otherwise, We Need to Proceed Fully Through the Logic Here...)
+	if ( ignore_pkt_timestamp == m_last_ignore_pkt_timestamp
+			&& check_old_pausemodes == m_last_check_old_pausemodes
+			&& ts.tv_sec == m_last_ts.tv_sec
+			&& ts.tv_nsec == m_last_ts.tv_nsec )
+	{
+		bool use_cached_lookup = true;
+
+		// But Wait, Also Need to Check for Case of the
+		// "Oldest" Max Data Source Time Having Been Advanced
+		// Since Our Last Lookup, "Just in case"... ;-D
+		if ( check_old_pausemodes
+				&& m_last_found_it != m_pauseModeStack.end() )
+		{
+			// Get "Oldest" Max DataSource Time,
+			// to Use as Furthest "Safe" Time Advancement for Comparison...
+			struct timespec old_ts =
+				ctrl->oldestMaxDataSourceTime(); // EPICS Time...!
+
+			// Something Changed Underfoot...!
+			// Go Through Usual Checking of Old PauseModes...
+			if ( old_ts.tv_sec != m_last_old_ts.tv_sec
+					|| old_ts.tv_nsec != m_last_old_ts.tv_nsec )
+			{
+				if ( ctrl->verbose() > 1 )
+				{
+					DEBUG("getPauseModeByTime():"
+						<< " *** CACHE HIT!"
+						<< " Yet Oldest Max Data Source Time Changed: "
+						<< " old_ts=" << old_ts.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< old_ts.tv_nsec << std::setw(0)
+						<< " != Cached"
+						<< " m_last_old_ts=" << old_ts.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< m_last_old_ts.tv_nsec << std::setw(0) << ","
+						<< " SAME Packet TimeStamp, Re-Use Last PauseMode "
+							<< m_last_found_it->m_numModes
+						<< " for ts=" << ts.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< ts.tv_nsec << std::setw(0)
+						<< " in [" << m_last_found_it->m_minTime.tv_sec
+							<< "."
+						<< std::setfill('0') << std::setw(9)
+						<< m_last_found_it->m_minTime.tv_nsec
+							<< std::setw(0)
+						<< ", " << m_last_found_it->m_maxTime.tv_sec << "."
+						<< std::setfill('0') << std::setw(9)
+						<< m_last_found_it->m_maxTime.tv_nsec
+							<< std::setw(0) << "]"
+						<< " ignore_pkt_timestamp=" << ignore_pkt_timestamp
+						<< " check_old_pausemodes=" << check_old_pausemodes
+						<< " m_paused=" << m_last_found_it->m_paused
+						<< " m_numModes=" << m_last_found_it->m_numModes
+						<< " m_numFiles=" << m_last_found_it->m_numFiles
+						<< " m_numPauseFiles="
+							<< m_last_found_it->m_numPauseFiles
+						<< " m_pendingFiles.size()="
+							<< m_last_found_it->m_pendingFiles.size()
+						<< " m_lastPrologueFile="
+						<< ( ( m_last_found_it->m_lastPrologueFile ) ?
+							m_last_found_it->m_lastPrologueFile->path()
+							: "(null)" )
+						<< " - Btw, the PauseMode Stack has "
+						<< m_pauseModeStack.size() << " elements");
+				}
+
+				// Don't Just Return Cached Lookup,
+				// Go Through Usual Logic...
+				use_cached_lookup = false;
+
+				// We can still use the Cached PauseMode Iterator...
+				// (Save _Some_ of the Lookup Overhead...)
+				found_it = m_last_found_it;
+			}
+		}
+
+		if ( use_cached_lookup )
+		{
+			if ( ctrl->verbose() > 1 )
+			{
+				DEBUG("getPauseModeByTime():"
+					<< " *** CACHE HIT!"
+					<< " SAME Packet TimeStamp, Re-Use Last PauseMode "
+						<< m_last_found_it->m_numModes
+					<< " for ts=" << ts.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< ts.tv_nsec << std::setw(0)
+					<< " in [" << m_last_found_it->m_minTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< m_last_found_it->m_minTime.tv_nsec << std::setw(0)
+					<< ", " << m_last_found_it->m_maxTime.tv_sec << "."
+					<< std::setfill('0') << std::setw(9)
+					<< m_last_found_it->m_maxTime.tv_nsec
+						<< std::setw(0) << "]"
+					<< " ignore_pkt_timestamp=" << ignore_pkt_timestamp
+					<< " check_old_pausemodes=" << check_old_pausemodes
+					<< " m_paused=" << m_last_found_it->m_paused
+					<< " m_numModes=" << m_last_found_it->m_numModes
+					<< " m_numFiles=" << m_last_found_it->m_numFiles
+					<< " m_numPauseFiles="
+						<< m_last_found_it->m_numPauseFiles
+					<< " m_pendingFiles.size()="
+						<< m_last_found_it->m_pendingFiles.size()
+					<< " m_lastPrologueFile="
+					<< ( ( m_last_found_it->m_lastPrologueFile ) ?
+						m_last_found_it->m_lastPrologueFile->path()
+						: "(null)" )
+					<< " - Btw, the PauseMode Stack has "
+					<< m_pauseModeStack.size() << " elements");
+			}
+
+			pm_it = m_last_found_it;
+
+			return;
+		}
+	}
 
 	std::list<struct PauseMode>::iterator it =
 		m_pauseModeStack.begin();
 
-	SMSControl *ctrl = SMSControl::getInstance();
-
 	// If Ignoring Packet TimeStamp, Just Write Into Current PauseMode
-	if ( ignore_pkt_timestamp )
+	if ( ignore_pkt_timestamp && found_it == m_pauseModeStack.end() )
 	{
 		found_it = m_pauseModeStack.begin();
 		if ( found_it != m_pauseModeStack.end() )
@@ -457,11 +585,11 @@ void StorageContainer::getPauseModeByTime(
 					<< found_it->m_maxTime.tv_nsec << std::setw(0) << "]"
 					<< " check_old_pausemodes=" << check_old_pausemodes
 					<< " m_paused=" << found_it->m_paused
-					<< " m_numModes=" << it->m_numModes
+					<< " m_numModes=" << found_it->m_numModes
 					<< " m_numFiles=" << found_it->m_numFiles
 					<< " m_numPauseFiles=" << found_it->m_numPauseFiles
 					<< " m_pendingFiles.size()="
-						<< it->m_pendingFiles.size()
+						<< found_it->m_pendingFiles.size()
 					<< " m_lastPrologueFile="
 					<< ( ( found_it->m_lastPrologueFile ) ?
 						found_it->m_lastPrologueFile->path() : "(null)" )
@@ -474,10 +602,6 @@ void StorageContainer::getPauseModeByTime(
 			it = found_it;
 			it++;
 		}
-	}
-	else
-	{
-		found_it = m_pauseModeStack.end();
 	}
 
 	// First, Make Sure We've Found the PauseMode with Time Range Match
@@ -699,6 +823,9 @@ void StorageContainer::getPauseModeByTime(
 				// Note: erase() Leaves Iterator Pointing at _Next_ Entry,
 				// Which is Fine Because We're Iterating "Backwards"...!
 				it = m_pauseModeStack.erase( it );
+
+				// Note: No Need to Reset "Last Time Stamp" Here,
+				// As We're About to Reset the Last Saved Iterator Anyway.
 			}
 		}
 
@@ -767,6 +894,10 @@ void StorageContainer::getPauseModeByTime(
 			// to Container File List and Signaled a FileAdded Notify
 			// As Part of the Pending File List Above... ;-D
 		}
+
+		// Cache this "Oldest" Max DataSource Time,
+		// To Use in Conjunction with the Next Cached Lookup...
+		m_last_old_ts = old_ts;
 	}
 
 	// Didn't Find PauseMode for That Time...! ;-O
@@ -818,6 +949,13 @@ void StorageContainer::getPauseModeByTime(
 
 					pm_it = it;
 
+					// Initialize Last Lookup for Caching...
+					m_last_found_it = it;
+					m_last_ts.tv_sec = ts.tv_sec; // EPICS Time...!
+					m_last_ts.tv_nsec = ts.tv_nsec;
+					m_last_ignore_pkt_timestamp = ignore_pkt_timestamp;
+					m_last_check_old_pausemodes = check_old_pausemodes;
+
 					return;
 				}
 			}
@@ -833,6 +971,13 @@ void StorageContainer::getPauseModeByTime(
 	}
 
 	pm_it = found_it;
+
+	// Initialize Last Lookup for Caching...
+	m_last_found_it = found_it;
+	m_last_ts.tv_sec = ts.tv_sec; // EPICS Time...!
+	m_last_ts.tv_nsec = ts.tv_nsec;
+	m_last_ignore_pkt_timestamp = ignore_pkt_timestamp;
+	m_last_check_old_pausemodes = check_old_pausemodes;
 
 	return;
 }
@@ -1024,6 +1169,12 @@ void StorageContainer::terminate(void)
 		// Note: erase() Leaves Iterator Pointing at _Next_ Entry,
 		// Which is Fine Because We're Iterating "Backwards"...!
 		it = m_pauseModeStack.erase( it );
+
+		// Reset "Last Time Stamp" for getPauseModeByTime()...!
+		// ("Just in Case" Changing PauseMode Stack Here
+		// Invalidates Saved Iterator)
+		m_last_ts.tv_sec = -1;
+		m_last_ts.tv_nsec = -1;
 	}
 
 	// Now Close "Current" PauseMode, Set Container Inactive
@@ -1109,6 +1260,12 @@ void StorageContainer::terminate(void)
 
 		// Remove Final/Current PauseMode from Stack
 		m_pauseModeStack.erase( it );
+
+		// Reset "Last Time Stamp" for getPauseModeByTime()...!
+		// ("Just in Case" Changing PauseMode Stack Here
+		// Invalidates Saved Iterator)
+		m_last_ts.tv_sec = -1;
+		m_last_ts.tv_nsec = -1;
 	}
 
 	// Clean Up & Close DataSource Saved Input Stream Files, Too!
@@ -1590,6 +1747,13 @@ StorageContainer::StorageContainer(
 {
 	m_maxTime.tv_sec = 0; // EPICS Time...!
 	m_maxTime.tv_nsec = 0;
+
+	// Initialize Last Lookup for getPauseModeByTime() Caching...
+	m_last_found_it = m_pauseModeStack.end();
+	m_last_ts.tv_sec = -1; // EPICS Time...!
+	m_last_ts.tv_nsec = -1;
+	m_last_ignore_pkt_timestamp = true;
+	m_last_check_old_pausemodes = false;
 }
 
 StorageContainer::StorageContainer(const std::string &name) :
@@ -1605,6 +1769,13 @@ StorageContainer::StorageContainer(const std::string &name) :
 
 	m_maxTime.tv_sec = 0; // EPICS Time...!
 	m_maxTime.tv_nsec = 0;
+
+	// Initialize Last Lookup for getPauseModeByTime() Caching...
+	m_last_found_it = m_pauseModeStack.end();
+	m_last_ts.tv_sec = -1; // EPICS Time...!
+	m_last_ts.tv_nsec = -1;
+	m_last_ignore_pkt_timestamp = true;
+	m_last_check_old_pausemodes = false;
 }
 
 StorageContainer::SharedPtr StorageContainer::create(
