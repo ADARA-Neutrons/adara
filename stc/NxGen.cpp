@@ -857,7 +857,8 @@ NxGen::finalize
 
         // Flush stream marker data
         flushPauseData( timespec_to_nsec( a_run_metrics.run_start_time ) );
-        flushScanData( timespec_to_nsec( a_run_metrics.run_start_time ) );
+        flushScanData( timespec_to_nsec( a_run_metrics.run_start_time ),
+            a_run_metrics );
         flushCommentData(
             timespec_to_nsec( a_run_metrics.run_start_time ) );
 
@@ -2808,7 +2809,8 @@ NxGen::flushPauseData
 void
 NxGen::flushScanData
 (
-    uint64_t a_start_time   ///< 1st Pulse Time (nanosecs)
+    uint64_t a_start_time,                  ///< 1st Pulse Time (nanosecs)
+    const STC::RunMetrics &a_run_metrics    ///< [in] Run metrics object
 )
 {
     multimap< uint64_t, pair<double, uint32_t> >::iterator smm;
@@ -2841,6 +2843,15 @@ NxGen::flushScanData
             NeXus::UINT32, "", m_scan_multimap.size() );
         makeDataset( m_daslogs_path + "/scan_index", "time",
             NeXus::FLOAT64, TIME_SEC_UNITS, m_scan_multimap.size() );
+
+        writeScalar( m_daslogs_path + "/scan_index", "minimum_value",
+            a_run_metrics.scan_stats.min(), "" );
+        writeScalar( m_daslogs_path + "/scan_index", "maximum_value",
+            a_run_metrics.scan_stats.max(), "" );
+        writeScalar( m_daslogs_path + "/scan_index", "average_value",
+            a_run_metrics.scan_stats.mean(), "" );
+        writeScalar( m_daslogs_path + "/scan_index", "average_value_error",
+            a_run_metrics.scan_stats.stdDev(), "" );
 
         // Extract Scan Index and Time Vectors from Multi-Map/Pair Beast!
         vector<uint32_t> value_vec;

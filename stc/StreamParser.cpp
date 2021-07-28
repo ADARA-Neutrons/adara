@@ -115,6 +115,7 @@ StreamParser::StreamParser
     m_last_scan_multimap_it = m_scan_multimap.insert(
         std::pair< uint64_t, std::pair<double, uint32_t> >(
             0, std::pair<double, uint32_t>(0.0, 0) ) );
+    m_run_metrics.scan_stats.push( 0 );
     m_last_scan_comment = "";
 
     // Insert initial "not paused" value
@@ -421,6 +422,7 @@ StreamParser::printStats
         a_os << "Pulse charge stats: "
              << m_run_metrics.charge_stats << endl;
         a_os << "Pulse freq stats: " << m_run_metrics.freq_stats << endl;
+        a_os << "Scan stats: " << m_run_metrics.scan_stats << endl;
     }
     else
     {
@@ -5647,6 +5649,8 @@ StreamParser::markerScanStart
             std::pair< uint64_t, std::pair<double, uint32_t> >( a_ts_nano,
                 std::pair<double, uint32_t>( a_time, a_scan_index ) ) );
 
+        m_run_metrics.scan_stats.push( a_scan_index );
+
         if ( a_comment.size() )
         {
             m_last_scan_comment = a_comment;
@@ -5785,6 +5789,8 @@ StreamParser::markerScanStop
         m_last_scan_multimap_it = m_scan_multimap.insert(
             std::pair< uint64_t, std::pair<double, uint32_t> >( a_ts_nano,
                 std::pair<double, uint32_t>( a_time, 0 ) ) );
+
+        m_run_metrics.scan_stats.push( 0 );
 
         if ( a_comment.size() )
         {

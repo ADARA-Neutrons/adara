@@ -606,6 +606,7 @@ struct RunMetrics
     struct timespec         run_end_time;
     Statistics              charge_stats;       ///< Pulse charge statistics
     Statistics              freq_stats;         ///< Pulse frequency statistics
+    Statistics              scan_stats;         ///< Scan (index) statistics
 };
 
 

@@ -2985,7 +2985,8 @@ private:
                             bool &a_has_non_normalized );
 
     void                flushPauseData( uint64_t a_start_time );
-    void                flushScanData( uint64_t a_start_time );
+    void                flushScanData( uint64_t a_start_time,
+                            const STC::RunMetrics &a_run_metrics );
     void                flushCommentData( uint64_t a_start_time );
 
     NeXus::NXnumtype    toNxType( STC::PVType a_type ) const;
