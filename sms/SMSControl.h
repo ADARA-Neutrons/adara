@@ -151,8 +151,6 @@ private:
 
 	typedef std::pair<uint32_t, uint32_t> BankIndex;
 
-	typedef std::map< BankIndex, EventVector > BankMap;
-
 	struct EventSource {
 		EventSource( uint32_t intraPulse, uint32_t tofField ) :
 				m_intraPulseTime(intraPulse),
@@ -164,7 +162,9 @@ private:
 		uint32_t			m_tofField;
 		uint32_t			m_activeBanks;
 
-		BankMap				m_banks;
+		EventVector			*m_banks_arr;
+		uint32_t			m_maxStates;
+		uint32_t			m_banks_arr_size; // Will be needed for realloc
 	};
 
 	typedef std::map<uint32_t, EventSource> SourceMap;
@@ -287,6 +287,10 @@ private:
 	std::set<uint32_t> m_choppers;
 
 	uint32_t m_maxBanks;
+
+	uint32_t m_maxStatesLast;
+	uint32_t m_maxStatesResetCount;
+
 	IoVector m_iovec;
 	std::vector<uint32_t> m_hdrs;
 
