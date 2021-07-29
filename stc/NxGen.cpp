@@ -1126,9 +1126,11 @@ NxGen::writeSTCConfigUnitsAttributes(
  * Execute the Command via system(), and capture and report the
  * Return Status using the "correct bits"... ;-D
  */
-void
+uint32_t
 NxGen::executePrePostCommands(void)
 {
+    uint32_t status = 0;
+
     // Check Each Config Command in Turn,
     // Execute Any Open or Conditional Commands...
     for ( uint32_t cmd=0 ; cmd < m_config_commands.size() ; cmd++ )
@@ -1204,12 +1206,28 @@ NxGen::executePrePostCommands(void)
 
             int rc = system( sscmd.str().c_str() );
 
-            syslog( LOG_INFO,
-                "[%i] %s: %s Command rc=%d: %s=[%s]",
-                g_pid, "executePrePostCommands()", CMD->name.c_str(),
-                (char) ( rc >> 8 ), // Grab Correct Bits... ;-D
-                "cmd", sscmd.str().c_str() );
-            usleep(30000); // give syslog a chance...
+            char bash_rc = rc >> 8; // Grab Correct Bits... ;-D
+
+            if ( bash_rc != 0 )
+            {
+                syslog( LOG_ERR,
+                    "[%i] %s %s: %s Command FAILED rc=%d: %s=[%s]",
+                    g_pid, "STC Error:", "executePrePostCommands()",
+                    CMD->name.c_str(), bash_rc,
+                    "cmd", sscmd.str().c_str() );
+                usleep(30000); // give syslog a chance...
+
+                status = bash_rc;
+            }
+            else
+            {
+                syslog( LOG_INFO,
+                    "[%i] %s: %s Command rc=%d: %s=[%s]",
+                    g_pid, "executePrePostCommands()",
+                    CMD->name.c_str(), bash_rc,
+                    "cmd", sscmd.str().c_str() );
+                usleep(30000); // give syslog a chance...
+            }
         }
         else
         {
@@ -1222,6 +1240,9 @@ NxGen::executePrePostCommands(void)
             usleep(30000); // give syslog a chance...
         }
     }
+
+    // Return Any Command Status/Failures...
+    return( status );
 }
 
 
