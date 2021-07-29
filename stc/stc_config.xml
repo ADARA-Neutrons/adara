@@ -780,33 +780,17 @@
 			<value>1</value><!-- Imaging Mode Activated -->
 		</condition>
 		<element>
-			<pattern>:Exp:IM:FileName$</pattern>
+			<pattern>:Exp:Det:FileName$</pattern>
 			<name>FileName</name>
 		</element>
+		<!-- element>
+			<pattern>:Exp:IM:FileName$</pattern>
+			<name>FileName</name>
+		</element -->
 		<element>
 			<pattern>:Exp:IM:SubDir$</pattern>
 			<name>SubDir</name>
 		</element>
-		<!-- REMOVE ME, FOR TESTING -->
-		<element_value>
-			<pattern>SMS:RunInfo:Sample:Id$</pattern>
-			<pattern>CS:ITEMS$</pattern>
-			<pattern>SampleId$</pattern>
-			<name>identifier</name>
-		</element_value>
-		<condition>
-			<name>Conditional Command Test</name>
-			<pattern>SMS:RunInfo:Sample:Id$</pattern>
-			<pattern>CS:ITEMS$</pattern>
-			<pattern>SampleId$</pattern>
-			<value>12345</value>
-			<element>
-				<pattern>SMS:RunInfo:Sample:Name$</pattern>
-				<pattern>CS:ITEMS:Name$</pattern>
-				<pattern>SampleName$</pattern>
-				<name>name</name>
-			</element>
-		</condition>
 	</command>
 
 </stc_config>
