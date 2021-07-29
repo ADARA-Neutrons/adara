@@ -24,7 +24,7 @@ done
 
 # Do Nothing and Exit...
 
-echo -e "\nDo Nothing and Exit with Status 123.\n"
+echo -e "\nDo Nothing and Exit with Status 0.\n"
 
-exit 123
+exit 0
 
