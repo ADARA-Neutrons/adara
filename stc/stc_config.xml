@@ -772,7 +772,7 @@
 	<!-- Pre-Post-Auto-Reduction Command Interface (for Image Files) -->
 	<command>
 		<name>ImagingCommand</name>
-		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_imaging.bash</path>
+		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_imaging.py</path>
 		<!-- Imaging Mode Conditional PV Check -->
 		<condition>
 			<name>Imaging Mode</name>
