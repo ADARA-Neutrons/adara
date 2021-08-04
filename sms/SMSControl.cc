@@ -911,6 +911,9 @@ SMSControl::SMSControl() :
 
 	m_maxBanks = m_pixelMap->numBanks() + PixelMap::REAL_BANK_OFFSET;
 
+	m_maxStatesLast = 1;
+	m_maxStatesResetCount = 10;
+
 	// Notify the IPTS-ITEMS IOC that "We're Alive" and request that it
 	// Re-Send the IPTS Proposal and ITEMS Sample Information PVs...
 
@@ -2068,8 +2071,12 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	// ("cnt" already incremented above... :-)
 	if ( !(cnt % freq) )
 	{
-		// Update Max Pulse Buffer Size from PV...
-		m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
+		// Infrequently Check Live Control PV for
+		// Max Pulse Buffer Size...
+		// (Once Per Minute...)
+		if ( !(++cnt % 3600) ) {
+			m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
+		}
 
 		// Now, *Before* Inserting New Pulse, Check Max Pulse Buffer Size!
 		// (Give the "New Guy" a chance to exist before we dump it... ;-D)
@@ -2623,6 +2630,10 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		 * the unneeded constructions and copies...
 		 */
 		EventSource new_src( pkt.intraPulseTime(), pkt.tofField() );
+		new_src.m_maxStates = m_maxStatesLast;
+		new_src.m_banks_arr_size =
+			new_src.m_maxStates * ( m_maxBanks + 1 );
+		new_src.m_banks_arr = new EventVector[ new_src.m_banks_arr_size ];
 		SourceMap::value_type val( hwId, new_src );
 		src = pulse->m_pulseSources.insert(val).first;
 	}
@@ -2719,8 +2730,6 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	uint32_t phys, base_phys, logical;
 	uint32_t state;
 	uint16_t bank = 0;
-
-	BankMap::iterator bsit;
 
 	bool got_neutrons = false;
 	bool got_metadata = false;
@@ -2868,33 +2877,56 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		if ( !m_neutronEventSortByState )
 			state = 0;
 
-		// Get the BankMap Iterator for This Bank+State... (If It Exists)
+		// Check State Versus Source Max State,
+		// Re-Allocate Banks Array As Needed...
+		if ( state + 1 > src->second.m_maxStates ) {
+			uint32_t new_banks_arr_size =
+				( state + 1 ) * ( m_maxBanks + 1 );
+			DEBUG("pulseEvents(): New State Out of Bounds:"
+				<< " state+1=" << ( state + 1 )
+				<< " > src->m_maxStates=" << src->second.m_maxStates
+				<< " - Re-Allocating Banks Array With"
+				<< " new_banks_arr_size=" << src->second.m_banks_arr_size
+				<< " -> " << new_banks_arr_size);
+			EventVector *new_banks_arr = new EventVector[
+				new_banks_arr_size ];
+			for ( uint32_t i=0 ; i < src->second.m_banks_arr_size ; i++ ) {
+				new_banks_arr[i].swap( src->second.m_banks_arr[i] );
+			}
+			delete[] src->second.m_banks_arr;
+			src->second.m_banks_arr = new_banks_arr;
+			src->second.m_banks_arr_size = new_banks_arr_size;
+			src->second.m_maxStates = state + 1;
 
-		BankIndex bsindex = std::make_pair( (uint32_t) bank, state );
+			// Also Check/Update Overall Last Max State for New Sources...
+			if ( state + 1 > m_maxStatesLast ) {
+				DEBUG("pulseEvents(): New Overall Max State:"
+					<< " state+1=" << ( state + 1 )
+					<< " > m_maxStatesLast=" << m_maxStatesLast
+					<< " - Updating for New Sources...");
+				m_maxStatesLast = state + 1;
+				// Reset Last Max State Reset Count...
+				m_maxStatesResetCount = 10;
+			}
+		}
 
-		bsit = src->second.m_banks.find( bsindex );
+		// Get the Bank Index for This Bank+State...
 
-		if ( bsit == src->second.m_banks.end() ) {
+		uint32_t bsindex = bank + ( state * ( m_maxBanks + 1 ) );
 
-			// Bank+State Entry Doesn't Yet Exist - Insert It! :-D
-			bsit = src->second.m_banks.insert(
-					std::make_pair( bsindex, EventVector() ) ).first;
+		EventVector *ev = &(src->second.m_banks_arr[ bsindex ]);
 
-			/* pulse->m_numBanks will double count banks if
-			 * their events arrive via two different HW sources.
-			 * This is good, as we'll need the room in the packet
-			 * for a bank section header in each source section.
-			 */
+		// Increment Bank Count on Each First Bank+State Event...
+		if ( ev->size() == 0 ) {
 			pulse->m_numBanks++;
 			src->second.m_activeBanks++;
-
-			bsit->second.reserve(m_bankReserve);
+			ev->reserve(m_bankReserve);
 		}
 
 		translated.pixel = logical;
 		translated.tof = events[i].tof;
 
-		bsit->second.push_back(translated);
+		ev->push_back(translated);
 
 		pulse->m_numEvents++;
 	}
@@ -3645,16 +3677,18 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 		m_hdrs.push_back(src.m_tofField);
 		m_hdrs.push_back(src.m_activeBanks);
 
-		BankMap::iterator bsIt;
-		
-		for ( bsIt = src.m_banks.begin();
-				bsIt != src.m_banks.end() ; ++bsIt ) {
+		for ( uint32_t bi=0 ; bi < src.m_banks_arr_size ; bi++ )
+		{
+			EventVector *ev = &(src.m_banks_arr[bi]);
+
+			if ( ev->size() == 0 )
+				continue;
 
 			iov.iov_base = &m_hdrs.front() + m_hdrs.size();
 			iov.iov_len = 2 * sizeof(uint32_t);
 			m_iovec.push_back(iov);
 
-			uint32_t bank = bsIt->first.first;
+			uint32_t bank = bi % ( m_maxBanks + 1 );
 
 			// Because we're using Unsigned Integers, we'll translate:
 			//    - Error Pixels to Bank -2
@@ -3663,16 +3697,34 @@ void SMSControl::buildBankedPacket(PulsePtr &pulse)
 			//       (PixelMap::UNMAPPED_BANK = 0xffff -> 0xffffffff)
 			// All other bank ids will get their real number.
 			m_hdrs.push_back( bank - PixelMap::REAL_BANK_OFFSET );
-			m_hdrs.push_back( bsIt->second.size() );
+			m_hdrs.push_back( ev->size() );
 
-			iov.iov_base = &(bsIt->second.front());
-			iov.iov_len = bsIt->second.size();
+			iov.iov_base = &(ev->front());
+			iov.iov_len = ev->size();
 			iov.iov_len *= sizeof(ADARA::Event);
 			m_iovec.push_back(iov);
 		}
 	}
 
 	StorageManager::addPacket(m_iovec);
+
+	// Check Last Max States/Reset Counter...
+	// - This Pulse had *No States*, i.e. Max States == 1...
+	if ( m_maxStatesLast > 1 && --m_maxStatesResetCount <= 0 )
+	{
+		DEBUG("buildBankedPacket():"
+			<< " Overall Max State Reset Count Expired,"
+			<< " Reset Overall Max State:"
+			<< "  m_maxStatesLast=" << m_maxStatesLast
+			<< " -> 1...");
+		m_maxStatesLast = 1;
+	}
+
+	// Free Up Allocated Banks Array Storage...
+	for (sIt = pulse->m_pulseSources.begin(); sIt != sEnd; sIt++) {
+		EventSource &src = sIt->second;
+		delete[] src.m_banks_arr;
+	}
 }
 
 void SMSControl::buildBankedStatePacket(PulsePtr &pulse)
@@ -3725,6 +3777,8 @@ void SMSControl::buildBankedStatePacket(PulsePtr &pulse)
 	iov.iov_len = m_hdrs.size() * sizeof(uint32_t);
 	m_iovec.push_back(iov);
 
+	uint32_t maxStates = 1;
+
 	SourceMap::iterator sIt, sEnd = pulse->m_pulseSources.end();
 	for (sIt = pulse->m_pulseSources.begin(); sIt != sEnd; sIt++) {
 		iov.iov_base = &m_hdrs.front() + m_hdrs.size();
@@ -3737,17 +3791,23 @@ void SMSControl::buildBankedStatePacket(PulsePtr &pulse)
 		m_hdrs.push_back(src.m_tofField);
 		m_hdrs.push_back(src.m_activeBanks);
 
-		BankMap::iterator bsIt;
-		
-		for ( bsIt = src.m_banks.begin();
-				bsIt != src.m_banks.end() ; ++bsIt ) {
+		for ( uint32_t bi=0 ; bi < src.m_banks_arr_size ; bi++ )
+		{
+			EventVector *ev = &(src.m_banks_arr[bi]);
+
+			if ( ev->size() == 0 )
+				continue;
 
 			iov.iov_base = &m_hdrs.front() + m_hdrs.size();
 			iov.iov_len = 3 * sizeof(uint32_t);
 			m_iovec.push_back(iov);
 
-			uint32_t bank = bsIt->first.first;
-			uint32_t state = bsIt->first.second;
+			uint32_t bank = bi % ( m_maxBanks + 1 );
+			uint32_t state = bi / ( m_maxBanks + 1 );
+
+			// Accumulate Max State for This Pulse...
+			if ( state + 1 > maxStates )
+				maxStates = state + 1;
 
 			// Because we're using Unsigned Integers, we'll translate:
 			//    - Error Pixels to Bank -2
@@ -3757,16 +3817,36 @@ void SMSControl::buildBankedStatePacket(PulsePtr &pulse)
 			// All other bank ids will get their real number.
 			m_hdrs.push_back( bank - PixelMap::REAL_BANK_OFFSET );
 			m_hdrs.push_back( state );
-			m_hdrs.push_back( bsIt->second.size() );
+			m_hdrs.push_back( ev->size() );
 
-			iov.iov_base = &(bsIt->second.front());
-			iov.iov_len = bsIt->second.size();
+			iov.iov_base = &(ev->front());
+			iov.iov_len = ev->size();
 			iov.iov_len *= sizeof(ADARA::Event);
 			m_iovec.push_back(iov);
 		}
 	}
 
 	StorageManager::addPacket(m_iovec);
+
+	// Check Last Max States/Reset Counter...
+	if ( m_maxStatesLast > maxStates && --m_maxStatesResetCount <= 0 )
+	{
+		DEBUG("buildBankedStatePacket():"
+			<< " Overall Max State Reset Count Expired,"
+			<< " Reset Overall Max State:"
+			<< "  m_maxStatesLast=" << m_maxStatesLast
+			<< " -> " << maxStates << "...");
+		m_maxStatesLast = maxStates;
+	}
+	// Reset the Reset Counter if We're Maintaining This Number of States
+	else if ( m_maxStatesLast == maxStates )
+		m_maxStatesResetCount = 10;
+
+	// Free Up Allocated Banks Array Storage...
+	for (sIt = pulse->m_pulseSources.begin(); sIt != sEnd; sIt++) {
+		EventSource &src = sIt->second;
+		delete[] src.m_banks_arr;
+	}
 }
 
 void SMSControl::buildChopperPackets(PulsePtr &pulse)

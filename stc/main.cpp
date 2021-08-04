@@ -587,7 +587,16 @@ int main( int argc, char** argv )
             // As Specified in the STC Config File...! ;-D
 
             if ( nxgen )
-                nxgen->executePrePostCommands();
+            {
+                uint32_t status = nxgen->executePrePostCommands();
+
+                if ( status != 0 )
+                {
+                    THROW_TRACE( STC::ERR_OUTPUT_FAILURE,
+                        "Error Executing Pre-PostProcessing Commands:"
+                            << " status=" << status )
+                }
+            }
 
             // NOW Send ComBus Final Notify/Trigger Message...
             // (_After_ Any Potential Pre-Post-Autoreduction Commands!)

@@ -11,7 +11,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STC_VERSION "1.12.8"
+#define STC_VERSION "1.12.9"
 extern pid_t g_pid;
 
 #define STC_DOUBLE_EPSILON (0.00000000000001)
@@ -1396,7 +1396,7 @@ public:
                                 std::vector<STC::PVEnumeratedType>
                                     &a_enumVec ) = 0;
     virtual void            checkSTCConfigElementUnitsPaths(void) = 0;
-    virtual void            executePrePostCommands(void) = 0;
+    virtual uint32_t        executePrePostCommands(void) = 0;
 };
 
 

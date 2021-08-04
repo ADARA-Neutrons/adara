@@ -2912,7 +2912,7 @@ public:
 
     void dumpProcessingStatistics(void);
 
-    void executePrePostCommands(void);
+    uint32_t executePrePostCommands(void);
 
 protected:
 

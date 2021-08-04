@@ -184,16 +184,24 @@ private:
 	struct timespec m_startTime; // Wallclock Time...!
 	struct timespec m_minTime; // EPICS Time...!
 	struct timespec m_maxTime; // EPICS Time...!
+
 	uint32_t m_runNumber;
+
 	std::string m_propId;
+
 	uint32_t m_totFileCount;
+
 	std::string m_name;
+
 	std::vector<StorageFile::SharedPtr> m_lastSavePrologueFiles;
 	onNewFile m_newFile;
+
 	bool m_active;
 	bool m_translated;
 	bool m_manual;
+
 	uint32_t m_requeueCount;
+
 	uint64_t m_saved_size;
 
 	std::list<StorageFile::SharedPtr> m_files;
@@ -201,6 +209,15 @@ private:
 	std::vector<StorageFile::SharedPtr> m_ds_input_files;
 	std::vector<uint32_t> m_ds_input_num_files;
 	StorageFile::SharedPtr m_dummy_file;
+
+	std::list<struct PauseMode>::iterator m_last_found_it;
+
+	struct timespec m_last_ts; // EPICS Time...!
+
+	struct timespec m_last_old_ts; // EPICS Time...!
+
+	bool m_last_ignore_pkt_timestamp;
+	bool m_last_check_old_pausemodes;
 
 	StorageContainer(
 		const struct timespec &start, // Wallclock Time...!
