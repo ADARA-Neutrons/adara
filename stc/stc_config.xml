@@ -689,7 +689,7 @@
 			<pattern>SampleComments$</pattern>
 			<name>comments</name>
 		</element_last_value>
-		<element_last_value>
+		<!-- element_last_value>
 			<pattern>SMS:RunInfo:Sample:HeightInContainer$</pattern>
 			<pattern>CS:ITEMS:HeightInContainer$</pattern>
 			<name>height_in_container</name>
@@ -766,7 +766,7 @@
 		<element_last_value>
 			<pattern>CS:ITEMS:LatticeGamma$</pattern>
 			<name>lattice_gamma</name>
-		</element_last_value>
+		</element_last_value -->
 	</command>
 
 	<!-- Pre-Post-Auto-Reduction Command Interface (for Image Files) -->
