@@ -135,6 +135,7 @@ declare -A nHostSTCIgnoreDupAnnot
 declare -A nHostSTCPositiveTimeComment
 declare -A nHostSTCPositiveTimePause
 declare -A nHostSTCPositiveTimeScan
+declare -A nHostSTCTruncateNegAnnotPkt
 declare -A nHostSTCTruncateNegComment
 declare -A nHostSTCTruncateNegPause
 declare -A nHostSTCTruncateNegScan
@@ -373,6 +374,7 @@ PARSE_LOG()
 		nHostSTCPositiveTimeComment[$host]=0
 		nHostSTCPositiveTimePause[$host]=0
 		nHostSTCPositiveTimeScan[$host]=0
+		nHostSTCTruncateNegAnnotPkt[$host]=0
 		nHostSTCTruncateNegComment[$host]=0
 		nHostSTCTruncateNegPause[$host]=0
 		nHostSTCTruncateNegScan[$host]=0
@@ -815,6 +817,14 @@ PARSE_LOG()
 			#echo "Positive Time Annotation for Scan Start/Stop Markers..."
 			nHostSTCPositiveTimeScan[$host]=$(( \
 				nHostSTCPositiveTimeScan[$host] + 1 ))
+
+		# "Truncate Negative Annotation Timestamp to Zero" Log
+		elif [[ "$log" =~ \
+			Truncate${S}Negative${S}Annotation${S}Timestamp${S}to${S}Zero \
+		]]; then
+			#echo "Truncate Negative Annotation Timestamp to Zero..."
+			nHostSTCTruncateNegAnnotPkt[$host]=$(( \
+				nHostSTCTruncateNegAnnotPkt[$host] + 1 ))
 
 		# "Truncate Negative Annotation Time for Comments" Log
 		elif [[ "$log" =~ \
@@ -2115,6 +2125,10 @@ for h in ${HostList} ; do
 		echo -n "   ** ${nHostSTCTruncateNegPause[$h]} "
 		echo \
 	"STC \"Truncate Negative Annotation Time for Pause/Resume\" Logs"
+	fi
+	if [[ ${nHostSTCTruncateNegAnnotPkt[$h]} -gt 0 ]]; then
+		echo -n "   ** ${nHostSTCTruncateNegAnnotPkt[$h]} "
+		echo "STC \"Truncate Negative Annotation Timestamp to Zero\" Logs"
 	fi
 	if [[ ${nHostSTCTruncateNegComment[$h]} -gt 0 ]]; then
 		echo -n "   ** ${nHostSTCTruncateNegComment[$h]} "
