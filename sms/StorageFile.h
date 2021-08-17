@@ -31,6 +31,7 @@ public:
 	void put_fd(void);
 	std::string path(void) const { return m_path; }
 	bool active(void) const { return m_active; }
+	void setInactive(void) { m_active = false; }
 	bool paused(void) const { return m_paused; }
 	bool addendum(void) const { return m_addendum; }
 	bool oversize(void) const { return m_oversize; }
