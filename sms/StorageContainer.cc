@@ -1471,10 +1471,13 @@ void StorageContainer::getLastPrologueFiles(
 		// Tell the storage manager about the new file so we can
 		// add the prologue header
 		StorageManager::fileCreated( it->m_lastPrologueFile,
-			true /* capture_last */ );
+			true /* capture_last */, false /* addStateToIndex */ );
 
 		// Close the Prologue Header File...
 		it->m_lastPrologueFile->put_fd();
+
+		// This is _Not_ an "Active" File, Just a Prologue Header...!
+		it->m_lastPrologueFile->setInactive();
 
 		DEBUG("getLastPrologueFiles():"
 			<< " Created Raw Data Prologue Header File "
@@ -1570,6 +1573,10 @@ void StorageContainer::getLastPrologueFiles(
 					// Close the Save Prologue Header File...
 					m_lastSavePrologueFiles[i]->put_fd();
 
+					// This is _Not_ an "Active" File,
+					// Just a Prologue Header...!
+					m_lastSavePrologueFiles[i]->setInactive();
+
 					DEBUG("getLastPrologueFiles():"
 						<< " Created Saved Data Prologue Header File "
 						<< m_lastSavePrologueFiles[i]->path()
@@ -1621,6 +1628,9 @@ void StorageContainer::copyLastPrologueFiles(
 		// Close the Prologue Header File...
 		it->m_lastPrologueFile->put_fd();
 
+		// This is _Not_ an "Active" File, Just a Prologue Header...!
+		it->m_lastPrologueFile->setInactive();
+
 		DEBUG("copyLastPrologueFiles():"
 			<< " Created Raw Data Prologue Header File "
 			<< it->m_lastPrologueFile->path()
@@ -1668,6 +1678,9 @@ void StorageContainer::copyLastPrologueFiles(
 
 			// Close the Save Prologue Header File...
 			m_lastSavePrologueFiles[i]->put_fd();
+
+			// This is _Not_ an "Active" File, Just a Prologue Header...!
+			m_lastSavePrologueFiles[i]->setInactive();
 
 			DEBUG("copyLastPrologueFiles():"
 				<< " Created Saved Data Prologue Header File "
