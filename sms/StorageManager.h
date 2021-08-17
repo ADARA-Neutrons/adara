@@ -338,7 +338,7 @@ private:
 				bool do_terminate);
 
 	static void fileCreated(StorageFile::SharedPtr &f,
-				bool capture_last = false);
+				bool capture_last = false, bool addStateToIndex = true);
 
 	static uint32_t validatePacket(const IoVector &iovec);
 

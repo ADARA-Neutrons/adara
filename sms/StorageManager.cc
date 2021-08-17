@@ -1336,14 +1336,16 @@ void StorageManager::stateSnapshot( StorageFile::SharedPtr &f,
 }
 
 void StorageManager::fileCreated( StorageFile::SharedPtr &f,
-		bool capture_last )
+		bool capture_last, bool addStateToIndex )
 {
 	/* Each new file gives us an opportunity to add a state checkpoint
 	 * at low cost; we do not need a separate state file as we'll be
 	 * taking a snapshot as part of the file creation.
 	 */
-	StorageFile::SharedPtr noFile;
-	indexState( noFile, f, 0 );
+	if ( addStateToIndex ) {
+		StorageFile::SharedPtr noFile;
+		indexState( noFile, f, 0 );
+	}
 
 	stateSnapshot( f, capture_last );
 }
