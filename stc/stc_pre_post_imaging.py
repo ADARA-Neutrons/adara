@@ -21,6 +21,8 @@ import errno
 import re
 import subprocess
 import traceback
+import requests
+
 
 def remove_leading_directory(path_1):
 	"""
@@ -101,6 +103,7 @@ def assure_directory_exists(directory):
 		if e.errno != errno.EEXIST:
 			raise
 
+
 def run_rsync(arg_list):
 	"""
 	Run rsync with default options using specified arguments..
@@ -109,7 +112,7 @@ def run_rsync(arg_list):
 		# print('\n\nCopying [{}] to [{}].\n\n'.format(source_file, target_file))
 		# command = ['rsync', '-aupAXSzv', '--stats', source_file, target_file]
 		# command = ['rsync', '-aupAXSzv']
-		command = ['rsync', '-avz']
+		command = ['rsync', '--list-only' , '-avz']
 		command += arg_list
 		p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		stdo, stde = p.communicate()
@@ -119,6 +122,7 @@ def run_rsync(arg_list):
 			print("\n\nDone running rsync command {} with return code of {}. {}\n\n".format(' '.join(command), p.returncode, stdo))
 	except Exception as ex:
 		raise Exception("Failed to run rsync command {}. {}".format(' '.join(command), ex))
+
 
 def copy_file(source_file, target_file):
 	"""
@@ -146,6 +150,18 @@ def copy_files_individually(source_files, target_dir):
 		copy_file(source_file, os.path.join(target_dir, head_tail[1])) 
 
 
+def get_target_files(initial_image_dir, run_number, target_dir):
+	"""
+	Construct list of taget files.
+	"""
+	source_files = get_files_to_copy(initial_image_dir, run_number)
+	target_files = []
+	for source_file in source_files:
+		head_tail = os.path.split(source_file)
+		target_files.append(os.path.join(target_dir, head_tail[1]))
+	return target_files
+
+
 def copy_images(file_path, proposal, run_number, source_dir, target_dir):
 	"""
 	Copies image files for the specified run.
@@ -158,14 +174,46 @@ def copy_images(file_path, proposal, run_number, source_dir, target_dir):
 	# Determine source and target directories.
 	initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, target_dir, proposal, subdir, new_subdir, run_number)
 			
-	# Identify files to copy.
-	files_to_copy = get_files_to_copy(initial_image_dir, run_number)
+	# Identify target files (for use in cataloging).
+	target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
+
+	print('\n\nIn copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
 
 	# Assure target directory exists.
 	assure_directory_exists(new_image_dir)
 
 	# copy_files_individually(files_to_copy, new_image_dir)
 	copy_files_batch(initial_image_dir, new_image_dir, run_number)
+
+	return target_files
+
+
+def get_creds():
+	file_name = 'creds_do_not_persist.txt' 
+	with open(file_name, 'r') as file:
+		creds = file.read().replace('\n', '')
+	return creds
+
+
+def catalog_images(files_to_catalog, creds=None):
+	creds = get_creds()
+	for file_path in files_to_catalog:
+		print('\n\nIn catalog_images(). file_path: {}\n\n'.format(file_path))
+
+		response = requests.post(
+			"https://oncat.ornl.gov/api/datafiles{}/ingest".format(file_path),
+			headers={"Authorization": "Bearer {}".format(creds)},
+		)
+
+		try:
+			# Raise on any errors.
+			response.raise_for_status()
+		except requests.exceptions.HTTPError as e:
+			# Handle any errors.  Assume that the network could go down,
+			# ONCat could go down, the network mount available to ONCat could go
+			# down, etc., etc.
+			print("\n\nCataloging ERROR for file {}: {}\n\n".format(file_path, e.response.json()))
+			raise
 
 
 def finish_up(rtn_code):
@@ -221,7 +269,8 @@ def do_pre_post_imaging(arg_list):
 		parms_present = all (p is not None for p in [file_path, proposal, run_number])
 
 		if parms_present is not None:
-			copy_images(file_path, proposal, run_number, source_dir, target_dir)
+			files_to_catalog = copy_images(file_path, proposal, run_number, source_dir, target_dir)
+			catalog_images(files_to_catalog)
 		else:
 			print('\n\nERROR: Not all parameters present.\n\n')
 			return_code = -2
