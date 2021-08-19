@@ -110,9 +110,8 @@ def run_rsync(arg_list):
 	"""
 	try:
 		# print('\n\nCopying [{}] to [{}].\n\n'.format(source_file, target_file))
-		# command = ['rsync', '-aupAXSzv', '--stats', source_file, target_file]
-		# command = ['rsync', '-aupAXSzv']
-		command = ['rsync', '--list-only' , '-avz']
+		# command = ['rsync', '--list-only' , '-avz']
+		command = ['rsync' , '-avz']
 		command += arg_list
 		p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 		stdo, stde = p.communicate()
@@ -195,26 +194,37 @@ def get_creds():
 	return creds
 
 
+def should_catalog_file(file_path):
+	# extension_list = []
+	extension_list = ['.tiff', '.fits']
+	split_path = os.path.splitext(file_path)
+	extension = split_path[1]
+	return extension in extension_list
+
+
 def catalog_images(files_to_catalog, creds=None):
 	creds = get_creds()
 	for file_path in files_to_catalog:
-		print('\n\nIn catalog_images(). file_path: {}\n\n'.format(file_path))
+		should_catalog = should_catalog_file(file_path)
+		print('\n\nIn catalog_images(). file_path: {} should_catalog: {}\n\n'.format(file_path, should_catalog))
+		if should_catalog:
+			response = requests.post(
+				"https://oncat.ornl.gov/api/datafiles{}/ingest".format(file_path),
+				headers={"Authorization": "Bearer {}".format(creds)},
+			)
 
-		response = requests.post(
-			"https://oncat.ornl.gov/api/datafiles{}/ingest".format(file_path),
-			headers={"Authorization": "Bearer {}".format(creds)},
-		)
-
-		try:
-			# Raise on any errors.
-			response.raise_for_status()
-		except requests.exceptions.HTTPError as e:
-			# Handle any errors.  Assume that the network could go down,
-			# ONCat could go down, the network mount available to ONCat could go
-			# down, etc., etc.
-			print("\n\nCataloging ERROR for file {}: {}\n\n".format(file_path, e.response.json()))
-			raise
-
+			try:
+				# Raise on any errors.
+				response.raise_for_status()
+			except requests.exceptions.HTTPError as e:
+				# Handle any errors.  Assume that the network could go down,
+				# ONCat could go down, the network mount available to ONCat could go
+				# down, etc., etc.
+				print("\n\nCataloging ERROR for file {}: {}\n\n".format(file_path, e.response.json()))
+				raise
+		else:
+			print('\nNonapplicable file: {}. Skipping catalog./n'.format(file_path))
+			pass
 
 def finish_up(rtn_code):
 	"""
