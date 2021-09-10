@@ -149,6 +149,7 @@ public:
 		m_genStart(false), m_genStop(false),
 		m_hysterical(false),
 		m_filterafter(false), m_filterbefore(false),
+		m_clearemptydata(false),
 		m_posixRead(false), m_showDDP(false), m_lowRate(false),
 		m_terse(false), m_catch(false),
 		m_out(std::cout),
@@ -232,6 +233,7 @@ private:
 	bool m_hysterical;
 	bool m_filterafter;
 	bool m_filterbefore;
+	bool m_clearemptydata;
 	bool m_posixRead;
 	bool m_showDDP;
 	bool m_lowRate;
@@ -391,6 +393,25 @@ bool MungeParser::handleDataPkt(const ADARA::RawDataPkt *pkt,
 			(uint64_t) pkt->tofOffset() * 100,
 			pkt->tofCorrected() ? "" : " (raw)",
 			(uint64_t) pkt->pulseCharge() * 10, pkt->num_events() );
+	}
+
+	// Munge Any "Empty, Version 0" Data Packets to "Version 1" Type,
+	// to _Force_ No "GOT_NEUTRONS" or "GOT_METADATA" Data Flags,
+	// Thereby Zeroing Out the Corresponding RTDL Proton Charge! ;-D
+	// (as per EQSANS Erroneous 30 Hz vs. 60 Hz 2nd DSP Issues, 9/8/21)
+	if ( m_clearemptydata
+			&& pkt->num_events() == 0 && pkt->version() == 0 )
+	{
+		fprintf( stderr,
+			"*** ClearEmptyData pkt->num_events()=%d pkt->version()=%d\n",
+			pkt->num_events(), pkt->version() );
+
+		ADARA::RawDataPkt *PKT =
+			const_cast<ADARA::RawDataPkt*>(pkt);
+		fprintf( stderr, "Before PKT->version()=%d\n", PKT->version() );
+		PKT->remapVersion( (ADARA::PacketType::Version) 0x1 );
+		fprintf( stderr, "After PKT->version()=%d (pkt->version()=%d)\n",
+			PKT->version(), pkt->version() );
 	}
 
 	// Save Last Packet Time as Potential "End of Run" Timestamp...
@@ -1624,6 +1645,8 @@ void MungeParser::parse(int argc, char **argv)
 		("filterbefore,B", "Filter Data Stream to Before Threshold Time")
 		("threshtime", po::value<std::string>(&m_threshtime_str),
 			"Filter Threshold Time for Data Stream")
+		("clearemptydata",
+			"Clear Empty Data Packets to Zero Proton Charge")
 		("case", po::value<uint32_t>(&m_case),
 			"Which Munge Case We Are Executing... (1,2,3...)");
 
@@ -1756,6 +1779,8 @@ void MungeParser::parse(int argc, char **argv)
 				<< " nsec=" << m_threshtime.tv_nsec << std::endl;
 		}
 	}
+
+	m_clearemptydata = vm.count("clearemptydata");
 
 	m_posixRead = vm.count("posixread");
 	m_showDDP = vm.count("showddp");
