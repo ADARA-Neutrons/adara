@@ -68,11 +68,23 @@ public:
 		return m_data + header_length();
 	}
 
-	void setPulseId(uint64_t pulseId) // ;-b
+	// ADARA Munge "Packet Editing" Methods... ;-b
+
+	// Edit/Change the PulseId (or Packet "Timestamp")...
+	void setPulseId(uint64_t pulseId)
 	{
 		uint32_t *field = (uint32_t *) m_data;
 		field[2] = pulseId >> 32;
 		field[3] = pulseId;
+	}
+
+	// Edit/Change the Packet Type Version...
+	// (Yes, Believe It or Not, We Need This Capability... ;-b)
+	void remapVersion( PacketType::Version version ) {
+		m_version = version;
+		m_type = ADARA_PKT_TYPE( m_base_type, m_version );
+		uint32_t *field = (uint32_t *) m_data;
+		field[1] = m_type;
 	}
 
 protected:

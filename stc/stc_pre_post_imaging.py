@@ -16,37 +16,286 @@ as command line parameters, of the form:
 """
 
 import sys
+import os
+import errno
+import re
+import subprocess
+import traceback
+import requests
 
-# Command Script Entry - Announce Our Existence...
 
-if __name__ == "__main__":
+def remove_leading_directory(path_1):
+	"""
+	Returns specified path with leading directory removed.
+	"""
+	path_2=''
+	while path_1:
+		head_tail = os.path.split(path_1)
+		new_path_1 = head_tail[0]
+		new_path_2 = os.path.join(head_tail[1], path_2)
+		if not new_path_1:
+			return path_2.rstrip('/')
+		else:
+			path_1 = new_path_1
+			path_2 = new_path_2
+	return ''
 
-	print("\nSTC Pre-Post AutoReduction Command Script Entry.\n")
 
-	print("   [%s]\n" % sys.argv[0])
+def determine_subdirectories(file_path):
+	"""
+	Determines image file subdirectory underneath IPTS directory.
+	"""
+	head_tail = os.path.split(file_path)
+	subdir = head_tail[0].replace('\\', '/').replace('C:/data/','')
+	subdir = remove_leading_directory(subdir)
+	if subdir:
+		new_subdir = subdir
+	else:
+		new_subdir = 'SubdirectoryUnspecified'
+	print('\n\nhead_tail: {}\nsubdir: {}\nnew_subdir: {}\n\n'.format(head_tail, subdir, new_subdir))
+	return subdir, new_subdir
 
-	print("   [%s]" % sys.argv)
 
-	# Dump Command Line Parameters...
+def determine_source_and_target_directories(source_dir, target_dir, proposal, subdir, new_subdir, run_number):
+	"""
+	Determines source and target directories for copying.
+	"""
+	if source_dir is not None:
+		# expand away tilde if present.
+		source_dir = os.path.expanduser(source_dir)
+	else:
+		source_dir = '/mcp'
+	initial_image_dir = "{}/{}/{}".format(source_dir, proposal, subdir)
+	if target_dir is not None:
+		# expand away tilde if present.
+		target_dir = os.path.expanduser(target_dir)
+	else:
+		target_dir = '/SNS/SNAP'
+	new_image_dir = "{}/{}/images/mcp/{}/Run_{}".format(target_dir, proposal, new_subdir, run_number) 
+	
+	print('\n\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
+	return initial_image_dir, new_image_dir
 
-	for arg in sys.argv[1:]:
 
+def get_files_to_copy(initial_image_dir, run_number):
+	"""
+	Gets files for the specified run that need to be copied.
+	"""
+	files_to_copy_ini = os.listdir(initial_image_dir)
+	# print('\n\nfiles_to_copy_ini:\n{}\n\n'.format('\n'.join(str(f) for f in files_to_copy_ini)))
+	files_to_copy = []
+	for file_in_dir in files_to_copy_ini:
+		if re.search('Run_{}'.format(run_number), file_in_dir):
+			files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
+	
+	print('\n\nfiles_to_copy:\n{}\n\n'.format('\n'.join(str(f) for f in files_to_copy)))
+	# print('\n\nfiles_to_copy:\n{}\n\n'.format(files_to_copy))
+	return files_to_copy
+
+
+def assure_directory_exists(directory):
+	"""
+	Assure the specified directory exists.
+	"""
+	try:
+		os.makedirs(directory)
+	except OSError as e:
+		if e.errno != errno.EEXIST:
+			raise
+
+
+def run_rsync(arg_list):
+	"""
+	Run rsync with default options using specified arguments..
+	"""
+	try:
+		# print('\n\nCopying [{}] to [{}].\n\n'.format(source_file, target_file))
+		# command = ['rsync', '--list-only' , '-avz']
+		command = ['rsync' , '-avz']
+		command += arg_list
+		p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+		stdo, stde = p.communicate()
+		if p.returncode != 0:
+			raise Exception("Failed to run rsync command {} with return code of {}. {}".format(' '.join(command), p.returncode, stde))
+		else:
+			print("\n\nDone running rsync command {} with return code of {}. {}\n\n".format(' '.join(command), p.returncode, stdo))
+	except Exception as ex:
+		raise Exception("Failed to run rsync command {}. {}".format(' '.join(command), ex))
+
+
+def copy_file(source_file, target_file):
+	"""
+	Copy a file to a target location.
+	"""
+	# print('\n\nCopying [{}] to [{}].\n\n'.format(source_file, target_file))
+	run_rsync([source_file, target_file])
+
+
+def copy_files_batch(initial_image_dir, target_dir, run_number):
+	"""
+	Copy specified source files to specified target directory using a single rsync command.
+	"""
+	initial_image_dir = initial_image_dir.rstrip('/') + '/'
+	arg_list = ["--include=*Run_{}*".format(run_number), "--exclude=*", initial_image_dir, target_dir]
+	run_rsync(arg_list)
+
+
+def copy_files_individually(source_files, target_dir):
+	"""
+	Copy specified source files to specified target directory.
+	"""
+	for source_file in source_files:
+		head_tail = os.path.split(source_file)
+		copy_file(source_file, os.path.join(target_dir, head_tail[1])) 
+
+
+def get_target_files(initial_image_dir, run_number, target_dir):
+	"""
+	Construct list of taget files.
+	"""
+	source_files = get_files_to_copy(initial_image_dir, run_number)
+	target_files = []
+	for source_file in source_files:
+		head_tail = os.path.split(source_file)
+		target_files.append(os.path.join(target_dir, head_tail[1]))
+	return target_files
+
+
+def copy_images(file_path, proposal, run_number, source_dir, target_dir):
+	"""
+	Copies image files for the specified run.
+	"""
+	print('\n\nIn copy_images().\nfile_path: {}\nproposal: {}\nrun_number: {}\n\n'.format(file_path, proposal, run_number))
+
+	# Determine proper subdirectories.
+	subdir, new_subdir = determine_subdirectories(file_path)
+
+	# Determine source and target directories.
+	initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, target_dir, proposal, subdir, new_subdir, run_number)
+			
+	# Identify target files (for use in cataloging).
+	target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
+
+	print('\n\nIn copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
+
+	# Assure target directory exists.
+	assure_directory_exists(new_image_dir)
+
+	# copy_files_individually(files_to_copy, new_image_dir)
+	copy_files_batch(initial_image_dir, new_image_dir, run_number)
+
+	return target_files
+
+
+def get_creds():
+	file_name = 'creds_do_not_persist.txt' 
+	with open(file_name, 'r') as file:
+		creds = file.read().replace('\n', '')
+	return creds
+
+
+def should_catalog_file(file_path):
+	# extension_list = []
+	extension_list = ['.tiff', '.fits']
+	split_path = os.path.splitext(file_path)
+	extension = split_path[1]
+	return extension in extension_list
+
+
+def catalog_images(files_to_catalog, creds=None):
+	creds = get_creds()
+	for file_path in files_to_catalog:
+		should_catalog = should_catalog_file(file_path)
+		print('\n\nIn catalog_images(). file_path: {} should_catalog: {}\n\n'.format(file_path, should_catalog))
+		if should_catalog:
+			response = requests.post(
+				"https://oncat.ornl.gov/api/datafiles{}/ingest".format(file_path),
+				headers={"Authorization": "Bearer {}".format(creds)},
+			)
+
+			try:
+				# Raise on any errors.
+				response.raise_for_status()
+			except requests.exceptions.HTTPError as e:
+				# Handle any errors.  Assume that the network could go down,
+				# ONCat could go down, the network mount available to ONCat could go
+				# down, etc., etc.
+				print("\n\nCataloging ERROR for file {}: {}\n\n".format(file_path, e.response.json()))
+				raise
+		else:
+			print('\nNonapplicable file: {}. Skipping catalog./n'.format(file_path))
+			pass
+
+def finish_up(rtn_code):
+	"""
+	Exit with specified return code.
+	"""
+	print("\nFinishing up with return code {}\n".format(rtn_code))
+	sys.exit(rtn_code)
+
+
+def process_args(arg_list):
+	"""
+	Process command line arguments.
+	"""
+	file_path = None
+	proposal = None
+	run_number = None
+	source_dir = None
+	target_dir = None
+
+	# Loop through Command Line Parameters...
+	for arg in arg_list:
 		print("\narg=%s" % arg)
-
 		pargs = arg.split('=')
-
 		key = pargs[0]
 		if len(pargs) > 1:
 			value = pargs[1]
 		else:
 			value = ""
-
 		print("key=%s" % key)
 		print("value=%s" % value)
+		if key == "FileName":
+			file_path = value
+		elif key == "proposal":
+			proposal = value
+		elif key == "run_number":
+			run_number = value
+		elif key == "source_dir":
+			source_dir = value
+		elif key == "target_dir":
+			target_dir = value
+	return file_path, proposal, run_number, source_dir, target_dir
 
-	# Do Nothing and Exit (for now)...
 
-	print("\nDo Nothing and Exit with Status 123.\n")
+def do_pre_post_imaging(arg_list):
+	"""
+	Do pre-post-processing for SNAP MCP Imaging.
+	"""
+	return_code = 0
+	try:
+		file_path, proposal, run_number, source_dir, target_dir = process_args(arg_list)
 
-	sys.exit(123)
+		parms_present = all (p is not None for p in [file_path, proposal, run_number])
 
+		if parms_present is not None:
+			files_to_catalog = copy_images(file_path, proposal, run_number, source_dir, target_dir)
+			catalog_images(files_to_catalog)
+		else:
+			print('\n\nERROR: Not all parameters present.\n\n')
+			return_code = -2
+	except Exception as e:
+		print('\n\nERROR In do_pre_post_imaging(): {}\n\n'.format(str(e)))
+		print(traceback.format_exc())
+		return_code = -1
+	finally:
+		finish_up(return_code)
+
+
+if __name__ == "__main__":
+	# Test parameters: [['/TESTING/SNS/stcdata_devel/stc_pre_post_imaging.py', 'FileName=C:/data/IPTS-26687/DAS_TEST_8_1_21/20210803_Run_51901_sample_file_0001_0605', 'SubDir=DAS_TEST_8_1_21', 'facility=SNS', 'beamline=SNAP', 'proposal=IPTS-26687', 'run_number=51901']]
+	print("\nSTC Pre-Post AutoReduction Imaging Command Script Entry.\n")
+	print("   [%s]\n" % sys.argv[0])
+	print("   [%s]" % sys.argv)
+
+	do_pre_post_imaging(sys.argv[1:])
