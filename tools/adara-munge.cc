@@ -153,7 +153,8 @@ public:
 		m_posixRead(false), m_showDDP(false), m_lowRate(false),
 		m_terse(false), m_catch(false),
 		m_out(std::cout),
-		m_save_count(0)
+		m_save_count(0),
+		m_skip_count(0)
 	{
 		m_lastpkttime.tv_sec = 0;
 		m_lastpkttime.tv_nsec = 0;
@@ -246,6 +247,9 @@ private:
 	std::vector<uint32_t> m_save_pkts;
 	uint32_t m_save_count;
 	std::ofstream m_save_out;
+
+	std::vector<uint32_t> m_skip_pkts;
+	uint32_t m_skip_count;
 };
 
 bool MungeParser::rxPacket(const ADARA::Packet &pkt)
@@ -285,6 +289,19 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 	m_lastpkttime.tv_sec = (uint32_t) (pkt.pulseId() >> 32);
 	m_lastpkttime.tv_nsec = (uint32_t) pkt.pulseId();
 
+	// Check for Packets to "Skip" By Type, I.e. "Throw Away"... ;-D
+	for ( uint32_t i=0 ; i < m_skip_pkts.size() ; i++ )
+	{
+		if ( pkt.type() == m_skip_pkts[i] )
+		{
+			std::cerr << "[Skipping Packet Type " << pkt.type()
+				<< " (0x" << std::hex << pkt.type()
+					<< std::dec << ")"
+				<< "]" << std::endl;
+			m_skip_pkt = true;
+		}
+	}
+	
 	// Pass Packet Through to Output Stream...
 	if ( !m_skip_pkt )
 	{
@@ -296,10 +313,13 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 		{
 			m_out.write( (const char *)pkt.packet(), pkt.packet_length() );
 		}
+		else
+			m_skip_count++;
 	}
 	else
 	{
 		m_skip_pkt = false;
+		m_skip_count++;
 	}
 
 	// Check for Packet Types to Save...
@@ -1638,6 +1658,9 @@ void MungeParser::parse(int argc, char **argv)
 			"List of Packet Types (UINT32) to Save")
 		("savefile,F", po::value<std::string>(&m_save_file),
 			"Save Certain Packet Types to Given File")
+		("skippkts",
+			po::value<std::vector<uint32_t> >(&m_skip_pkts)->multitoken(),
+			"List of Packet Types (UINT32) to SKIP (i.e. Throw Away)")
 		("hysterical,H", "Set Hysterical Run Start/End Times")
 		("starttime", po::value<std::string>(&m_starttime_str),
 			"Hysterical Start Time for Experiment Data")
@@ -1715,8 +1738,8 @@ void MungeParser::parse(int argc, char **argv)
 	// Save Packets Options...
 	if ( m_save_pkts.size() || m_genStart || m_genStop ) {
 		for ( uint32_t i=0 ; i < m_save_pkts.size() ; i++ ) {
-			std::cerr << "Packet Type 0x"
-			<< std::hex << m_save_pkts[i] << std::dec
+			std::cerr << "Packet Type " << m_save_pkts[i]
+				<< " (0x" << std::hex << m_save_pkts[i] << std::dec << ")"
 			<< " Selected for Saving." << std::endl;
 		}
 		if ( m_save_file.size() ) {
@@ -1743,6 +1766,15 @@ void MungeParser::parse(int argc, char **argv)
 		std::cerr << "Warning: Save Packets File Specified "
 			<< "with NO Selected Packet Types! Ignoring..."
 			<< std::endl;
+	}
+
+	// Skip Packets Options...
+	if ( m_skip_pkts.size() ) {
+		for ( uint32_t i=0 ; i < m_skip_pkts.size() ; i++ ) {
+			std::cerr << "Packet Type " << m_skip_pkts[i]
+				<< " (0x" << std::hex << m_skip_pkts[i] << std::dec << ")"
+			<< " Selected for SKIPPING." << std::endl;
+		}
 	}
 
 	m_hysterical = vm.count("hysterical");
@@ -1909,6 +1941,12 @@ void MungeParser::parse(int argc, char **argv)
 			<< " - Saved " << m_save_count << " Packets."
 			<< std::endl;
 		m_save_out.close();
+	}
+
+	// Dump Any Skipped Packet Count...
+	if ( m_skip_pkts.size() ) {
+		std::cerr << "SKIPPED " << m_skip_count << " Packets."
+			<< std::endl;
 	}
 }
 
