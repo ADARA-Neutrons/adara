@@ -54,7 +54,7 @@ StreamParser::StreamParser
     bool            a_gather_stats,             ///< [in] Controls stream statistics gathering
     uint32_t        a_event_buf_write_thresh,   ///< [in] Event buffer write threshold (number of elements)
     uint32_t        a_anc_buf_write_thresh,     ///< [in] Ancillary buffer write threshold (number of elements)
-    bool            a_verbose                   ///< [in] STC Verbosity
+    uint32_t        a_verbose_level             ///< [in] STC Verbosity Level
 )
 :
     POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
@@ -78,7 +78,7 @@ StreamParser::StreamParser
     m_gather_stats(a_gather_stats),
     m_skipped_pkt_count(0),
     m_pulse_flag(0),
-    m_verbose(a_verbose),
+    m_verbose_level(a_verbose_level),
     m_pause_has_non_normalized(false),
     m_scan_has_non_normalized(false),
     m_comment_has_non_normalized(false)
@@ -160,7 +160,7 @@ StreamParser::~StreamParser()
     for ( vector<PVInfoBase*>::iterator ipv = m_pvs_list.begin();
             ipv != m_pvs_list.end(); ++ipv ) {
         if ( *ipv ) {
-            if ( m_verbose ) {
+            if ( m_verbose_level > 1 ) {
                 syslog( LOG_ERR,
                     "[%i] %s: Erasing Device %s: %s (%s)",
                     g_pid, "~StreamParser()",
@@ -1672,7 +1672,7 @@ StreamParser::processBankEvents
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
-            bi->initializeBank( false, m_verbose );
+            bi->initializeBank( false, m_verbose_level );
 
         // Event-based Data Processing
         if ( bi->m_has_event )
@@ -1923,7 +1923,7 @@ StreamParser::handleBankPulseGap
 {
     // Make Sure Data has been (Late) Initialized...
     if ( !(a_bi.m_initialized) )
-        a_bi.initializeBank( false, m_verbose );
+        a_bi.initializeBank( false, m_verbose_level );
 
     // If the gap (count) is small enough (fits within size threshold),
     // then just insert values into index buffer
@@ -4043,7 +4043,7 @@ StreamParser::rxPacket
                                                     + ":" + pv_connection ]
                                                 = key;
 
-                                            if ( m_verbose ) {
+                                            if ( m_verbose_level > 1 ) {
                                                 stringstream ss2;
                                                 ss2 << "Adding New Key "
                                                     << key.first
@@ -4305,7 +4305,8 @@ StreamParser::rxPacket
                                                 // map[] = always
                                                 // overwrites!
 
-                                                if ( m_verbose ) {
+                                                if ( m_verbose_level > 1 )
+                                                {
                                                     stringstream ss2;
                                                     ss2 << "Adding"
                                                         << " Revised Key "
@@ -6619,7 +6620,7 @@ StreamParser::finalizeStreamProcessing()
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(ibi->second->m_initialized) )
-            ibi->second->initializeBank( true, m_verbose );
+            ibi->second->initializeBank( true, m_verbose_level );
 
         // Detect gaps in bank data and fill event index if present
         if ( ibi->second->m_last_pulse_with_data < m_pulse_count )
