@@ -47,7 +47,7 @@ public:
         bool a_strict, bool a_gather_stats = false,
         uint32_t a_event_buf_write_thresh = 40960, // number of elems
         uint32_t a_ancillary_buf_write_thresh = 4096, // number of elems
-        bool a_verbose = false );
+        uint32_t a_verbose_level = 0 );
 
     virtual ~StreamParser();
 
@@ -80,7 +80,7 @@ public:
 
     bool getDoRename(void) { return m_do_rename; }
 
-    bool verbose(void) { return m_verbose; }
+    uint32_t verbose(void) { return m_verbose_level; }
 
     uint64_t m_total_bytes_count;   ///< Total Input Stream Byte Count of ADARA packets
 
@@ -247,7 +247,7 @@ private:
 
     struct timespec                         m_default_run_start_time;   ///< Default Run Start Time (No Neutron Pulses)...
 
-    bool                                    m_verbose;                  ///< STC Verbosity
+    uint32_t                                m_verbose_level;            ///< STC Verbosity Level
 
 protected:
     std::multimap<uint64_t, std::pair<double, uint16_t> >
