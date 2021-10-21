@@ -1010,7 +1010,8 @@ public:
     /// Normalize PV values/timestamps relative to 1st Pulse Start Time
     void normalizeTimestamps
     (
-        uint64_t start_time     ///< 1st Pulse Time (nanosecs)
+        uint64_t start_time,        ///< 1st Pulse Time (nanosecs)
+        uint32_t a_verbose_level    ///< Verbose Logging Level
     )
     {
         // Normalize All Non-Normalized Timestamps...
@@ -1032,16 +1033,20 @@ public:
                         / NANO_PER_SECOND_D;
                     this->m_time_buffer[i] = t;
 
-                    syslog( LOG_INFO,
-                        "[%i] %s %s %s: %s = %s @ %lf",
-                        g_pid, "PVInfo::normalizeTimestamps()",
-                        this->m_device_str.c_str(),
-                        "Positive Time Update",
-                        this->m_pv_str.c_str(),
-                        this->valueToString(
-                            this->m_value_buffer[i] ).c_str(),
-                        this->m_time_buffer[i] );
-                    usleep(30000); // give syslog a chance
+                    // Verbose Logging Level 1 or Above...
+                    if ( a_verbose_level > 0 )
+                    {
+                        syslog( LOG_INFO,
+                            "[%i] %s %s %s: %s = %s @ %lf",
+                            g_pid, "PVInfo::normalizeTimestamps()",
+                            this->m_device_str.c_str(),
+                            "Positive Time Update",
+                            this->m_pv_str.c_str(),
+                            this->valueToString(
+                                this->m_value_buffer[i] ).c_str(),
+                            this->m_time_buffer[i] );
+                        usleep(30000); // give syslog a chance
+                    }
 
                     // Time is Normalized Now,
                     // We Can Add This Value to Stats.
@@ -1055,41 +1060,45 @@ public:
                 // every PV in the run! ;-D)
                 else
                 {
-                    std::string log_hdr = "";
-                    int log_type = LOG_INFO;
-                    // Don't Log _Any_ of These as "Errors",
-                    // Just Too Much Spam...! ;-b
-                    // if ( this->m_last_value_set ) {
-                        // log_type = LOG_ERR;
-                        // log_hdr = "STC Error: ";
-                    // }
-                    std::stringstream ss;
-                    ss << log_hdr;
-                    ss << "PVInfo::normalizeTimestamps() ";
-                    ss << this->m_device_pv_str;
-                    ss << " = ";
-                    ss << this->valueToString(
-                        this->m_value_buffer[i] ).c_str();
-                    ss << ":";
-                    ss << " Truncate Negative Variable";
-                    ss << " Value Update Time to Zero";
-                    syslog( log_type,
-                        "[%i] %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
-                        g_pid, ss.str().c_str(),
-                        (unsigned long)( this->m_abs_time_buffer[i]
-                                / NANO_PER_SECOND_LL )
-                            - ADARA::EPICS_EPOCH_OFFSET,
-                        (unsigned long)( this->m_abs_time_buffer[i]
-                                % NANO_PER_SECOND_LL ),
-                        this->m_abs_time_buffer[i],
-                        (unsigned long)( start_time
-                                / NANO_PER_SECOND_LL )
-                            - ADARA::EPICS_EPOCH_OFFSET,
-                        (unsigned long)( start_time
-                                % NANO_PER_SECOND_LL ),
-                        start_time );
-                    // give syslog a chance...
-                    usleep(30000);
+                    // Verbose Logging Level 1 or Above...
+                    if ( a_verbose_level > 0 )
+                    {
+                        std::string log_hdr = "";
+                        int log_type = LOG_INFO;
+                        // Don't Log _Any_ of These as "Errors",
+                        // Just Too Much Spam...! ;-b
+                        // if ( this->m_last_value_set ) {
+                            // log_type = LOG_ERR;
+                            // log_hdr = "STC Error: ";
+                        // }
+                        std::stringstream ss;
+                        ss << log_hdr;
+                        ss << "PVInfo::normalizeTimestamps() ";
+                        ss << this->m_device_pv_str;
+                        ss << " = ";
+                        ss << this->valueToString(
+                            this->m_value_buffer[i] ).c_str();
+                        ss << ":";
+                        ss << " Truncate Negative Variable";
+                        ss << " Value Update Time to Zero";
+                        syslog( log_type,
+                            "[%i] %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                            g_pid, ss.str().c_str(),
+                            (unsigned long)( this->m_abs_time_buffer[i]
+                                    / NANO_PER_SECOND_LL )
+                                - ADARA::EPICS_EPOCH_OFFSET,
+                            (unsigned long)( this->m_abs_time_buffer[i]
+                                    % NANO_PER_SECOND_LL ),
+                            this->m_abs_time_buffer[i],
+                            (unsigned long)( start_time
+                                    / NANO_PER_SECOND_LL )
+                                - ADARA::EPICS_EPOCH_OFFSET,
+                            (unsigned long)( start_time
+                                    % NANO_PER_SECOND_LL ),
+                            start_time );
+                        // give syslog a chance...
+                        usleep(30000);
+                    }
 
                     this->m_time_buffer[i] = 0.0;
 
