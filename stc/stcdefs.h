@@ -86,7 +86,7 @@ public:
     virtual ~BankInfo()
     {}
 
-    void initializeBank( bool a_end_of_run, bool a_verbose )
+    void initializeBank( bool a_end_of_run, uint32_t a_verbose_level )
     {
         // Already Initialized...
         if ( m_initialized )
@@ -312,7 +312,7 @@ public:
                         }
                     }
 
-                    if ( a_verbose )
+                    if ( a_verbose_level > 1 )
                     {
                         syslog( LOG_INFO,
                             "[%i] %s %u %s %u Done with Histogram Init.",
