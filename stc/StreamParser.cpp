@@ -595,10 +595,21 @@ StreamParser::rxPacket
         {
             m_processing_state = PROCESSING_RUN_HEADER;
             syslog( LOG_INFO,
-                "[%i] Run Status Start-of-Run Received (%s = %s).",
-                g_pid, "Processing State",
-                getProcessingStateString().c_str() );
+            "[%i] Run Status Start-of-Run Received at %u.%09u (%s = %s).",
+                g_pid,
+                (uint32_t) a_pkt.timestamp().tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) a_pkt.timestamp().tv_nsec,
+                "Processing State", getProcessingStateString().c_str() );
             usleep(30000); // give syslog a chance...
+
+            // Because We Got A Valid RunStatus Packet for the
+            // Start of the Run, Go Ahead and Use This Packet's
+            // TimeStamp as the Backup/"Default" Run Start Time,
+            // In Case We Never Receive Any Neutron Pulses/Data...
+            // (Do This _Instead_ of Using the Wallclock TimeStamp,
+            // Which Could Easily Be Bogus if This is a "Replay"... ;-D)
+            m_default_run_start_time = a_pkt.timestamp();
         }
         else
         {
@@ -6536,25 +6547,34 @@ StreamParser::finalizeStreamProcessing()
         if ( m_strict )
         {
             syslog( LOG_ERR,
-                "[%i] %s %s. %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
-                "STC Error:", "No Neutron Pulses Received in Stream",
-                "Target Station", m_beamline_info.target_station_number,
-                "Beamline", m_run_info.facility_name.c_str(),
-                m_beamline_info.instr_shortname.c_str(),
-                "Proposal", m_run_info.proposal_id.c_str(),
-                "Run", m_run_info.run_number );
-            usleep(30000); // give syslog a chance...
-        }
-        else
-        {
-            syslog( LOG_WARNING,
-                "[%i] %s. %s: %u, %s: %s:%s, %s: %s, %s: %u", g_pid,
+               "[%i] %s %s. %s: %u, %s: %s:%s, %s: %s, %s: %u, %s %u.%09u",
+                g_pid, "STC Error:",
                 "No Neutron Pulses Received in Stream",
                 "Target Station", m_beamline_info.target_station_number,
                 "Beamline", m_run_info.facility_name.c_str(),
                 m_beamline_info.instr_shortname.c_str(),
                 "Proposal", m_run_info.proposal_id.c_str(),
-                "Run", m_run_info.run_number );
+                "Run", m_run_info.run_number,
+                "Using Default Run Start Time as",
+                (uint32_t) m_default_run_start_time.tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) m_default_run_start_time.tv_nsec );
+            usleep(30000); // give syslog a chance...
+        }
+        else
+        {
+            syslog( LOG_WARNING,
+                "[%i] %s. %s: %u, %s: %s:%s, %s: %s, %s: %u, %s %u.%09u",
+                g_pid, "No Neutron Pulses Received in Stream",
+                "Target Station", m_beamline_info.target_station_number,
+                "Beamline", m_run_info.facility_name.c_str(),
+                m_beamline_info.instr_shortname.c_str(),
+                "Proposal", m_run_info.proposal_id.c_str(),
+                "Run", m_run_info.run_number,
+                "Using Default Run Start Time as",
+                (uint32_t) m_default_run_start_time.tv_sec
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (uint32_t) m_default_run_start_time.tv_nsec );
             usleep(30000); // give syslog a chance...
         }
 
