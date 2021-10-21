@@ -2,7 +2,7 @@
 
 # Command Script Entry - Announce Our Existence...
 
-echo -e "\nSTC Pre-Post AutoReduction Dummy Command Test Script Entry."
+echo -e "STC Pre-Post AutoReduction Dummy Command Test Script Entry."
 
 echo -e "   [$0]"
 
@@ -17,13 +17,13 @@ for arg in "$@" ; do
 	key=`echo "$arg" | awk -F = '{print $1}'`
 	value=`echo "$arg" | awk -F = '{print $2}'`
 
-	echo "arg=$arg, key=$key, value=$value"
+	echo -n "arg=$arg, key=$key, value=$value ; "
 
 done
 
 # Do Nothing and Exit...
 
-echo -e "\nDo Nothing and Exit with Status 0.\n"
+echo -e "\nDo Nothing and Exit with Status 0."
 
 exit 0
 
