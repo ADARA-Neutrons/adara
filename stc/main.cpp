@@ -258,6 +258,7 @@ int main( int argc, char** argv )
         bool strict;
         bool move;
         bool doRename;
+        uint32_t verbose_level;
         bool verbose;
         bool gather_stats;
         bool suppress_adara;
@@ -273,7 +274,8 @@ int main( int argc, char** argv )
                 ("help,h", "show help")
                 ("version", "show version number")
                 ("interactive,i", po::bool_switch( &interact )->default_value( false ), "interactive mode")
-                ("verbose,v", po::bool_switch( &verbose )->default_value( false ), "verbose output mode")
+                ("verbose_level", po::value<uint32_t>( &verbose_level )->default_value( 0 ), "verbose output logging level (uint32)")
+                ("verbose,v", po::bool_switch( &verbose )->default_value( false ), "verbose output mode (deprecated)")
                 ("strict,s", po::bool_switch( &strict )->default_value( false ), "enable strict protocol parsing")
                 ("move,m", po::bool_switch( &move )->default_value( false ), "move output nexus file to cataloging location (forces strict parsing)")
                 ("report,r", po::bool_switch( &gather_stats )->default_value( false ), "report stream statistics")
@@ -314,6 +316,26 @@ int main( int argc, char** argv )
                  << ", ComBus Version " << ADARA::ComBus::VERSION
                  << ", Tag " << ADARA::TAG_NAME << ")" << endl;
             return STC::TS_TRANSIENT_ERROR;
+        }
+
+        // Apply "Verbose" Boolean Option (Now Deprecated)
+        // to Set New Verbose Logging Level... ;-D
+        if ( verbose_level == 0 && verbose )
+        {
+            // Formerly "--verbose" Triggered "Level 2" Verbosity...
+            // ("Effectively", Before there was a "Level 1"... ;-D)
+            verbose_level = 2;
+
+            syslog( LOG_INFO, "[%i] %s %s %u.",
+                g_pid, "Applying (Deprecated) \"Verbose\" Option",
+                "to Set Verbose Logging Level to", verbose_level );
+            usleep(30000); // give syslog a chance...
+        }
+        else if ( verbose_level > 0 )
+        {
+            syslog( LOG_INFO, "[%i] %s %u.",
+                g_pid, "STC Verbose Logging Level Set to", verbose_level );
+            usleep(30000); // give syslog a chance...
         }
 
         // If user has requested cataloging, force sane options
@@ -419,7 +441,7 @@ int main( int argc, char** argv )
 
         // Only Dump Verbose STC Settings in Interactive Mode...!
         // (else screws up the STC-to-SMS return status...! ;-D)
-        if ( interact && verbose )
+        if ( interact && verbose_level > 0 )
         {
             cout << "STC Information:" << endl;
             cout << "   STC Version    : "
@@ -487,7 +509,7 @@ int main( int argc, char** argv )
                 work_root, work_base, adara_outfile, nexus_outfile,
                 config_file, strict, gather_stats, chunk_size,
                 evt_buf_size, anc_buf_size, cache_size, compression_level,
-                verbose );
+                verbose_level );
 
             // Start ComBus monitor thread (even in interactive mode!)
             monitor = new ComBusTransMon();
