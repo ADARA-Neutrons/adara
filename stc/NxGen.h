@@ -807,7 +807,8 @@ private:
                             this->m_pv_str.c_str() );
                         usleep(30000); // give syslog a chance...
 
-                        this->normalizeTimestamps( start_time );
+                        this->normalizeTimestamps( start_time,
+                            m_nxgen.verbose() );
                     }
 
                     // Nope, No 1st Pulse Time to Normalize From Yet...

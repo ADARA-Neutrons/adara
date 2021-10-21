@@ -4827,49 +4827,53 @@ StreamParser::pvValueUpdate
             if ( pvinfo->m_value_buffer.size() == 1
                     && pvinfo->m_last_time < m_pulse_info.start_time )
             {
-                // Rate-limited logging of truncated negative update times
-                if ( RateLimitedLogging::checkLog(
-                        RLLHistory_StreamParserH,
-                        RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP, ss.str(),
-                        60, 10, 100, log_info ) ) {
-                    // Only Log Negative Time Truncation as Error
-                    // After 1st PV Value...
-                    // (Otherwise we get spammed for nearly
-                    // every PV in the run! ;-D)
-                    std::string log_hdr = "";
-                    int log_type = LOG_INFO;
-                    // Don't Log _Any_ of These as "Errors",
-                    // Just Too Much Spam...! ;-b
-                    // if ( pvinfo->m_last_value_set ) {
-                        // log_type = LOG_ERR;
-                        // log_hdr = "STC Error: ";
-                    // }
-                    std::stringstream ss2;
-                    ss2 << "Discard Previous Pre-First-Pulse Value ";
-                    ss2 << pvinfo->valueToString(
-                        pvinfo->m_value_buffer[0] );
-                    ss2 << " @ " << pvinfo->m_last_time;
-                    ss2 << " - Keep New Value";
-                    ss2 << ": " << ssinfo.str();
-                    syslog( log_type,
+                // Verbose Logging Level 1 or Above...
+                if ( m_verbose_level > 0 ) {
+                    // Rate-limited logging of
+                    // truncated negative update times
+                    if ( RateLimitedLogging::checkLog(
+                            RLLHistory_StreamParserH,
+                            RLL_PV_VALUE_UPDATE_NEG_TIME_CLAMP, ss.str(),
+                            60, 10, 100, log_info ) ) {
+                        // Only Log Negative Time Truncation as Error
+                        // After 1st PV Value...
+                        // (Otherwise we get spammed for nearly
+                        // every PV in the run! ;-D)
+                        std::string log_hdr = "";
+                        int log_type = LOG_INFO;
+                        // Don't Log _Any_ of These as "Errors",
+                        // Just Too Much Spam...! ;-b
+                        // if ( pvinfo->m_last_value_set ) {
+                            // log_type = LOG_ERR;
+                            // log_hdr = "STC Error: ";
+                        // }
+                        std::stringstream ss2;
+                        ss2 << "Discard Previous Pre-First-Pulse Value ";
+                        ss2 << pvinfo->valueToString(
+                            pvinfo->m_value_buffer[0] );
+                        ss2 << " @ " << pvinfo->m_last_time;
+                        ss2 << " - Keep New Value";
+                        ss2 << ": " << ssinfo.str();
+                        syslog( log_type,
                "[%i] %s%s%s %s %lu.%09lu (%s=%lu) < %lu.%09lu (%s=%lu) %s",
-                        g_pid, log_hdr.c_str(), log_info.c_str(),
-                        "StreamParser::pvValueUpdate()",
-                        ss2.str().c_str(),
-                        a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
-                        a_timestamp.tv_nsec,
-                        "ts_nano", ts_nano,
-                        (unsigned long)(m_pulse_info.start_time
-                                / NANO_PER_SECOND_LL)
-                            - ADARA::EPICS_EPOCH_OFFSET,
-                        (unsigned long)(m_pulse_info.start_time
-                            % NANO_PER_SECOND_LL),
-                        "ts_nano", m_pulse_info.start_time,
-                        ( ( value_changed ) ? "(Value Changed)"
-                            : ( ( new_value )
-                                ? "(New Value)" : "(Same Value)" ) )
-                    );
-                    usleep(30000); // give syslog a chance...
+                            g_pid, log_hdr.c_str(), log_info.c_str(),
+                            "StreamParser::pvValueUpdate()",
+                            ss2.str().c_str(),
+                            a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                            a_timestamp.tv_nsec,
+                            "ts_nano", ts_nano,
+                            (unsigned long)(m_pulse_info.start_time
+                                    / NANO_PER_SECOND_LL)
+                                - ADARA::EPICS_EPOCH_OFFSET,
+                            (unsigned long)(m_pulse_info.start_time
+                                % NANO_PER_SECOND_LL),
+                            "ts_nano", m_pulse_info.start_time,
+                            ( ( value_changed ) ? "(Value Changed)"
+                                : ( ( new_value )
+                                    ? "(New Value)" : "(Same Value)" ) )
+                        );
+                        usleep(30000); // give syslog a chance...
+                    }
                 }
 
                 // Purge Existing Pre-Pulse PV Data...
@@ -4927,36 +4931,39 @@ StreamParser::pvValueUpdate
     // (Later, Will Only Save _Last_ of Pre-Pulse PV Value Data...)
     else
     {
-        /* Rate-limited logging of pre-pulse variable value updates */
-        // REMOVEME
-        std::stringstream ss;
-        ss << a_device_id << "." << a_pv_id;
-        std::string log_info;
-        if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
-                RLL_PV_VALUE_UPDATE_EARLY, ss.str(),
-                60, 10, 100, log_info ) ) {
-            // If Logging, Include Actual Purged PV Values...
-            // (the times have all been zeroed out... ;-)
-            std::stringstream ssinfo;
-            ssinfo << "devId=" << a_device_id
-                << " (" << pvinfo->m_device_name << ")";
-            ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
-                << " [" << pvinfo->m_connection << "]" << ")";
-            syslog( LOG_INFO,
-                "[%i] %s%s %s %s = %s @ %lu.%09lu (%s=%lu) %s",
-                g_pid, log_info.c_str(),
-                "StreamParser::pvValueUpdate()",
-                "Got Pre-Pulse Variable Value Update",
-                ssinfo.str().c_str(),
-                pvinfo->valueToString( a_value ).c_str(),
-                a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
-                a_timestamp.tv_nsec,
-                "ts_nano", ts_nano,
-                ( ( value_changed ) ? "(Value Changed)"
-                    : ( ( new_value ) ? "(New Value)" : "(Same Value)" ) )
-            );
-            // give syslog a chance...
-            usleep(30000);
+        // Verbose Logging Level 1 or Above...
+        if ( m_verbose_level > 0 ) {
+            /* Rate-limited logging of pre-pulse variable value updates */
+            std::stringstream ss;
+            ss << a_device_id << "." << a_pv_id;
+            std::string log_info;
+            if ( RateLimitedLogging::checkLog( RLLHistory_StreamParserH,
+                    RLL_PV_VALUE_UPDATE_EARLY, ss.str(),
+                    60, 10, 100, log_info ) ) {
+                // If Logging, Include Actual Purged PV Values...
+                // (the times have all been zeroed out... ;-)
+                std::stringstream ssinfo;
+                ssinfo << "devId=" << a_device_id
+                    << " (" << pvinfo->m_device_name << ")";
+                ssinfo << " pvId=" << a_pv_id << " (" << pvinfo->m_name
+                    << " [" << pvinfo->m_connection << "]" << ")";
+                syslog( LOG_INFO,
+                    "[%i] %s%s %s %s = %s @ %lu.%09lu (%s=%lu) %s",
+                    g_pid, log_info.c_str(),
+                    "StreamParser::pvValueUpdate()",
+                    "Got Pre-Pulse Variable Value Update",
+                    ssinfo.str().c_str(),
+                    pvinfo->valueToString( a_value ).c_str(),
+                    a_timestamp.tv_sec - ADARA::EPICS_EPOCH_OFFSET,
+                    a_timestamp.tv_nsec,
+                    "ts_nano", ts_nano,
+                    ( ( value_changed ) ? "(Value Changed)"
+                        : ( ( new_value )
+                            ? "(New Value)" : "(Same Value)" ) )
+                );
+                // give syslog a chance...
+                usleep(30000);
+            }
         }
 
         pvinfo->m_has_non_normalized = true;
@@ -6818,7 +6825,7 @@ StreamParser::collapseDuplicatePVs()
                                 usleep(30000); // give syslog a chance...
 
                                 pvinfoU32->normalizeTimestamps(
-                                    start_time );
+                                    start_time, m_verbose_level );
                             }
 
                             pvinfoDupU32 =
@@ -6844,7 +6851,7 @@ StreamParser::collapseDuplicatePVs()
                                 usleep(30000); // give syslog a chance...
 
                                 pvinfoDupU32->normalizeTimestamps(
-                                    start_time );
+                                    start_time, m_verbose_level );
                             }
 
                             pvinfoU32->subsumeValues(
@@ -6886,7 +6893,7 @@ StreamParser::collapseDuplicatePVs()
                                 usleep(30000); // give syslog a chance...
 
                                 pvinfoDbl->normalizeTimestamps(
-                                    start_time );
+                                    start_time, m_verbose_level );
                             }
 
                             pvinfoDupDbl =
@@ -6912,7 +6919,7 @@ StreamParser::collapseDuplicatePVs()
                                 usleep(30000); // give syslog a chance...
 
                                 pvinfoDupDbl->normalizeTimestamps(
-                                    start_time );
+                                    start_time, m_verbose_level );
                             }
 
                             pvinfoDbl->subsumeValues(
@@ -6953,7 +6960,7 @@ StreamParser::collapseDuplicatePVs()
                                 usleep(30000); // give syslog a chance...
 
                                 pvinfoStr->normalizeTimestamps(
-                                    start_time );
+                                    start_time, m_verbose_level );
                             }
 
                             pvinfoDupStr =
@@ -6979,7 +6986,7 @@ StreamParser::collapseDuplicatePVs()
                                 usleep(30000); // give syslog a chance...
 
                                 pvinfoDupStr->normalizeTimestamps(
-                                    start_time );
+                                    start_time, m_verbose_level );
                             }
 
                             pvinfoStr->subsumeValues(
@@ -7021,7 +7028,7 @@ StreamParser::collapseDuplicatePVs()
                                 usleep(30000); // give syslog a chance...
 
                                 pvinfoU32Arr->normalizeTimestamps(
-                                    start_time );
+                                    start_time, m_verbose_level );
                             }
 
                             pvinfoDupU32Arr =
@@ -7048,7 +7055,7 @@ StreamParser::collapseDuplicatePVs()
                                 usleep(30000); // give syslog a chance...
 
                                 pvinfoDupU32Arr->normalizeTimestamps(
-                                    start_time );
+                                    start_time, m_verbose_level );
                             }
 
                             pvinfoU32Arr->subsumeValues(
@@ -7090,7 +7097,7 @@ StreamParser::collapseDuplicatePVs()
                                 usleep(30000); // give syslog a chance...
 
                                 pvinfoDblArr->normalizeTimestamps(
-                                    start_time );
+                                    start_time, m_verbose_level );
                             }
 
                             pvinfoDupDblArr =
@@ -7117,7 +7124,7 @@ StreamParser::collapseDuplicatePVs()
                                 usleep(30000); // give syslog a chance...
 
                                 pvinfoDupDblArr->normalizeTimestamps(
-                                    start_time );
+                                    start_time, m_verbose_level );
                             }
 
                             pvinfoDblArr->subsumeValues(
