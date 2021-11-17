@@ -1911,6 +1911,8 @@ NxGen::bankPidTOFBuffersReady
                 bi->m_event_cur_size );
 
             bi->m_event_cur_size += a_bank.m_tof_buffer_size;
+
+            // Note: Reset TOF Buffer Size in Caller... ;-D
         }
 
         // No NeXus Histogram-based Handling Needed Here...
