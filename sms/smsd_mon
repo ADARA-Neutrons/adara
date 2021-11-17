@@ -44,6 +44,7 @@ WAIT="-w 9" # for caget wait... ;-)
 S="[[:space:]]"
 
 ALT="" # for Alternate/Secondary SMS Deployments... ;-D
+ALTLABEL=""
 
 #
 # Parse Command Line Options... ;-)
@@ -62,6 +63,7 @@ for arg in "$@" ; do
 		SMSD_USER="$value"
 	elif [ "#$key#" == '#--alt#' ]; then
 		ALT="$value"
+		ALTLABEL=`echo "$value" | tr '[:lower:]' '[:upper:]'`
 		# Also Update All the Associated Config...
 		LOGFILE="$LOG_HOME/smsd_mon/smsd_mon.$host_short${ALT}.log"
 		LOGLOGFILE="$LOG_HOME/smsd_mon/smsd_mon.$host_short${ALT}-log.log"
@@ -89,8 +91,8 @@ status=`ps augxww | grep $SMSD | grep -v -e $PROG -e $TIME -e grep | grep $SMSD_
 if [ "#$status#" == '##' ]; then
 
 	if [ $do_notify == 1 ]; then
-		echo \
-		"Error on ${host}: SMS Daemon $SMSD Not Running as User $SMSD_USER!"
+		echo -n "Error on ${host}:"
+		eco " SMS${ALTLABEL} Daemon $SMSD Not Running as User $SMSD_USER!"
 		exit -1
 	else
 		# Just Exit Cleanly, Nothing to log here... ;-D
@@ -138,7 +140,7 @@ if [ $do_notify == 1 ]; then
 		if [[ "$summary" =~ Channel${S}connect${S}timed${S}out ]]; then
 
 			echo -e -n "Error on ${host}: Timed Out $cnt Times"
-			echo -e " on SMS Summary Status PV!\n"
+			echo -e " on SMS${ALTLABEL} Summary Status PV!\n"
 			echo -e "   ${summary}\n"
 
 			caget ${WAIT} -a "${prefix}:SMS:Recording"
@@ -154,7 +156,8 @@ if [ $do_notify == 1 ]; then
 
 			if [[ "${summary}" != "OK" ]]; then
 
-				echo -e "Error on ${host}: SMS Summary Status Not OK!\n"
+				echo -e -n "Error on ${host}:"
+				echo -e " SMS${ALTLABEL} Summary Status Not OK!\n"
 
 				caget ${WAIT} -a "${prefix}:SMS:Recording"
 				caget ${WAIT} "${prefix}:SMS:RunNumber"
@@ -167,7 +170,8 @@ if [ $do_notify == 1 ]; then
 
 	else
 
-		echo "Error on ${host}: ${SMSD} Config File Not Found!"
+		echo -n "Error on ${host}:"
+		echo " SMS${ALTLABEL} ${SMSD}${ALT} Config File Not Found!"
 		echo -e "\n\t[${SMSD_CONFIG}]\n"
 		/bin/ls -l ${SMSD_CONFIG}
 
@@ -254,7 +258,8 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 
 	# Seemed like a good idea at the time... ;-D
 	# if [[ $pct_log -gt 80 ]]; then
-	# 	echo "Error on ${host}: SMS Daemon Log is $pct_log% of Usage!"
+	# 	echo -n "Error on ${host}:"
+	#	echo " SMS${ALTLABEL} Daemon Log is $pct_log% of Usage!"
 	# 	echo "   $SMSD_LOG $log_bytes ($log_hbytes)"
 	# 	exit -2
 	# fi
