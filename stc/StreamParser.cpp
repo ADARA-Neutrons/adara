@@ -1692,12 +1692,37 @@ StreamParser::processBankEvents
             // the Values in the vector when resizing...! ;-D
             // - we track our own "in use" vector size in the
             // new "BankInfo::m_tof_buffer_size" field... :-D
+            // Update: Don't Resize Incrementally with 1000 Razor Blades,
+            // Do Exponential Growth (Like This Helps... ;-D)
             if ( sz + a_event_count > bi->m_tof_buffer.size() )
             {
-                bi->m_tof_buffer.resize( sz + a_event_count,
-                    (float) -1.0 );
-                bi->m_pid_buffer.resize( sz + a_event_count,
-                    (uint32_t) -1 );
+                size_t resz;
+                // If Buffer Hasn't Yet Been Allocated,
+                // Start with 10x What We Need Right Now...
+                if ( bi->m_tof_buffer.size() == 0 )
+                {
+                    resz = 10 * a_event_count;
+                }
+                // If Buffer Exists But We've Filled It Up,
+                // Just Double the Size of the Existing Buffer.
+                // (We don't wanna spend our lives resizing... ;-b)
+                else
+                {
+                    resz = 2 * bi->m_tof_buffer.size();
+                }
+                // Don't Blow Over the Event Buffer Write Threshold,
+                // Otherwise Limit Buffer Resize to "Just What We Need"...
+                // (As Long as Working Directory has been Fully Resolved!)
+                if ( isWorkingDirectoryReady()
+                        && resz > m_event_buf_write_thresh )
+                {
+                    resz = m_event_buf_write_thresh;
+                    if ( sz + a_event_count > resz )
+                        resz = sz + a_event_count;
+                }
+                // Now Resize the Buffers to this Max Resize Size...
+                bi->m_tof_buffer.resize( resz, (float) -1.0 );
+                bi->m_pid_buffer.resize( resz, (uint32_t) -1 );
             }
 
             float           *tof_ptr = &bi->m_tof_buffer[sz];
@@ -2184,10 +2209,36 @@ StreamParser::processMonitorEvents
         // the Values in the vector when resizing...! ;-D
         // - we track our own "in use" vector size in the
         // new "MonitorInfo::m_tof_buffer_size" field... :-D
+        // Update: Don't Resize Incrementally with 1000 Razor Blades,
+        // Do Exponential Growth (Like This Helps... ;-D)
         if ( sz + a_event_count > imi->second->m_tof_buffer.size() )
         {
-            imi->second->m_tof_buffer.resize( sz + a_event_count,
-                (float) -1.0 );
+            size_t resz;
+            // If Buffer Hasn't Yet Been Allocated,
+            // Start with 10x What We Need Right Now...
+            if ( imi->second->m_tof_buffer.size() == 0 )
+            {
+                resz = 10 * a_event_count;
+            }
+            // If Buffer Exists But We've Filled It Up,
+            // Just Double the Size of the Existing Buffer.
+            // (We don't wanna spend our lives resizing... ;-b)
+            else
+            {
+                resz = 2 * imi->second->m_tof_buffer.size();
+            }
+            // Don't Blow Over the Event Buffer Write Threshold,
+            // Otherwise Limit Buffer Resize to "Just What We Need"...
+            // (As Long as Working Directory has been Fully Resolved!)
+            if ( isWorkingDirectoryReady()
+                    && resz > m_event_buf_write_thresh )
+            {
+                resz = m_event_buf_write_thresh;
+                if ( sz + a_event_count > resz )
+                    resz = sz + a_event_count;
+            }
+            // Now Resize the Buffers to this Max Resize Size...
+            imi->second->m_tof_buffer.resize( resz, (float) -1.0 );
         }
 
         float *tof_ptr = &imi->second->m_tof_buffer[sz];
