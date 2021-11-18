@@ -149,8 +149,6 @@ private:
 
 	typedef std::vector<ADARA::Event> EventVector;
 
-	typedef std::pair<uint32_t, uint32_t> BankIndex;
-
 	struct EventSource {
 		EventSource( uint32_t intraPulse, uint32_t tofField ) :
 				m_intraPulseTime(intraPulse),
