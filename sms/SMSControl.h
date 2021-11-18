@@ -161,7 +161,9 @@ private:
 		uint32_t			m_activeBanks;
 
 		EventVector			*m_banks_arr;
-		uint32_t			m_maxStates;
+
+		// Note: "Number" of States Includes State 0...
+		uint32_t			m_numStates;
 		uint32_t			m_banks_arr_size; // Will be needed for realloc
 	};
 
@@ -284,10 +286,11 @@ private:
 	boost::shared_ptr<Markers> m_markers;
 	std::set<uint32_t> m_choppers;
 
-	uint32_t m_maxBanks;
+	uint32_t m_maxBank;
 
-	uint32_t m_maxStatesLast;
-	uint32_t m_maxStatesResetCount;
+	// Note: "Number" of States Includes State 0...
+	uint32_t m_numStatesLast;
+	uint32_t m_numStatesResetCount;
 
 	IoVector m_iovec;
 	std::vector<uint32_t> m_hdrs;
