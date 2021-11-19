@@ -3783,7 +3783,7 @@ void SMSControl::buildBankedStatePacket(PulsePtr &pulse)
 	iov.iov_len = m_hdrs.size() * sizeof(uint32_t);
 	m_iovec.push_back(iov);
 
-	uint32_t maxStates = 1;
+	uint32_t numStates = 1;
 
 	SourceMap::iterator sIt, sEnd = pulse->m_pulseSources.end();
 	for (sIt = pulse->m_pulseSources.begin(); sIt != sEnd; sIt++) {
@@ -3812,8 +3812,8 @@ void SMSControl::buildBankedStatePacket(PulsePtr &pulse)
 			uint32_t state = bi / ( m_maxBank + 1 );
 
 			// Accumulate Max State for This Pulse...
-			if ( state + 1 > maxStates )
-				maxStates = state + 1;
+			if ( state + 1 > numStates )
+				numStates = state + 1;
 
 			// Because we're using Unsigned Integers, we'll translate:
 			//    - Error Pixels to Bank -2
@@ -3836,17 +3836,17 @@ void SMSControl::buildBankedStatePacket(PulsePtr &pulse)
 
 	// Check Last Max States/Reset Counter...
 	// Note: "Number" of States Includes State 0...
-	if ( m_numStatesLast > maxStates && --m_numStatesResetCount <= 0 )
+	if ( m_numStatesLast > numStates && --m_numStatesResetCount <= 0 )
 	{
 		DEBUG("buildBankedStatePacket():"
 			<< " Overall Max State Reset Count Expired,"
 			<< " Reset Overall Max State:"
 			<< "  m_numStatesLast=" << m_numStatesLast
-			<< " -> " << maxStates << "...");
-		m_numStatesLast = maxStates;
+			<< " -> " << numStates << "...");
+		m_numStatesLast = numStates;
 	}
 	// Reset the Reset Counter if We're Maintaining This Number of States
-	else if ( m_numStatesLast == maxStates )
+	else if ( m_numStatesLast == numStates )
 		m_numStatesResetCount = 10;
 
 	// Free Up Allocated Banks Array Storage...
