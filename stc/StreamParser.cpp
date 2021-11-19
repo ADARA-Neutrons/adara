@@ -64,6 +64,10 @@ StreamParser::StreamParser
     m_pkt_recvd(0),
     m_pulse_id(0),
     m_pulse_count(0),
+    m_banks_arr(NULL),
+    m_banks_arr_size(0),
+    m_maxBank(0),   // Maximum Detector Bank ID
+    m_numStates(1), // Total Number of States (Including State 0)
     m_event_buf_write_thresh(a_event_buf_write_thresh),
     m_anc_buf_write_thresh(a_anc_buf_write_thresh),
     m_info_rcvd(0),
@@ -137,10 +141,12 @@ StreamParser::~StreamParser()
     if ( m_ofs_adara.is_open() )
         m_ofs_adara.close();
 
-    for ( BankInfoMap::iterator ibi = m_banks.begin();
-            ibi != m_banks.end(); ++ibi ) {
-        if ( ibi->second )
-            delete ibi->second;
+    for ( uint32_t i=0 ; i < m_banks_arr_size ; i++ )
+    {
+        BankInfo *bi = m_banks_arr[i];
+
+        if ( bi != NULL )
+            delete m_banks_arr[i];
     }
 
     for ( vector<STC::DetectorBankSet *>::iterator dbs =
@@ -715,9 +721,9 @@ StreamParser::rxPacket
     const ADARA::PixelMappingAltPkt &a_pkt     ///< [in] ADARA PixelMappingAltPkt object to process
 )
 {
-    BankInfoMap::iterator isi;
+    BankInfo *bi;
 
-    BankIndex bsindex;
+    uint32_t bsindex;
 
     const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
     const uint32_t *epos = (const uint32_t *)
@@ -744,6 +750,11 @@ StreamParser::rxPacket
     syslog( LOG_INFO, "[%i] %s: Max Bank = %u", g_pid,
         "PixelMappingAltPkt", bank_count );
     usleep(30000); // give syslog a chance...
+
+    // Check/Re-Allocate the Detector Banks Array...
+    // For Initial Creation of BankInfo Map, Just Do All as State=0...
+
+    reallocateBanksArray( bank_count, 0 );
 
     // Now build banks and populate bank container
 
@@ -781,30 +792,32 @@ StreamParser::rxPacket
         }
 
         // For Initial Creation of BankInfo Map, Just Do All as State=0...
-        bsindex = std::make_pair( (uint32_t) bank_id, 0 );
+        // Note: Max Bank is Maximum Detector Bank ID...
+        bsindex = NUM_SPECIAL_BANKS
+            + bank_id + ( 0 * ( m_maxBank + 1 ) );
 
-        isi = m_banks.find( bsindex );
+        bi = m_banks_arr[ bsindex ];
 
         // Create New BankInfo...
-        if ( isi == m_banks.end() )
+        if ( bi == NULL )
         {
             // Create BankInfo Instance
-            BankInfo *bi = makeBankInfo( bank_id, 0,
+            m_banks_arr[ bsindex ] = makeBankInfo( bank_id, 0,
                 m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+            bi = m_banks_arr[ bsindex ];
 
             // Try to Associate Any Detector Bank Sets that
             // Contain This Bank Id...
             bi->m_bank_sets =
                 getDetectorBankSets( static_cast<uint32_t>(bank_id) );
-
-            isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
         }
 
         // Append This Section's Logical PixelIds...
         const uint32_t *epos2 = rpos + pix_count;
         tot_pix_count += pix_count;
         while ( rpos < epos2 ) {
-            isi->second->m_logical_pixelids.push_back(*rpos++);
+            bi->m_logical_pixelids.push_back(*rpos++);
         }
 
         section_count++;
@@ -814,8 +827,8 @@ StreamParser::rxPacket
             // g_pid, "PixelMappingAltPkt", "Done with Section",
             // "bank_id", bank_id, "base_physical", base_physical,
             // "Last Logical PixelId",
-            // isi->second->m_logical_pixelids.back(),
-            // pix_count, isi->second->m_logical_pixelids.size() );
+            // bi->m_logical_pixelids.back(),
+            // pix_count, bi->m_logical_pixelids.size() );
         // usleep(30000); // give syslog a chance...
     }
 
@@ -823,38 +836,36 @@ StreamParser::rxPacket
 
     // Unmapped BankInfo
 
-    bsindex = std::make_pair( (uint32_t) UNMAPPED_BANK, 0 );
-
-    isi = m_banks.find( bsindex );
+    bi = m_banks_arr[ UNMAPPED_BANK_INDEX ];
 
     // Create New BankInfo...
-    if ( isi == m_banks.end() )
+    if ( bi == NULL )
     {
         // Create BankInfo Instance
-        BankInfo *bi = makeBankInfo( (uint16_t) UNMAPPED_BANK, 0,
+        m_banks_arr[ UNMAPPED_BANK_INDEX ] = makeBankInfo(
+            (uint16_t) UNMAPPED_BANK, 0,
             m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
-        // No Detector Bank Sets for Unmapped Bank...
+        bi = m_banks_arr[ UNMAPPED_BANK_INDEX ];
 
-        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+        // No Detector Bank Sets for Unmapped Bank...
     }
 
     // Error BankInfo
 
-    bsindex = std::make_pair( (uint32_t) ERROR_BANK, 0 );
-
-    isi = m_banks.find( bsindex );
+    bi = m_banks_arr[ ERROR_BANK_INDEX ];
 
     // Create New BankInfo...
-    if ( isi == m_banks.end() )
+    if ( bi == NULL )
     {
         // Create BankInfo Instance
-        BankInfo *bi = makeBankInfo( (uint16_t) ERROR_BANK, 0,
+        m_banks_arr[ ERROR_BANK_INDEX ] = makeBankInfo(
+            (uint16_t) ERROR_BANK, 0,
             m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
-        // No Detector Bank Sets for Error Bank...
+        bi = m_banks_arr[ ERROR_BANK_INDEX ];
 
-        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+        // No Detector Bank Sets for Error Bank...
     }
 
     // Done
@@ -889,9 +900,9 @@ StreamParser::rxPacket
     const ADARA::PixelMappingPkt &a_pkt     ///< [in] ADARA PixelMappingPkt object to process
 )
 {
-    BankInfoMap::iterator isi;
+    BankInfo *bi;
 
-    BankIndex bsindex;
+    uint32_t bsindex;
 
     const uint32_t *rpos = (const uint32_t *) a_pkt.mappingData();
     const uint32_t *epos = (const uint32_t *)
@@ -941,6 +952,11 @@ StreamParser::rxPacket
         "[%i] %s: Max Bank = %u", g_pid, "PixelMappingPkt", bank_count );
     usleep(30000); // give syslog a chance...
 
+    // Check/Re-Allocate the Detector Banks Array...
+    // For Initial Creation of BankInfo Map, Just Do All as State=0...
+
+    reallocateBanksArray( bank_count, 0 );
+
     // Now build banks and populate bank container
     while ( rpos < epos )
     {
@@ -958,36 +974,38 @@ StreamParser::rxPacket
         }
 
         // For Initial Creation of BankInfo Map, Just Do All as State=0...
-        bsindex = std::make_pair( (uint32_t) bank_id, 0 );
+        // Note: Max Bank is Maximum Detector Bank ID...
+        bsindex = NUM_SPECIAL_BANKS
+            + bank_id + ( 0 * ( m_maxBank + 1 ) );
 
-        isi = m_banks.find( bsindex );
+        bi = m_banks_arr[ bsindex ];
 
         // Create New BankInfo...
-        if ( isi == m_banks.end() )
+        if ( bi == NULL )
         {
             // Create BankInfo Instance
-            BankInfo *bi = makeBankInfo( bank_id, 0,
+            m_banks_arr[ bsindex ] = makeBankInfo( bank_id, 0,
                 m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+            bi = m_banks_arr[ bsindex ];
 
             // Try to Associate Any Detector Bank Sets that
             // Contain This Bank Id...
             bi->m_bank_sets =
                 getDetectorBankSets( static_cast<uint32_t>(bank_id) );
-
-            isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
         }
 
         // Append This Section's Logical PixelIds...
         for (uint32_t i=0 ; i < pix_count ; ++i)
         {
-            isi->second->m_logical_pixelids.push_back(
+            bi->m_logical_pixelids.push_back(
                 base_logical + i );
         }
 
         // syslog( LOG_INFO,
             // "[%i] %s: bank_id=%u base_logical=%u count=%u tot=%lu",
             // g_pid, "PixelMappingPkt", bank_id, base_logical, pix_count,
-            // isi->second->m_logical_pixelids.size() );
+            // bi->m_logical_pixelids.size() );
         // usleep(30000); // give syslog a chance...
 
         // Next Section
@@ -998,38 +1016,36 @@ StreamParser::rxPacket
 
     // Unmapped BankInfo
 
-    bsindex = std::make_pair( (uint32_t) UNMAPPED_BANK, 0 );
-
-    isi = m_banks.find( bsindex );
+    bi = m_banks_arr[ UNMAPPED_BANK_INDEX ];
 
     // Create New BankInfo...
-    if ( isi == m_banks.end() )
+    if ( bi == NULL )
     {
         // Create BankInfo Instance
-        BankInfo *bi = makeBankInfo( (uint16_t) UNMAPPED_BANK, 0,
+        m_banks_arr[ UNMAPPED_BANK_INDEX ] = makeBankInfo(
+            (uint16_t) UNMAPPED_BANK, 0,
             m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
-        // No Detector Bank Sets for Unmapped Bank...
+        bi = m_banks_arr[ UNMAPPED_BANK_INDEX ];
 
-        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+        // No Detector Bank Sets for Unmapped Bank...
     }
 
     // Error BankInfo
 
-    bsindex = std::make_pair( (uint32_t) ERROR_BANK, 0 );
-
-    isi = m_banks.find( bsindex );
+    bi = m_banks_arr[ ERROR_BANK_INDEX ];
 
     // Create New BankInfo...
-    if ( isi == m_banks.end() )
+    if ( bi == NULL )
     {
         // Create BankInfo Instance
-        BankInfo *bi = makeBankInfo( (uint16_t) ERROR_BANK, 0,
+        m_banks_arr[ ERROR_BANK_INDEX ] = makeBankInfo(
+            (uint16_t) ERROR_BANK, 0,
             m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
-        // No Detector Bank Sets for Error Bank...
+        bi = m_banks_arr[ ERROR_BANK_INDEX ];
 
-        isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
+        // No Detector Bank Sets for Error Bank...
     }
 
     // Done
@@ -1432,6 +1448,90 @@ StreamParser::rxOversizePkt
     return Parser::rxOversizePkt(hdr, chunk, chunk_offset, chunk_len);
 }
 
+/*! \brief This method checks and reallocates as necessary the Array of Detector Bank Info instances.
+ *
+ * This method compares the State and Bank ID to the Max State and
+ * Max Bank ID, respectively, and Re-Allocates the Bank-State-Indexed
+ * BankInfo* Array.
+ */
+void
+StreamParser::reallocateBanksArray
+(
+    uint32_t        a_bank_id,        ///< [in] Bank ID of detector bank to be processed
+    uint32_t        a_state           ///< [in] State of detector bank to be processed
+)
+{
+    // Check State Versus Total Number of States,
+    // Check Bank ID Versus Max Bank,
+    // Re-Allocate Banks Array As Needed...
+    // Note: "Number" of States Includes State 0...
+    // Note: Max Bank is Maximum Detector Bank ID...
+    if ( ( a_state + 1 > m_numStates ) || ( a_bank_id > m_maxBank ) )
+    {
+        // Calculate New Banks Array Size (Including Special Banks)
+        uint32_t new_banks_arr_size = NUM_SPECIAL_BANKS
+            + ( ( a_state + 1 ) * ( a_bank_id + 1 ) );
+
+        syslog( LOG_INFO,
+          "[%i] %s(): %s = %u > %s = %u and/or %s = %u > %s = %u, %s = %u",
+            g_pid, "reallocateBanksArray",
+            "New State (+1 for 0)", a_state,
+            "Num States", m_numStates,
+            "New Bank ID", a_bank_id,
+            "Max Bank", m_maxBank,
+            "New Banks Array Size", new_banks_arr_size );
+        usleep(30000); // give syslog a chance...
+
+        // Allocate New Banks Array
+        BankInfoPtr *new_banks_arr = new BankInfoPtr[ new_banks_arr_size ];
+
+        // Make Sure All Elements are Initialized... ;-D
+        for ( uint32_t i=0 ; i < new_banks_arr_size ; i++ )
+            new_banks_arr[i] = NULL;
+
+        // Swap Over Original State-Bank BankInfo Array to New Array...
+        if ( m_banks_arr != NULL )
+        {
+            // Swap Over Existing Special BankInfo Instances...
+            // (e.g. UNMAPPED_BANK and ERROR_BANK)
+            for ( uint32_t i=0 ; i < NUM_SPECIAL_BANKS ; i++ )
+            {
+                new_banks_arr[ i ] = m_banks_arr[ i ];
+                m_banks_arr[ i ] = (BankInfo *) NULL;
+            }
+
+            // Swap Over Existing Regular State-Bank BankInfo Instances...
+            // Note: "Number" of States Includes State 0...
+            // Note: Max Bank is Maximum Detector Bank ID...
+            for ( uint32_t s=0 ; s < m_numStates ; s++ )
+            {
+                for ( uint32_t b=0 ; b < m_maxBank + 1 ; b++ )
+                {
+                    uint32_t bsindex_old = NUM_SPECIAL_BANKS
+                        + b + ( s * ( m_maxBank + 1 ) );
+                    uint32_t bsindex_new = NUM_SPECIAL_BANKS
+                        + b + ( s * ( a_bank_id + 1 ) );
+    
+                    new_banks_arr[ bsindex_new ] =
+                        m_banks_arr[ bsindex_old ];
+                    m_banks_arr[ bsindex_old ] = (BankInfo *) NULL;
+                }
+            }
+
+            // Free Original State-Bank bankInfo Array...
+            delete[] m_banks_arr;
+        }
+
+        // Assign New Array and Update State/Bank Parameters
+        // Note: "Number" of States Includes State 0...
+        // Note: Max Bank is Maximum Detector Bank ID...
+        m_banks_arr = new_banks_arr;
+        m_banks_arr_size = new_banks_arr_size;
+        m_numStates = a_state + 1;
+        m_maxBank = a_bank_id;
+    }
+}
+
 /*! \brief This method processes the neutron pulse data associated with a Banked Event packet.
  *
  * This method accumulates pulse charge, time, and frequency data associated with a Banked Event packet. The various
@@ -1606,12 +1706,41 @@ StreamParser::processBankEvents
     const uint32_t *a_rpos            ///< [in] Stream event buffer read pointer
 )
 {
-    BankIndex bsindex = std::make_pair( a_bank_id, a_state );
+    // Check/Re-Allocate the Detector Banks Array...
+    // For Initial Creation of BankInfo Map, Just Do All as State=0...
 
-    BankInfoMap::iterator isi = m_banks.find( bsindex );
+    // Make Sure We At Least Allocate 1 Bank, Plus the UNMAPPED/ERROR Banks
+    if ( a_bank_id == UNMAPPED_BANK || a_bank_id == ERROR_BANK )
+    {
+        reallocateBanksArray( 1, a_state );
+    }
+    // Check/Allocate the Regular Detector Bank Slots...
+    else
+    {
+        reallocateBanksArray( a_bank_id, a_state );
+    }
+
+    // Determine State-Bank BankInfo Array Index...
+    uint32_t bsindex;
+    if ( a_bank_id == UNMAPPED_BANK )
+    {
+        bsindex = UNMAPPED_BANK_INDEX;
+    }
+    else if ( a_bank_id == ERROR_BANK )
+    {
+        bsindex = ERROR_BANK_INDEX;
+    }
+    else
+    {
+        // Note: Max Bank is Maximum Detector Bank ID...
+        bsindex = NUM_SPECIAL_BANKS
+            + a_bank_id + ( a_state * ( m_maxBank + 1 ) );
+    }
+
+    BankInfo *bi = m_banks_arr[ bsindex ];
 
     // No BankInfo for This Detector Bank ID/State Yet...?
-    if ( isi == m_banks.end() ) {
+    if ( bi == NULL ) {
 
         syslog( LOG_ERR,
             "[%i] %s: No BankInfo Found for bank_id=%u state=%u",
@@ -1619,57 +1748,79 @@ StreamParser::processBankEvents
             a_bank_id, a_state );
         usleep(30000); // give syslog a chance...
 
-        // Search for the State=0 BankInfo...
-
-        BankIndex bsindex0 = std::make_pair( a_bank_id, 0 );
-
-        BankInfoMap::iterator isi0 = m_banks.find( bsindex0 );
-
-        // Valid State=0 Detector Bank ID...
-        if ( isi0 != m_banks.end() ) {
-
-            syslog( LOG_ERR,
-                "[%i] %s: Found State=0 BankInfo for bank_id=%u state=%u",
-                g_pid, "StreamParser::processBankEvents()",
-                a_bank_id, a_state );
-            usleep(30000); // give syslog a chance...
-
-            // Carefully "Clone" the Base State=0 BankInfo for This State
-
+        if ( a_bank_id == UNMAPPED_BANK )
+        {
             // Create BankInfo Instance
-            BankInfo *bi = makeBankInfo( a_bank_id, a_state,
+            m_banks_arr[ UNMAPPED_BANK_INDEX ] = makeBankInfo(
+                (uint16_t) UNMAPPED_BANK, 0,
                 m_event_buf_write_thresh, m_anc_buf_write_thresh );
 
-            // Try to Associate Any Detector Bank Sets that
-            // Contain This Bank Id...
-            bi->m_bank_sets =
-                getDetectorBankSets( static_cast<uint32_t>(a_bank_id) );
-
-            isi = m_banks.insert( std::make_pair( bsindex, bi ) ).first;
-
-            // Copy Any Saved Logical PixelIds for This Detector Bank...
-            isi->second->m_logical_pixelids =
-                isi0->second->m_logical_pixelids;
-
-            // Copy Any Saved Detector Bank Sets for This Detector Bank...
-            isi->second->m_bank_sets =
-                isi0->second->m_bank_sets;
+            bi = m_banks_arr[ UNMAPPED_BANK_INDEX ];
         }
 
-        else {
-            syslog( LOG_ERR,
-                "[%i] %s: No State=0 BankInfo Found! bank_id=%u state=%u",
-                g_pid, "StreamParser::processBankEvents()",
-                a_bank_id, a_state );
-            usleep(30000); // give syslog a chance...
+        else if ( a_bank_id == ERROR_BANK )
+        {
+            // Create BankInfo Instance
+            m_banks_arr[ ERROR_BANK_INDEX ] = makeBankInfo(
+                (uint16_t) ERROR_BANK, 0,
+                m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+            bi = m_banks_arr[ ERROR_BANK_INDEX ];
+        }
+
+        else
+        {
+            // Search for the State=0 BankInfo...
+
+            uint32_t bsindex0 = NUM_SPECIAL_BANKS
+                + a_bank_id + ( 0 * ( m_maxBank + 1 ) );
+
+            BankInfo *bi0 = m_banks_arr[ bsindex0 ];
+
+            // Valid State=0 Detector Bank ID...
+            if ( bi0 != NULL ) {
+
+                syslog( LOG_ERR,
+                 "[%i] %s: Found State=0 BankInfo for bank_id=%u state=%u",
+                    g_pid, "StreamParser::processBankEvents()",
+                    a_bank_id, a_state );
+                usleep(30000); // give syslog a chance...
+
+                // Carefully "Clone" the Base State=0 BankInfo
+                // for This State...
+
+                // Create BankInfo Instance
+                m_banks_arr[ bsindex ] = makeBankInfo( a_bank_id, a_state,
+                    m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+                bi = m_banks_arr[ bsindex ];
+
+                // Try to Associate Any Detector Bank Sets that
+                // Contain This Bank Id...
+                bi->m_bank_sets =
+                    getDetectorBankSets(
+                        static_cast<uint32_t>(a_bank_id) );
+
+                // Copy Any Saved Logical PixelIds for This Detector Bank
+                bi->m_logical_pixelids = bi0->m_logical_pixelids;
+
+                // Copy Any Saved Detector Bank Sets for This Detector Bank
+                bi->m_bank_sets = bi0->m_bank_sets;
+            }
+
+            else {
+                syslog( LOG_ERR,
+                 "[%i] %s: No State=0 BankInfo Found! bank_id=%u state=%u",
+                    g_pid, "StreamParser::processBankEvents()",
+                    a_bank_id, a_state );
+                usleep(30000); // give syslog a chance...
+            }
         }
     }
 
     // Valid Detector Bank ID...
-    if ( isi != m_banks.end() )
+    if ( bi != NULL )
     {
-        BankInfo *bi = isi->second;
-
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
             bi->initializeBank( false, m_verbose_level );
@@ -2253,7 +2404,7 @@ StreamParser::processMonitorEvents
 
             syslog( LOG_INFO,
                 "[%i] %s: %s=%u %s %s=%lu %s=%u %s=%lu %s=%lu",
-                g_pid, "StreamParser::processMonitorEvents"",
+                g_pid, "StreamParser::processMonitorEvents",
                 "MonitorID", a_monitor_id,
                 "Resizing Event Buffers",
                 "m_tof_buffer_size", imi->second->m_tof_buffer_size,
@@ -3292,24 +3443,25 @@ StreamParser::associateDetectorBankSet
     // Look for Detector Banks that are Listed in This Set...
     //    - append to given BankInfo Bank Sets vector
 
-    for ( BankInfoMap::iterator ibi = m_banks.begin();
-            ibi != m_banks.end(); ++ibi )
+    for ( uint32_t i=0 ; i < m_banks_arr_size ; i++ )
     {
-        if ( !(ibi->second) )
+        BankInfo *bi = m_banks_arr[i];
+
+        if ( bi == NULL )
             continue;
 
         for ( vector<uint32_t>::iterator b = a_bank_set->banklist.begin();
                 b != a_bank_set->banklist.end(); ++b )
         {
-            if ( (*b) == ibi->second->m_id )
+            if ( (*b) == bi->m_id )
             {
                 syslog( LOG_INFO,
                     "[%i] %s: Bank Set \"%s\" Associated with Bank Id %d.",
                     g_pid, "StreamParser::associateDetectorBankSet()",
-                    a_bank_set->name.c_str(), ibi->second->m_id );
+                    a_bank_set->name.c_str(), bi->m_id );
                 usleep(30000); // give syslog a chance...
 
-                ibi->second->m_bank_sets.push_back(a_bank_set);
+                bi->m_bank_sets.push_back(a_bank_set);
             }
         }
     }
@@ -6681,14 +6833,18 @@ StreamParser::finalizeStreamProcessing()
 
     // Write any remaining data in bank buffers
 
-    for ( BankInfoMap::iterator ibi = m_banks.begin();
-            ibi != m_banks.end(); ++ibi )
+    for ( uint32_t i=0 ; i < m_banks_arr_size ; i++ )
     {
-        if ( !(ibi->second) ) {
+        BankInfo *bi = m_banks_arr[i];
+
+        if ( bi == NULL ) {
             syslog( LOG_WARNING,
-              "[%i] %s: Can't Finalize Empty Detector Bank ID %u State %u",
+              "[%i] %s: %s Bank ID %u State %u (i=%u)",
                 g_pid, "StreamParser::finalizeStreamProcessing()",
-                ibi->first.first, ibi->first.second );
+                "Can't Finalize Empty Detector",
+                ( i - NUM_SPECIAL_BANKS ) % ( m_maxBank + 1 ), // bank_id
+                ( i - NUM_SPECIAL_BANKS ) / ( m_maxBank + 1 ), // state
+                i );
             // give syslog a chance...
             usleep(30000);
             continue;
@@ -6697,19 +6853,19 @@ StreamParser::finalizeStreamProcessing()
         syslog( LOG_INFO,
             "[%i] %s: Finalizing Detector Bank ID %u State %u",
             g_pid, "StreamParser::finalizeStreamProcessing()",
-            ibi->second->m_id, ibi->second->m_state );
+            bi->m_id, bi->m_state );
         // give syslog a chance...
         usleep(30000);
 
         // Make Sure Data has been (Late) Initialized...
-        if ( !(ibi->second->m_initialized) )
-            ibi->second->initializeBank( true, m_verbose_level );
+        if ( !(bi->m_initialized) )
+            bi->initializeBank( true, m_verbose_level );
 
         // Detect gaps in bank data and fill event index if present
-        if ( ibi->second->m_last_pulse_with_data < m_pulse_count )
+        if ( bi->m_last_pulse_with_data < m_pulse_count )
         {
-            handleBankPulseGap( *(ibi->second),
-                m_pulse_count - ibi->second->m_last_pulse_with_data );
+            handleBankPulseGap( *bi,
+                m_pulse_count - bi->m_last_pulse_with_data );
         }
 
         // Write Bank Pid/TOF and Event Index Buffers Independently
@@ -6717,13 +6873,13 @@ StreamParser::finalizeStreamProcessing()
 
         // _Always_ Flush Pid/TOF bank buffers in the end,
         //    to create any Dummy/Empty Datasets...
-        bankPidTOFBuffersReady( *(ibi->second) );
+        bankPidTOFBuffersReady( *bi );
 
         // _Always_ Flush Event Index bank buffers in the end,
         //    to create any Dummy/Empty Datasets...
-        bankIndexBuffersReady( *(ibi->second), false );
+        bankIndexBuffersReady( *bi, false );
 
-        bankFinalize( *(ibi->second) );
+        bankFinalize( *bi );
     }
 
     // Write any remaining data in monitor buffers
