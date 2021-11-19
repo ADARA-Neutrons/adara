@@ -1701,14 +1701,14 @@ StreamParser::processBankEvents
                 // Start with 10x What We Need Right Now...
                 if ( bi->m_tof_buffer.size() == 0 )
                 {
-                    resz = 10 * a_event_count;
+                    resz = 10 * ( sz + a_event_count );
                 }
                 // If Buffer Exists But We've Filled It Up,
                 // Just Double the Size of the Existing Buffer.
                 // (We don't wanna spend our lives resizing... ;-b)
                 else
                 {
-                    resz = 2 * bi->m_tof_buffer.size();
+                    resz = 2 * ( sz + a_event_count );
                 }
                 // Don't Blow Over the Event Buffer Write Threshold,
                 // Otherwise Limit Buffer Resize to "Just What We Need"...
@@ -1720,6 +1720,19 @@ StreamParser::processBankEvents
                     if ( sz + a_event_count > resz )
                         resz = sz + a_event_count;
                 }
+
+                syslog( LOG_INFO,
+                    "[%i] %s: %s=%u %s=%u %s %s=%lu %s=%u %s=%lu %s=%lu",
+                    g_pid, "StreamParser::processBankEvents",
+                    "BankID", a_bank_id,
+                    "State", a_state,
+                    "Resizing Event Buffers",
+                    "m_tof_buffer_size", bi->m_tof_buffer_size,
+                    "event_count", a_event_count,
+                    "m_tof_buffer.size()", bi->m_tof_buffer.size(),
+                    "resz", resz );
+                usleep(30000); // give syslog a chance...
+
                 // Now Resize the Buffers to this Max Resize Size...
                 bi->m_tof_buffer.resize( resz, (float) -1.0 );
                 bi->m_pid_buffer.resize( resz, (uint32_t) -1 );
@@ -2218,14 +2231,14 @@ StreamParser::processMonitorEvents
             // Start with 10x What We Need Right Now...
             if ( imi->second->m_tof_buffer.size() == 0 )
             {
-                resz = 10 * a_event_count;
+                resz = 10 * ( sz + a_event_count );
             }
             // If Buffer Exists But We've Filled It Up,
             // Just Double the Size of the Existing Buffer.
             // (We don't wanna spend our lives resizing... ;-b)
             else
             {
-                resz = 2 * imi->second->m_tof_buffer.size();
+                resz = 2 * ( sz + a_event_count );
             }
             // Don't Blow Over the Event Buffer Write Threshold,
             // Otherwise Limit Buffer Resize to "Just What We Need"...
@@ -2237,6 +2250,18 @@ StreamParser::processMonitorEvents
                 if ( sz + a_event_count > resz )
                     resz = sz + a_event_count;
             }
+
+            syslog( LOG_INFO,
+                "[%i] %s: %s=%u %s %s=%lu %s=%u %s=%lu %s=%lu",
+                g_pid, "StreamParser::processMonitorEvents"",
+                "MonitorID", a_monitor_id,
+                "Resizing Event Buffers",
+                "m_tof_buffer_size", imi->second->m_tof_buffer_size,
+                "event_count", a_event_count,
+                "m_tof_buffer.size()", imi->second->m_tof_buffer.size(),
+                "resz", resz );
+            usleep(30000); // give syslog a chance...
+
             // Now Resize the Buffers to this Max Resize Size...
             imi->second->m_tof_buffer.resize( resz, (float) -1.0 );
         }
