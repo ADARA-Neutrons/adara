@@ -365,8 +365,6 @@ bool StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify,
 			}
 
 			rc = writev( m_fd, vec, iovcnt );
-			// XXX NOMAD Bandwidth Testing ("Perfect" SSD Simulation)
-			// rc = remaining;
 			if ( rc <= 0 ) {
 				if ( errno == EAGAIN || errno == EINTR )
 					continue;
