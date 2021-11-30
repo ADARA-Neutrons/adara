@@ -92,7 +92,7 @@ if [ "#$status#" == '##' ]; then
 
 	if [ $do_notify == 1 ]; then
 		echo -n "Error on ${host}:"
-		eco " SMS${ALTLABEL} Daemon $SMSD Not Running as User $SMSD_USER!"
+		echo " SMS${ALTLABEL} Daemon $SMSD Not Running as User $SMSD_USER!"
 		exit -1
 	else
 		# Just Exit Cleanly, Nothing to log here... ;-D
