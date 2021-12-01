@@ -472,10 +472,6 @@ if [[ ${_ckconfck} != 0 ]]; then
 	echo -e "*** ConfCk FAILED...!\n"
 fi
 
-if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
-	echo -e "Status = ${_ckconfck}\n"
-fi
-
 # In Update Mode, Perform Other Assorted Install Operations, As Needed...
 if [[ $UPDATE == 1 ]]; then
 
