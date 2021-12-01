@@ -31,7 +31,7 @@ fi
 if [ -z "$ADARA_DIR" ]; then
 	ADARA_DIR="/usr/local/src/ADARA"
 	#ADARA_DIR="/SNS/users/y8y/gitsrc/ADARA"
-else
+elif [[ $QUIET == 1 ]]; then
 	echo "Inheriting ADARA_DIR Value from User Environment."
 fi
 
