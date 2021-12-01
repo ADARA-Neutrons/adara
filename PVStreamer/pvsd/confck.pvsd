@@ -238,18 +238,18 @@ CONFCK()
 	echo "Comparing Saved ChkConfig PVSD ADARA Config to System:"
 	echo
 
-	check_update=0
+	local _check_update=0
 	chkconfig --list pvsd > /tmp/chkconfig.pvsd.$$ 2>&1
 	if [ $? != 0 ]; then
 		echo "Failure Retrieving System ChkConfig for PVSD...!"
-		check_update=1
+		_check_update=1
 		(( nerrors++ ))
 	else
 		echo "diff ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
 		diff ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
 		if [ $? != 0 ]; then
 			echo "System ChkConfig for PVSD Differed...!"
-			check_update=1
+			_check_update=1
 			(( nerrors++ ))
 		else
 			echo "System ChkConfig for PVSD is the Same."
@@ -261,7 +261,7 @@ CONFCK()
 		(( nerrors++ ))
 	fi
 	# Create PVSD Local Run Level...
-	if [[ $check_update == 1 ]]; then
+	if [[ ${_check_update} == 1 ]]; then
 		echo -n "Create PVSD Local Run Level? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
@@ -279,22 +279,27 @@ CONFCK()
 	echo "Comparing Saved ADARA Admin Crontab to System:"
 	echo
 
-	check_update=0
+	_check_update=0
 	crontab -l > /tmp/y8y.crontab.$$ 2>&1
 	if [[ $? != 0 || ! -s /tmp/y8y.crontab.$$ ]]; then
 		echo "Failure Retrieving ADARA Admin Crontab for PVSD...!"
-		check_update=1
+		_check_update=1
 		(( nerrors++ ))
 	else
 		echo "diff ./pvsd/y8y.crontab /tmp/y8y.crontab.$$"
 		diff ./pvsd/y8y.crontab /tmp/y8y.crontab.$$
 		if [ $? != 0 ]; then
 			echo "ADARA Admin Crontab for PVSD Differed...!"
-			check_update=1
+			_check_update=1
 			(( nerrors++ ))
 		else
 			echo "ADARA Admin Crontab for PVSD is the Same."
 		fi
+	fi
+	# Defer PVSD Admin Crontab to Below...
+	if [[ ${_check_update} == 1 ]]; then
+		echo "Defer Fixing of PVSD Admin Crontab..."
+		echo "(See Admin Crontab Create Below, or Fix Manually.)"
 	fi
 	/bin/rm -f /tmp/y8y.crontab.$$
 	if [ $? != 0 ]; then
