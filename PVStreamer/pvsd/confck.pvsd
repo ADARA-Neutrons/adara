@@ -110,7 +110,7 @@ DIFF_FILE()
 
 	echo "diff ${_file1} ${_file2}"
 	diff "${_file1}" "${_file2}"
-	_ckdiff=$?
+	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
 		# Update the Deployed System File or Git Repo File Version...
