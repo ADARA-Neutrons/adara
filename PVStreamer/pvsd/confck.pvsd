@@ -152,6 +152,9 @@ CONFCK()
 {
 	nerrors=0
 
+	echo
+	echo "Comparing Git Repo to Deployed:"
+
 	DIFF_FILE "PVSD Wrapper Script" "Deployed" \
 		./pvsd/usr.local.bin.pvsd /usr/local/bin/pvsd
 	if [ $? != 0 ]; then
