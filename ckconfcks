@@ -16,8 +16,9 @@ CONFCKS="./dasmon/server/confck.dasmon \
 echo -e "\nComparing Git Repo ConfCk Templates Versus Deployed in:"
 echo -e "\n\t[$TARGET_DIR]"
 
-updated=0
+checked=0
 differ=0
+updated=0
 
 for cfck in $CONFCKS ; do
 
@@ -72,9 +73,13 @@ for cfck in $CONFCKS ; do
 		echo -e "\n\t-> ConfCk Template \"$bn\" is Ok."
 	fi
 
+	checked=$(( checked + 1 ))
+
 done
 
-echo -e "\n$differ Deployed ConfCk Templates Differed."
+echo -e "\n*** $checked Deployed ConfCk Templates Checked."
+
+echo -e "\n\t-> $differ Deployed ConfCk Templates Differed."
 
 echo -e "\n\t-> $updated Deployed ConfCk Templates Updated.\n"
 
