@@ -1,0 +1,80 @@
+#!/bin/bash
+#
+# Check ConfCk Templates Script... ;-D
+#
+
+TARGET_DIR=/SNS/users/y8y
+
+CONFCKS="./dasmon/server/confck.dasmon \
+	./stc/confck.stc \
+	./stc/confck.stc-config \
+	./PVStreamer/pvsd/confck.pvsd \
+	./sms/confck.smsd-mon \
+	./sms/confck.smsd \
+	./sms/confck.now"
+
+echo -e "\nComparing Git Repo ConfCk Templates Versus Deployed in:"
+echo -e "\n\t[$TARGET_DIR]"
+
+updated=0
+differ=0
+
+for cfck in $CONFCKS ; do
+
+	echo -e "\nChecking Deployed ConfCk Template: [$cfck]"
+
+	bn=`basename $cfck`
+
+	echo -e "\ndiff $cfck $TARGET_DIR/$bn"
+	diff "$cfck" "$TARGET_DIR/$bn"
+
+	ckcfck=$?
+
+	if [[ $ckcfck != 0 ]]; then
+		echo -e "\nERROR: Deployed ConfCk Template \"$bn\" Differs!\n"
+		/bin/ls -l "$cfck" "$TARGET_DIR/$bn"
+		differ=$(( differ + 1 ))
+		echo -en "\nCopy Over Deployed ConfCk Template \"$bn\"...? [y/N/q] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ $ckUpdate == "q" ]]; then
+			echo -e "\nExiting ckconfcks at User Request.\n"
+			exit 0
+		elif [[ $ckUpdate == "y" ]]; then
+			/bin/cp -i "$cfck" "$TARGET_DIR/$bn"
+			if [[ $? != 0 ]]; then
+				echo -e "\nERROR Copying Over Deployed ConfCk Template!!\n"
+				/bin/ls -l "$cfck" "$TARGET_DIR/$bn"
+				echo -e "\nFiles May Still Differ!!"
+				echo -e "\ndiff $cfck $TARGET_DIR/$bn"
+				diff "$cfck" "$TARGET_DIR/$bn"
+			else
+				# Double Check...
+				cmpout=`cmp "$cfck" "$TARGET_DIR/$bn"`
+				if [[ $? != 0 ]]; then
+					echo -e \
+						"\n\t-> Failed to Deploy ConfCk Template \"$bn\"!!"
+					echo -e "\n\t[$cmpout]\n"
+					/bin/ls -l "$cfck" "$TARGET_DIR/$bn"
+					echo -e "\ndiff $cfck $TARGET_DIR/$bn"
+					diff "$cfck" "$TARGET_DIR/$bn"
+				else
+					echo -e \
+						"\n\t-> Deployed ConfCk Template \"$bn\" Updated."
+					updated=$(( updated + 1 ))
+				fi
+			fi
+		else
+			echo -e "\n\t-> Leaving Deployed ConfCk Template \"$bn\" As Is."
+		fi
+
+	else
+		echo -e "\n\t-> ConfCk Template \"$bn\" is Ok."
+	fi
+
+done
+
+echo -e "\n$differ Deployed ConfCk Templates Differed."
+
+echo -e "\n\t-> $updated Deployed ConfCk Templates Updated.\n"
+
