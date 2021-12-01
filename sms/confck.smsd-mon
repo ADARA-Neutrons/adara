@@ -332,6 +332,28 @@ CONFCK()
 	fi
 
 	echo
+	echo "Comparing Saved ADARA Admin Crontab to System:"
+	echo
+
+	crontab -l > /tmp/y8y.crontab.$$ 2>&1
+	_ckcrontab=$?
+	if [ ${_ckcrontab} != 0 ]; then
+		_status=${_ckcrontab}
+	else
+		echo "diff ./sms${ALT}/y8y.crontab /tmp/y8y.crontab.$$"
+		diff ./sms${ALT}/y8y.crontab /tmp/y8y.crontab.$$
+		_ckdiff=$?
+		if [ ${_ckdiff} != 0 ]; then
+			_status=${_ckdiff}
+		fi
+	fi
+	/bin/rm -f /tmp/y8y.crontab.$$
+	_ckrmcrontab=$?
+	if [ ${_ckrmcrontab} != 0 ]; then
+		_status=${_ckrmcrontab}
+	fi
+
+	echo
 
 	return ${_status}
 }
