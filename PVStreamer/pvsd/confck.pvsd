@@ -395,8 +395,8 @@ if [[ $UPDATE == 1 ]]; then
 			# Set Big Error Pipe...
 			echo "Set Big Error Pipe..."
 			/bin/cp ${ADARA_DIR}/big_err_pipe.c /tmp
-		    cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
-		    /tmp/big_err_pipe
+			cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+			/tmp/big_err_pipe
 		fi
 	fi
 	echo
