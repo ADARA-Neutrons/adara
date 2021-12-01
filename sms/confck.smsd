@@ -28,7 +28,7 @@ ALT=""
 
 # ADARA Git Repo
 if [ -z "$ADARA_DIR" ]; then
-	ADARA_DIR=/usr/local/src/ADARA"
+	ADARA_DIR="/usr/local/src/ADARA"
 	#ADARA_DIR="/SNS/users/y8y/gitsrc/ADARA"
 else
 	echo "Inheriting ADARA_DIR Value from User Environment."
