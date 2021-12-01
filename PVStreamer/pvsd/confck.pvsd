@@ -27,6 +27,14 @@ elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
 	exit 0
 fi
 
+# ADARA Git Repo
+if [ -z "$ADARA_DIR" ]; then
+	ADARA_DIR=/usr/local/src/ADARA"
+	#ADARA_DIR="/SNS/users/y8y/gitsrc/ADARA"
+else
+	echo "Inheriting ADARA_DIR Value from User Environment."
+fi
+
 # Default Update/Installation Target Definitions
 SYSTEMCTL="/usr/bin/systemctl"
 PVSD_LOG="/var/log/pvsd.log"
@@ -384,6 +392,11 @@ if [[ $UPDATE == 1 ]]; then
 			sudo chgrp snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
 			sudo chmod 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
 			/bin/ls -l "${RSYSLOG_PIPES}"
+			# Set Big Error Pipe...
+			echo "Set Big Error Pipe..."
+			/bin/cp ${ADARA_DIR}/big_err_pipe.c /tmp
+		    cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+		    /tmp/big_err_pipe
 		fi
 	fi
 	echo
