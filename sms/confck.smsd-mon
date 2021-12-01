@@ -31,7 +31,7 @@ ALT="-mon"
 if [ -z "$ADARA_DIR" ]; then
 	ADARA_DIR="/usr/local/src/ADARA"
 	#ADARA_DIR="/SNS/users/y8y/gitsrc/ADARA"
-elif [[ $QUIET == 1 ]]; then
+elif [[ $QUIET == 0 ]]; then
 	echo "Inheriting ADARA_DIR Value from User Environment."
 fi
 
