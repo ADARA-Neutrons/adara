@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# Script to Show the Differences Between the Deployed Configuration Files
+#    and the Git Repository Versions.
+#
+
+# Handle "Quiet" Operation Option for Cron Usage...
+# (Only output on errors...)
+QUIET=0
+if [ "$1" == "--quiet" ]; then
+	QUIET=1
+fi
+
+# Go to proper Git Config Repo Checkout, for easy checking systemwide.
+cd /home/controls/config-stc-config/
+
+diff_cnt=0
+
+#
+# Search the Given Directory for Files...
+#
+
+CONFIG_DIFF_DIR()
+{
+	file="$1"
+
+	if [[ -d $file ]]; then
+
+		echo "[$file]:"
+
+		for f in $file/* ; do
+
+			CONFIG_DIFF_DIR $f
+
+		done
+
+	elif [[ -e $file ]]; then
+
+		if [ "$file" == "README" ]; then
+			echo -e "Ignoring README.\n"
+		elif [ "$file" == "confck" ]; then
+			echo -e "Ignoring confck.\n"
+		else
+
+			echo "diff ${LOCAL_DATA}/$file $file"
+			diff "${LOCAL_DATA}/$file" "$file"
+
+			if [ $? != 0 ] ; then
+				diff_cnt=$(( $diff_cnt + 1 ))
+			fi
+
+			echo
+
+		fi
+
+	fi
+}
+
+CONFCK()
+{
+    local _status=0
+
+	#
+	# Start the Search from the Top Level (Current) Directory...
+	#
+
+	echo
+	echo -n "Comparing Deployed Configuration"
+	echo " to Current Git Repository Versions:"
+	echo
+
+	for f in * ; do
+
+		CONFIG_DIFF_DIR $f
+
+	done
+
+	#
+	# Done.
+	#
+
+	echo "$diff_cnt Files Differed."
+	echo
+
+	return $diff_cnt
+}
+
+doConfCk=`CONFCK 2>&1`
+_ckconfck=$?
+if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+	echo -e "$doConfCk\n"
+fi
+
+if [[ ${_ckconfck} != 0 ]]; then
+	echo -e "*** ConfCk FAILED...!\n"
+fi
+exit ${_ckconfck}
+

@@ -1,0 +1,182 @@
+#!/bin/bash
+#
+# Script to Show the Differences Between the Deployed Configuration Files
+#    and the Git Repository Versions.
+#
+
+# Handle "Quiet" Operation Option for Cron Usage...
+# (Only output on errors...)
+QUIET=0
+if [ "$1" == "--quiet" ]; then
+	QUIET=1
+fi
+
+# Go to proper Git Config Repo Checkout, for easy checking systemwide.
+cd /home/controls/config/
+
+diff_cnt=0
+
+#
+# Search the Given Directory for Files...
+#
+
+STAT_LIST="./stat_list"
+
+CONFIG_DIFF_STAT()
+{
+	local _status=0
+
+	local _file="$1"
+	shift
+
+	local _statlist="$1"
+	shift
+
+	echo -e "\nDiff Stat for ${_file}"
+
+	stat --printf='%A %F %U %G ' "${_file}" > .tmp.A.$$
+	local _ckstat=$?
+	if [ ${_ckstat} != 0 ]; then
+		_status=${_ckstat}
+	fi
+	echo "${_file}" >> .tmp.A.$$
+
+	grep "${_file}$" "${_statlist}" > .tmp.B.$$
+	local _ckgrep=$?
+	if [ ${_ckgrep} != 0 ]; then
+		_status=${_ckgrep}
+	fi
+
+	diff .tmp.A.$$ .tmp.B.$$
+	local _ckdiff=$?
+	if [ ${_ckdiff} != 0 ]; then
+		_status=${_ckdiff}
+	fi
+
+	/bin/rm .tmp.A.$$ .tmp.B.$$
+
+	return ${_status}
+}
+
+CONFIG_DIFF_DIR()
+{
+	file="$1"
+
+	if [[ -d $file ]]; then
+
+		echo "[$file]:"
+
+		if [ "$file" == "deploy" ]; then
+			echo -e "Ignoring 'deploy' directory.\n"
+		else
+
+			for f in $file/* ; do
+
+				CONFIG_DIFF_DIR $f
+
+			done
+
+		fi
+
+	elif [[ -e $file ]]; then
+
+		if [ "$file" == "README" ]; then
+			echo -e "Ignoring README.\n"
+		elif [ "$file" == "confck" ]; then
+			echo -e "Ignoring confck.\n"
+		elif [ "$file" == "stc.deployment.history.txt" ]; then
+			echo -e "Ignoring stc.deployment.history.txt.\n"
+		elif [ "$file" == "stat_list" ]; then
+			echo -e "Ignoring Stat List File: stat_list.\n"
+		elif [ "$file" == "y8y.crontab" ]; then
+			echo -e "Ignoring ADARA Admin Crontab File: y8y.crontab\n"
+		else
+
+			# File Diff
+
+			echo "diff /$file $file"
+			diff "/$file" "$file"
+
+			if [ $? != 0 ] ; then
+				diff_cnt=$(( $diff_cnt + 1 ))
+			fi
+
+			# File Stat Diff
+
+			CONFIG_DIFF_STAT "/$file" "${STAT_LIST}"
+
+			if [ $? != 0 ] ; then
+				diff_cnt=$(( $diff_cnt + 1 ))
+			fi
+
+			echo
+
+		fi
+
+	fi
+}
+
+CONFCK()
+{
+    local _status=0
+
+	#
+	# Start the Search from the Top Level (Current) Directory...
+	#
+
+	echo
+	echo -n "Comparing Deployed Configuration"
+	echo " to Current Git Repository Versions:"
+	echo
+
+	for f in * ; do
+
+		CONFIG_DIFF_DIR $f
+
+	done
+
+	echo "Comparing Saved ADARA Admin Crontab to System:"
+	echo
+
+	crontab -l > /tmp/y8y.crontab.$$ 2>&1
+	if [[ $? != 0 || ! -s /tmp/y8y.crontab.$$ ]]; then
+		echo "Failure Retrieving ADARA Admin Crontab for STC...!"
+		diff_cnt=$(( $diff_cnt + 1 ))
+	else
+		echo "diff ./y8y.crontab /tmp/y8y.crontab.$$"
+		diff ./y8y.crontab /tmp/y8y.crontab.$$
+		if [ $? != 0 ]; then
+			echo "ADARA Admin Crontab for STC Differed...!"
+			diff_cnt=$(( $diff_cnt + 1 ))
+		else
+			echo "ADARA Admin Crontab for STC is the Same."
+		fi
+	fi
+	/bin/rm -f /tmp/y8y.crontab.$$
+	if [ $? != 0 ]; then
+		echo "Failure Deleting Temporary Admin Crontab File for STC...!"
+		diff_cnt=$(( $diff_cnt + 1 ))
+	fi
+	echo
+
+	#
+	# Done.
+	#
+
+	echo "$diff_cnt Files Differed."
+	echo
+
+	return $diff_cnt
+}
+
+doConfCk=`CONFCK 2>&1`
+_ckconfck=$?
+if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+	echo -e "$doConfCk\n"
+fi
+
+if [[ ${_ckconfck} != 0 ]]; then
+	echo -e "*** ConfCk FAILED...!\n"
+fi
+exit ${_ckconfck}
+
