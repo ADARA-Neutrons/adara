@@ -10,6 +10,10 @@ if [ -e $HOME/.bash_profile ] ; then
 	source $HOME/.bash_profile
 fi
 
+# Note: to ensure proper file permissions for captured system files,
+# please set your shell "umask" as follows before proceeding! ;-D
+umask 0002
+
 # Handle "Quiet" Operation Option for Cron Usage...
 # (Only output on errors...)
 UPDATE=0
