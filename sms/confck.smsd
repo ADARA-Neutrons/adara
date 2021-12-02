@@ -558,7 +558,7 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			cron_file=`mktemp ./.confck.pvsd.crontab.edit.file.XXXXXX`
+			cron_file=`mktemp ./.confck.smsd.crontab.edit.file.XXXXXX`
 
 			echo "MAILTO=idac_adara_notify@email.ornl.gov" >> $cron_file
 			echo "0-59/10 * * * * /SNS/users/y8y/stuff/exec/smsd_mon" \
