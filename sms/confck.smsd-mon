@@ -32,7 +32,7 @@ fi
 ALT="-mon"
 
 # ADARA Git Repo
-if [ -z "$ADARA_DIR" ]; then
+if [[ -z "$ADARA_DIR" ]]; then
 	ADARA_DIR="/usr/local/src/ADARA"
 	#ADARA_DIR="/SNS/users/y8y/gitsrc/ADARA"
 elif [[ $QUIET == 0 ]]; then
@@ -411,17 +411,22 @@ CONFCK()
 	fi
 	# Create SMSD Local Run Level...
 	if [[ ${_check_update} == 1 ]]; then
-		echo -n "Create SMSD${ALT} Local Run Level? [yes|No] "
-		read ckUpdate
-		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
-		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo chkconfig --add smsd${ALT}
-			chkconfig --list smsd${ALT}
-			sudo chkconfig smsd${ALT} on
-			chkconfig --list smsd${ALT}
-			/bin/rm -i ./sms${ALT}/chkconfig.smsd${ALT}
-			chkconfig --list smsd${ALT} \
-				> ./sms${ALT}/chkconfig.smsd${ALT} 2>&1
+		if [[ $UPDATE == 1 ]]; then
+			echo -n "Create SMSD${ALT} Local Run Level? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo chkconfig --add smsd${ALT}
+				chkconfig --list smsd${ALT}
+				sudo chkconfig smsd${ALT} on
+				chkconfig --list smsd${ALT}
+				/bin/rm -i ./sms${ALT}/chkconfig.smsd${ALT}
+				chkconfig --list smsd${ALT} \
+					> ./sms${ALT}/chkconfig.smsd${ALT} 2>&1
+			fi
+		else
+			echo -n "*** SMSD${ALT} Must Be Added to the"
+			echo " System ChkConfig Run Level!"
 		fi
 	fi
 
@@ -468,10 +473,15 @@ CONFCK()
 	return ${_nerrors}
 }
 
-doConfCk=`CONFCK 2>&1`
-_ckconfck=$?
-if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
-	echo -e "$doConfCk\n"
+if [[ $UPDATE == 1 ]]; then
+	CONFCK
+	_ckconfck=$?
+else
+	doConfCk=`CONFCK 2>&1`
+	_ckconfck=$?
+	if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doConfCk\n"
+	fi
 fi
 
 if [[ ${_ckconfck} != 0 ]]; then
