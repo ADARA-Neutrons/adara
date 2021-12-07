@@ -606,7 +606,6 @@ if [[ $UPDATE == 1 ]]; then
 				>> $cron_file
 			echo " > /dev/null 2>&1" >> $cron_file
 
-
 			# Install Administrator Crontab
 			crontab $cron_file
 			if [[ $? != 0 ]]; then
