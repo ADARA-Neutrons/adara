@@ -27,7 +27,7 @@ elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
 fi
 
 # ADARA Git Repo
-if [ -z "$ADARA_DIR" ]; then
+if [[ -z "$ADARA_DIR" ]]; then
 	ADARA_DIR="/usr/local/src/ADARA"
 	#ADARA_DIR="/SNS/users/y8y/gitsrc/ADARA"
 elif [[ $QUIET == 0 ]]; then
@@ -244,10 +244,15 @@ CONFCK()
 	return $diff_cnt
 }
 
-doConfCk=`CONFCK 2>&1`
-_ckconfck=$?
-if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
-	echo -e "$doConfCk\n"
+if [[ $UPDATE == 1 ]]; then
+	CONFCK
+	_ckconfck=$?
+else
+	doConfCk=`CONFCK 2>&1`
+	_ckconfck=$?
+	if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doConfCk\n"
+	fi
 fi
 
 # In Update Mode, Perform Other Assorted Install Operations, As Needed...
@@ -363,6 +368,10 @@ if [[ $UPDATE == 1 ]]; then
 
 			# Install Administrator Crontab
 			crontab $cron_file
+			if [[ $? != 0 ]]; then
+				echo -e "\nError Creating STC Administrator Crontab:\n"
+				/bin/cat $cron_file
+			fi
 
 			# Clean Up Temp Crontab File
 			/bin/rm $cron_file

@@ -6,9 +6,15 @@
 
 # Handle "Quiet" Operation Option for Cron Usage...
 # (Only output on errors...)
+UPDATE=0
 QUIET=0
 if [ "$1" == "--quiet" ]; then
 	QUIET=1
+elif [[ "$1" == "--update" ]]; then
+	UPDATE=1
+elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
+	echo -e "\nusage: confck [--quiet|--update]\n"
+	exit 0
 fi
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
@@ -42,11 +48,40 @@ CONFIG_DIFF_DIR()
 			echo -e "Ignoring confck.\n"
 		else
 
-			echo "diff ${LOCAL_DATA}/$file $file"
-			diff "${LOCAL_DATA}/$file" "$file"
+			echo "diff $file ${LOCAL_DATA}/$file"
+			diff "$file" "${LOCAL_DATA}/$file"
 
 			if [ $? != 0 ] ; then
 				diff_cnt=$(( $diff_cnt + 1 ))
+				# Update the Deployed System File or Git Repo File Version
+				if [[ $UPDATE == 1 ]]; then
+					echo -e "\nPush/Deploy the System File (\"sys\"),"
+					echo -e \
+						"   or Pull/Update the Git Repo File (\"repo\"),"
+					echo -n "   or Do Nothing (\"nothing\")?"
+					echo -n " [sys|repo|Nothing]: "
+					read ckUpdate
+					ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+					# Push Latest Git Repo Version to System
+					if [[ "$ckUpdate" == "s" \
+							|| "$ckUpdate" == "sys" ]]; then
+						echo "Deploying Latest Repo File to System:"
+						sudo /bin/cp -i "$file" "${LOCAL_DATA}/$file"
+					# Pull Latest System Version into Git Repo
+					elif [[ "$ckUpdate" == "r" \
+							|| "$ckUpdate" == "repo" ]]; then
+						echo \
+						   "Updating Repo with Latest Deployed System File:"
+						/bin/cp -i "${LOCAL_DATA}/$file" "$file"
+						git add "$file"
+						git commit \
+						   -m "Update Config Repo with Latest System File" \
+						   "$file"
+					# Do Nothing.
+					else
+						echo "Doing Nothing, as Requested."
+					fi
+				fi
 			fi
 
 			echo
@@ -85,14 +120,20 @@ CONFCK()
 	return $diff_cnt
 }
 
-doConfCk=`CONFCK 2>&1`
-_ckconfck=$?
-if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
-	echo -e "$doConfCk\n"
+if [[ $UPDATE == 1 ]]; then
+	CONFCK
+	_ckconfck=$?
+else
+	doConfCk=`CONFCK 2>&1`
+	_ckconfck=$?
+	if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doConfCk\n"
+	fi
 fi
 
 if [[ ${_ckconfck} != 0 ]]; then
 	echo -e "*** ConfCk FAILED...!\n"
 fi
+
 exit ${_ckconfck}
 
