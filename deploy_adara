@@ -156,7 +156,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.6.3"
+DEPLOY_VERSION="1.6.4"
 
 TMP_DIR="/tmp"
 
@@ -204,10 +204,15 @@ HOST_PREFIX=""
 
 hfir_hb_ck=`hostname -A | sed 's/ /\n/g' | grep '^hb' \
 	| wc | awk '{print $1}'`
+
 hfir_cg_ck=`hostname -A | sed 's/ /\n/g' | grep '^cg' \
 	| wc | awk '{print $1}'`
-stc_ck=`hostname -A | sed 's/ /\n/g' | grep '^sns' \
+
+# STC New VM Host Names: stc[123].ornl.gov
+# STC Old Host Names: sns-stc[12].sns.gov
+stc_ck=`hostname -A | sed 's/ /\n/g' | grep -e '^sns' -e '^stc' \
 	| wc | awk '{print $1}'`
+
 now_ck=`hostname -A | sed 's/ /\n/g' | grep 'now[0-9]' \
 	| wc | awk '{print $1}'`
 
