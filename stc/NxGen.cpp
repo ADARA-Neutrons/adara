@@ -1071,15 +1071,18 @@ NxGen::writeSTCConfigUnitsAttributes(
                         it->first, // elem_link_path
                         "units", units, existing_attr_value );
 
-                syslog( LOG_INFO,
-                    "[%i] Group %s: %s %s to %s %s=[%s] %s=[%s] %s=%d",
-                    g_pid, G->name.c_str(), "Setting PV Units Attribute",
-                    it->second.c_str(), // pv_value_path
-                    label.c_str(), "units", units.c_str(),
-                    "existing_attr_value", existing_attr_value.c_str(),
-                    "attrWasSet", attrWasSet );
-                // give syslog a chance...
-                usleep(30000);
+                if ( verbose() > 0 ) {
+                    syslog( LOG_INFO,
+                        "[%i] Group %s: %s %s to %s %s=[%s] %s=[%s] %s=%d",
+                        g_pid, G->name.c_str(),
+                        "Setting PV Units Attribute",
+                        it->second.c_str(), // pv_value_path
+                        label.c_str(), "units", units.c_str(),
+                        "existing_attr_value", existing_attr_value.c_str(),
+                        "attrWasSet", attrWasSet );
+                    // give syslog a chance...
+                    usleep(30000);
+                }
             }
         }
 
@@ -4456,20 +4459,23 @@ NxGen::parseSTCConfigFile
                             && ( group.elements.size()
                                 || group.conditions.size() ) )
                     {
-                        std::stringstream ss;
-                        ss << "Adding Group Container"
-                            << " \"" << group.name << "\""
-                            << " to STC Config -"
-                            << " path=[" << group.path << "]"
-                            << " type=[" << group.type << "]"
-                            << " ("
-                            << group.elements.size() << " elements, "
-                            << group.conditions.size() << " conditions)"
-                            << ": " << ss_elements.str() << "]"
-                            << " " << ss_conditions.str() << "]";
-                        syslog( LOG_INFO, "[%i] %s",
-                            g_pid, ss.str().c_str() );
-                        usleep(30000); // give syslog a chance
+                        if ( verbose() > 1 ) {
+                            std::stringstream ss;
+                            ss << "Adding Group Container"
+                                << " \"" << group.name << "\""
+                                << " to STC Config -"
+                                << " path=[" << group.path << "]"
+                                << " type=[" << group.type << "]"
+                                << " ("
+                                << group.elements.size() << " elements, "
+                                << group.conditions.size()
+                                    << " conditions)"
+                                << ": " << ss_elements.str() << "]"
+                                << " " << ss_conditions.str() << "]";
+                            syslog( LOG_INFO, "[%i] %s",
+                                g_pid, ss.str().c_str() );
+                            usleep(30000); // give syslog a chance
+                        }
 
                         m_config_groups.push_back( group );
                     }
