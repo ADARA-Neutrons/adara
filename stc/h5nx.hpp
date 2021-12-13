@@ -17,6 +17,8 @@
 #include "hdf5.h"
 #include <nexus/NeXusFile.hpp>
 
+#include "stcdefs.h"
+
 //HDF5 return codes
 #define SUCCEED     0
 #define FAIL        (-1)
