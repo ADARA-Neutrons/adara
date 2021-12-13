@@ -1872,17 +1872,19 @@ StreamParser::processBankEvents
                         resz = sz + a_event_count;
                 }
 
-                syslog( LOG_INFO,
-                    "[%i] %s: %s=%u %s=%u %s %s=%lu %s=%u %s=%lu %s=%lu",
-                    g_pid, "StreamParser::processBankEvents",
-                    "BankID", a_bank_id,
-                    "State", a_state,
-                    "Resizing Event Buffers",
-                    "m_tof_buffer_size", bi->m_tof_buffer_size,
-                    "event_count", a_event_count,
-                    "m_tof_buffer.size()", bi->m_tof_buffer.size(),
-                    "resz", resz );
-                usleep(30000); // give syslog a chance...
+                if ( m_verbose_level > 0 ) {
+                    syslog( LOG_INFO,
+                      "[%i] %s: %s=%u %s=%u %s %s=%lu %s=%u %s=%lu %s=%lu",
+                        g_pid, "StreamParser::processBankEvents",
+                        "BankID", a_bank_id,
+                        "State", a_state,
+                        "Resizing Event Buffers",
+                        "m_tof_buffer_size", bi->m_tof_buffer_size,
+                        "event_count", a_event_count,
+                        "m_tof_buffer.size()", bi->m_tof_buffer.size(),
+                        "resz", resz );
+                    usleep(30000); // give syslog a chance...
+                }
 
                 // Now Resize the Buffers to this Max Resize Size...
                 bi->m_tof_buffer.resize( resz, (float) -1.0 );
@@ -2402,16 +2404,19 @@ StreamParser::processMonitorEvents
                     resz = sz + a_event_count;
             }
 
-            syslog( LOG_INFO,
-                "[%i] %s: %s=%u %s %s=%lu %s=%u %s=%lu %s=%lu",
-                g_pid, "StreamParser::processMonitorEvents",
-                "MonitorID", a_monitor_id,
-                "Resizing Event Buffers",
-                "m_tof_buffer_size", imi->second->m_tof_buffer_size,
-                "event_count", a_event_count,
-                "m_tof_buffer.size()", imi->second->m_tof_buffer.size(),
-                "resz", resz );
-            usleep(30000); // give syslog a chance...
+            if ( m_verbose_level > 0 ) {
+                syslog( LOG_INFO,
+                    "[%i] %s: %s=%u %s %s=%lu %s=%u %s=%lu %s=%lu",
+                    g_pid, "StreamParser::processMonitorEvents",
+                    "MonitorID", a_monitor_id,
+                    "Resizing Event Buffers",
+                    "m_tof_buffer_size", imi->second->m_tof_buffer_size,
+                    "event_count", a_event_count,
+                    "m_tof_buffer.size()",
+                        imi->second->m_tof_buffer.size(),
+                    "resz", resz );
+                usleep(30000); // give syslog a chance...
+            }
 
             // Now Resize the Buffers to this Max Resize Size...
             imi->second->m_tof_buffer.resize( resz, (float) -1.0 );
