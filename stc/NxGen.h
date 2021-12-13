@@ -1802,15 +1802,17 @@ private:
                                         GroupNameIndex.length(),
                                         ss.str() );
 
-                                    syslog( LOG_INFO,
-                                        "[%i] %s - %s %s as %s \"%s\" %s",
-                                        g_pid, ss_index.str().c_str(),
-                                        "Indexed Group Name Found for",
-                                        this->m_device_pv_str.c_str(),
-                                        "Group", indexedName.c_str(),
-                                        patt_str.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    if ( m_nxgen.verbose() > 0 ) {
+                                        syslog( LOG_INFO,
+                                         "[%i] %s - %s %s as %s \"%s\" %s",
+                                            g_pid, ss_index.str().c_str(),
+                                            "Indexed Group Name Found for",
+                                            this->m_device_pv_str.c_str(),
+                                            "Group", indexedName.c_str(),
+                                            patt_str.c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
 
                                     group_path =
                                         G->path + "/" + indexedName;
@@ -1889,16 +1891,18 @@ private:
 
                                 else
                                 {
-                                    syslog( LOG_INFO,
+                                    if ( m_nxgen.verbose() > 0 ) {
+                                        syslog( LOG_INFO,
                                      "[%i] %s: %s \"%s\", %s=[%s] %s=[%s]",
-                                        g_pid,
+                                            g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                        "Creating Indexed Group",
-                                        indexedName.c_str(),
-                                        "path", group_path.c_str(),
-                                        "type", G->type.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                            "Creating Indexed Group",
+                                            indexedName.c_str(),
+                                            "path", group_path.c_str(),
+                                            "type", G->type.c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
 
                                     m_nxgen.makeGroup( group_path,
                                         G->type );
@@ -1968,15 +1972,18 @@ private:
 
                                 else
                                 {
-                                    syslog( LOG_INFO,
+                                    if ( m_nxgen.verbose() > 0 ) {
+                                        syslog( LOG_INFO,
                                      "[%i] %s: %s \"%s\", %s=[%s] %s=[%s]",
-                                        g_pid,
+                                            g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                        "Creating Group", G->name.c_str(),
-                                        "path", group_path.c_str(),
-                                        "type", G->type.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                            "Creating Group",
+                                                G->name.c_str(),
+                                            "path", group_path.c_str(),
+                                            "type", G->type.c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
 
                                     m_nxgen.makeGroup( group_path,
                                         G->type );
