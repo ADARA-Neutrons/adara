@@ -312,7 +312,7 @@ public:
                         }
                     }
 
-                    if ( a_verbose_level > 1 )
+                    if ( a_verbose_level > 2 )
                     {
                         syslog( LOG_INFO,
                             "[%i] %s %u %s %u Done with Histogram Init.",
@@ -1033,8 +1033,8 @@ public:
                         / NANO_PER_SECOND_D;
                     this->m_time_buffer[i] = t;
 
-                    // Verbose Logging Level 1 or Above...
-                    if ( a_verbose_level > 0 )
+                    // Verbose Logging Level 2 or Above...
+                    if ( a_verbose_level > 1 )
                     {
                         syslog( LOG_INFO,
                             "[%i] %s %s %s: %s = %s @ %lf",
@@ -1060,8 +1060,8 @@ public:
                 // every PV in the run! ;-D)
                 else
                 {
-                    // Verbose Logging Level 1 or Above...
-                    if ( a_verbose_level > 0 )
+                    // Verbose Logging Level 2 or Above...
+                    if ( a_verbose_level > 1 )
                     {
                         std::string log_hdr = "";
                         int log_type = LOG_INFO;

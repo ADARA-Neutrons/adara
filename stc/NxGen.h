@@ -542,7 +542,7 @@ private:
             if ( max_len == (uint32_t) -1 || max_len == 0 )
                 max_len = 1;
 
-            if ( m_nxgen.verbose() > 1 )
+            if ( m_nxgen.verbose() > 2 )
             {
                 syslog( LOG_INFO,
                     "[%i] DASlogs String %s size=%lu max_len=%u",
@@ -1039,7 +1039,7 @@ private:
                                     m_value_enum_strings_max_len = 1;
                                 }
 
-                                if ( m_nxgen.verbose() > 1 )
+                                if ( m_nxgen.verbose() > 2 )
                                 {
                                     syslog( LOG_ERR,
                                       "[%i] %s %s: %s for %s %s=%lu %s=%u",
@@ -1706,7 +1706,7 @@ private:
                         || boost::regex_search(
                             this->m_internal_connection, subs, expr ) )
                     {
-                        if ( m_nxgen.verbose() > 1 )
+                        if ( m_nxgen.verbose() > 2 )
                         {
                             syslog( LOG_INFO,
                                 "[%i] %s: %s %s in %s \"%s\" %s", g_pid,
@@ -2279,7 +2279,7 @@ private:
                             ss << this->valueToString(
                                 this->m_last_value );
 
-                            if ( m_nxgen.verbose() > 1 )
+                            if ( m_nxgen.verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                "[%i] %s: %s %s in %s \"%s\" %s, %s \"%s\"",
@@ -2378,7 +2378,7 @@ private:
                         || boost::regex_search(
                             this->m_internal_connection, subs, expr ) )
                     {
-                        if ( m_nxgen.verbose() > 1 )
+                        if ( m_nxgen.verbose() > 2 )
                         {
                             syslog( LOG_INFO,
                                 "[%i] %s: %s %s in %s \"%s\" %s", g_pid,
@@ -2644,7 +2644,7 @@ private:
                             || boost::regex_search(
                                 this->m_internal_connection, subs, expr ) )
                         {
-                            if ( m_nxgen.verbose() > 1 )
+                            if ( m_nxgen.verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                          "[%i] %s: %s %s in %s \"%s\" %s \"%s\" %s \"%s\"",
@@ -2747,7 +2747,7 @@ private:
                             || boost::regex_search(
                                 this->m_internal_connection, subs, expr ) )
                         {
-                            if ( m_nxgen.verbose() > 1 )
+                            if ( m_nxgen.verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                          "[%i] %s: %s %s in %s \"%s\" %s \"%s\" %s \"%s\"",

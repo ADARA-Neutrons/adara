@@ -3088,7 +3088,7 @@ NxGen::writeDeviceEnums
         }
         while ( !done );
 
-        if ( verbose() > 1 )
+        if ( verbose() > 2 )
         {
             stringstream ss;
             ss << "Creating Enum Log Group for Device " << a_devId
@@ -3432,7 +3432,7 @@ NxGen::parseSTCConfigFile
 
                     conditionIndex = 0;
 
-                    if ( verbose() > 1 )
+                    if ( verbose() > 2 )
                     {
                         syslog( LOG_INFO, "[%i] %s Found Group [%s]",
                             g_pid, "STC Config", value.c_str() );
@@ -3464,7 +3464,7 @@ NxGen::parseSTCConfigFile
                                     "Using New Group Name..." );
                                 usleep(30000); // give syslog a chance...
                             }
-                            else if ( verbose() > 1 )
+                            else if ( verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Name [%s]",
@@ -3500,7 +3500,7 @@ NxGen::parseSTCConfigFile
                                     "Using New Group Path..." );
                                 usleep(30000); // give syslog a chance...
                             }
-                            else if ( verbose() > 1 )
+                            else if ( verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Path [%s]",
@@ -3525,7 +3525,7 @@ NxGen::parseSTCConfigFile
                                     "Using New Group Type..." );
                                 usleep(30000); // give syslog a chance...
                             }
-                            else if ( verbose() > 1 )
+                            else if ( verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Type [%s]",
@@ -3570,7 +3570,7 @@ NxGen::parseSTCConfigFile
 
                             element.lastIndex = 0;
 
-                            if ( verbose() > 1 )
+                            if ( verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Element [%s]",
@@ -3594,7 +3594,7 @@ NxGen::parseSTCConfigFile
                                 if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"pattern" ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                        "[%i] %s Element Pattern #%ld [%s]",
@@ -3611,7 +3611,7 @@ NxGen::parseSTCConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"index" ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                         "[%i] %s Element Index #%ld [%s]",
@@ -3642,7 +3642,7 @@ NxGen::parseSTCConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    else if ( verbose() > 1 )
+                                    else if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                             "[%i] %s Element Name [%s]",
@@ -3659,7 +3659,7 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)
                                             "units_value" ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                             "[%i] %s %s #%ld [%s]",
@@ -3693,7 +3693,7 @@ NxGen::parseSTCConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    else if ( verbose() > 1 )
+                                    else if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                             "[%i] %s Element Units [%s]",
@@ -3780,7 +3780,7 @@ NxGen::parseSTCConfigFile
                                 }
                                 else
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                             "[%i] %s %s \"%s\" - %s",
@@ -3823,7 +3823,7 @@ NxGen::parseSTCConfigFile
 
                             condition.is_set = false;
 
-                            if ( verbose() > 1 )
+                            if ( verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s Group Condition [%s]",
@@ -3863,7 +3863,7 @@ NxGen::parseSTCConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    else if ( verbose() > 1 )
+                                    else if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                            "[%i] %s Condition Name [%s]",
@@ -3879,7 +3879,7 @@ NxGen::parseSTCConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"pattern" ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                           "[%i] %s Condition %s #%ld [%s]",
@@ -3897,7 +3897,7 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)"value_string" )
                                             == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                           "[%i] %s Condition %s #%ld [%s]",
@@ -3916,7 +3916,7 @@ NxGen::parseSTCConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"value" ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                           "[%i] %s Condition %s #%ld [%s]",
@@ -3934,7 +3934,7 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)"not_value_string"
                                             ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                           "[%i] %s Condition %s #%ld [%s]",
@@ -3955,7 +3955,7 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)"not_value" )
                                             == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                           "[%i] %s Condition %s #%ld [%s]",
@@ -4006,7 +4006,7 @@ NxGen::parseSTCConfigFile
 
                                     element.lastIndex = 0;
 
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                             "[%i] %s %s [%s]",
@@ -4037,7 +4037,7 @@ NxGen::parseSTCConfigFile
                                                 (const xmlChar*)"pattern" )
                                                     == 0 )
                                         {
-                                            if ( verbose() > 1 )
+                                            if ( verbose() > 2 )
                                             {
                                                 syslog( LOG_INFO,
                                                 "[%i] %s %s %s #%ld [%s]",
@@ -4059,7 +4059,7 @@ NxGen::parseSTCConfigFile
                                                 (const xmlChar*)"index" )
                                                     == 0 )
                                         {
-                                            if ( verbose() > 1 )
+                                            if ( verbose() > 2 )
                                             {
                                                 syslog( LOG_INFO,
                                                 "[%i] %s %s %s #%ld [%s]",
@@ -4096,7 +4096,7 @@ NxGen::parseSTCConfigFile
                                                 // give syslog a chance...
                                                 usleep(30000);
                                             }
-                                            else if ( verbose() > 1 )
+                                            else if ( verbose() > 2 )
                                             {
                                                 syslog( LOG_INFO,
                                                     "[%i] %s %s [%s]",
@@ -4114,7 +4114,7 @@ NxGen::parseSTCConfigFile
                                                 (const xmlChar*)
                                                     "units_value" ) == 0 )
                                         {
-                                            if ( verbose() > 1 )
+                                            if ( verbose() > 2 )
                                             {
                                                 syslog( LOG_INFO,
                                                     "[%i] %s %s #%ld [%s]",
@@ -4151,7 +4151,7 @@ NxGen::parseSTCConfigFile
                                                 // give syslog a chance...
                                                 usleep(30000);
                                             }
-                                            else if ( verbose() > 1 )
+                                            else if ( verbose() > 2 )
                                             {
                                                 syslog( LOG_INFO,
                                               "[%i] %s Element Units [%s]",
@@ -4277,7 +4277,7 @@ NxGen::parseSTCConfigFile
                                         }
                                         else
                                         {
-                                            if ( verbose() > 1 )
+                                            if ( verbose() > 2 )
                                             {
                                                 std::string info =
                                                     "STC Config Adding";
@@ -4400,7 +4400,7 @@ NxGen::parseSTCConfigFile
                                     || condition.not_value_strings.size()
                                     || condition.not_values.size() ) )
                             {
-                                if ( verbose() > 1 )
+                                if ( verbose() > 2 )
                                 {
                                     syslog( LOG_INFO,
                                         "[%i] %s \"%s\" %s \"%s\" - %s",
@@ -4509,7 +4509,7 @@ NxGen::parseSTCConfigFile
 
                     conditionIndex = 0;
 
-                    if ( verbose() > 1 )
+                    if ( verbose() > 2 )
                     {
                         syslog( LOG_INFO, "[%i] %s Found Command [%s]",
                             g_pid, "STC Config", value.c_str() );
@@ -4541,7 +4541,7 @@ NxGen::parseSTCConfigFile
                                     "Using New Command Name..." );
                                 usleep(30000); // give syslog a chance...
                             }
-                            else if ( verbose() > 1 )
+                            else if ( verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s Command Name [%s]",
@@ -4577,7 +4577,7 @@ NxGen::parseSTCConfigFile
                                     "Using New Command Path..." );
                                 usleep(30000); // give syslog a chance...
                             }
-                            else if ( verbose() > 1 )
+                            else if ( verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s Command Path [%s]",
@@ -4622,7 +4622,7 @@ NxGen::parseSTCConfigFile
 
                             element.lastIndex = 0;
 
-                            if ( verbose() > 1 )
+                            if ( verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s Command Element [%s]",
@@ -4646,7 +4646,7 @@ NxGen::parseSTCConfigFile
                                 if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"pattern" ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                        "[%i] %s Element Pattern #%ld [%s]",
@@ -4663,7 +4663,7 @@ NxGen::parseSTCConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"index" ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                         "[%i] %s Element Index #%ld [%s]",
@@ -4694,7 +4694,7 @@ NxGen::parseSTCConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    else if ( verbose() > 1 )
+                                    else if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                             "[%i] %s Element Name [%s]",
@@ -4711,7 +4711,7 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)
                                             "units_value" ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                             "[%i] %s %s #%ld [%s]",
@@ -4745,7 +4745,7 @@ NxGen::parseSTCConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    else if ( verbose() > 1 )
+                                    else if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                             "[%i] %s Element Units [%s]",
@@ -4832,7 +4832,7 @@ NxGen::parseSTCConfigFile
                                 }
                                 else
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                             "[%i] %s %s \"%s\" - %s",
@@ -4875,7 +4875,7 @@ NxGen::parseSTCConfigFile
 
                             condition.is_set = false;
 
-                            if ( verbose() > 1 )
+                            if ( verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                     "[%i] %s Command Condition [%s]",
@@ -4915,7 +4915,7 @@ NxGen::parseSTCConfigFile
                                         // give syslog a chance...
                                         usleep(30000);
                                     }
-                                    else if ( verbose() > 1 )
+                                    else if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                            "[%i] %s Condition Name [%s]",
@@ -4931,7 +4931,7 @@ NxGen::parseSTCConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"pattern" ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                           "[%i] %s Condition %s #%ld [%s]",
@@ -4949,7 +4949,7 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)"value_string" )
                                             == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                           "[%i] %s Condition %s #%ld [%s]",
@@ -4968,7 +4968,7 @@ NxGen::parseSTCConfigFile
                                 else if ( xmlStrcmp( lev3->name,
                                         (const xmlChar*)"value" ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                           "[%i] %s Condition %s #%ld [%s]",
@@ -4986,7 +4986,7 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)"not_value_string"
                                             ) == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                           "[%i] %s Condition %s #%ld [%s]",
@@ -5007,7 +5007,7 @@ NxGen::parseSTCConfigFile
                                         (const xmlChar*)"not_value" )
                                             == 0 )
                                 {
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                           "[%i] %s Condition %s #%ld [%s]",
@@ -5058,7 +5058,7 @@ NxGen::parseSTCConfigFile
 
                                     element.lastIndex = 0;
 
-                                    if ( verbose() > 1 )
+                                    if ( verbose() > 2 )
                                     {
                                         syslog( LOG_INFO,
                                             "[%i] %s %s [%s]",
@@ -5089,7 +5089,7 @@ NxGen::parseSTCConfigFile
                                                 (const xmlChar*)"pattern" )
                                                     == 0 )
                                         {
-                                            if ( verbose() > 1 )
+                                            if ( verbose() > 2 )
                                             {
                                                 syslog( LOG_INFO,
                                                 "[%i] %s %s %s #%ld [%s]",
@@ -5111,7 +5111,7 @@ NxGen::parseSTCConfigFile
                                                 (const xmlChar*)"index" )
                                                     == 0 )
                                         {
-                                            if ( verbose() > 1 )
+                                            if ( verbose() > 2 )
                                             {
                                                 syslog( LOG_INFO,
                                                 "[%i] %s %s %s #%ld [%s]",
@@ -5148,7 +5148,7 @@ NxGen::parseSTCConfigFile
                                                 // give syslog a chance...
                                                 usleep(30000);
                                             }
-                                            else if ( verbose() > 1 )
+                                            else if ( verbose() > 2 )
                                             {
                                                 syslog( LOG_INFO,
                                                     "[%i] %s %s [%s]",
@@ -5166,7 +5166,7 @@ NxGen::parseSTCConfigFile
                                                 (const xmlChar*)
                                                     "units_value" ) == 0 )
                                         {
-                                            if ( verbose() > 1 )
+                                            if ( verbose() > 2 )
                                             {
                                                 syslog( LOG_INFO,
                                                     "[%i] %s %s #%ld [%s]",
@@ -5203,7 +5203,7 @@ NxGen::parseSTCConfigFile
                                                 // give syslog a chance...
                                                 usleep(30000);
                                             }
-                                            else if ( verbose() > 1 )
+                                            else if ( verbose() > 2 )
                                             {
                                                 syslog( LOG_INFO,
                                               "[%i] %s Element Units [%s]",
@@ -5329,7 +5329,7 @@ NxGen::parseSTCConfigFile
                                         }
                                         else
                                         {
-                                            if ( verbose() > 1 )
+                                            if ( verbose() > 2 )
                                             {
                                                 std::string info =
                                                     "STC Config Adding";
@@ -5452,7 +5452,7 @@ NxGen::parseSTCConfigFile
                                     || condition.not_value_strings.size()
                                     || condition.not_values.size() ) )
                             {
-                                if ( verbose() > 1 )
+                                if ( verbose() > 2 )
                                 {
                                     syslog( LOG_INFO,
                                         "[%i] %s \"%s\" %s \"%s\" - %s",

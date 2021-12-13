@@ -166,7 +166,7 @@ StreamParser::~StreamParser()
     for ( vector<PVInfoBase*>::iterator ipv = m_pvs_list.begin();
             ipv != m_pvs_list.end(); ++ipv ) {
         if ( *ipv ) {
-            if ( m_verbose_level > 1 ) {
+            if ( m_verbose_level > 2 ) {
                 syslog( LOG_ERR,
                     "[%i] %s: Erasing Device %s: %s (%s)",
                     g_pid, "~StreamParser()",
@@ -4271,7 +4271,7 @@ StreamParser::rxPacket
                                                     + ":" + pv_connection ]
                                                 = key;
 
-                                            if ( m_verbose_level > 1 ) {
+                                            if ( m_verbose_level > 2 ) {
                                                 stringstream ss2;
                                                 ss2 << "Adding New Key "
                                                     << key.first
@@ -4533,7 +4533,7 @@ StreamParser::rxPacket
                                                 // map[] = always
                                                 // overwrites!
 
-                                                if ( m_verbose_level > 1 )
+                                                if ( m_verbose_level > 2 )
                                                 {
                                                     stringstream ss2;
                                                     ss2 << "Adding"
@@ -5160,7 +5160,7 @@ StreamParser::pvValueUpdate
     else
     {
         // Verbose Logging Level 1 or Above...
-        if ( m_verbose_level > 0 ) {
+        if ( m_verbose_level > 1 ) {
             /* Rate-limited logging of pre-pulse variable value updates */
             std::stringstream ss;
             ss << a_device_id << "." << a_pv_id;
