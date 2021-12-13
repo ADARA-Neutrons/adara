@@ -16,6 +16,17 @@ extern pid_t g_pid;
 
 #define STC_DOUBLE_EPSILON (0.00000000000001)
 
+// Verbose Logging Self-Limiting/Metering... a la the Dreaded USleep()...!
+// (for when Syslog won't let us log profusely without being suppressed!)
+
+// Do the USleep() for 30000 Microseconds, i.e. 30 Milliseconds...
+//#define give_syslog_a_chance  usleep(30000)
+
+// Or
+
+// Do Nothing...
+#define give_syslog_a_chance
+
 namespace STC {
 
 
@@ -114,7 +125,7 @@ public:
                         (*dbs)->name.c_str(), "Bank Set",
                         (*dbs)->tofOffset,
                         (*dbs)->tofMax, (*dbs)->tofBin );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                 }
 
                 else
@@ -134,7 +145,7 @@ public:
                             (*dbs)->name.c_str(), "Bank Set",
                             (*dbs)->tofOffset, (*dbs)->tofMax,
                             (*dbs)->tofBin );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
 
                         // Don't set "m_has_histo", just fall thru...
                         // (all subsequent Histo attempts will also fail)
@@ -159,7 +170,7 @@ public:
                             "Empty Histogram", "Setting",
                             "num_tof_bins", m_num_tof_bins,
                             "tof_bin_size", m_tof_bin_size);
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
 
                     else
@@ -187,7 +198,7 @@ public:
                                 "State", m_state,
                                 "Histogram Warning",
                                 "num_tof_bins", m_num_tof_bins);
-                            usleep(30000); // give syslog a chance...
+                            give_syslog_a_chance;
                             m_num_tof_bins = 2;
                         }
 
@@ -229,7 +240,7 @@ public:
                         << ( num_pids * ( m_num_tof_bins - 1 ) ) << ")";
 
                     syslog( LOG_INFO, "[%i] %s", g_pid, ss.str().c_str() );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
 
                     // Actual Histogram Storage, Non-Inclusive Max TOF Bin
                     m_data_buffer.reserve( num_pids
@@ -264,7 +275,7 @@ public:
                             "m_data_buffer", m_data_buffer.size(),
                             "expected",
                             num_pids * ( m_num_tof_bins - 1 ) );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
 
                     // Reserve Required Index Size & Initialize Vector...
@@ -293,7 +304,7 @@ public:
                                 // "State", m_state, "Histogram",
                                 // p, index, m_histo_pid_offset[ index ] );
                             // give sleep a chance...
-                            // usleep(10000);
+                            // give_syslog_a_chance;
                         }
 
                         // Duplicate PixelId!  (shouldn't happen...)
@@ -305,7 +316,7 @@ public:
                                 "State", m_state,
                                 "Duplicate PixelId in Histo Offset Map",
                                 index );
-                            usleep(30000); // give syslog a chance...
+                            give_syslog_a_chance;
 
                             // Still need to increment offset past PixelId!
                             offset++;
@@ -318,7 +329,7 @@ public:
                             "[%i] %s %u %s %u Done with Histogram Init.",
                             g_pid, "Detector Bank", m_id,
                             "State", m_state );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
 
                     // Got One, That's All We'll Ever Need... ;-D
@@ -441,7 +452,7 @@ public:
                     "[%i] %s %s %u Histogram Warning: %s=%u < 2!",
                     g_pid, "STC Error:", "Beam Monitor", m_id,
                     "num_tof_bins", m_num_tof_bins);
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 m_num_tof_bins = 2;
             }
 
@@ -455,7 +466,7 @@ public:
                 "[%i] Beam Monitor %u Histogram: %u %s, %u to %u by %u",
                 g_pid, m_id, m_num_tof_bins, "Time Bin Values",
                 m_config.tofOffset, m_config.tofMax, m_config.tofBin );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             uint32_t tofbin = m_config.tofOffset;
             for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
@@ -1045,7 +1056,7 @@ public:
                             this->valueToString(
                                 this->m_value_buffer[i] ).c_str(),
                             this->m_time_buffer[i] );
-                        usleep(30000); // give syslog a chance
+                        give_syslog_a_chance;
                     }
 
                     // Time is Normalized Now,
@@ -1096,8 +1107,7 @@ public:
                             (unsigned long)( start_time
                                     % NANO_PER_SECOND_LL ),
                             start_time );
-                        // give syslog a chance...
-                        usleep(30000);
+                        give_syslog_a_chance;
                     }
 
                     this->m_time_buffer[i] = 0.0;
@@ -1147,7 +1157,7 @@ public:
                 (unsigned long)( start_time
                         % NANO_PER_SECOND_LL ),
                 start_time );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             // Erase PV Value Updates Up to the
             // "Last" Pre-First-Pulse Update...
@@ -1211,7 +1221,7 @@ public:
                     "ADD Omitted Value/Timestamp from Duplicate",
                     valueToString( *ivalDup ).c_str(),
                     (*itimDup) );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
     
                 this->m_value_buffer.insert( ival, *ivalDup );
                 this->m_time_buffer.insert( itim, *itimDup );
@@ -1232,7 +1242,7 @@ public:
                     "Skip Our Value/Timestamp Omitted in Duplicate",
                     valueToString( *ival ).c_str(),
                     (*itim), (*itimDup), STC_DOUBLE_EPSILON );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
     
                 ++ival; ++itim; ++index;
             }
@@ -1246,7 +1256,7 @@ public:
                     "ADD Omitted Value/Timestamp from Duplicate",
                     valueToString( *ivalDup ).c_str(),
                     (*itimDup), (*itim), STC_DOUBLE_EPSILON );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
     
                 this->m_value_buffer.insert( ival, *ivalDup );
                 this->m_time_buffer.insert( itim, *itimDup );
@@ -1273,7 +1283,7 @@ public:
                         valueToString( *ival ).c_str(), (*itim),
                         valueToString( *ivalDup ).c_str(), (*itimDup),
                         STC_DOUBLE_EPSILON );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
 
                     ++ival; ++itim; ++index;
                     ++ivalDup; ++itimDup;
@@ -1293,7 +1303,7 @@ public:
                         valueToString( *ivalDup ).c_str(), (*itimDup),
                         valueToString( *ival ).c_str(), (*itim),
                         STC_DOUBLE_EPSILON );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
      
                     // Insert These Weirdos _After_ Current Value...
                     ++ival; ++itim; ++index;
