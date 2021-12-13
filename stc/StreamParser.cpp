@@ -102,7 +102,7 @@ StreamParser::StreamParser
             string adara_file_path = m_work_dir + m_adara_out_file;
             syslog( LOG_INFO, "[%i] Creating ADARA Stream File: %s",
                 g_pid, adara_file_path.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             m_ofs_adara.open( adara_file_path.c_str(),
                 ios_base::out | ios_base::binary );
         }
@@ -173,8 +173,7 @@ StreamParser::~StreamParser()
                     (*ipv)->m_device_name.c_str(),
                     (*ipv)->m_name.c_str(),
                     (*ipv)->m_connection.c_str() );
-                // give syslog a chance...
-                usleep(30000);
+                give_syslog_a_chance;
             }
             delete *ipv;
         }
@@ -216,7 +215,7 @@ StreamParser::constructWorkingDirectory( bool a_force_init, string caller )
                 "[%i] %s: Working Directory Constructed %s: [%s]",
                 g_pid, "StreamParser::constructWorkingDirectory()",
                 "from Run/Beamline Info", m_work_dir.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             return( true );
         }
@@ -225,7 +224,7 @@ StreamParser::constructWorkingDirectory( bool a_force_init, string caller )
             syslog( LOG_INFO, "[%i] %s: %s by Caller %s",
                 g_pid, "StreamParser::constructWorkingDirectory()",
                 "Forcing Initialization of Nexus File", caller.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             // In a pinch, Steal STC Config File Directory as Scratch...!
             size_t last_slash = m_config_file.find_last_of("/");
@@ -245,7 +244,7 @@ StreamParser::constructWorkingDirectory( bool a_force_init, string caller )
                 "Working Directory Constructed from STC Config File Path",
                 m_config_file.c_str(), m_work_dir.c_str(),
                 ( m_do_rename ? "true" : "false" ) );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             return( true );
         }
@@ -257,7 +256,7 @@ StreamParser::constructWorkingDirectory( bool a_force_init, string caller )
                 "Still Missing Info for Working Directory Construction",
                 "FacilityName", getFacilityName().c_str(),
                 "BeamShortName", getBeamShortName().c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             return( false );
         }
@@ -277,7 +276,7 @@ StreamParser::flushAdaraStreamBuffer()
         string adara_file_path = m_work_dir + m_adara_out_file;
         syslog( LOG_INFO, "[%i] %s, Creating ADARA Stream File: %s",
             g_pid, "Working Directory Created", adara_file_path.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_ofs_adara.open( adara_file_path.c_str(),
             ios_base::out | ios_base::binary );
     }
@@ -288,7 +287,7 @@ StreamParser::flushAdaraStreamBuffer()
         syslog( LOG_INFO, "[%i] Dumping %d %s to ADARA Stream File: %s%s",
             g_pid, (int) m_adara_queue.size(), "Queued Packets",
             m_work_dir.c_str(), m_adara_out_file.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
 
         for ( std::vector<ADARA::Packet *>::iterator pkt =
                     m_adara_queue.begin();
@@ -607,7 +606,7 @@ StreamParser::rxPacket
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (uint32_t) a_pkt.timestamp().tv_nsec,
                 "Processing State", getProcessingStateString().c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             // Because We Got A Valid RunStatus Packet for the
             // Start of the Run, Go Ahead and Use This Packet's
@@ -622,7 +621,7 @@ StreamParser::rxPacket
             syslog( LOG_ERR, "[%i] %s Run Status Error: %s = %s.",
                 g_pid, "STC Error:", "Start-of-Run with Processing State",
                 getProcessingStateString().c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             bad_state = true;
         }
     }
@@ -647,7 +646,7 @@ StreamParser::rxPacket
                 "[%i] Run Status End-of-Run Received (%s = %s).",
                 g_pid, "Processing State",
                 getProcessingStateString().c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             return true;
         }
         else
@@ -655,7 +654,7 @@ StreamParser::rxPacket
             syslog( LOG_ERR, "[%i] %s Run Status Error: %s = %s.",
                 g_pid, "STC Error:", "End-of-Run with Processing State",
                 getProcessingStateString().c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             bad_state = true;
         }
     }
@@ -676,14 +675,14 @@ StreamParser::rxPacket
                 "[%i] %s, Mode Index #%d, File Index #%d, %s = %s.",
                 g_pid, "Run Status", modeNum, fileNum,
                 "Processing State", getProcessingStateString().c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         else
         {
             syslog( LOG_INFO, "[%i] %s, File Index #%d, %s = %s.",
                 g_pid, "Run Status", fileNum,
                 "Processing State", getProcessingStateString().c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
     }
 
@@ -749,7 +748,7 @@ StreamParser::rxPacket
 
     syslog( LOG_INFO, "[%i] %s: Max Bank = %u", g_pid,
         "PixelMappingAltPkt", bank_count );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     // Check/Re-Allocate the Detector Banks Array...
     // For Initial Creation of BankInfo Map, Just Do All as State=0...
@@ -775,14 +774,14 @@ StreamParser::rxPacket
             //"[%i] %s: Base Physical = %u, Bank ID = %u, Count = %u",
             //g_pid, "PixelMappingAltPkt",
             //base_physical, bank_id, pix_count );
-        //usleep(30000); // give syslog a chance...
+        //give_syslog_a_chance;
 
         // Skip Unmapped Sections of Pixel Map...!
         if ( bank_id == (uint16_t) UNMAPPED_BANK )
         {
             //syslog( LOG_INFO, "[%i] %s: Unmapped Section - Skip...",
                 //g_pid, "PixelMappingAltPkt" );
-            //usleep(30000); // give syslog a chance...
+            //give_syslog_a_chance;
 
             // Next Section
             skip_pix_count += pix_count;
@@ -829,7 +828,7 @@ StreamParser::rxPacket
             // "Last Logical PixelId",
             // bi->m_logical_pixelids.back(),
             // pix_count, bi->m_logical_pixelids.size() );
-        // usleep(30000); // give syslog a chance...
+        // give_syslog_a_chance;
     }
 
     // Also Add Unmapped and Error BankInfo to Map, as State=0...
@@ -874,7 +873,7 @@ StreamParser::rxPacket
         "[%i] %s: %s, PixelIds Tot=%u Skip=%u, Sections Tot=%u Skip=%u",
         g_pid, "PixelMappingAltPkt", "Done with Packet",
         tot_pix_count, skip_pix_count, section_count, skip_sections );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     // The receipt of a pixel mapping packet allows state to progress
     // to event processing
@@ -936,21 +935,21 @@ StreamParser::rxPacket
         syslog( LOG_INFO,
             "[%i] %s: bank_id=%u pix_count=%u", g_pid, "PixelMappingPkt",
             bank_id, pix_count );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         if ( bank_id != (uint16_t) UNMAPPED_BANK && bank_id > bank_count )
         {
             bank_count = bank_id;
             syslog( LOG_INFO,
                 "[%i] %s: bank_count -> %u", g_pid, "PixelMappingPkt",
                 bank_count );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         rpos2 += pix_count;
     }
 
     syslog( LOG_INFO,
         "[%i] %s: Max Bank = %u", g_pid, "PixelMappingPkt", bank_count );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     // Check/Re-Allocate the Detector Banks Array...
     // For Initial Creation of BankInfo Map, Just Do All as State=0...
@@ -1006,7 +1005,7 @@ StreamParser::rxPacket
             // "[%i] %s: bank_id=%u base_logical=%u count=%u tot=%lu",
             // g_pid, "PixelMappingPkt", bank_id, base_logical, pix_count,
             // bi->m_logical_pixelids.size() );
-        // usleep(30000); // give syslog a chance...
+        // give_syslog_a_chance;
 
         // Next Section
         rpos += pix_count;
@@ -1057,7 +1056,7 @@ StreamParser::rxPacket
         "[%i] %s: Pixel Mapping Table Processed (%s = %s).",
         g_pid, "StreamParser::rxPacket( ADARA::PixelMappingPkt )",
         "Processing State", getProcessingStateString().c_str() );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     return false;
 }
@@ -1097,7 +1096,7 @@ StreamParser::rxPacket
                 (uint32_t) a_pkt.timestamp().tv_nsec,
                 nbytes, "Payload Bytes",
                 "BankedEventPkt" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         // Else Just Note the Dropped Duplicate Pulse
         // (if for no other reason than diagnostics and testing :-)
@@ -1111,7 +1110,7 @@ StreamParser::rxPacket
                 (uint32_t) a_pkt.timestamp().tv_nsec,
                 nbytes, "Payload Bytes",
                 "BankedEventPkt" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         return false;
     }
@@ -1148,7 +1147,7 @@ StreamParser::rxPacket
             (uint32_t) a_pkt.timestamp().tv_nsec,
             "No Intervening Beam Monitor Packet!",
             "(LOST EXPERIMENT DATA?)" );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
 
     processPulseInfo( a_pkt );
@@ -1220,7 +1219,7 @@ StreamParser::rxPacket
                 (uint32_t) a_pkt.timestamp().tv_nsec,
                 nbytes, "Payload Bytes",
                 "BankedEventStatePkt" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         // Else Just Note the Dropped Duplicate Pulse
         // (if for no other reason than diagnostics and testing :-)
@@ -1234,7 +1233,7 @@ StreamParser::rxPacket
                 (uint32_t) a_pkt.timestamp().tv_nsec,
                 nbytes, "Payload Bytes",
                 "BankedEventStatePkt" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         return false;
     }
@@ -1271,7 +1270,7 @@ StreamParser::rxPacket
             (uint32_t) a_pkt.timestamp().tv_nsec,
             "No Intervening Beam Monitor Packet!",
             "(LOST EXPERIMENT DATA?)" );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
 
     processPulseInfo( a_pkt );
@@ -1340,7 +1339,7 @@ StreamParser::rxOversizePkt
             (uint32_t) hdr->timestamp().tv_nsec,
             hdr->type(), hdr->payload_length(), ADARA_IN_BUF_SIZE,
             chunk_offset, chunk_len);
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
 
         // Handle pulse sequence flag for this Oversized Packet
         // (so we don't get "out of sync" when we throw it away... :-)
@@ -1409,7 +1408,7 @@ StreamParser::rxOversizePkt
                     (uint32_t) hdr->timestamp().tv_nsec,
                     "No Intervening Beam Monitor Packet!",
                     "(LOST EXPERIMENT DATA?)" );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
             else if ( hdr->base_type() ==
                     ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE )
@@ -1430,7 +1429,7 @@ StreamParser::rxOversizePkt
                     (uint32_t) hdr->timestamp().tv_nsec,
                     "No Intervening Banked Event Packet!",
                     "(LOST EXPERIMENT DATA?)" );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
     }
@@ -1441,7 +1440,7 @@ StreamParser::rxOversizePkt
         syslog( LOG_WARNING,
             "[%i] OversizePkt: next chunk max=%u offset=%u len=%u",
             g_pid, ADARA_IN_BUF_SIZE, chunk_offset, chunk_len);
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
 
     // Invoke the base handler, in case it ever does anything...
@@ -1480,7 +1479,7 @@ StreamParser::reallocateBanksArray
             "New Bank ID", a_bank_id,
             "Max Bank", m_maxBank,
             "New Banks Array Size", new_banks_arr_size );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
 
         // Allocate New Banks Array
         BankInfoPtr *new_banks_arr = new BankInfoPtr[ new_banks_arr_size ];
@@ -1567,7 +1566,7 @@ StreamParser::processPulseInfo
                 g_pid, "Pulse time went backwards",
                 m_pulse_info.times.size(), a_pkt.pulseId(),
                 "Clamping to zero" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             pulse_time = 0;
         }
         else
@@ -1644,7 +1643,7 @@ StreamParser::processPulseInfo
                 g_pid, "Pulse time went backwards",
                 m_pulse_info.times.size(), a_pkt.pulseId(),
                 "Clamping to zero" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             pulse_time = 0;
         }
         else
@@ -1746,7 +1745,7 @@ StreamParser::processBankEvents
             "[%i] %s: No BankInfo Found for bank_id=%u state=%u",
             g_pid, "StreamParser::processBankEvents()",
             a_bank_id, a_state );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
 
         if ( a_bank_id == UNMAPPED_BANK )
         {
@@ -1784,7 +1783,7 @@ StreamParser::processBankEvents
                  "[%i] %s: Found State=0 BankInfo for bank_id=%u state=%u",
                     g_pid, "StreamParser::processBankEvents()",
                     a_bank_id, a_state );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
 
                 // Carefully "Clone" the Base State=0 BankInfo
                 // for This State...
@@ -1813,7 +1812,7 @@ StreamParser::processBankEvents
                  "[%i] %s: No State=0 BankInfo Found! bank_id=%u state=%u",
                     g_pid, "StreamParser::processBankEvents()",
                     a_bank_id, a_state );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
     }
@@ -1883,7 +1882,7 @@ StreamParser::processBankEvents
                         "event_count", a_event_count,
                         "m_tof_buffer.size()", bi->m_tof_buffer.size(),
                         "resz", resz );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                 }
 
                 // Now Resize the Buffers to this Max Resize Size...
@@ -2000,7 +1999,7 @@ StreamParser::processBankEvents
                                     "Detector Bank", bi->m_id,
                                     "Histogram Error",
                                     tof, tofbin, bi->m_num_tof_bins - 1 );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
                                 // Count Uncounted Detector Histo Events...
                                 (bi->m_histo_event_uncounted)++;
                                 continue;
@@ -2025,7 +2024,7 @@ StreamParser::processBankEvents
                                     bi->m_logical_pixelids.size()
                                         * ( bi->m_num_tof_bins - 1 )
                                     );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
                                 // Count Uncounted Detector Histo Events...
                                 (bi->m_histo_event_uncounted)++;
                                 continue;
@@ -2054,7 +2053,7 @@ StreamParser::processBankEvents
                                     pid, bi->m_base_pid,
                                     bi->m_histo_pid_offset[
                                         pid - bi->m_base_pid ] );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
                             }
 
                             (bi->m_histo_event_uncounted)++;
@@ -2169,7 +2168,7 @@ StreamParser::rxPacket
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (uint32_t) a_pkt.timestamp().tv_nsec,
                 nevents, "BeamMonitorPkt" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         // Else Just Note the Dropped Duplicate Pulse
         // (if for no other reason than diagnostics and testing :-)
@@ -2182,7 +2181,7 @@ StreamParser::rxPacket
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (uint32_t) a_pkt.timestamp().tv_nsec,
                 "BeamMonitorPkt" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         return false;
     }
@@ -2219,7 +2218,7 @@ StreamParser::rxPacket
             (uint32_t) a_pkt.timestamp().tv_nsec,
             "No Intervening Banked Event Packet!",
             "(LOST EXPERIMENT DATA?)" );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
 
     const uint32_t *rpos = (const uint32_t*)a_pkt.payload();
@@ -2335,7 +2334,7 @@ StreamParser::processMonitorEvents
                         g_pid, "STC Error:", "Beam Monitor",
                         imi->second->m_id, tof, tofbin,
                         imi->second->m_num_tof_bins - 1 );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     // Count Uncounted Beam Monitor Events...
                     (imi->second->m_event_uncounted)++;
                     continue;
@@ -2415,7 +2414,7 @@ StreamParser::processMonitorEvents
                     "m_tof_buffer.size()",
                         imi->second->m_tof_buffer.size(),
                     "resz", resz );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
 
             // Now Resize the Buffers to this Max Resize Size...
@@ -2549,7 +2548,7 @@ StreamParser::rxPacket
             "[%i] %s: Proceed to Parse RunInfo XML - %lu Bytes, [%s]",
             g_pid, "rxPacket(RunInfoPkt)",
             a_pkt.info().length(), a_pkt.info().c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
 
         // Temporary RunInfo Holder...
         // (to Enable Duplicate RunInfoPkt Comparisons... ;-D)
@@ -2924,7 +2923,7 @@ StreamParser::rxPacket
         {
             syslog( LOG_INFO, "[%i] %s: First RunInfoPkt - %s...",
                 g_pid, "rxPacket(RunInfoPkt)", "Utilizing Values" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             m_pkt_recvd |= (PKT_BIT_RUNINFO);
 
@@ -2936,7 +2935,7 @@ StreamParser::rxPacket
         {
             syslog( LOG_INFO, "[%i] %s: Duplicate RunInfoPkt - %s...",
                 g_pid, "rxPacket(RunInfoPkt)", "Updating" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             updateRunInfo( tmp_run_info );
         }
@@ -2948,7 +2947,7 @@ StreamParser::rxPacket
             "[%i] %s %s: Error Parsing RunInfo XML - %lu Bytes, [%s]",
             g_pid, "STC Error:", "rxPacket(RunInfoPkt)",
             a_pkt.info().length(), a_pkt.info().c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
 
     if ( m_strict )
@@ -2971,7 +2970,7 @@ StreamParser::rxPacket
             syslog( LOG_ERR,
                 "[%i] %s %s: Strictly Missing RunInfo - %s...",
                 g_pid, "STC Error:", "rxPacket(RunInfoPkt)", msg.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
     }
 
@@ -3070,7 +3069,7 @@ StreamParser::rxPacket
     syslog( LOG_INFO,
         "[%i] %s: Beam Monitor Config Received: %u Beam Monitors",
         g_pid, "BeamMonitorConfigPkt", a_pkt.beamMonCount() );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     // Count Number of Histo vs. Event Beam Monitors,
     // So We Can Clamp to "All" One or the Other... ;-D
@@ -3124,7 +3123,7 @@ StreamParser::rxPacket
         syslog( LOG_INFO, "[%i] %s: %s %u Config: %s",
             g_pid, "BeamMonitorConfigPkt",
             "Beam Monitor", config.id, ss_new.str().c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
 
         // Basic Sanity Check...
         if ( config.tofOffset >= config.tofMax ) {
@@ -3137,13 +3136,13 @@ StreamParser::rxPacket
                     "[%i] %s %s: Reverting Beam Monitor %u to Event Mode!",
                     g_pid, "STC Error:", "BeamMonitorConfigPkt",
                     config.id );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 config.format = ADARA::EVENT_FORMAT;
             } else {
                 syslog( LOG_WARNING,
                     "[%i] %s: Beam Monitor %u Stays in Event Mode...",
                     g_pid, "BeamMonitorConfigPkt", config.id );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
 
@@ -3154,7 +3153,7 @@ StreamParser::rxPacket
                 g_pid, "STC Error:", "BeamMonitorConfigPkt",
                 "Beam Monitor", config.id,
                 "Histogram Config Error", config.tofBin );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             config.tofBin = 1;
         }
 
@@ -3168,7 +3167,7 @@ StreamParser::rxPacket
             syslog( LOG_INFO, "[%i] %s: Adding New Beam Monitor %u: %s",
                 g_pid, "BeamMonitorConfigPkt",
                 config.id, ss_new.str().c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             mi = makeMonitorInfo( config.id,
                 m_event_buf_write_thresh, m_anc_buf_write_thresh, config );
             m_monitors.insert( m_monitors.begin(),
@@ -3203,14 +3202,14 @@ StreamParser::rxPacket
                     "Doesn't Match Existing Definition",
                     ss_new.str().c_str(), ss_orig.str().c_str(),
                     "Ignoring" );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             } else {
                 syslog( LOG_ERR, "[%i] %s %s: %s %u - %s: %s - %s...",
                     g_pid, "STC Error:", "BeamMonitorConfigPkt",
                     "Duplicate Beam Monitor", config.id,
                     "Matches Existing Definition", ss_new.str().c_str(),
                     "Ignoring" );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
     }
@@ -3273,7 +3272,7 @@ StreamParser::getBeamMonitorConfig
             "Setting Beam Monitor Config to Defaults",
             ss_mon.str().c_str(),
             "Please Add Missing Beam Monitor to Beamline Config!" );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
 }
 
@@ -3299,7 +3298,7 @@ StreamParser::rxPacket
     syslog( LOG_INFO,
         "[%i] Detector Bank Sets Packet Received: %u Detector Bank Sets",
         g_pid, a_pkt.detBankSetCount() );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     std::vector<uint32_t> banklist;
 
@@ -3348,7 +3347,7 @@ StreamParser::rxPacket
             "flags", set->flags, format.c_str(),
             "histo", set->tofOffset, set->tofMax, set->tofBin,
             "throttle", set->throttle, set->suffix.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
 
         // Basic Sanity Check...
         if ( set->tofOffset >= set->tofMax )
@@ -3360,7 +3359,7 @@ StreamParser::rxPacket
             syslog( LOG_ERR,
                 "[%i] %s Restricting Detector Bank Set to Event Mode!",
                 g_pid, "STC Error:" );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             set->flags &= !(ADARA::HISTO_FORMAT);
         }
 
@@ -3371,7 +3370,7 @@ StreamParser::rxPacket
                 "[%i] %s %s %s Histogram Config Issue: Time Bin %u < 1",
                 g_pid, "STC Error:", "Detector Bank Set",
                 set->name.c_str(), set->tofBin );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             set->tofBin = 1;
         }
 
@@ -3423,7 +3422,7 @@ StreamParser::getDetectorBankSets
                     "[%i] %s: Bank Id %d Found in \"%s\" Bank Set.",
                     g_pid, "StreamParser::getDetectorBankSets()",
                     a_bank_id, (*dbs)->name.c_str() );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
 
                 bank_sets.push_back(*dbs);
             }
@@ -3464,7 +3463,7 @@ StreamParser::associateDetectorBankSet
                     "[%i] %s: Bank Set \"%s\" Associated with Bank Id %d.",
                     g_pid, "StreamParser::associateDetectorBankSet()",
                     a_bank_set->name.c_str(), bi->m_id );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
 
                 bi->m_bank_sets.push_back(a_bank_set);
             }
@@ -3501,7 +3500,7 @@ StreamParser::rxPacket
         syslog( LOG_INFO, "[%i] Data Done Received (%s = %s).",
             g_pid, "Processing State",
             getProcessingStateString().c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
 
     else if ( m_processing_state != DONE_PROCESSING )
@@ -3510,7 +3509,7 @@ StreamParser::rxPacket
             "[%i] STC failed: Data Done Received, %s (%s = %s)!",
             g_pid, "Not Done Processing", "Processing State",
             getProcessingStateString().c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
 
         if ( m_processing_state == PROCESSING_EVENTS )
         {
@@ -3518,7 +3517,7 @@ StreamParser::rxPacket
                 "[%i] Data Done Received, %s (%s = %s)!",
                 g_pid, "Still Processing Events", "Processing State",
                 getProcessingStateString().c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             // On fatal error, flush buffers to Nexus before terminating
             markerComment(
@@ -3691,8 +3690,7 @@ StreamParser::rxPacket
                                                     syslog( LOG_ERR,
                                                         "[%i] %s", g_pid,
                                                         ss.str().c_str() );
-                                                    // give syslog a chance
-                                                    usleep(30000);
+                                                    give_syslog_a_chance;
                                                     */
 
                                                     pv_enum_vector =
@@ -3721,8 +3719,7 @@ StreamParser::rxPacket
                                             syslog( LOG_ERR,
                                                 "[%i] %s", g_pid,
                                                 ss.str().c_str() );
-                                            // give syslog a chance...
-                                            usleep(30000);
+                                            give_syslog_a_chance;
                                         }
                                     }
                                 }
@@ -3905,8 +3902,7 @@ StreamParser::rxPacket
                                                 syslog( LOG_ERR, "[%i] %s",
                                                     g_pid,
                                                     ss.str().c_str() );
-                                                // give syslog a chance...
-                                                usleep(30000);
+                                                give_syslog_a_chance;
 
                                                 // Re-Use this PVInfo Entry
                                                 create = false;
@@ -3951,8 +3947,7 @@ StreamParser::rxPacket
                                                     "DeviceDescriptor",
                                                     ss2.str().c_str()
                                                 );
-                                                // give syslog a chance
-                                                usleep(30000);
+                                                give_syslog_a_chance;
                                             }
                                             else
                                             {
@@ -3996,8 +3991,7 @@ StreamParser::rxPacket
                                                 syslog( LOG_ERR, "[%i] %s",
                                                     g_pid,
                                                     ss.str().c_str() );
-                                                // give syslog a chance...
-                                                usleep(30000);
+                                                give_syslog_a_chance;
 
                                                 // Existing entry differs;
                                                 // *Don't* flush or delete
@@ -4060,9 +4054,7 @@ StreamParser::rxPacket
                                                             ss2.str().
                                                                 c_str()
                                                         );
-                                                        // give syslog
-                                                        // a chance...
-                                                        usleep(30000);
+                                                        give_syslog_a_chance;
 
                                                         // *Reset* Key
                                                         // Mapping from
@@ -4130,8 +4122,7 @@ StreamParser::rxPacket
                                                 << " pvId=" << pv_id;
                                             syslog( LOG_ERR, "[%i] %s",
                                                 g_pid, ss.str().c_str() );
-                                            // give syslog a chance...
-                                            usleep(30000);
+                                            give_syslog_a_chance;
 
                                             // Delete bad xref entry
                                             m_pvs_by_name_xref.erase(
@@ -4198,8 +4189,7 @@ StreamParser::rxPacket
                                                     ss2.str().
                                                         c_str()
                                                 );
-                                                // give syslog a chance...
-                                                usleep(30000);
+                                                give_syslog_a_chance;
 
                                                 // *Reset* Key
                                                 // Mapping from
@@ -4264,8 +4254,7 @@ StreamParser::rxPacket
                                                 //"[%i] %s %s", g_pid,
                                                 //"New PV",
                                                 //ss.str().c_str() );
-                                            // give syslog a chance...
-                                            //usleep(30000);
+                                            //give_syslog_a_chance;
 
                                             m_pvs_list.push_back( info );
 
@@ -4301,8 +4290,7 @@ StreamParser::rxPacket
                                                     "DeviceDescriptor",
                                                     ss2.str().c_str()
                                                 );
-                                                // give syslog a chance...
-                                                usleep(30000);
+                                                give_syslog_a_chance;
                                             }
                                         }
                                         else
@@ -4311,8 +4299,7 @@ StreamParser::rxPacket
                                                 "[%i] %s %s", g_pid,
                                                 "Failed to Create New PV",
                                                 ss.str().c_str() );
-                                            // give syslog a chance...
-                                            usleep(30000);
+                                            give_syslog_a_chance;
                                         }
                                     }
                                 }
@@ -4380,8 +4367,7 @@ StreamParser::rxPacket
                                         syslog( LOG_ERR, "[%i] %s",
                                             g_pid,
                                             ss.str().c_str() );
-                                        // give syslog a chance...
-                                        usleep(30000);
+                                        give_syslog_a_chance;
 
                                         // Did the name change?
                                         // Clean Up the Old XRef Entry...
@@ -4473,8 +4459,7 @@ StreamParser::rxPacket
                                                     "DeviceDescriptor",
                                                     ss2.str().c_str()
                                                 );
-                                                // give syslog a chance...
-                                                usleep(30000);
+                                                give_syslog_a_chance;
 
                                                 // *Reset* Mapping from
                                                 // Re-Used Key to Existing
@@ -4567,8 +4552,7 @@ StreamParser::rxPacket
                                                         "DeviceDescriptor",
                                                         ss2.str().c_str()
                                                     );
-                                                    // give syslog a chance
-                                                    usleep(30000);
+                                                    give_syslog_a_chance;
                                                 }
                                             }
                                             else
@@ -4589,8 +4573,7 @@ StreamParser::rxPacket
                                                     "Failed to Create",
                                                     "New PV",
                                                     ss.str().c_str() );
-                                                // give syslog a chance...
-                                                usleep(30000);
+                                                give_syslog_a_chance;
 
                                                 stringstream ss2;
                                                 ss2 << "Erasing Old Key "
@@ -4612,8 +4595,7 @@ StreamParser::rxPacket
                                                     "DeviceDescriptor",
                                                     ss2.str().c_str()
                                                 );
-                                                // give syslog a chance
-                                                usleep(30000);
+                                                give_syslog_a_chance;
 
                                                 m_pvs_by_key.erase( ipk );
                                             }
@@ -4643,8 +4625,7 @@ StreamParser::rxPacket
                                     << std::hex << found << std::dec;
                                 syslog( LOG_ERR, "[%i] %s", g_pid,
                                     ss.str().c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                give_syslog_a_chance;
                             }
 
                             // Reset PV Name and Connection String...!
@@ -4739,8 +4720,7 @@ StreamParser::rxPacket
                                             << " elemValue=" << elem_value;
                                         syslog( LOG_ERR, "[%i] %s", g_pid,
                                             ss.str().c_str() );
-                                        // give syslog a chance...
-                                        usleep(30000);
+                                        give_syslog_a_chance;
                                     }
                                 }
                             }
@@ -4761,8 +4741,7 @@ StreamParser::rxPacket
                                         << " First Enum " << devEnum.name;
                                     syslog( LOG_INFO, "[%i] %s", g_pid,
                                         ss.str().c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
 
                                     std::vector<PVEnumeratedType> enumVec;
                                     enumVec.push_back( devEnum );
@@ -4797,8 +4776,7 @@ StreamParser::rxPacket
                                             // syslog( LOG_ERR,
                                                 // "[%i] %s", g_pid,
                                                 // ss.str().c_str() );
-                                            // give syslog a chance...
-                                            // usleep(30000);
+                                            // give_syslog_a_chance;
                                             addEnum = false;
                                         }
                                         else if ( !ienum->second[i].name
@@ -4814,8 +4792,7 @@ StreamParser::rxPacket
                                             syslog( LOG_ERR,
                                                 "[%i] %s", g_pid,
                                                 ss.str().c_str() );
-                                            // give syslog a chance...
-                                            usleep(30000);
+                                            give_syslog_a_chance;
                                             // Still Include Enum in File.
                                         }
                                     }
@@ -4829,8 +4806,7 @@ StreamParser::rxPacket
                                             << devEnum.name;
                                         syslog( LOG_INFO, "[%i] %s", g_pid,
                                             ss.str().c_str() );
-                                        // give syslog a chance...
-                                        usleep(30000);
+                                        give_syslog_a_chance;
 
                                         ienum->second.push_back( devEnum );
                                     }
@@ -4845,8 +4821,7 @@ StreamParser::rxPacket
                                     << " enumName=" << devEnum.name;
                                 syslog( LOG_ERR, "[%i] %s", g_pid,
                                     ss.str().c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                give_syslog_a_chance;
                             }
                         }
                     }
@@ -4878,8 +4853,7 @@ StreamParser::rxPacket
     {
         syslog( LOG_ERR, "[%i] %s %s [%s]", g_pid, "STC Error:",
             "Error Parsing Device Descriptor", xml.c_str() );
-        // give syslog a chance...
-        usleep(30000);
+        give_syslog_a_chance;
     }
 
     return false;
@@ -5007,8 +4981,7 @@ StreamParser::pvValueUpdate
                     : ( ( new_value ) ? "(New Value)" : "(Same Value)" ) ),
                 "- Pass Thru Anyway..."
             );
-            // give syslog a chance...
-            usleep(30000);
+            give_syslog_a_chance;
         }
     }
 
@@ -5105,7 +5078,7 @@ StreamParser::pvValueUpdate
                                 : ( ( new_value )
                                     ? "(New Value)" : "(Same Value)" ) )
                         );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
                 }
 
@@ -5153,7 +5126,7 @@ StreamParser::pvValueUpdate
                             : ( ( new_value )
                                 ? "(New Value)" : "(Same Value)" ) )
                     );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                 }
             }
         }
@@ -5194,8 +5167,7 @@ StreamParser::pvValueUpdate
                         : ( ( new_value )
                             ? "(New Value)" : "(Same Value)" ) )
                 );
-                // give syslog a chance...
-                usleep(30000);
+                give_syslog_a_chance;
             }
         }
 
@@ -5426,7 +5398,7 @@ StreamParser::rxPacket
                     (unsigned long)(m_pulse_info.start_time
                         % NANO_PER_SECOND_LL),
                     "ts_nano", m_pulse_info.start_time );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
     }
@@ -5460,7 +5432,7 @@ StreamParser::rxPacket
                 (unsigned long)(m_pulse_info.start_time
                     % NANO_PER_SECOND_LL),
                 "ts_nano", m_pulse_info.start_time );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
 
         t = -1.0;
@@ -5497,7 +5469,7 @@ StreamParser::rxPacket
             (unsigned long)(ts_nano % NANO_PER_SECOND_LL),
             "ts_nano", ts_nano,
             a_pkt.comment().c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         break;
     }
 
@@ -5540,7 +5512,7 @@ StreamParser::markerPause
         (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
         "ts_nano", a_ts_nano,
         "state_changed", state_changed );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     // Have We Previously Had A Pause Annotation to Compare Against...?
     if ( m_last_pause_multimap_it != m_pause_multimap.end() )
@@ -5559,7 +5531,7 @@ StreamParser::markerPause
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
                 "ts_nano", a_ts_nano );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             return;
         }
         // Log Annotation if Time Stamp Goes into the Past...! ;-D
@@ -5591,7 +5563,7 @@ StreamParser::markerPause
                     (unsigned long)(m_last_pause_multimap_it->first
                         % NANO_PER_SECOND_LL),
                     "ts_nano", m_last_pause_multimap_it->first );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
         // REMOVEME
@@ -5615,7 +5587,7 @@ StreamParser::markerPause
                 (unsigned long)(m_last_pause_multimap_it->first
                     % NANO_PER_SECOND_LL),
                 "ts_nano", m_last_pause_multimap_it->first );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         */
     }
@@ -5675,7 +5647,7 @@ StreamParser::markerResume
         (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
         "ts_nano", a_ts_nano,
         "state_changed", state_changed );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     // Have We Previously Had A Pause Annotation to Compare Against...?
     if ( m_last_pause_multimap_it != m_pause_multimap.end() )
@@ -5695,7 +5667,7 @@ StreamParser::markerResume
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
                 "ts_nano", a_ts_nano );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             return;
         }
         // Log Annotation if Time Stamp Goes into the Past...! ;-D
@@ -5727,7 +5699,7 @@ StreamParser::markerResume
                     (unsigned long)(m_last_pause_multimap_it->first
                         % NANO_PER_SECOND_LL),
                     "ts_nano", m_last_pause_multimap_it->first );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
         // REMOVEME
@@ -5751,7 +5723,7 @@ StreamParser::markerResume
                 (unsigned long)(m_last_pause_multimap_it->first
                     % NANO_PER_SECOND_LL),
                 "ts_nano", m_last_pause_multimap_it->first );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         */
     }
@@ -5814,7 +5786,7 @@ StreamParser::markerScanStart
         (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
         "ts_nano", a_ts_nano,
         "state_changed", state_changed );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     // Have We Previously Had A Scan Annotation to Compare Against...?
     if ( m_last_scan_multimap_it != m_scan_multimap.end() )
@@ -5834,7 +5806,7 @@ StreamParser::markerScanStart
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
                 "ts_nano", a_ts_nano );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             return;
         }
         // Log Annotation if Time Stamp Goes into the Past...! ;-D
@@ -5866,7 +5838,7 @@ StreamParser::markerScanStart
                     (unsigned long)(m_last_scan_multimap_it->first
                         % NANO_PER_SECOND_LL),
                     "ts_nano", m_last_scan_multimap_it->first );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
         // REMOVEME
@@ -5890,7 +5862,7 @@ StreamParser::markerScanStart
                 (unsigned long)(m_last_scan_multimap_it->first
                     % NANO_PER_SECOND_LL),
                 "ts_nano", m_last_scan_multimap_it->first );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         */
     }
@@ -5953,7 +5925,7 @@ StreamParser::markerScanStop
         (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
         "ts_nano", a_ts_nano,
         "state_changed", state_changed );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     // Have We Previously Had A Scan Annotation to Compare Against...?
     if ( m_last_scan_multimap_it != m_scan_multimap.end() )
@@ -5973,7 +5945,7 @@ StreamParser::markerScanStop
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
                 "ts_nano", a_ts_nano );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             return;
         }
         // Log Annotation if Time Stamp Goes into the Past...! ;-D
@@ -6005,7 +5977,7 @@ StreamParser::markerScanStop
                     (unsigned long)(m_last_scan_multimap_it->first
                         % NANO_PER_SECOND_LL),
                     "ts_nano", m_last_scan_multimap_it->first );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
         // REMOVEME
@@ -6029,7 +6001,7 @@ StreamParser::markerScanStop
                 (unsigned long)(m_last_scan_multimap_it->first
                     % NANO_PER_SECOND_LL),
                 "ts_nano", m_last_scan_multimap_it->first );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         */
     }
@@ -6090,7 +6062,7 @@ StreamParser::markerComment
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
                 "ts_nano", a_ts_nano );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             return;
         }
         // Log Annotation if Time Stamp Goes into the Past...! ;-D
@@ -6121,7 +6093,7 @@ StreamParser::markerComment
                     (unsigned long)(m_last_comment_multimap_it->first
                         % NANO_PER_SECOND_LL),
                     "ts_nano", m_last_comment_multimap_it->first );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
         // REMOVEME
@@ -6144,7 +6116,7 @@ StreamParser::markerComment
                 (unsigned long)(m_last_comment_multimap_it->first
                     % NANO_PER_SECOND_LL),
                 "ts_nano", m_last_comment_multimap_it->first );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         */
     }
@@ -6215,13 +6187,13 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "[%i] %s %s: Illegal Attempt to Update RunInfo %s! (%u != %u)",
             g_pid, "STC Error:", "updateRunInfo()", "Run Number",
             a_run_info.run_number, m_run_info.run_number );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
     if ( m_run_info.run_title.compare( a_run_info.run_title ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
             g_pid, "STC Error:", "updateRunInfo()", "Run Title",
             m_run_info.run_title.c_str(), a_run_info.run_title.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.run_title = a_run_info.run_title;
     }
     if ( m_run_info.proposal_id.compare( a_run_info.proposal_id ) ) {
@@ -6229,7 +6201,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Proposal Id",
             m_run_info.proposal_id.c_str(),
             a_run_info.proposal_id.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.proposal_id = a_run_info.proposal_id;
     }
     if ( m_run_info.proposal_title.compare( a_run_info.proposal_title ) ) {
@@ -6237,7 +6209,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Proposal Title",
             m_run_info.proposal_title.c_str(),
             a_run_info.proposal_title.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.proposal_title = a_run_info.proposal_title;
     }
     if ( m_run_info.das_version.compare( a_run_info.das_version ) ) {
@@ -6245,7 +6217,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "DAS Version",
             m_run_info.das_version.c_str(),
             a_run_info.das_version.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.das_version = a_run_info.das_version;
     }
     // ILLEGAL UPDATE (Meta-Data Used in Preliminary ComBus Messaging!)
@@ -6255,21 +6227,21 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Facility Name",
             m_run_info.facility_name.c_str(),
             a_run_info.facility_name.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
     if ( a_run_info.no_sample_info != m_run_info.no_sample_info ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
             g_pid, "STC Error:", "updateRunInfo()", "No Sample Info",
             (m_run_info.no_sample_info) ? "True" : "False",
             (a_run_info.no_sample_info) ? "True" : "False" );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.no_sample_info = a_run_info.no_sample_info;
     }
     if ( m_run_info.sample_id.compare( a_run_info.sample_id ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
             g_pid, "STC Error:", "updateRunInfo()", "Sample Id",
             m_run_info.sample_id.c_str(), a_run_info.sample_id.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_id = a_run_info.sample_id;
     }
     if ( m_run_info.sample_name.compare( a_run_info.sample_name ) ) {
@@ -6277,7 +6249,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Name",
             m_run_info.sample_name.c_str(),
             a_run_info.sample_name.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_name = a_run_info.sample_name;
     }
     if ( m_run_info.sample_nature.compare( a_run_info.sample_nature ) ) {
@@ -6285,7 +6257,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Nature",
             m_run_info.sample_nature.c_str(),
             a_run_info.sample_nature.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_nature = a_run_info.sample_nature;
     }
     if ( m_run_info.sample_formula.compare( a_run_info.sample_formula ) ) {
@@ -6293,7 +6265,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Formula",
             m_run_info.sample_formula.c_str(),
             a_run_info.sample_formula.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_formula = a_run_info.sample_formula;
     }
     if ( !approximatelyEqual( a_run_info.sample_mass,
@@ -6302,7 +6274,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "[%i] %s %s: Updating RunInfo %s: %.17lg -> %.17lg",
             g_pid, "STC Error:", "updateRunInfo()", "Sample Mass",
             m_run_info.sample_mass, a_run_info.sample_mass );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_mass = a_run_info.sample_mass;
     }
     if ( m_run_info.sample_mass_units.compare(
@@ -6311,7 +6283,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Mass Units",
             m_run_info.sample_mass_units.c_str(),
             a_run_info.sample_mass_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_mass_units = a_run_info.sample_mass_units;
     }
     if ( !approximatelyEqual( a_run_info.sample_mass_density,
@@ -6321,7 +6293,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Mass Density",
             m_run_info.sample_mass_density,
             a_run_info.sample_mass_density );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_mass_density = a_run_info.sample_mass_density;
     }
     if ( m_run_info.sample_mass_density_units.compare(
@@ -6331,7 +6303,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Mass Density Units",
             m_run_info.sample_mass_density_units.c_str(),
             a_run_info.sample_mass_density_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_mass_density_units =
             a_run_info.sample_mass_density_units;
     }
@@ -6341,7 +6313,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Container Id",
             m_run_info.sample_container_id.c_str(),
             a_run_info.sample_container_id.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_container_id = a_run_info.sample_container_id;
     }
     if ( m_run_info.sample_container_name.compare(
@@ -6351,7 +6323,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Container Name",
             m_run_info.sample_container_name.c_str(),
             a_run_info.sample_container_name.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_container_name =
             a_run_info.sample_container_name;
     }
@@ -6361,7 +6333,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Can Indicator",
             m_run_info.sample_can_indicator.c_str(),
             a_run_info.sample_can_indicator.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_can_indicator =
             a_run_info.sample_can_indicator;
     }
@@ -6371,7 +6343,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Can Barcode",
             m_run_info.sample_can_barcode.c_str(),
             a_run_info.sample_can_barcode.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_can_barcode = a_run_info.sample_can_barcode;
     }
     if ( m_run_info.sample_can_name.compare(
@@ -6380,7 +6352,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Can Name",
             m_run_info.sample_can_name.c_str(),
             a_run_info.sample_can_name.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_can_name = a_run_info.sample_can_name;
     }
     if ( m_run_info.sample_can_materials.compare(
@@ -6389,7 +6361,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Can Materials",
             m_run_info.sample_can_materials.c_str(),
             a_run_info.sample_can_materials.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_can_materials = a_run_info.sample_can_materials;
     }
     if ( m_run_info.sample_description.compare(
@@ -6398,7 +6370,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Description",
             m_run_info.sample_description.c_str(),
             a_run_info.sample_description.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_description = a_run_info.sample_description;
     }
     if ( m_run_info.sample_comments.compare(
@@ -6407,7 +6379,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Comments",
             m_run_info.sample_comments.c_str(),
             a_run_info.sample_comments.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_comments = a_run_info.sample_comments;
     }
     if ( !approximatelyEqual( a_run_info.sample_height_in_container,
@@ -6418,7 +6390,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Height In Container",
             m_run_info.sample_height_in_container,
             a_run_info.sample_height_in_container );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_height_in_container =
             a_run_info.sample_height_in_container;
     }
@@ -6429,7 +6401,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Height in Container Units",
             m_run_info.sample_height_in_container_units.c_str(),
             a_run_info.sample_height_in_container_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_height_in_container_units =
             a_run_info.sample_height_in_container_units;
     }
@@ -6441,7 +6413,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Interior Diameter",
             m_run_info.sample_interior_diameter,
             a_run_info.sample_interior_diameter );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_interior_diameter =
             a_run_info.sample_interior_diameter;
     }
@@ -6452,7 +6424,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Interior Diameter Units",
             m_run_info.sample_interior_diameter_units.c_str(),
             a_run_info.sample_interior_diameter_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_interior_diameter_units =
             a_run_info.sample_interior_diameter_units;
     }
@@ -6464,7 +6436,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Interior Height",
             m_run_info.sample_interior_height,
             a_run_info.sample_interior_height );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_interior_height =
             a_run_info.sample_interior_height;
     }
@@ -6475,7 +6447,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Interior Height Units",
             m_run_info.sample_interior_height_units.c_str(),
             a_run_info.sample_interior_height_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_interior_height_units =
             a_run_info.sample_interior_height_units;
     }
@@ -6487,7 +6459,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Interior Width",
             m_run_info.sample_interior_width,
             a_run_info.sample_interior_width );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_interior_width =
             a_run_info.sample_interior_width;
     }
@@ -6498,7 +6470,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Interior Width Units",
             m_run_info.sample_interior_width_units.c_str(),
             a_run_info.sample_interior_width_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_interior_width_units =
             a_run_info.sample_interior_width_units;
     }
@@ -6510,7 +6482,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Interior Depth",
             m_run_info.sample_interior_depth,
             a_run_info.sample_interior_depth );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_interior_depth =
             a_run_info.sample_interior_depth;
     }
@@ -6521,7 +6493,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Interior Depth Units",
             m_run_info.sample_interior_depth_units.c_str(),
             a_run_info.sample_interior_depth_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_interior_depth_units =
             a_run_info.sample_interior_depth_units;
     }
@@ -6533,7 +6505,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Outer Diameter",
             m_run_info.sample_outer_diameter,
             a_run_info.sample_outer_diameter );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_outer_diameter =
             a_run_info.sample_outer_diameter;
     }
@@ -6544,7 +6516,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Outer Diameter Units",
             m_run_info.sample_outer_diameter_units.c_str(),
             a_run_info.sample_outer_diameter_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_outer_diameter_units =
             a_run_info.sample_outer_diameter_units;
     }
@@ -6555,7 +6527,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Outer Height",
             m_run_info.sample_outer_height,
             a_run_info.sample_outer_height );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_outer_height = a_run_info.sample_outer_height;
     }
     if ( m_run_info.sample_outer_height_units.compare(
@@ -6565,7 +6537,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Outer Height Units",
             m_run_info.sample_outer_height_units.c_str(),
             a_run_info.sample_outer_height_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_outer_height_units =
             a_run_info.sample_outer_height_units;
     }
@@ -6576,7 +6548,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Outer Width",
             m_run_info.sample_outer_width,
             a_run_info.sample_outer_width );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_outer_width = a_run_info.sample_outer_width;
     }
     if ( m_run_info.sample_outer_width_units.compare(
@@ -6586,7 +6558,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Outer Width Units",
             m_run_info.sample_outer_width_units.c_str(),
             a_run_info.sample_outer_width_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_outer_width_units =
             a_run_info.sample_outer_width_units;
     }
@@ -6597,7 +6569,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Outer Depth",
             m_run_info.sample_outer_depth,
             a_run_info.sample_outer_depth );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_outer_depth = a_run_info.sample_outer_depth;
     }
     if ( m_run_info.sample_outer_depth_units.compare(
@@ -6607,7 +6579,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Outer Depth Units",
             m_run_info.sample_outer_depth_units.c_str(),
             a_run_info.sample_outer_depth_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_outer_depth_units =
             a_run_info.sample_outer_depth_units;
     }
@@ -6618,7 +6590,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             g_pid, "STC Error:", "updateRunInfo()", "Sample Volume Cubic",
             m_run_info.sample_volume_cubic,
             a_run_info.sample_volume_cubic );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_volume_cubic = a_run_info.sample_volume_cubic;
     }
     if ( m_run_info.sample_volume_cubic_units.compare(
@@ -6628,7 +6600,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Sample Volume Cubic Units",
             m_run_info.sample_volume_cubic_units.c_str(),
             a_run_info.sample_volume_cubic_units.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.sample_volume_cubic_units =
             a_run_info.sample_volume_cubic_units;
     }
@@ -6640,7 +6612,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             "Users Vector Size Changed",
             m_run_info.users.size(),
             a_run_info.users.size() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         update_users = true;
     }
     else {
@@ -6653,7 +6625,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
                     "User", i, "Id Changed",
                     m_run_info.users[i].id.c_str(),
                     a_run_info.users[i].id.c_str() );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 update_users = true;
             }
             if ( m_run_info.users[i].name.compare(
@@ -6664,7 +6636,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
                     "User", i, "Name Changed",
                     m_run_info.users[i].name.c_str(),
                     a_run_info.users[i].name.c_str() );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 update_users = true;
             }
             if ( m_run_info.users[i].role.compare(
@@ -6675,7 +6647,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
                     "User", i, "Role Changed",
                     m_run_info.users[i].role.c_str(),
                     a_run_info.users[i].role.c_str() );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 update_users = true;
             }
         }
@@ -6704,7 +6676,7 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: %s -> %s",
             g_pid, "STC Error:", "updateRunInfo()", "Users",
             ss_old.str().c_str(), ss_new.str().c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
         m_run_info.users = a_run_info.users;
     }
 }
@@ -6732,7 +6704,7 @@ StreamParser::receivedInfo( InfoBit a_bit )
             m_beamline_info.instr_shortname.c_str(),
             "Proposal", m_run_info.proposal_id.c_str(),
             "Run", m_run_info.run_number );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
 }
 
@@ -6767,7 +6739,7 @@ StreamParser::finalizeStreamProcessing()
                 g_pid, "STC Error:", "NxGen::finalizeStreamProcessing()",
                 "Failed to Force Construction of Working Directory",
                 "EPIC FAIL, This Was Our Last Chance...!! Bailing..." );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
             return;
         }
     }
@@ -6800,7 +6772,7 @@ StreamParser::finalizeStreamProcessing()
                 (uint32_t) m_default_run_start_time.tv_sec
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (uint32_t) m_default_run_start_time.tv_nsec );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         else
         {
@@ -6816,7 +6788,7 @@ StreamParser::finalizeStreamProcessing()
                 (uint32_t) m_default_run_start_time.tv_sec
                     - ADARA::EPICS_EPOCH_OFFSET,
                 (uint32_t) m_default_run_start_time.tv_nsec );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
 
         // Make Sure We Have "Reasonable" Run Time Values... (Fake It!)
@@ -6850,8 +6822,7 @@ StreamParser::finalizeStreamProcessing()
                 ( i - NUM_SPECIAL_BANKS ) % ( m_maxBank + 1 ), // bank_id
                 ( i - NUM_SPECIAL_BANKS ) / ( m_maxBank + 1 ), // state
                 i );
-            // give syslog a chance...
-            usleep(30000);
+            give_syslog_a_chance;
             continue;
         }
 
@@ -6859,8 +6830,7 @@ StreamParser::finalizeStreamProcessing()
             "[%i] %s: Finalizing Detector Bank ID %u State %u",
             g_pid, "StreamParser::finalizeStreamProcessing()",
             bi->m_id, bi->m_state );
-        // give syslog a chance...
-        usleep(30000);
+        give_syslog_a_chance;
 
         // Make Sure Data has been (Late) Initialized...
         if ( !(bi->m_initialized) )
@@ -6906,8 +6876,7 @@ StreamParser::finalizeStreamProcessing()
             "[%i] %s: Finalizing Beam Monitor %u: %s",
             g_pid, "StreamParser::finalizeStreamProcessing()",
             imi->second->m_id, ss_mon.str().c_str() );
-        // give syslog a chance...
-        usleep(30000);
+        give_syslog_a_chance;
 
         // Event-based Monitors Only...
         if ( imi->second->m_config.format == ADARA::EVENT_FORMAT )
@@ -7013,7 +6982,7 @@ StreamParser::collapseDuplicatePVs()
                 "StreamParser::collapseDuplicatePVs()",
                 "Found PV Marked as Duplicate",
                 (*ipv)->m_device_pv_str.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             // Search Remaining List of PVs for Matching Connections,
             // and Try to Absorb/Subsume Any Duplicate PV Values...
@@ -7030,8 +6999,7 @@ StreamParser::collapseDuplicatePVs()
                         "Found Matching Duplicate PV",
                         (*ipvDup)->m_device_pv_str.c_str(),
                         "Try to Subsume Its Values..." );
-                    // give syslog a chance...
-                    usleep(30000);
+                    give_syslog_a_chance;
 
                     switch ( (*ipv)->m_type )
                     {
@@ -7059,7 +7027,7 @@ StreamParser::collapseDuplicatePVs()
                                     "Normalizing PV Value Times",
                                     "with First Pulse Time",
                                     "Now Available" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 pvinfoU32->normalizeTimestamps(
                                     start_time, m_verbose_level );
@@ -7085,7 +7053,7 @@ StreamParser::collapseDuplicatePVs()
                                     "Normalizing PV Value Times",
                                     "with First Pulse Time",
                                     "Now Available" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 pvinfoDupU32->normalizeTimestamps(
                                     start_time, m_verbose_level );
@@ -7127,7 +7095,7 @@ StreamParser::collapseDuplicatePVs()
                                     "Normalizing PV Value Times",
                                     "with First Pulse Time",
                                     "Now Available" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 pvinfoDbl->normalizeTimestamps(
                                     start_time, m_verbose_level );
@@ -7153,7 +7121,7 @@ StreamParser::collapseDuplicatePVs()
                                     "Normalizing PV Value Times",
                                     "with First Pulse Time",
                                     "Now Available" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 pvinfoDupDbl->normalizeTimestamps(
                                     start_time, m_verbose_level );
@@ -7194,7 +7162,7 @@ StreamParser::collapseDuplicatePVs()
                                     "Normalizing PV Value Times",
                                     "with First Pulse Time",
                                     "Now Available" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 pvinfoStr->normalizeTimestamps(
                                     start_time, m_verbose_level );
@@ -7220,7 +7188,7 @@ StreamParser::collapseDuplicatePVs()
                                     "Normalizing PV Value Times",
                                     "with First Pulse Time",
                                     "Now Available" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 pvinfoDupStr->normalizeTimestamps(
                                     start_time, m_verbose_level );
@@ -7262,7 +7230,7 @@ StreamParser::collapseDuplicatePVs()
                                     "Normalizing PV Value Times",
                                     "with First Pulse Time",
                                     "Now Available" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 pvinfoU32Arr->normalizeTimestamps(
                                     start_time, m_verbose_level );
@@ -7289,7 +7257,7 @@ StreamParser::collapseDuplicatePVs()
                                     "Normalizing PV Value Times",
                                     "with First Pulse Time",
                                     "Now Available" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 pvinfoDupU32Arr->normalizeTimestamps(
                                     start_time, m_verbose_level );
@@ -7331,7 +7299,7 @@ StreamParser::collapseDuplicatePVs()
                                     "Normalizing PV Value Times",
                                     "with First Pulse Time",
                                     "Now Available" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 pvinfoDblArr->normalizeTimestamps(
                                     start_time, m_verbose_level );
@@ -7358,7 +7326,7 @@ StreamParser::collapseDuplicatePVs()
                                     "Normalizing PV Value Times",
                                     "with First Pulse Time",
                                     "Now Available" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 pvinfoDupDblArr->normalizeTimestamps(
                                     start_time, m_verbose_level );
@@ -7393,8 +7361,7 @@ StreamParser::collapseDuplicatePVs()
                 "PV Has Subsumed All Duplicate PV Log Values",
                 (*ipv)->m_device_pv_str.c_str(),
                 "Cleared for Writing to DASlogs." );
-            // give syslog a chance...
-            usleep(30000);
+            give_syslog_a_chance;
         }
 
         // This Duplicate has Already Been Subsumed...! ;-D
@@ -7405,7 +7372,7 @@ StreamParser::collapseDuplicatePVs()
                 "StreamParser::collapseDuplicatePVs()",
                 "Ignoring Already Subsumed PV Duplicate",
                 (*ipv)->m_device_pv_str.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
     }
 }
