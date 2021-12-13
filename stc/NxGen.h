@@ -2011,16 +2011,18 @@ private:
                                     std::string pv_value_path =
                                         m_log_path + "/" + "value";
 
-                                    syslog( LOG_INFO,
+                                    if ( m_nxgen.verbose() > 0 ) {
+                                        syslog( LOG_INFO,
                                         "[%i] %s: %s %s %s in Group as %s",
-                                        g_pid,
+                                            g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                        "Create Data with",
-                                        "Last PV Value from",
-                                        pv_value_path.c_str(),
-                                        elem_link_path.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                            "Create Data with",
+                                            "Last PV Value from",
+                                            pv_value_path.c_str(),
+                                            elem_link_path.c_str() );
+                                        // give syslog a chance...
+                                        usleep(30000);
+                                    }
 
                                     writeScalarValue(
                                         group_path, E->name, 
@@ -2085,15 +2087,17 @@ private:
                                 std::string pv_value_path =
                                     m_log_path + "/" + "value";
 
-                                syslog( LOG_INFO,
-                                    "[%i] %s: %s %s to Group as %s",
-                                    g_pid,
+                                if ( m_nxgen.verbose() > 0 ) {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s: %s %s to Group as %s",
+                                        g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                    "Linking PV Value",
-                                    pv_value_path.c_str(),
-                                    elem_link_path.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                        "Linking PV Value",
+                                        pv_value_path.c_str(),
+                                        elem_link_path.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
 
                                 // Make Sure Target Group/Dataset Exists
                                 // Before Trying to Link to It...! ;-D
@@ -2153,15 +2157,17 @@ private:
                             // Link Whole PV Log into Group...
                             else
                             {
-                                syslog( LOG_INFO,
-                                    "[%i] %s: %s %s to Group in %s",
-                                    g_pid,
+                                if ( m_nxgen.verbose() > 0 ) {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s: %s %s to Group in %s",
+                                        g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                    "Linking PV Channel",
-                                    m_log_path.c_str(),
-                                    elem_link_path.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                        "Linking PV Channel",
+                                        m_log_path.c_str(),
+                                        elem_link_path.c_str() );
+                                    // give syslog a chance...
+                                    usleep(30000);
+                                }
 
                                 // Make Sure Target Group/Dataset Exists
                                 // Before Trying to Link to It...! ;-D
