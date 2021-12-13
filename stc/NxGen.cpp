@@ -1088,7 +1088,7 @@ NxGen::writeSTCConfigUnitsAttributes(
 
         // Hmmm... Had Some Units PVs Patterns But Didn't Match Anything...
         // Better Log It!
-        else if ( E->unitsPatterns.size() )
+        else if ( ( verbose() > 1 ) && ( E->unitsPatterns.size() ) )
         {
             std::stringstream ss;
             ss << "unitsPatterns=[";

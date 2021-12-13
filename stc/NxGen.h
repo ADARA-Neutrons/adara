@@ -797,15 +797,17 @@ private:
                     // If So, Then Fix Non-Normalized Value Updates Now.
                     if ( start_time )
                     {
-                        syslog( LOG_INFO,
-                            "[%i] %s %s %s %s, %s: %s",
-                            g_pid, "NxPVInfo::flushBuffers()",
-                            this->m_device_str.c_str(),
-                            "Normalizing PV Value Times",
-                            "with First Pulse Time",
-                            "Now Available",
-                            this->m_pv_str.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        if ( m_nxgen.verbose() > 1 ) {
+                            syslog( LOG_INFO,
+                                "[%i] %s %s %s %s, %s: %s",
+                                g_pid, "NxPVInfo::flushBuffers()",
+                                this->m_device_str.c_str(),
+                                "Normalizing PV Value Times",
+                                "with First Pulse Time",
+                                "Now Available",
+                                this->m_pv_str.c_str() );
+                            usleep(30000); // give syslog a chance...
+                        }
 
                         this->normalizeTimestamps( start_time,
                             m_nxgen.verbose() );
@@ -1000,13 +1002,16 @@ private:
                             std::stringstream ss_dst;
                             ss_dst << m_log_path << "/" << "enum";
 
-                            syslog( LOG_INFO, "[%i] %s %s: %s %s to %s",
-                                g_pid, "NxPVInfo::flushBuffers()",
-                                this->m_device_pv_str.c_str(),
-                                "Linking Enum Group",
-                                ss_src.str().c_str(),
-                                ss_dst.str().c_str() );
-                            usleep(30000); // give syslog a chance...
+                            if ( m_nxgen.verbose() > 1 ) {
+                                syslog( LOG_INFO,
+                                    "[%i] %s %s: %s %s to %s",
+                                    g_pid, "NxPVInfo::flushBuffers()",
+                                    this->m_device_pv_str.c_str(),
+                                    "Linking Enum Group",
+                                    ss_src.str().c_str(),
+                                    ss_dst.str().c_str() );
+                                usleep(30000); // give syslog a chance...
+                            }
 
                             m_nxgen.makeGroupLink(
                                 ss_src.str(), ss_dst.str() );
