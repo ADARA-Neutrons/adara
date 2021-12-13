@@ -331,7 +331,7 @@ int main( int argc, char** argv )
                 "to Set Verbose Logging Level to", verbose_level );
             usleep(30000); // give syslog a chance...
         }
-        else if ( verbose_level > 0 )
+        else
         {
             syslog( LOG_INFO, "[%i] %s %u.",
                 g_pid, "STC Verbose Logging Level Set to", verbose_level );
