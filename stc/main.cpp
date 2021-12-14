@@ -338,6 +338,17 @@ int main( int argc, char** argv )
             give_syslog_a_chance;
         }
 
+        // Log Chunk/Buffer Sizes...
+        syslog( LOG_INFO,
+            "[%i] %s %s=%lu %s=%u (%lu/0x%lx) %s=%u (%lu/0x%lx).",
+            g_pid, "STC Data Buffering",
+            "chunk_size", chunk_size,
+            "evt_buf_size", evt_buf_size,
+            chunk_size * evt_buf_size, chunk_size * evt_buf_size,
+            "anc_buf_size", anc_buf_size,
+            chunk_size * anc_buf_size, chunk_size * anc_buf_size );
+        give_syslog_a_chance;
+
         // If user has requested cataloging, force sane options
         if ( move )
         {
