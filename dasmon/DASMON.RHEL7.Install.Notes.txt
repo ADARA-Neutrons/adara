@@ -1,0 +1,53 @@
+
+Fixes Required for New RHEL7 DASMON Server (rh7-dasmon.sns.gov) 8/23/2019
+
+1. sudo chmod g+ws /home/controls/
+
+   <rh7-dasmon.sns.gov-1015>$ ls -ld /home/controls
+   drwsrwsr-x 2 controls slowcontrols_developers 76 Aug 21 16:23 /home/controls/
+
+2. [SOLVED] Hmmm... No "upstart" for RHEL7...?
+
+   <rh7-dasmon.sns.gov-1024>$ sudo cp dasmond/init.dasmond.conf \
+      /etc/init/dasmond.conf
+   cp: cannot create regular file '/etc/init/dasmond.conf':
+      No such file or directory
+
+   <rh7-dasmon.sns.gov-1026>$ rpm -q -a | grep upstart
+   (Nuthin'...)
+
+   <rh7-dasmon.sns.gov-1027>$ sudo yum list upstart
+   Loaded plugins: priorities, product-id, rhnplugin,
+   search-disabled-repos,
+                 : subscription-manager, versionlock
+   This system is receiving updates from RHN Classic or Red Hat Satellite.
+   Error: No matching Packages to list
+
+   -> A-HA! Found new systemd scripts in /etc/systemd/system:
+
+   -r--r--r--  1 root root  394 Aug 20 16:39 dasmond.service
+   -r--r--r--  1 root root  432 Aug 20 16:39 dasmongui.service
+
+   *** DASMON Daemon/GUI Client Usage FIXED By Jeeeem!! ;-D
+
+3. sudo chmod u+w /etc/logrotate.d/dasmon_log
+
+   <rh7-dasmon.sns.gov-1220>$ ll /etc/logrotate.d/dasmon_log
+   -r--r--r-- 1 root root 199 Aug 20 16:39 /etc/logrotate.d/dasmon_log
+
+   <rh7-dasmon.sns.gov-1222>$ sudo chmod u+w /etc/logrotate.d/dasmon_log
+
+   <rh7-dasmon.sns.gov-1224>$  ll /etc/logrotate.d/dasmon_log
+   -rw-r--r-- 1 root root 199 Aug 20 16:39 /etc/logrotate.d/dasmon_log
+
+   (For Consistency and Comparisons Between Saved System Files
+   in Config Repo...! ;-D)
+
+4. Roll Back postgresql94 to postgresql.x86_64...
+
+   sudo yum erase postgresql94.x86_64 postgresql94-devel.x86_64 \
+      postgresql94-libs.x86_64
+
+   sudo yum install postgresql.x86_64 postgresql-devel.x86_64 \
+      postgresql-libs.x86_64
+

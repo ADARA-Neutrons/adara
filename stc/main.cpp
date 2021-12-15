@@ -202,7 +202,7 @@ long_syslog( const string &a_label, const string &a_msg )
             ( ( cont ) ? " (Cont.) ..." : " " ),
             a_msg.substr( msg_index, len ).c_str(),
             ( ( done ) ? "" : "..." ) );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
 
         msg_index += len;
 
@@ -251,13 +251,14 @@ int main( int argc, char** argv )
         "ADARA Common", ADARA::VERSION.c_str(),
         "ComBus", ADARA::ComBus::VERSION.c_str(),
         ADARA::TAG_NAME.c_str() );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     try
     {
         bool strict;
         bool move;
         bool doRename;
+        uint32_t verbose_level;
         bool verbose;
         bool gather_stats;
         bool suppress_adara;
@@ -273,7 +274,8 @@ int main( int argc, char** argv )
                 ("help,h", "show help")
                 ("version", "show version number")
                 ("interactive,i", po::bool_switch( &interact )->default_value( false ), "interactive mode")
-                ("verbose,v", po::bool_switch( &verbose )->default_value( false ), "verbose output mode")
+                ("verbose_level", po::value<uint32_t>( &verbose_level )->default_value( 0 ), "verbose output logging level (uint32)")
+                ("verbose,v", po::bool_switch( &verbose )->default_value( false ), "verbose output mode (deprecated)")
                 ("strict,s", po::bool_switch( &strict )->default_value( false ), "enable strict protocol parsing")
                 ("move,m", po::bool_switch( &move )->default_value( false ), "move output nexus file to cataloging location (forces strict parsing)")
                 ("report,r", po::bool_switch( &gather_stats )->default_value( false ), "report stream statistics")
@@ -316,6 +318,37 @@ int main( int argc, char** argv )
             return STC::TS_TRANSIENT_ERROR;
         }
 
+        // Apply "Verbose" Boolean Option (Now Deprecated)
+        // to Set New Verbose Logging Level... ;-D
+        if ( verbose_level == 0 && verbose )
+        {
+            // Formerly "--verbose" Triggered "Level 2" Verbosity...
+            // ("Effectively", Before there was a "Level 1"... ;-D)
+            verbose_level = 2;
+
+            syslog( LOG_INFO, "[%i] %s %s %u.",
+                g_pid, "Applying (Deprecated) \"Verbose\" Option",
+                "to Set Verbose Logging Level to", verbose_level );
+            give_syslog_a_chance;
+        }
+        else
+        {
+            syslog( LOG_INFO, "[%i] %s %u.",
+                g_pid, "STC Verbose Logging Level Set to", verbose_level );
+            give_syslog_a_chance;
+        }
+
+        // Log Chunk/Buffer Sizes...
+        syslog( LOG_INFO,
+            "[%i] %s %s=%lu %s=%u (%lu/0x%lx) %s=%u (%lu/0x%lx).",
+            g_pid, "STC Data Buffering",
+            "chunk_size", chunk_size,
+            "evt_buf_size", evt_buf_size,
+            chunk_size * evt_buf_size, chunk_size * evt_buf_size,
+            "anc_buf_size", anc_buf_size,
+            chunk_size * anc_buf_size, chunk_size * anc_buf_size );
+        give_syslog_a_chance;
+
         // If user has requested cataloging, force sane options
         if ( move )
         {
@@ -357,11 +390,11 @@ int main( int argc, char** argv )
 
             syslog( LOG_INFO, "[%i] Working Directory Root set to: [%s]",
                 g_pid, work_root.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             syslog( LOG_INFO, "[%i] Working Directory Base set to: [%s]",
                 g_pid, work_base.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
 
         if ( work_path.size() )
@@ -372,7 +405,7 @@ int main( int argc, char** argv )
 
             syslog( LOG_INFO, "[%i] Working Directory Path set to: [%s]",
                 g_pid, work_path.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
 
         string tempName = genTempName();
@@ -394,7 +427,7 @@ int main( int argc, char** argv )
                 syslog( LOG_ERR,
                     "[%i] Stat Error on Config File: %s, %s - Ignoring...",
                     g_pid, config_file.c_str(), strerror(errno) );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 config_file.clear();
             }
             else if ( statbuf.st_size == 0 )
@@ -402,24 +435,24 @@ int main( int argc, char** argv )
                 syslog( LOG_ERR,
                     "[%i] Empty Config File: %s - Ignoring...",
                     g_pid, config_file.c_str() );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 config_file.clear();
             }
             else
             {
                 syslog( LOG_INFO, "[%i] STC Config File Specified: %s",
                     g_pid, config_file.c_str() );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
         }
         else {
             syslog( LOG_ERR, "[%i] No STC Config File Specified", g_pid );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
 
         // Only Dump Verbose STC Settings in Interactive Mode...!
         // (else screws up the STC-to-SMS return status...! ;-D)
-        if ( interact && verbose )
+        if ( interact && verbose_level > 0 )
         {
             cout << "STC Information:" << endl;
             cout << "   STC Version    : "
@@ -487,7 +520,7 @@ int main( int argc, char** argv )
                 work_root, work_base, adara_outfile, nexus_outfile,
                 config_file, strict, gather_stats, chunk_size,
                 evt_buf_size, anc_buf_size, cache_size, compression_level,
-                verbose );
+                verbose_level );
 
             // Start ComBus monitor thread (even in interactive mode!)
             monitor = new ComBusTransMon();
@@ -499,7 +532,7 @@ int main( int argc, char** argv )
             nxgen->processStream();
 
             syslog( LOG_INFO, "[%i] Stream processing completed", g_pid );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             nxgen->dumpProcessingStatistics();
 
@@ -512,7 +545,7 @@ int main( int argc, char** argv )
 
             syslog( LOG_INFO, "[%i] Working Directory: [%s] (doRename=%s)",
                 g_pid, work_dir.c_str(), ( doRename ? "true" : "false" ) );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             string cat_nexus_file;
 
@@ -544,7 +577,7 @@ int main( int argc, char** argv )
                             "[%i] Successfully %s ADARA file to: %s%s%s%s",
                             g_pid, "Renamed", cat_path.c_str(), "adara/",
                             cat_name.c_str(), ".adara" );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
                     else
                     {
@@ -555,7 +588,7 @@ int main( int argc, char** argv )
                             "[%i] Successfully %s ADARA file to: %s%s%s%s",
                             g_pid, "Moved", cat_path.c_str(), "adara/",
                             cat_name.c_str(), ".adara" );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
                 }
                 if ( !nexus_outfile.empty() )
@@ -568,7 +601,7 @@ int main( int argc, char** argv )
                         syslog( LOG_INFO,
                             "[%i] Successfully Renamed Nexus file to: %s",
                             g_pid, cat_nexus_file.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
                     else
                     {
@@ -578,7 +611,7 @@ int main( int argc, char** argv )
                         syslog( LOG_INFO,
                             "[%i] Successfully Moved Nexus file to: %s",
                             g_pid, cat_nexus_file.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
                 }
             }
@@ -667,7 +700,7 @@ int main( int argc, char** argv )
     {
         syslog( LOG_INFO, "[%i] STC failed: Translation%s failed. code: %u",
             g_pid, run_desc.c_str(), (unsigned int)sms_code );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
 
         // Notify ComBus Monitor of Failure...
         if ( monitor )
@@ -677,7 +710,7 @@ int main( int argc, char** argv )
     {
         syslog( LOG_INFO, "[%i] Translation%s succeeded",
             g_pid, run_desc.c_str() );
-        usleep(30000); // give syslog a chance...
+        give_syslog_a_chance;
     }
 
     if ( !interact )
@@ -710,7 +743,7 @@ int main( int argc, char** argv )
             syslog( LOG_INFO,
                 "[%i] STC failed: Translation Complete Message: %s",
                 g_pid, log_info.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
 
         send_status |= Utils::sendBytes( outfd,
@@ -720,14 +753,14 @@ int main( int argc, char** argv )
         {
             syslog( LOG_INFO,
                 "[%i] Notified SMS of translation status", g_pid );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
         else
         {
             syslog( LOG_INFO,
                 "[%i] STC failed: Translation Complete/Heartbeat Msg: %s",
                 g_pid, log_info.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
 
         // Request shutdown of write socket - should initiate buffer flush
@@ -767,7 +800,7 @@ int main( int argc, char** argv )
             syslog( LOG_INFO,
                 "[%i] Warning: Extra Data Read from SMS socket cnt=%ld",
                 g_pid, cnt );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
     }
     else if ( sms_code != STC::TS_SUCCESS )
@@ -778,7 +811,7 @@ int main( int argc, char** argv )
     // Clean Up, We're Done...! :-D
 
     syslog( LOG_INFO, "[%i] Cleaning up", g_pid );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     if ( monitor )
         delete monitor;
@@ -798,7 +831,7 @@ int main( int argc, char** argv )
             syslog( LOG_INFO,
                 "[%i] Error Cleaning Up NeXus File at %s/%s.",
                 g_pid, work_dir.c_str(), nexus_outfile.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
     }
 
@@ -813,12 +846,12 @@ int main( int argc, char** argv )
             syslog( LOG_INFO,
                 "[%i] Error Cleaning Up ADARA File at %s/%s.",
                 g_pid, work_dir.c_str(), adara_outfile.c_str() );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
         }
     }
 
     syslog( LOG_INFO, "[%i] Process exiting", g_pid );
-    usleep(30000); // give syslog a chance...
+    give_syslog_a_chance;
 
     closelog();
 

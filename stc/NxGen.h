@@ -542,13 +542,13 @@ private:
             if ( max_len == (uint32_t) -1 || max_len == 0 )
                 max_len = 1;
 
-            if ( m_nxgen.verbose() )
+            if ( m_nxgen.verbose() > 2 )
             {
                 syslog( LOG_INFO,
                     "[%i] DASlogs String %s size=%lu max_len=%u",
                     g_pid, this->m_device_pv_str.c_str(),
                     value_buffer.size(), max_len );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
             }
 
             // Write 2D String Array to NeXus File...
@@ -593,7 +593,7 @@ private:
                     "No String Array Values for",
                     this->m_device_pv_str.c_str(),
                     "Creating Empty String Value" );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 m_nxgen.makeDataset( m_log_path,
                     "value", NeXus::CHAR, this->m_units, 1 );
             }
@@ -623,7 +623,7 @@ private:
                 "[%i] DASlogs Uint32 Array %s size=%lu max_len=%u",
                 g_pid, this->m_device_pv_str.c_str(),
                 value_buffer.size(), max_len );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             // Write 2D Uint32 Array to NeXus File...
             if ( value_buffer.size() )
@@ -682,7 +682,7 @@ private:
                     "No Uint32 Array Values for",
                     this->m_device_pv_str.c_str(),
                     "Creating Empty Value Array" );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 m_nxgen.makeDataset( m_log_path,
                     "value", NeXus::UINT32, this->m_units, 1 );
             }
@@ -712,7 +712,7 @@ private:
                 "[%i] DASlogs Double Array %s size=%lu max_len=%u",
                 g_pid, this->m_device_pv_str.c_str(),
                 value_buffer.size(), max_len );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             // Write 2D Double Array to NeXus File...
             if ( value_buffer.size() )
@@ -773,7 +773,7 @@ private:
                     "No Double Array Values for",
                     this->m_device_pv_str.c_str(),
                     "Creating Empty Value Array" );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 m_nxgen.makeDataset( m_log_path,
                     "value", NeXus::FLOAT64, this->m_units, 1 );
             }
@@ -797,17 +797,20 @@ private:
                     // If So, Then Fix Non-Normalized Value Updates Now.
                     if ( start_time )
                     {
-                        syslog( LOG_INFO,
-                            "[%i] %s %s %s %s, %s: %s",
-                            g_pid, "NxPVInfo::flushBuffers()",
-                            this->m_device_str.c_str(),
-                            "Normalizing PV Value Times",
-                            "with First Pulse Time",
-                            "Now Available",
-                            this->m_pv_str.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        if ( m_nxgen.verbose() > 1 ) {
+                            syslog( LOG_INFO,
+                                "[%i] %s %s %s %s, %s: %s",
+                                g_pid, "NxPVInfo::flushBuffers()",
+                                this->m_device_str.c_str(),
+                                "Normalizing PV Value Times",
+                                "with First Pulse Time",
+                                "Now Available",
+                                this->m_pv_str.c_str() );
+                            give_syslog_a_chance;
+                        }
 
-                        this->normalizeTimestamps( start_time );
+                        this->normalizeTimestamps( start_time,
+                            m_nxgen.verbose() );
                     }
 
                     // Nope, No 1st Pulse Time to Normalize From Yet...
@@ -824,7 +827,7 @@ private:
                             "With No First Pulse Time Yet",
                             "Deferring For Now",
                             this->m_pv_str.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
 
                         return( -1 );
                     }
@@ -843,7 +846,7 @@ private:
                         "Losing PV Value Data!!",
                         this->m_device_str.c_str(),
                         this->m_pv_str.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     return( 0 );
                 }
 
@@ -864,7 +867,7 @@ private:
                             g_pid, "Warning", "NxPVInfo::flushBuffers()",
                             "Deferring Write of Duplicate PV Log",
                             this->m_device_pv_str.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
 
                         return( -1 );
                     }
@@ -887,7 +890,7 @@ private:
                                 "String/Array PV Buffer Full",
                                 "Deferring to Run End",
                                 this->m_pv_str.c_str() );
-                            usleep(30000); // give syslog a chance...
+                            give_syslog_a_chance;
                         }
                         return( -1 );
                     }
@@ -999,13 +1002,16 @@ private:
                             std::stringstream ss_dst;
                             ss_dst << m_log_path << "/" << "enum";
 
-                            syslog( LOG_INFO, "[%i] %s %s: %s %s to %s",
-                                g_pid, "NxPVInfo::flushBuffers()",
-                                this->m_device_pv_str.c_str(),
-                                "Linking Enum Group",
-                                ss_src.str().c_str(),
-                                ss_dst.str().c_str() );
-                            usleep(30000); // give syslog a chance...
+                            if ( m_nxgen.verbose() > 1 ) {
+                                syslog( LOG_INFO,
+                                    "[%i] %s %s: %s %s to %s",
+                                    g_pid, "NxPVInfo::flushBuffers()",
+                                    this->m_device_pv_str.c_str(),
+                                    "Linking Enum Group",
+                                    ss_src.str().c_str(),
+                                    ss_dst.str().c_str() );
+                                give_syslog_a_chance;
+                            }
 
                             m_nxgen.makeGroupLink(
                                 ss_src.str(), ss_dst.str() );
@@ -1026,7 +1032,7 @@ private:
                                         "Enumerated Type Value Strings",
                                         "Not Found For",
                                         this->m_pv_str.c_str() );
-                                    usleep(30000); // give syslog a chance
+                                    give_syslog_a_chance;
                                 }
 
                                 // Make Sure We Don't Freak Out HDF5
@@ -1038,7 +1044,7 @@ private:
                                     m_value_enum_strings_max_len = 1;
                                 }
 
-                                if ( m_nxgen.verbose() )
+                                if ( m_nxgen.verbose() > 2 )
                                 {
                                     syslog( LOG_ERR,
                                       "[%i] %s %s: %s for %s %s=%lu %s=%u",
@@ -1050,8 +1056,7 @@ private:
                                         m_value_enum_strings.size(),
                                         "max_len",
                                         m_value_enum_strings_max_len );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
                                 }
 
                                 // Value Strings as 2D String Dataset
@@ -1093,7 +1098,7 @@ private:
                                     "Empty Enumerated Type Value Strings",
                                     this->m_pv_str.c_str(),
                                     "Creating Dummy Value Strings" );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
 
                                 m_nxgen.makeDataset( m_log_path,
                                     "value_strings", NeXus::CHAR, "", 1 );
@@ -1110,7 +1115,7 @@ private:
                                 "Linking PV Channel",
                                 m_log_path.c_str(),
                                 m_link_path.c_str() );
-                            usleep(30000); // give syslog a chance...
+                            give_syslog_a_chance;
 
                             // Only Create "Target" String for Group Links
                             // if we haven't already done so... ;-D
@@ -1135,7 +1140,7 @@ private:
                                     m_log_path.c_str(),
                                     "Already Has Target Group Link String",
                                     "Skipping..." );
-                                usleep(30000); // give syslog a chance...
+                                give_syslog_a_chance;
                             }
 
                             m_nxgen.makeGroupLink(
@@ -1158,7 +1163,7 @@ private:
                             g_pid, "NxPVInfo::flushBuffers()",
                             this->m_device_pv_str.c_str(),
                             "Was Already Finalized, Duplicate Key...?" );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
                 }
 
@@ -1171,7 +1176,7 @@ private:
                         this->m_device_str.c_str(),
                         ( ( this->m_duplicate ) ? "Duplicate " : "" ),
                         this->m_pv_str.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     num_values = 0;
 
                     // For Subsumed Duplicate PV Logs, We May
@@ -1188,7 +1193,7 @@ private:
                             "Linking Duplicate PV Channel",
                             m_log_path.c_str(),
                             m_link_path.c_str() );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
 
                         // Only Create "Target" String for Group Links
                         // if we haven't already done so... ;-D
@@ -1217,7 +1222,7 @@ private:
                                 "Duplicate", m_log_path.c_str(),
                                 "Already Has Target Group Link String",
                                 "Skipping..." );
-                            usleep(30000); // give syslog a chance...
+                            give_syslog_a_chance;
                         }
 
                         m_nxgen.makeGroupLink(
@@ -1271,7 +1276,7 @@ private:
                 {
                     syslog( LOG_INFO, "[%i] Value Match (%u)",
                         g_pid, value );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     return( true );
                 }
             }
@@ -1297,7 +1302,7 @@ private:
                 {
                     syslog( LOG_INFO, "[%i] Value Match (%lf)",
                         g_pid, value );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     return( true );
                 }
             }
@@ -1322,7 +1327,7 @@ private:
                 {
                     syslog( LOG_INFO, "[%i] Value Match (%s)",
                         g_pid, value.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     return( true );
                 }
             }
@@ -1354,7 +1359,7 @@ private:
                     {
                         syslog( LOG_INFO, "[%i] Value[%d] Match (%u)",
                             g_pid, j, value[j] );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                         return( true );
                     }
                 }
@@ -1388,7 +1393,7 @@ private:
                     {
                         syslog( LOG_INFO, "[%i] Value[%d] Match (%lf)",
                             g_pid, j, value[j] );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                         return( true );
                     }
                 }
@@ -1415,7 +1420,7 @@ private:
                 {
                     syslog( LOG_INFO, "[%i] Value Not-Match (%u)",
                         g_pid, value );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     return( true );
                 }
             }
@@ -1442,7 +1447,7 @@ private:
                 {
                     syslog( LOG_INFO, "[%i] Value Not-Match (%lf)",
                         g_pid, value );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     return( true );
                 }
             }
@@ -1467,7 +1472,7 @@ private:
                 {
                     syslog( LOG_INFO, "[%i] Value Not-Match (%s)",
                         g_pid, value.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     return( true );
                 }
             }
@@ -1499,7 +1504,7 @@ private:
                     {
                         syslog( LOG_INFO, "[%i] Value[%d] Not-Match (%u)",
                             g_pid, j, value[j] );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                         return( true );
                     }
                 }
@@ -1533,7 +1538,7 @@ private:
                     {
                         syslog( LOG_INFO, "[%i] Value[%d] Not-Match (%lf)",
                             g_pid, j, value[j] );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                         return( true );
                     }
                 }
@@ -1560,7 +1565,7 @@ private:
                 {
                     syslog( LOG_INFO, "[%i] Value String Match (%s)",
                         g_pid, enum_string.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     return( true );
                 }
             }
@@ -1586,7 +1591,7 @@ private:
                 {
                     syslog( LOG_INFO, "[%i] Value String Not-Match (%s)",
                         g_pid, enum_string.c_str() );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                     return( true );
                 }
             }
@@ -1674,7 +1679,7 @@ private:
             //syslog( LOG_INFO, "[%i] %s: Checking for Group \"%s\"...",
                 //g_pid, "createSTCConfigGroupMatchingElements()",
                 //G->name.c_str() );
-            //usleep(30000); // give syslog a chance...
+            //give_syslog_a_chance;
 
             for ( uint32_t e=0 ; e < elements.size() ; e++ )
             {
@@ -1694,8 +1699,7 @@ private:
                     //syslog( LOG_INFO, "[%i] %s: %s %s Match", g_pid,
                         //"createSTCConfigGroupMatchingElements()",
                         //"Checking for", patt_str.c_str() );
-                    // give syslog a chance...
-                    //usleep(30000);
+                    //give_syslog_a_chance;
 
                     // Does PV Match This Group's Regex Pattern?
                     boost::regex expr( P );
@@ -1705,7 +1709,7 @@ private:
                         || boost::regex_search(
                             this->m_internal_connection, subs, expr ) )
                     {
-                        if ( m_nxgen.verbose() )
+                        if ( m_nxgen.verbose() > 2 )
                         {
                             syslog( LOG_INFO,
                                 "[%i] %s: %s %s in %s \"%s\" %s", g_pid,
@@ -1714,8 +1718,7 @@ private:
                                 this->m_device_pv_str.c_str(),
                                 "Group", G->name.c_str(),
                                 patt_str.c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
+                            give_syslog_a_chance;
                         }
 
                         std::string group_path;
@@ -1780,8 +1783,7 @@ private:
                                         G->name.c_str(),
                                         this->m_device_pv_str.c_str(),
                                         patt_str.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
 
                                     continue;
                                 }
@@ -1796,15 +1798,16 @@ private:
                                         GroupNameIndex.length(),
                                         ss.str() );
 
-                                    syslog( LOG_INFO,
-                                        "[%i] %s - %s %s as %s \"%s\" %s",
-                                        g_pid, ss_index.str().c_str(),
-                                        "Indexed Group Name Found for",
-                                        this->m_device_pv_str.c_str(),
-                                        "Group", indexedName.c_str(),
-                                        patt_str.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    if ( m_nxgen.verbose() > 0 ) {
+                                        syslog( LOG_INFO,
+                                         "[%i] %s - %s %s as %s \"%s\" %s",
+                                            g_pid, ss_index.str().c_str(),
+                                            "Indexed Group Name Found for",
+                                            this->m_device_pv_str.c_str(),
+                                            "Group", indexedName.c_str(),
+                                            patt_str.c_str() );
+                                        give_syslog_a_chance;
+                                    }
 
                                     group_path =
                                         G->path + "/" + indexedName;
@@ -1821,8 +1824,7 @@ private:
                                     this->m_device_pv_str.c_str(),
                                     "Group", G->name.c_str(),
                                     patt_str.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                give_syslog_a_chance;
 
                                 continue;
                             }
@@ -1852,8 +1854,7 @@ private:
                                         ss.str().c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
 
                                     continue;
                                 }
@@ -1877,22 +1878,22 @@ private:
                                         ss.str().c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
                                 }
 
                                 else
                                 {
-                                    syslog( LOG_INFO,
+                                    if ( m_nxgen.verbose() > 0 ) {
+                                        syslog( LOG_INFO,
                                      "[%i] %s: %s \"%s\", %s=[%s] %s=[%s]",
-                                        g_pid,
+                                            g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                        "Creating Indexed Group",
-                                        indexedName.c_str(),
-                                        "path", group_path.c_str(),
-                                        "type", G->type.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                            "Creating Indexed Group",
+                                            indexedName.c_str(),
+                                            "path", group_path.c_str(),
+                                            "type", G->type.c_str() );
+                                        give_syslog_a_chance;
+                                    }
 
                                     m_nxgen.makeGroup( group_path,
                                         G->type );
@@ -1931,8 +1932,7 @@ private:
                                         ss.str().c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
 
                                     continue;
                                 }
@@ -1956,21 +1956,22 @@ private:
                                         ss.str().c_str(),
                                         "path", group_path.c_str(),
                                         "type", G->type.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
                                 }
 
                                 else
                                 {
-                                    syslog( LOG_INFO,
+                                    if ( m_nxgen.verbose() > 0 ) {
+                                        syslog( LOG_INFO,
                                      "[%i] %s: %s \"%s\", %s=[%s] %s=[%s]",
-                                        g_pid,
+                                            g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                        "Creating Group", G->name.c_str(),
-                                        "path", group_path.c_str(),
-                                        "type", G->type.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                            "Creating Group",
+                                                G->name.c_str(),
+                                            "path", group_path.c_str(),
+                                            "type", G->type.c_str() );
+                                        give_syslog_a_chance;
+                                    }
 
                                     m_nxgen.makeGroup( group_path,
                                         G->type );
@@ -1998,16 +1999,17 @@ private:
                                     std::string pv_value_path =
                                         m_log_path + "/" + "value";
 
-                                    syslog( LOG_INFO,
+                                    if ( m_nxgen.verbose() > 0 ) {
+                                        syslog( LOG_INFO,
                                         "[%i] %s: %s %s %s in Group as %s",
-                                        g_pid,
+                                            g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                        "Create Data with",
-                                        "Last PV Value from",
-                                        pv_value_path.c_str(),
-                                        elem_link_path.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                            "Create Data with",
+                                            "Last PV Value from",
+                                            pv_value_path.c_str(),
+                                            elem_link_path.c_str() );
+                                        give_syslog_a_chance;
+                                    }
 
                                     writeScalarValue(
                                         group_path, E->name, 
@@ -2046,8 +2048,7 @@ private:
                                             elem_link_path.c_str(),
                                             "to Link to Element Path",
                                             "Check", m_log_path.c_str() );
-                                        // give syslog a chance...
-                                        usleep(30000);
+                                        give_syslog_a_chance;
                                     }
                                 }
 
@@ -2061,8 +2062,7 @@ private:
                                         elem_link_path.c_str(),
                                         "Nothing to Link to Element Path",
                                         "Skipping", m_log_path.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
                                 }
                             }
 
@@ -2072,15 +2072,16 @@ private:
                                 std::string pv_value_path =
                                     m_log_path + "/" + "value";
 
-                                syslog( LOG_INFO,
-                                    "[%i] %s: %s %s to Group as %s",
-                                    g_pid,
+                                if ( m_nxgen.verbose() > 0 ) {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s: %s %s to Group as %s",
+                                        g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                    "Linking PV Value",
-                                    pv_value_path.c_str(),
-                                    elem_link_path.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                        "Linking PV Value",
+                                        pv_value_path.c_str(),
+                                        elem_link_path.c_str() );
+                                    give_syslog_a_chance;
+                                }
 
                                 // Make Sure Target Group/Dataset Exists
                                 // Before Trying to Link to It...! ;-D
@@ -2128,8 +2129,7 @@ private:
                                         pv_value_path.c_str(),
                                         elem_link_path.c_str(),
                                         "- PV Log/Value Does Not Exist!" );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
 
                                     // Don't Call This A "Match" Yet,
                                     // Let's Give Someone Else A Try...
@@ -2140,15 +2140,16 @@ private:
                             // Link Whole PV Log into Group...
                             else
                             {
-                                syslog( LOG_INFO,
-                                    "[%i] %s: %s %s to Group in %s",
-                                    g_pid,
+                                if ( m_nxgen.verbose() > 0 ) {
+                                    syslog( LOG_INFO,
+                                        "[%i] %s: %s %s to Group in %s",
+                                        g_pid,
                                   "createSTCConfigGroupMatchingElements()",
-                                    "Linking PV Channel",
-                                    m_log_path.c_str(),
-                                    elem_link_path.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                        "Linking PV Channel",
+                                        m_log_path.c_str(),
+                                        elem_link_path.c_str() );
+                                    give_syslog_a_chance;
+                                }
 
                                 // Make Sure Target Group/Dataset Exists
                                 // Before Trying to Link to It...! ;-D
@@ -2186,8 +2187,7 @@ private:
                                             "Already Has",
                                             "Target Group Link String",
                                             "Skipping..." );
-                                        // give syslog a chance...
-                                        usleep(30000);
+                                        give_syslog_a_chance;
                                     }
 
                                     m_nxgen.makeGroupLink(
@@ -2211,8 +2211,7 @@ private:
                                         m_log_path.c_str(),
                                         elem_link_path.c_str(),
                                         "- PV Log Does Not Exist!" );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
 
                                     // Don't Call This A "Match" Yet,
                                     // Let's Give Someone Else A Try...
@@ -2233,8 +2232,7 @@ private:
                                 "PV/Log Path", it->second.c_str(),
                                 "Already Linked to Element Path",
                                 "Skipping", m_log_path.c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
+                            give_syslog_a_chance;
                         }
 
                         matched = true;
@@ -2261,8 +2259,7 @@ private:
                         //"createSTCConfigGroupMatchingElements()",
                         //"Checking for",
                         //units_patt_str.c_str() );
-                    // give syslog a chance...
-                    //usleep(30000);
+                    //give_syslog_a_chance;
 
                     // Does PV Match This Element Units Regex Pattern?
                     boost::regex expr( U );
@@ -2278,7 +2275,7 @@ private:
                             ss << this->valueToString(
                                 this->m_last_value );
 
-                            if ( m_nxgen.verbose() )
+                            if ( m_nxgen.verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                                "[%i] %s: %s %s in %s \"%s\" %s, %s \"%s\"",
@@ -2290,8 +2287,7 @@ private:
                                     units_patt_str.c_str(),
                                     "Capturing Units Value as",
                                     ss.str().c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                give_syslog_a_chance;
                             }
 
                             E->unitsValue = ss.str();
@@ -2310,8 +2306,7 @@ private:
                                     "Group", G->name.c_str(),
                                     units_patt_str.c_str(),
                                     "Check", m_log_path.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                give_syslog_a_chance;
                             }
                         }
 
@@ -2325,8 +2320,7 @@ private:
                                 units_patt_str.c_str(),
                                 "Ignoring",
                                 this->m_device_pv_str.c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
+                            give_syslog_a_chance;
                         }
                     }
                 }
@@ -2346,7 +2340,7 @@ private:
                 //g_pid, "appendSTCConfigCommandMatchingElements()",
                 //CMD->name.c_str(), label.c_str(),
                 //"Element Command Line Parameters" );
-            //usleep(30000); // give syslog a chance...
+            //give_syslog_a_chance;
 
             for ( uint32_t e=0 ; e < elements.size() ; e++ )
             {
@@ -2366,8 +2360,7 @@ private:
                     //syslog( LOG_INFO, "[%i] %s: %s %s Match", g_pid,
                         //"appendSTCConfigCommandMatchingElements()",
                         //"Checking for", patt_str.c_str() );
-                    // give syslog a chance...
-                    //usleep(30000);
+                    //give_syslog_a_chance;
 
                     // Does PV Match This Command's Regex Pattern?
                     boost::regex expr( P );
@@ -2377,7 +2370,7 @@ private:
                         || boost::regex_search(
                             this->m_internal_connection, subs, expr ) )
                     {
-                        if ( m_nxgen.verbose() )
+                        if ( m_nxgen.verbose() > 2 )
                         {
                             syslog( LOG_INFO,
                                 "[%i] %s: %s %s in %s \"%s\" %s", g_pid,
@@ -2386,8 +2379,7 @@ private:
                                 this->m_device_pv_str.c_str(),
                                 "Command", CMD->name.c_str(),
                                 patt_str.c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
+                            give_syslog_a_chance;
                         }
 
                         // Indexed Commands...
@@ -2450,8 +2442,7 @@ private:
                                         CMD->name.c_str(),
                                         this->m_device_pv_str.c_str(),
                                         patt_str.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
 
                                     continue;
                                 }
@@ -2473,8 +2464,7 @@ private:
                                         this->m_device_pv_str.c_str(),
                                         "Command", indexedName.c_str(),
                                         patt_str.c_str() );
-                                    // give syslog a chance...
-                                    usleep(30000);
+                                    give_syslog_a_chance;
 
                                     // Capture Indexed Command Name
                                     // If Not Yet Included...
@@ -2487,8 +2477,7 @@ private:
                                 "appendSTCConfigCommandMatchingElements()",
                                             "Capturing Indexed Group Name",
                                             indexedName.c_str() );
-                                        // give syslog a chance...
-                                        usleep(30000);
+                                        give_syslog_a_chance;
 
                                         CMD->createdIndices.insert(
                                             indexedName );
@@ -2506,8 +2495,7 @@ private:
                                     this->m_device_pv_str.c_str(),
                                     "Command", CMD->name.c_str(),
                                     patt_str.c_str() );
-                                // give syslog a chance...
-                                usleep(30000);
+                                give_syslog_a_chance;
 
                                 continue;
                             }
@@ -2534,8 +2522,7 @@ private:
                                 CMD->name.c_str(), E->name.c_str(),
                                 this->valueToString(
                                     this->m_last_value ).c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
+                            give_syslog_a_chance;
 
                             CMD->args += " " + E->name
                                 + "=" + "\""
@@ -2554,8 +2541,7 @@ private:
                                 CMD->name.c_str(), "Command",
                                 "Nothing to Link to Element Path",
                                 "Skipping", m_log_path.c_str() );
-                            // give syslog a chance...
-                            usleep(30000);
+                            give_syslog_a_chance;
 
                             // Don't Call This A "Match" Yet,
                             // Let's Give Someone Else A Try...
@@ -2575,7 +2561,7 @@ private:
                 //g_pid, "createSTCConfigGroups()",
                 //this->m_device_pv_str.c_str(),
                 //"Config Group Membership..." );
-            //usleep(30000); // give syslog a chance...
+            //give_syslog_a_chance;
 
             // Do We Have a Valid Initialized NeXus Data File...?
             // (We shouldn't get called if not, so if we do, better
@@ -2594,7 +2580,7 @@ private:
                     "Losing STC Config Meta-Data!!",
                     this->m_device_str.c_str(),
                     this->m_pv_str.c_str() );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 return;
             }
 
@@ -2632,8 +2618,7 @@ private:
                             //g_pid, "createSTCConfigGroups()",
                             //"Checking for Group Conditional",
                             //C->name.c_str(), P.c_str() );
-                        // give syslog a chance...
-                        //usleep(30000);
+                        //give_syslog_a_chance;
 
                         // Does PV Match This Group's Conditional Pattern?
                         boost::regex expr( P );
@@ -2643,7 +2628,7 @@ private:
                             || boost::regex_search(
                                 this->m_internal_connection, subs, expr ) )
                         {
-                            if ( m_nxgen.verbose() )
+                            if ( m_nxgen.verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                          "[%i] %s: %s %s in %s \"%s\" %s \"%s\" %s \"%s\"",
@@ -2653,8 +2638,7 @@ private:
                                     "Group", G->name.c_str(),
                                     "Conditional", C->name.c_str(),
                                     "Pattern", P.c_str());
-                                // give syslog a chance...
-                                usleep(30000);
+                                give_syslog_a_chance;
                             }
 
                             // Check PV Value Against Condition Values...
@@ -2682,8 +2666,7 @@ private:
                                     this->m_device_pv_str.c_str(),
                                     "Group", G->name.c_str(),
                                     "Conditional Pattern", P.c_str());
-                                // give syslog a chance...
-                                usleep(30000);
+                                give_syslog_a_chance;
                             }
                         }
                     }
@@ -2735,8 +2718,7 @@ private:
                             //g_pid, "createSTCConfigGroups()",
                             //"Checking for Command Conditional",
                             //C->name.c_str(), P.c_str() );
-                        // give syslog a chance...
-                        //usleep(30000);
+                        //give_syslog_a_chance;
 
                         // Does PV Match This Group's Conditional Pattern?
                         boost::regex expr( P );
@@ -2746,7 +2728,7 @@ private:
                             || boost::regex_search(
                                 this->m_internal_connection, subs, expr ) )
                         {
-                            if ( m_nxgen.verbose() )
+                            if ( m_nxgen.verbose() > 2 )
                             {
                                 syslog( LOG_INFO,
                          "[%i] %s: %s %s in %s \"%s\" %s \"%s\" %s \"%s\"",
@@ -2756,8 +2738,7 @@ private:
                                     "Command", CMD->name.c_str(),
                                     "Conditional", C->name.c_str(),
                                     "Pattern", P.c_str());
-                                // give syslog a chance...
-                                usleep(30000);
+                                give_syslog_a_chance;
                             }
 
                             // Check PV Value Against Condition Values...
@@ -2785,8 +2766,7 @@ private:
                                     this->m_device_pv_str.c_str(),
                                     "Command", CMD->name.c_str(),
                                     "Conditional Pattern", P.c_str());
-                                // give syslog a chance...
-                                usleep(30000);
+                                give_syslog_a_chance;
                             }
                         }
                     }
@@ -2822,7 +2802,7 @@ private:
                     "Losing STC Conditional Config Groups!!",
                     this->m_device_str.c_str(),
                     this->m_pv_str.c_str() );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 return;
             }
 
@@ -2834,7 +2814,7 @@ private:
                     //g_pid, "createSTCConfigConditionalGroups()",
                     //this->m_device_pv_str.c_str(),
                     //"STC Config Conditional Group Membership..." );
-                //usleep(30000); // give syslog a chance...
+                //give_syslog_a_chance;
 
                 // Check Each Config Group in Turn for a
                 // Conditional Pattern Match on This PV...
@@ -2851,7 +2831,7 @@ private:
                        //"[%i] %s: Checking for Conditional Group %s...",
                         //g_pid, "createSTCConfigConditionalGroups()",
                         //G->name.c_str() );
-                    //usleep(30000); // give syslog a chance...
+                    //give_syslog_a_chance;
 
                     for ( uint32_t c=0 ; c < G->conditions.size() ; c++ )
                     {
@@ -2907,7 +2887,7 @@ public:
         unsigned short a_ancillary_buf_chunk_count = 5,
         unsigned long a_cache_size = 10485760,
         unsigned short a_compression_level = 0,
-        bool a_verbose = false );
+        uint32_t a_verbose_level = 0 );
     ~NxGen();
 
     void dumpProcessingStatistics(void);

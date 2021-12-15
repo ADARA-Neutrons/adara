@@ -11,10 +11,21 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STC_VERSION "1.12.9"
+#define STC_VERSION "1.13.0"
 extern pid_t g_pid;
 
 #define STC_DOUBLE_EPSILON (0.00000000000001)
+
+// Verbose Logging Self-Limiting/Metering... a la the Dreaded USleep()...!
+// (for when Syslog won't let us log profusely without being suppressed!)
+
+// Do the USleep() for 30000 Microseconds, i.e. 30 Milliseconds...
+//#define give_syslog_a_chance  usleep(30000)
+
+// Or
+
+// Do Nothing...
+#define give_syslog_a_chance
 
 namespace STC {
 
@@ -86,7 +97,7 @@ public:
     virtual ~BankInfo()
     {}
 
-    void initializeBank( bool a_end_of_run, bool a_verbose )
+    void initializeBank( bool a_end_of_run, uint32_t a_verbose_level )
     {
         // Already Initialized...
         if ( m_initialized )
@@ -114,7 +125,7 @@ public:
                         (*dbs)->name.c_str(), "Bank Set",
                         (*dbs)->tofOffset,
                         (*dbs)->tofMax, (*dbs)->tofBin );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
                 }
 
                 else
@@ -134,7 +145,7 @@ public:
                             (*dbs)->name.c_str(), "Bank Set",
                             (*dbs)->tofOffset, (*dbs)->tofMax,
                             (*dbs)->tofBin );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
 
                         // Don't set "m_has_histo", just fall thru...
                         // (all subsequent Histo attempts will also fail)
@@ -159,7 +170,7 @@ public:
                             "Empty Histogram", "Setting",
                             "num_tof_bins", m_num_tof_bins,
                             "tof_bin_size", m_tof_bin_size);
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
 
                     else
@@ -187,7 +198,7 @@ public:
                                 "State", m_state,
                                 "Histogram Warning",
                                 "num_tof_bins", m_num_tof_bins);
-                            usleep(30000); // give syslog a chance...
+                            give_syslog_a_chance;
                             m_num_tof_bins = 2;
                         }
 
@@ -229,7 +240,7 @@ public:
                         << ( num_pids * ( m_num_tof_bins - 1 ) ) << ")";
 
                     syslog( LOG_INFO, "[%i] %s", g_pid, ss.str().c_str() );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
 
                     // Actual Histogram Storage, Non-Inclusive Max TOF Bin
                     m_data_buffer.reserve( num_pids
@@ -264,7 +275,7 @@ public:
                             "m_data_buffer", m_data_buffer.size(),
                             "expected",
                             num_pids * ( m_num_tof_bins - 1 ) );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
 
                     // Reserve Required Index Size & Initialize Vector...
@@ -293,7 +304,7 @@ public:
                                 // "State", m_state, "Histogram",
                                 // p, index, m_histo_pid_offset[ index ] );
                             // give sleep a chance...
-                            // usleep(10000);
+                            // give_syslog_a_chance;
                         }
 
                         // Duplicate PixelId!  (shouldn't happen...)
@@ -305,20 +316,20 @@ public:
                                 "State", m_state,
                                 "Duplicate PixelId in Histo Offset Map",
                                 index );
-                            usleep(30000); // give syslog a chance...
+                            give_syslog_a_chance;
 
                             // Still need to increment offset past PixelId!
                             offset++;
                         }
                     }
 
-                    if ( a_verbose )
+                    if ( a_verbose_level > 2 )
                     {
                         syslog( LOG_INFO,
                             "[%i] %s %u %s %u Done with Histogram Init.",
                             g_pid, "Detector Bank", m_id,
                             "State", m_state );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
                     }
 
                     // Got One, That's All We'll Ever Need... ;-D
@@ -441,7 +452,7 @@ public:
                     "[%i] %s %s %u Histogram Warning: %s=%u < 2!",
                     g_pid, "STC Error:", "Beam Monitor", m_id,
                     "num_tof_bins", m_num_tof_bins);
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
                 m_num_tof_bins = 2;
             }
 
@@ -455,7 +466,7 @@ public:
                 "[%i] Beam Monitor %u Histogram: %u %s, %u to %u by %u",
                 g_pid, m_id, m_num_tof_bins, "Time Bin Values",
                 m_config.tofOffset, m_config.tofMax, m_config.tofBin );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             uint32_t tofbin = m_config.tofOffset;
             for (uint32_t i=0 ; i < m_num_tof_bins - 1 ; i++)
@@ -1010,7 +1021,8 @@ public:
     /// Normalize PV values/timestamps relative to 1st Pulse Start Time
     void normalizeTimestamps
     (
-        uint64_t start_time     ///< 1st Pulse Time (nanosecs)
+        uint64_t start_time,        ///< 1st Pulse Time (nanosecs)
+        uint32_t a_verbose_level    ///< Verbose Logging Level
     )
     {
         // Normalize All Non-Normalized Timestamps...
@@ -1032,16 +1044,20 @@ public:
                         / NANO_PER_SECOND_D;
                     this->m_time_buffer[i] = t;
 
-                    syslog( LOG_INFO,
-                        "[%i] %s %s %s: %s = %s @ %lf",
-                        g_pid, "PVInfo::normalizeTimestamps()",
-                        this->m_device_str.c_str(),
-                        "Positive Time Update",
-                        this->m_pv_str.c_str(),
-                        this->valueToString(
-                            this->m_value_buffer[i] ).c_str(),
-                        this->m_time_buffer[i] );
-                    usleep(30000); // give syslog a chance
+                    // Verbose Logging Level 2 or Above...
+                    if ( a_verbose_level > 1 )
+                    {
+                        syslog( LOG_INFO,
+                            "[%i] %s %s %s: %s = %s @ %lf",
+                            g_pid, "PVInfo::normalizeTimestamps()",
+                            this->m_device_str.c_str(),
+                            "Positive Time Update",
+                            this->m_pv_str.c_str(),
+                            this->valueToString(
+                                this->m_value_buffer[i] ).c_str(),
+                            this->m_time_buffer[i] );
+                        give_syslog_a_chance;
+                    }
 
                     // Time is Normalized Now,
                     // We Can Add This Value to Stats.
@@ -1055,41 +1071,44 @@ public:
                 // every PV in the run! ;-D)
                 else
                 {
-                    std::string log_hdr = "";
-                    int log_type = LOG_INFO;
-                    // Don't Log _Any_ of These as "Errors",
-                    // Just Too Much Spam...! ;-b
-                    // if ( this->m_last_value_set ) {
-                        // log_type = LOG_ERR;
-                        // log_hdr = "STC Error: ";
-                    // }
-                    std::stringstream ss;
-                    ss << log_hdr;
-                    ss << "PVInfo::normalizeTimestamps() ";
-                    ss << this->m_device_pv_str;
-                    ss << " = ";
-                    ss << this->valueToString(
-                        this->m_value_buffer[i] ).c_str();
-                    ss << ":";
-                    ss << " Truncate Negative Variable";
-                    ss << " Value Update Time to Zero";
-                    syslog( log_type,
-                        "[%i] %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
-                        g_pid, ss.str().c_str(),
-                        (unsigned long)( this->m_abs_time_buffer[i]
-                                / NANO_PER_SECOND_LL )
-                            - ADARA::EPICS_EPOCH_OFFSET,
-                        (unsigned long)( this->m_abs_time_buffer[i]
-                                % NANO_PER_SECOND_LL ),
-                        this->m_abs_time_buffer[i],
-                        (unsigned long)( start_time
-                                / NANO_PER_SECOND_LL )
-                            - ADARA::EPICS_EPOCH_OFFSET,
-                        (unsigned long)( start_time
-                                % NANO_PER_SECOND_LL ),
-                        start_time );
-                    // give syslog a chance...
-                    usleep(30000);
+                    // Verbose Logging Level 2 or Above...
+                    if ( a_verbose_level > 1 )
+                    {
+                        std::string log_hdr = "";
+                        int log_type = LOG_INFO;
+                        // Don't Log _Any_ of These as "Errors",
+                        // Just Too Much Spam...! ;-b
+                        // if ( this->m_last_value_set ) {
+                            // log_type = LOG_ERR;
+                            // log_hdr = "STC Error: ";
+                        // }
+                        std::stringstream ss;
+                        ss << log_hdr;
+                        ss << "PVInfo::normalizeTimestamps() ";
+                        ss << this->m_device_pv_str;
+                        ss << " = ";
+                        ss << this->valueToString(
+                            this->m_value_buffer[i] ).c_str();
+                        ss << ":";
+                        ss << " Truncate Negative Variable";
+                        ss << " Value Update Time to Zero";
+                        syslog( log_type,
+                            "[%i] %s %lu.%09lu (%lu) < %lu.%09lu (%lu)",
+                            g_pid, ss.str().c_str(),
+                            (unsigned long)( this->m_abs_time_buffer[i]
+                                    / NANO_PER_SECOND_LL )
+                                - ADARA::EPICS_EPOCH_OFFSET,
+                            (unsigned long)( this->m_abs_time_buffer[i]
+                                    % NANO_PER_SECOND_LL ),
+                            this->m_abs_time_buffer[i],
+                            (unsigned long)( start_time
+                                    / NANO_PER_SECOND_LL )
+                                - ADARA::EPICS_EPOCH_OFFSET,
+                            (unsigned long)( start_time
+                                    % NANO_PER_SECOND_LL ),
+                            start_time );
+                        give_syslog_a_chance;
+                    }
 
                     this->m_time_buffer[i] = 0.0;
 
@@ -1138,7 +1157,7 @@ public:
                 (unsigned long)( start_time
                         % NANO_PER_SECOND_LL ),
                 start_time );
-            usleep(30000); // give syslog a chance...
+            give_syslog_a_chance;
 
             // Erase PV Value Updates Up to the
             // "Last" Pre-First-Pulse Update...
@@ -1202,7 +1221,7 @@ public:
                     "ADD Omitted Value/Timestamp from Duplicate",
                     valueToString( *ivalDup ).c_str(),
                     (*itimDup) );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
     
                 this->m_value_buffer.insert( ival, *ivalDup );
                 this->m_time_buffer.insert( itim, *itimDup );
@@ -1223,7 +1242,7 @@ public:
                     "Skip Our Value/Timestamp Omitted in Duplicate",
                     valueToString( *ival ).c_str(),
                     (*itim), (*itimDup), STC_DOUBLE_EPSILON );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
     
                 ++ival; ++itim; ++index;
             }
@@ -1237,7 +1256,7 @@ public:
                     "ADD Omitted Value/Timestamp from Duplicate",
                     valueToString( *ivalDup ).c_str(),
                     (*itimDup), (*itim), STC_DOUBLE_EPSILON );
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
     
                 this->m_value_buffer.insert( ival, *ivalDup );
                 this->m_time_buffer.insert( itim, *itimDup );
@@ -1264,7 +1283,7 @@ public:
                         valueToString( *ival ).c_str(), (*itim),
                         valueToString( *ivalDup ).c_str(), (*itimDup),
                         STC_DOUBLE_EPSILON );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
 
                     ++ival; ++itim; ++index;
                     ++ivalDup; ++itimDup;
@@ -1284,7 +1303,7 @@ public:
                         valueToString( *ivalDup ).c_str(), (*itimDup),
                         valueToString( *ival ).c_str(), (*itim),
                         STC_DOUBLE_EPSILON );
-                    usleep(30000); // give syslog a chance...
+                    give_syslog_a_chance;
      
                     // Insert These Weirdos _After_ Current Value...
                     ++ival; ++itim; ++index;

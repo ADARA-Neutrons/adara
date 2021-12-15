@@ -384,7 +384,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/master
 
-	/tmp/share/master/scripts/setup_controls.sh
+	/tmp/share/master/scripts/setup_controls.sh "STC"
 	   - Note: Prompts for User Password for Sudo Commands...
 	   - script can be re-executed repeatedly after fixing any errors... :-)
 

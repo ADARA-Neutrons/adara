@@ -1,0 +1,280 @@
+#!/bin/bash
+#
+# DASMON Config Check
+#
+# Compare Git Repo Config Files to Deployed...
+#
+
+# For Cron Usage - Source Home Shell Environment:
+if [ -e $HOME/.bash_profile ] ; then
+	source $HOME/.bash_profile
+fi
+
+# Handle "Quiet" Operation Option for Cron Usage...
+# (Only output on errors...)
+QUIET=0
+if [ "$1" == "--quiet" ]; then
+	QUIET=1
+fi
+
+# Go to proper Git Config Repo Checkout, for easy checking systemwide.
+cd /home/controls/config-dasmon/
+
+STAT_LIST="./stat_list"
+
+DIFF_STAT()
+{
+	local _status=0
+
+	local _label="$1"
+	shift
+
+	local _file="$1"
+	shift
+
+	local _statlist="$1"
+	shift
+
+	echo -e "\nDiff Stat for ${_file}"
+
+	stat --printf='%A %F %U %G ' "${_file}" > .tmp.A.$$
+	local _ckstat=$?
+	if [ ${_ckstat} != 0 ]; then
+		_status=${_ckstat}
+	fi
+	echo "${_file}" >> .tmp.A.$$
+
+	grep "${_file}$" "${_statlist}" > .tmp.B.$$
+	local _ckgrep=$?
+	if [ ${_ckgrep} != 0 ]; then
+		_status=${_ckgrep}
+	fi
+
+	diff .tmp.A.$$ .tmp.B.$$
+	local _ckdiff=$?
+	if [ ${_ckdiff} != 0 ]; then
+		_status=${_ckdiff}
+	fi
+
+	/bin/rm .tmp.A.$$ .tmp.B.$$
+
+	return ${_status}
+}
+
+DIFF_FILE()
+{
+	local _status=0
+
+	local _label1="$1"
+	shift
+
+	local _label2="$1"
+	shift
+
+	local _file1="$1"
+	shift
+
+	local _file2="$1"
+	shift
+
+	echo
+	echo "Comparing ${_label1}"
+	echo -e "\tto ${_label2}:"
+	echo
+
+	echo "diff ${_file1} ${_file2}"
+	diff "${_file1}" "${_file2}"
+	_ckdiff=$?
+	if [ ${_ckdiff} != 0 ]; then
+		_status=${_ckdiff}
+	fi
+
+	DIFF_STAT "${_label2}" "${_file2}" "${STAT_LIST}"
+	_ckdiff=$?
+	if [ ${_ckdiff} != 0 ]; then
+		_status=${_ckdiff}
+	fi
+
+	return ${_status}
+}
+
+CONFCK()
+{
+	nerrors=0
+
+	DIFF_FILE "Dasmon Daemon Config File" "Deployed" \
+		./dasmond/dasmond.cfg /home/dasmon/dasmond.cfg
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
+	echo
+	if [[ -f ./dasmond/dasmond_def.cfg \
+			|| -f /home/dasmon/dasmond_def.cfg ]]; then
+		DIFF_FILE "Dasmon Daemon Default Config File" "Deployed" \
+			./dasmond/dasmond_def.cfg /home/dasmon/dasmond_def.cfg
+		if [ $? != 0 ]; then
+			echo "Files Differed...!"
+			(( nerrors++ ))
+		else
+			echo "Files are the Same."
+		fi
+	else
+		echo "No Dasmon Daemon Default Config Files to Compare."
+	fi
+
+	# RedHat6 Upstart
+	if [[ -f ./dasmond/init.dasmond.conf ]]; then
+		DIFF_FILE "Dasmon Daemon Init Script" "Deployed" \
+			./dasmond/init.dasmond.conf /etc/init/dasmond.conf
+		if [ $? != 0 ]; then
+			echo "Files Differed...!"
+			(( nerrors++ ))
+		else
+			echo "Files are the Same."
+		fi
+	fi
+
+	# RedHat7 SystemD
+	if [[ -f ./dasmond/systemd.dasmond.service ]]; then
+		DIFF_FILE "Dasmon Daemon Init Script" "Deployed" \
+			./dasmond/systemd.dasmond.service \
+			/etc/systemd/system/dasmond.service
+		if [ $? != 0 ]; then
+			echo "Files Differed...!"
+			(( nerrors++ ))
+		else
+			echo "Files are the Same."
+		fi
+	fi
+
+	DIFF_FILE "Dasmon Daemon Wrapper Script" "Deployed" \
+		./dasmond/usr.local.bin.dasmond /usr/local/bin/dasmond
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
+	DIFF_FILE "Saved RSyslog ADARA Config" "System" \
+		./dasmond/rsyslog.conf /etc/rsyslog.conf
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
+	if [[ -f ./dasmond/dasmon_syslog.conf ]]; then
+		DIFF_FILE "Saved RSyslog DASMON Config" "System" \
+			./dasmond/dasmon_syslog.conf /etc/rsyslog.d/dasmon.conf
+		if [ $? != 0 ]; then
+			echo "Files Differed...!"
+			(( nerrors++ ))
+		else
+			echo "Files are the Same."
+		fi
+	fi
+
+	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
+		./dasmond/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
+	DIFF_FILE "Saved Etc Logrotate Dasmon Daemon Config" "System" \
+		./dasmond/etc.logrotate.d.dasmon_log /etc/logrotate.d/dasmon_log
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
+	DIFF_FILE "Dasmon GUI Client XInitrc File" "Deployed" \
+		./dasmon/xinitrc.dasmon /etc/X11/xinit/xinitrc.dasmon
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
+	# RedHat6 Upstart
+	if [[ -f ./dasmon/init.dasmongui.conf ]]; then
+		DIFF_FILE "Dasmon GUI Client Init Script" "Deployed" \
+			./dasmon/init.dasmongui.conf /etc/init/dasmongui.conf
+		if [ $? != 0 ]; then
+			echo "Files Differed...!"
+			(( nerrors++ ))
+		else
+			echo "Files are the Same."
+		fi
+	fi
+
+	# RedHat7 SystemD
+	if [[ -f ./dasmon/systemd.dasmongui.service ]]; then
+		DIFF_FILE "Dasmon GUI Client Init Script" "Deployed" \
+			./dasmon/systemd.dasmongui.service \
+			/etc/systemd/system/dasmongui.service
+		if [ $? != 0 ]; then
+			echo "Files Differed...!"
+			(( nerrors++ ))
+		else
+			echo "Files are the Same."
+		fi
+	fi
+
+	echo
+	echo "Comparing Saved ADARA Admin Crontab to System:"
+	echo
+
+	crontab -l > /tmp/y8y.crontab.$$ 2>&1
+	if [[ $? != 0 || ! -s /tmp/y8y.crontab.$$ ]]; then
+		echo "Failure Retrieving ADARA Admin Crontab for DASMOND!"
+		(( nerrors++ ))
+	else
+		echo "diff ./dasmond/y8y.crontab /tmp/y8y.crontab.$$"
+		diff ./dasmond/y8y.crontab /tmp/y8y.crontab.$$
+		if [ $? != 0 ]; then
+			echo "ADARA Admin Crontab for DASMOND Differed...!"
+			(( nerrors++ ))
+		else
+			echo "ADARA Admin Crontab for DASMOND is the Same."
+		fi
+	fi
+	/bin/rm -f /tmp/y8y.crontab.$$
+	if [ $? != 0 ]; then
+		echo "Failure Deleting Temporary Admin Crontab File for DASMOND...!"
+		(( nerrors++ ))
+	fi
+
+	echo
+	if [ $nerrors -gt 0 ]; then
+		echo "$nerrors Files Differed!"
+	else
+		echo "All Files are the Same."
+	fi
+	echo
+
+	return $nerrors
+}
+
+doConfCk=`CONFCK 2>&1`
+_ckconfck=$?
+if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+	echo -e "$doConfCk\n"
+fi
+
+if [[ ${_ckconfck} != 0 ]]; then
+	echo -e "*** ConfCk FAILED...!\n"
+fi
+exit ${_ckconfck}
+

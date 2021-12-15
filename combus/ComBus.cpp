@@ -719,7 +719,7 @@ Connection::reconnectThread()
 
             exceptionLog(
                 "reconnectThread(): ActiveMQ Error Cleanup Complete.",
-                ERR_LOG);
+                INFO_LOG);
 
             // Failed to connect
             if ( m_reconn_retry < 10 )
@@ -728,25 +728,25 @@ Connection::reconnectThread()
 
         exceptionLog(
             "reconnectThread(): After ActiveMQ Reconnect Attempt.",
-            ERR_LOG);
+            INFO_LOG);
 
         // _ONLY_ Unlock If Not Already Unlocked...! ;-Q
         if ( !unlocked )
         {
-            exceptionLog( "reconnectThread(): Unlocking Lock...",
-                ERR_LOG );
+            exceptionLog("reconnectThread(): Unlocking Lock...",
+                INFO_LOG);
 
             lock.unlock();
             unlocked = true;
 
-            exceptionLog( "reconnectThread(): After Unlock...",
-                ERR_LOG );
+            exceptionLog("reconnectThread(): After Unlock...",
+                INFO_LOG);
         }
 
         std::stringstream ss;
         ss << "reconnectThread(): Sleeping for"
             << " reconn_retry=" << m_reconn_retry;
-        exceptionLog( ss.str(), ERR_LOG );
+        exceptionLog( ss.str(), INFO_LOG );
 
         // TODO Replace with a timed cond var wait so destructor
         // can interrupt this thread
@@ -764,7 +764,7 @@ Connection::reconnectThread()
         ss2 << "reconnectThread(): After Retry Sleep..."
             << " (reconn_retry=" << m_reconn_retry
             << ", cnt=" << cnt << ")";
-        exceptionLog( ss2.str(), ERR_LOG );
+        exceptionLog( ss2.str(), INFO_LOG );
     }
 
     exceptionLog( "reconnectThread(): After Reconnect Loop...", INFO_LOG);

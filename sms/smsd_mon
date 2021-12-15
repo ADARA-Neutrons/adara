@@ -3,8 +3,22 @@
 # (Cron) Script to Monitor Local SMS Daemon Executable
 #
 # Track things like Memory/CPU Usage, as well as Note If/When SMSD Fails!
+# Also Check Basic SMS "Summary" PV for Error Status...! ;-D
 # (and maybe even notify via email or text message on a crash...! :-)
 #
+
+# For Cron Usage - Source Home Shell Environment:
+if [ -e $HOME/.bash_profile ] ; then
+	source $HOME/.bash_profile
+fi
+
+#
+# Default Settings
+#
+
+LOG_HOME="/SNS/users/y8y"
+
+SMS_HOME="/SNSlocal"
 
 host=`hostname`
 #echo "host=$host"
@@ -12,17 +26,25 @@ host=`hostname`
 host_short=`echo $host | awk -F '.' '{print $1}'`
 #echo "host_short=$host_short"
 
-LOGFILE="$HOME/smsd_mon/smsd_mon.$host_short.log"
-LOGLOGFILE="$HOME/smsd_mon/smsd_mon.$host_short-log.log"
+LOGFILE="$LOG_HOME/smsd_mon/smsd_mon.$host_short.log"
+LOGLOGFILE="$LOG_HOME/smsd_mon/smsd_mon.$host_short-log.log"
 
 SMSD_USER="snsdata"
 SMSD="smsd"
+SMS="sms"
 
-SMSD_LOG="/var/log/smsd.log"
+SMSD_LOG="/var/log/${SMSD}.log"
 
 PROG="smsd_mon"
 
 TIME="/usr/bin/time" # for Test Harness, duh... ;-b
+
+WAIT="-w 9" # for caget wait... ;-)
+
+S="[[:space:]]"
+
+ALT="" # for Alternate/Secondary SMS Deployments... ;-D
+ALTLABEL=""
 
 #
 # Parse Command Line Options... ;-)
@@ -39,8 +61,18 @@ for arg in "$@" ; do
 		do_notify=0
 	elif [ "#$key#" == '#--smsd_user#' ]; then
 		SMSD_USER="$value"
+	elif [ "#$key#" == '#--alt#' ]; then
+		ALT="$value"
+		ALTLABEL=`echo "$value" | tr '[:lower:]' '[:upper:]'`
+		# Also Update All the Associated Config...
+		LOGFILE="$LOG_HOME/smsd_mon/smsd_mon.$host_short${ALT}.log"
+		LOGLOGFILE="$LOG_HOME/smsd_mon/smsd_mon.$host_short${ALT}-log.log"
+		SMSD="smsd${ALT}"
+		SMS="sms${ALT}"
+		SMSD_LOG="/var/log/${SMSD}.log"
 	elif [ "#$key#" == '#--help#' ]; then
-		echo "usage:  smsd_mon [--no_notify] [--smsd_user=y8y]"
+		echo -n "usage:  smsd_mon [--no_notify] [--smsd_user=y8y]"
+		echo " [--alt=\"-mon\"]"
 		exit 0
 	fi
 
@@ -59,8 +91,8 @@ status=`ps augxww | grep $SMSD | grep -v -e $PROG -e $TIME -e grep | grep $SMSD_
 if [ "#$status#" == '##' ]; then
 
 	if [ $do_notify == 1 ]; then
-		echo \
-		"Error on ${host}: SMS Daemon $SMSD Not Running as User $SMSD_USER!"
+		echo -n "Error on ${host}:"
+		echo " SMS${ALTLABEL} Daemon $SMSD Not Running as User $SMSD_USER!"
 		exit -1
 	else
 		# Just Exit Cleanly, Nothing to log here... ;-D
@@ -68,7 +100,88 @@ if [ "#$status#" == '##' ]; then
 	fi
 fi
 
-# Extract statistics of interest
+#
+# Check SMS Summary Status PV Value...
+#
+
+# No Point in Checking if We're Not Going to Notify for This System...! ;-D
+if [ $do_notify == 1 ]; then
+
+	SMSD_CONFIG="${SMS_HOME}/${SMS}/conf/smsd.conf"
+
+	if [[ -f ${SMSD_CONFIG} ]]; then
+
+		prefix=`grep "beamline_id" ${SMSD_CONFIG} \
+			| grep -v ";" | awk -F "=" '{print $2}'`
+		prefix="${prefix//[[:space:]]}"
+
+		summaryPV="${prefix}:SMS:Summary"
+
+		# Try 3 Times to Get the SMS Summary Status, as Needed...
+
+		cnt=0
+
+		while [[ $cnt -lt 3 ]]; do
+
+			# Ignore Odd Channel Access
+			# "Duplicate EPICS CA Address" Warnings...
+			summary=`caget ${WAIT} "${summaryPV}" 2>&1`
+
+			# Did We Time Out Connecting to the SMS Summary PV...?
+			if [[ "$summary" =~ Channel${S}connect${S}timed${S}out ]]; then
+				echo "Channel Connect Timed Out on: ${summaryPV}..."
+				cnt=$(( $cnt + 1 ))
+			else
+				break
+			fi
+
+		done
+
+		if [[ "$summary" =~ Channel${S}connect${S}timed${S}out ]]; then
+
+			echo -e -n "Error on ${host}: Timed Out $cnt Times"
+			echo -e " on SMS${ALTLABEL} Summary Status PV!\n"
+			echo -e "   ${summary}\n"
+
+			caget ${WAIT} -a "${prefix}:SMS:Recording"
+			caget ${WAIT} "${prefix}:SMS:RunNumber"
+			caget ${WAIT} "${summaryPV}"
+			caget ${WAIT} -S "${prefix}:SMS:SummaryReason"
+
+		else
+			
+			# Strip Off Actual Summary Status Value...
+			summary=`echo "${summary}" \
+				| grep -v "Warning" | awk '{print $2}'`
+
+			if [[ "${summary}" != "OK" ]]; then
+
+				echo -e -n "Error on ${host}:"
+				echo -e " SMS${ALTLABEL} Summary Status Not OK!\n"
+
+				caget ${WAIT} -a "${prefix}:SMS:Recording"
+				caget ${WAIT} "${prefix}:SMS:RunNumber"
+				caget ${WAIT} "${summaryPV}"
+				caget ${WAIT} -S "${prefix}:SMS:SummaryReason"
+
+			fi
+
+		fi
+
+	else
+
+		echo -n "Error on ${host}:"
+		echo " SMS${ALTLABEL} ${SMSD}${ALT} Config File Not Found!"
+		echo -e "\n\t[${SMSD_CONFIG}]\n"
+		/bin/ls -l ${SMSD_CONFIG}
+
+	fi
+
+fi
+
+#
+# Extract & log statistics of interest
+#
 
 log="$date $host $SMSD as ${SMSD_USER}:\n  "
 
@@ -145,7 +258,8 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 
 	# Seemed like a good idea at the time... ;-D
 	# if [[ $pct_log -gt 80 ]]; then
-	# 	echo "Error on ${host}: SMS Daemon Log is $pct_log% of Usage!"
+	# 	echo -n "Error on ${host}:"
+	#	echo " SMS${ALTLABEL} Daemon Log is $pct_log% of Usage!"
 	# 	echo "   $SMSD_LOG $log_bytes ($log_hbytes)"
 	# 	exit -2
 	# fi

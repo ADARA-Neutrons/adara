@@ -223,7 +223,7 @@ ComBusTransMon::commThread()
                             "as User", m_broker_user.c_str(),
                             "for", ss.str().c_str(),
                             " - Will Retry..." );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
 
                         terminal_bcast_retry = true;
                     }
@@ -236,7 +236,7 @@ ComBusTransMon::commThread()
                             "to URI", m_broker_uri.c_str(),
                             "as User", m_broker_user.c_str(),
                             "for", ss.str().c_str() );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
 
                         terminal_bcast_retry = false;
                     }
@@ -257,7 +257,7 @@ ComBusTransMon::commThread()
                             "as User", m_broker_user.c_str(),
                             "for", ss.str().c_str(),
                             " - Will Retry..." );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
 
                         terminal_workflow_retry = true;
                     }
@@ -271,7 +271,7 @@ ComBusTransMon::commThread()
                             "to URI", m_broker_uri.c_str(),
                             "as User", m_broker_user.c_str(),
                             "for", ss.str().c_str() );
-                        usleep(30000); // give syslog a chance...
+                        give_syslog_a_chance;
 
                         terminal_workflow_retry = false;
                     }
@@ -345,7 +345,7 @@ ComBusTransMon::commThread()
                         g_pid, "Connected to ComBus", m_domain.c_str(),
                         m_broker_uri.c_str(), m_broker_user.c_str() );
                 }
-                usleep(30000); // give syslog a chance...
+                give_syslog_a_chance;
 
                 // Send Translation Started message
                 ADARA::ComBus::STC::TranslationStartedMsg msg(

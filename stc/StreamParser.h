@@ -32,12 +32,22 @@ class StreamParser : public ADARA::POSIXParser, public IStreamAdapter
 {
 public:
 
-    /// Used to Identify "Special" Detector Bank Indices (Error & Unmapped)
-    enum SpecialBank
+    /// Used to Identify "Special" Detector Bank Ids (Error & Unmapped)
+    enum SpecialBankIds
     {
         UNMAPPED_BANK   = 0xffffffff,
         ERROR_BANK      = 0xfffffffe
     };
+
+    /// Used to Identify "Special" Detector Bank Indices (Error & Unmapped)
+    enum SpecialBankIndices
+    {
+        UNMAPPED_BANK_INDEX = 0,
+        ERROR_BANK_INDEX    = 1,
+        NUM_SPECIAL_BANKS   = 2
+    };
+
+    typedef BankInfo *BankInfoPtr;
 
     StreamParser( int a_fd,
         const std::string & a_work_root,
@@ -47,7 +57,7 @@ public:
         bool a_strict, bool a_gather_stats = false,
         uint32_t a_event_buf_write_thresh = 40960, // number of elems
         uint32_t a_ancillary_buf_write_thresh = 4096, // number of elems
-        bool a_verbose = false );
+        uint32_t a_verbose_level = 0 );
 
     virtual ~StreamParser();
 
@@ -80,15 +90,11 @@ public:
 
     bool getDoRename(void) { return m_do_rename; }
 
-    bool verbose(void) { return m_verbose; }
+    uint32_t verbose(void) { return m_verbose_level; }
 
     uint64_t m_total_bytes_count;   ///< Total Input Stream Byte Count of ADARA packets
 
 private:
-
-    typedef std::pair<uint32_t, uint32_t> BankIndex;
-
-    typedef std::map< BankIndex, BankInfo * > BankInfoMap;
 
     /// Defines internal stream processing states of StreamParser class
     enum ProcessingState
@@ -172,6 +178,9 @@ private:
     using ADARA::POSIXParser::rxPacket; // Shunt remaining rxPacket flavors
                                         // to base class implementations
 
+    void        reallocateBanksArray( uint32_t a_bank_id,
+                    uint32_t a_state );
+
     void        processPulseInfo( const ADARA::BankedEventPkt &a_pkt );
     void        processPulseInfo( const ADARA::BankedEventStatePkt &a_pkt );
     void        processBankEvents( uint32_t a_bank_id, uint32_t a_state,
@@ -222,7 +231,10 @@ private:
     uint64_t                                m_pulse_count;              ///< Internal pulse counter
     PulseInfo                               m_pulse_info;               ///< Neutron pulse data
     std::vector<STC::DetectorBankSet *>     m_bank_sets;                ///< Vector of Detector Bank Sets info
-    BankInfoMap                             m_banks;                    ///< Container of detector bank information
+    BankInfoPtr                            *m_banks_arr;                ///< Container of Detector Bank Information
+    uint32_t                                m_banks_arr_size;           ///< Size of Detector Bank Array (for Realloc)
+    uint32_t                                m_maxBank;                  ///< Maximum Detector Bank ID Encountered
+    uint32_t                                m_numStates;                ///< Total Number of States Encountered (Includes State 0)
     std::vector<STC::BeamMonitorConfig>     m_monitor_config;           ///< Vector of Beam Monitor (Histo) Config info
     std::map<Identifier,MonitorInfo*>       m_monitors;                 ///< Container of monitor information
     uint32_t                                m_event_buf_write_thresh;   ///< Event buffer write threshold (banks & monitors; number of elements)
@@ -247,7 +259,7 @@ private:
 
     struct timespec                         m_default_run_start_time;   ///< Default Run Start Time (No Neutron Pulses)...
 
-    bool                                    m_verbose;                  ///< STC Verbosity
+    uint32_t                                m_verbose_level;            ///< STC Verbosity Level
 
 protected:
     std::multimap<uint64_t, std::pair<double, uint16_t> >

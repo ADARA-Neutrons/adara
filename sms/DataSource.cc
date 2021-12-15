@@ -2192,7 +2192,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 	// Optionally Save Input Stream to Storage Container File...
 	// (Check the Live Control PV Periodically, but _Not_ Every Packet!)
 	// (And While We're At It, Also Check "Ignore Local SAWTOOTH" PV... :-)
-	if ( !( ++cnt % 99999 ) ) {
+	if ( !( ++cnt % 3333 ) ) {
 		bool tmpSaveInputStream = m_pvSaveInputStream->value();
 		if ( tmpSaveInputStream != m_save_input_stream )
 		{
@@ -2224,7 +2224,7 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 
 	// Once in a blue moon, dump "Discarded Packet" statistics... ;-D
 	// (Note: count already incremented above for Save Input Stream...!)
-	if ( !( cnt % 999999 ) ) {
+	if ( !( cnt % 99999 ) ) {
 		std::string log_info;
 		Parser::getDiscardedPacketsLogString(log_info);
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
@@ -2625,7 +2625,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	// - We don't expect this to change very often, if ever,
 	// so only check rarely, like every 3 minutes... ;-D
 	// (Note: count already incremented above for overall method...!)
-	if ( !(cnt % 33333) ) {
+	if ( !(cnt % 9999) ) {
 		bool tmpCheckSourceSequence = m_pvCheckSourceSequence->value();
 		if ( tmpCheckSourceSequence != m_check_source_sequence )
 		{
@@ -2764,7 +2764,7 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	// Sometimes we just can't rely on end-of-pulse being set correctly ;-b
 	// - Infrequently Update from Live Control PV Value, once per minute?
 	// (Note: count already incremented above for overall method...!)
-	if ( !(cnt % 99999) ) {
+	if ( !(cnt % 9999) ) {
 		bool tmpIgnoreEoP = m_pvIgnoreEoP->value();
 		if ( tmpIgnoreEoP != m_ignore_eop )
 		{
