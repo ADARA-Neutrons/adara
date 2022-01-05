@@ -43,6 +43,38 @@ USAGE()
 	echo
 }
 
+CHECK_PROCEED()
+{
+	local _proceed_query="Proceed"
+	local _alt_query=0
+
+	if [[ "#$1#" != '##' ]]; then
+		_proceed_query="$1"
+		_alt_query=1
+	fi
+
+	local _proceed_ck=""
+
+	echo -e -n "\n${_proceed_query} (yes/No)? "
+	read _proceed_ck
+
+	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ -z ${_proceed_ck} || ${_proceed_ck} == "n" \
+			|| ${_proceed_ck} == "no" ]]; then
+		# Alternate Query? Just Return...
+		if [[ ${_alt_query} == 1 ]]; then
+			return 99
+		# Else Actually Exit Script...
+		else
+			echo -e "\nExiting ADARA Latest Data at User's Request.\n"
+			exit 99
+		fi
+	fi
+
+	return 0
+}
+
 #
 # Parse Command Line Arguments
 #
@@ -50,7 +82,7 @@ USAGE()
 FILE_TYPE="SMS"
 FILE_PREFIX="m"
 
-EXTRA_PARSER_ARGS=""
+Latest Data
 
 SEARCH=""
 
@@ -147,6 +179,7 @@ DO_CMD()
 		if [[ -z "${SEARCH}" ]]; then
 			echo -e "\n*** Error: No Search Pattern Specified!"
 			echo -e "\nPlease Use 'S' or 's' to Set Search Pattern."
+			CHECK_PROCEED
 		else
 			echo -e "\nGrep Latest Raw Data File [${datafile}]"
 			echo -e "   for Search Pattern [${SEARCH}]"
@@ -159,6 +192,7 @@ DO_CMD()
 		if [[ -z "${SEARCH}" ]]; then
 			echo -e "\n*** Error: No Search Pattern Specified!"
 			echo -e "\nPlease Use 'S' or 's' to Set Search Pattern."
+			CHECK_PROCEED
 		else
 			echo -e "\nTail Latest Raw Data File [${datafile}]"
 			echo -e "   Searching for Pattern [${SEARCH}]"
@@ -166,10 +200,11 @@ DO_CMD()
 				"${fullrawdir}/${datafile}" \
 					| eval "${GREP} ${SEARCH}" \
 					| ${TAIL}
+			CHECK_PROCEED
 		fi
 	elif [[ "${_cmd}" == "S" || "${_cmd}" == "s" ]]; then
 		echo -e -n "\nPlease Enter New Search Pattern: "
-		read pattern
+		IFS="" read pattern
 		SEARCH="-e \"${pattern}\""
 		echo -e "\nNew Search Pattern Set to: [${SEARCH}]"
 	elif [[ "${_cmd}" == "A" || "${_cmd}" == "a" ]]; then
@@ -180,10 +215,12 @@ DO_CMD()
 	elif [[ "${_cmd}" == "H" || "${_cmd}" == "h" \
 			|| "${_cmd}" == "?" ]]; then
 		CMD_USAGE
+		CHECK_PROCEED
 	# Ignore Carriage Returns... ;-D
 	elif [[ "${_cmd}" != "" ]]; then
 		CMD_USAGE
 		echo "Error: Unknown Interactive Command [${_cmd}]...!"
+		CHECK_PROCEED
 	fi
 }
 
@@ -224,7 +261,7 @@ while [[ true ]]; do
 	${LS} -l "${fullrawdir}/${datafile}" | ${SED} "s#${fullrawdir}/##"
 
 	# Check for Interactive Command Input...
-	IFS= read -t 1 -n 1 -s cmd
+	IFS="" read -t 1 -n 1 -s cmd
 
 	# Got a Command, Execute It...
 	if [[ $? == 0 ]]; then
