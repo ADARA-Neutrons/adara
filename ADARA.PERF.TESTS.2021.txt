@@ -2,16 +2,26 @@
 ADARA Fat Meta-Data Performance Tests (HYSPEC Laser, Starting 1/5/2022)
 
 1/5/2022:
-	- first HYS_330089 Test Harness run:
-		-> started run: Wed Jan  5 14:39:00 EST 2022
-		-> data input ended: Wed Jan  5 15:14:21 EST 2022
-		-> SMS finished processing: Wed Jan  5 15:15:28 EST 2022
-		-> STC finished processing: Wed Jan  5 15:15:29 EST 2022
-			=> Total STC Processing Time = 2187.820068 seconds
-			=> STC Overhead Ratio = 2.216727 (relative event bandwidth)
-			=> Total Input Stream Byte Count of ADARA packets = 1214047824
-			=> Average Stream Bandwidth = 554912.097918 bytes/sec
-	- Note: similar data scenario to long-running REF_M_927800 test case!!
+    - first HYS_330089 Test Harness run:
+        -> started run: Wed Jan  5 14:39:00 EST 2022
+        -> data input ended: Wed Jan  5 15:14:21 EST 2022
+        -> SMS finished processing: Wed Jan  5 15:15:28 EST 2022
+            => Total Time = 2188 sec (36 minutes 28 sec)
+        -> STC finished processing: Wed Jan  5 15:15:29 EST 2022
+            => Total STC Processing Time = 2187.820068 seconds
+            => STC Overhead Ratio = 2.216727 (relative event bandwidth)
+            => Total Input Stream Byte Count of ADARA packets = 1214047824
+            => Average Stream Bandwidth = 554912.097918 bytes/sec
+    - Note: similar data scenario to long-running REF_M_927800 test case!!
+        -> started run: Wed Jan  5 16:32:53 EST 2022
+        -> data input ended: Wed Jan  5 18:25:22 EST 2022
+        -> SMS finished processing: Wed Jan  5 18:26:06 EST 2022
+            => Total Time = 6793 sec (113 minutes 13 sec)
+        -> STC finished processing: Wed Jan  5 18:26:46 EST 2022
+            => Total STC Processing Time = 6831.863281 seconds
+            => STC Overhead Ratio = 5.776595 (relative event bandwidth)
+            => Total Input Stream Byte Count of ADARA packets = 3837149624
+            => Average Stream Bandwidth = 561654.919900 bytes/sec
 
 ADARA Performance Tests for NOMAD 25 Million Events/Second Bandwidth 2021
 
