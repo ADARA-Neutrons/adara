@@ -185,6 +185,8 @@ private:
 
 	typedef std::map<uint32_t, ChopperEvents> ChopperMap;
 
+	typedef std::map<uint32_t, EventVector> FastMetaMap;
+
 	struct Pulse {
 		Pulse(const PulseIdentifier &id, const SourceSet &srcs) :
 				m_id(id), m_pending(srcs), m_numEventSources(srcs.count()),
@@ -200,7 +202,7 @@ private:
 		SourceMap				m_pulseSources;
 		MonitorMap				m_monitors;
 		ChopperMap				m_chopperEvents;
-		EventVector				m_fastMetaEvents;
+		FastMetaMap				m_fastMetaEvents;
 		uint32_t				m_numEvents;
 		uint32_t				m_numBanks;
 		uint32_t				m_numMonEvents;

@@ -2731,6 +2731,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	uint32_t i, count = pkt.num_events();
 	uint32_t phys, base_phys, logical;
 	uint32_t state;
+	uint32_t key;
 	uint16_t bank = 0;
 
 	bool got_neutrons = false;
@@ -2816,11 +2817,12 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				 * mapping for it. If not, let it fall through to the
 				 * common error pixel handling.
 				 */
-				if (m_fastmeta->validVariable(phys)) {
-					if (pulse->m_fastMetaEvents.empty()) {
-						pulse->m_fastMetaEvents.reserve(m_fastMetaReserve);
+				if (m_fastmeta->validVariable(phys, key)) {
+					if (pulse->m_fastMetaEvents[key].empty()) {
+						pulse->m_fastMetaEvents[key].reserve(
+							m_fastMetaReserve);
 					}
-					pulse->m_fastMetaEvents.push_back(events[i]);
+					pulse->m_fastMetaEvents[key].push_back(events[i]);
 					meta_count++;
 					continue;
 				}
@@ -4009,10 +4011,23 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 void SMSControl::buildFastMetaPackets(PulsePtr &pulse)
 {
 	uint64_t pulse_id = pulse->m_id.first;
-	EventVector::iterator it, end = pulse->m_fastMetaEvents.end();
 
-	for (it = pulse->m_fastMetaEvents.begin(); it != end; ++it)
-		m_fastmeta->sendUpdate(pulse_id, it->pixel, it->tof);
+	FastMetaMap::iterator fmit, fmend = pulse->m_fastMetaEvents.end();
+	for (fmit = pulse->m_fastMetaEvents.begin(); fmit != fmend; ++fmit)
+	{
+		EventVector::iterator it, end = fmit->second.end();
+
+		// REMOVEME
+		//DEBUG("buildFastMetaPackets(): key="
+			//<< std::hex << fmit->first << std::dec
+			//<< " size=" << fmit->second.size());
+
+		//int cnt=0;
+		for (it = fmit->second.begin(); it != end /*&& cnt++ < 4*/ ; ++it)
+		{
+			m_fastmeta->sendUpdate(pulse_id, it->pixel, it->tof);
+		}
+	}
 }
 
 uint32_t SMSControl::pulseEnergy(uint32_t ringPeriod)
