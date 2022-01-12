@@ -35,6 +35,7 @@ USAGE()
 	echo "    [--nED|--ned|--ds=1] \\"
 	echo "    [--PVSD|--pvsd|--ds=3] \\"
 	echo "    [--ds=<N>] \\"
+	echo "    [--timeout=1|-t=1] \\"
 	echo "    [--sms_data=<${SMS_DATA}>] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
 	echo "    [--extra_parser_args=\"--events\"]  \\"
@@ -82,6 +83,8 @@ CHECK_PROCEED()
 FILE_TYPE="SMS"
 FILE_PREFIX="m"
 
+TIMEOUT=1
+
 EXTRA_PARSER_ARGS=""
 
 SEARCH=""
@@ -126,6 +129,9 @@ for arg in "$@" ; do
 		fi
 		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
 		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+	elif [[ "#$key#" == '#--timeout#' || "#$key#" == '#-t#' ]]; then
+		TIMEOUT="${value}"
+		echo -e "\nSetting Keyboard Timeout to:  [${TIMEOUT}]"
 	elif [[ "#$key#" == '#--sms_data#' ]]; then
 		SMS_DATA="${value%/}"
 		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
@@ -261,7 +267,7 @@ while [[ true ]]; do
 	${LS} -l "${fullrawdir}/${datafile}" | ${SED} "s#${fullrawdir}/##"
 
 	# Check for Interactive Command Input...
-	IFS="" read -t 1 -n 1 -s cmd
+	IFS="" read -t ${TIMEOUT} -n 1 -s cmd
 
 	# Got a Command, Execute It...
 	if [[ $? == 0 ]]; then
