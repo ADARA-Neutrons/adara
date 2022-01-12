@@ -45,15 +45,16 @@ RateLimitedLogging::History RLLHistory_SMSControl;
 #define RLL_GLOBAL_SAWTOOTH_LAST         2
 #define RLL_PULSE_BUFFER_OVERFLOW        3
 #define RLL_SET_SOURCES_READ_DELAY       4
-#define RLL_UNKNOWN_FAST_META_PIXEL_ID   5
-#define RLL_RTDL_OUT_OF_ORDER_WITH_DATA  6
-#define RLL_PULSE_PCHG_UNCORRECTED       7
-#define RLL_PULSE_PCHG_BUFFER_EMPTY      8
-#define RLL_NO_RTDL_FOR_PULSE            9
-#define RLL_CHOPPER_SYNC_ISSUE          10
-#define RLL_CHOPPER_GLITCH_ISSUE        11
-#define RLL_BOGUS_PULSE_ENERGY_ZERO     12
-#define RLL_BOGUS_PULSE_ENERGY_BETA     13
+#define RLL_MISSING_RTDL_PROTON_CHARGE   5
+#define RLL_UNKNOWN_FAST_META_PIXEL_ID   6
+#define RLL_RTDL_OUT_OF_ORDER_WITH_DATA  7
+#define RLL_PULSE_PCHG_UNCORRECTED       8
+#define RLL_PULSE_PCHG_BUFFER_EMPTY      9
+#define RLL_NO_RTDL_FOR_PULSE           10
+#define RLL_CHOPPER_SYNC_ISSUE          11
+#define RLL_CHOPPER_GLITCH_ISSUE        12
+#define RLL_BOGUS_PULSE_ENERGY_ZERO     13
+#define RLL_BOGUS_PULSE_ENERGY_BETA     14
 
 uint32_t SMSControl::m_targetStationNumber;
 
@@ -2660,12 +2661,24 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	}
 	else {
 		if ( !m_noRTDLPulses ) {
-			ERROR( ( m_recording ? "[RECORDING] " : "" )
-				<< "pulseEvents(): Missing RTDL for Setting Proton Charge!"
-				<< " Use Data Packet Proton Charge, If Available..."
-				<< " Data=" << pkt.pulseCharge()
-				<< " id=0x" << std::hex << pulse->m_id.first
-				<< " dup=0x" << pulse->m_id.second << std::dec);
+			// Rate-Limited Log Missing RTDL for Setting Proton Charge...
+			std::stringstream ss;
+			// Just Use Hardware ID for RLL Key...
+			ss << hwId;
+			std::string log_info;
+			if ( RateLimitedLogging::checkLog(
+					RLLHistory_SMSControl,
+					RLL_MISSING_RTDL_PROTON_CHARGE, ss.str(),
+					2, 10, 100, log_info ) ) {
+				ERROR(log_info
+					<< ( m_recording ? "[RECORDING] " : "" )
+					<< "pulseEvents():"
+					<< " Missing RTDL for Setting Proton Charge!"
+					<< " Use Data Packet Proton Charge, If Available..."
+					<< " Data=" << pkt.pulseCharge()
+					<< " id=0x" << std::hex << pulse->m_id.first
+					<< " dup=0x" << pulse->m_id.second << std::dec);
+			}
 		}
 		pulse->m_charge = pkt.pulseCharge();
 	}
