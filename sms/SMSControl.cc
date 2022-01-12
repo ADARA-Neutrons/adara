@@ -2669,7 +2669,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 			if ( RateLimitedLogging::checkLog(
 					RLLHistory_SMSControl,
 					RLL_MISSING_RTDL_PROTON_CHARGE, ss.str(),
-					2, 10, 100, log_info ) ) {
+					2, 10, 5000, log_info ) ) {
 				ERROR(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "pulseEvents():"
