@@ -79,6 +79,8 @@ FACILITY=""
 INST=""
 ALT=""
 
+SMS_DATA_OPT=""
+
 STC_SERVICE=""
 STC_HOST=""
 
@@ -141,6 +143,8 @@ for arg in "$@" ; do
 		echo -e "\nSetting Alternate SMS Suffix to: [$ALT]"
 		SMS_DATA="/SNSlocal/sms${ALT}/data"
 		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+		SMS_DATA_OPT="--sms_data=${SMS_DATA}"
+		echo -e "\nSetting SMS Data Option to:\n\t[${SMS_DATA_OPT}]"
 		SMS_LOG="/var/log/smsd${ALT}.log"
 		echo -e "\nSetting SMS Log File to:\n\t[${SMS_LOG}]"
 	elif [[ "#$key#" == '#--sms_data#' ]]; then
@@ -204,7 +208,8 @@ for man in ${MANS} ; do
 
 			${ADARA_ADD_RUN_END} --inst=$INST --facility=${FACILITY} \
 				${STC_HOST} ${STC_SERVICE} \
-				--stc_port=${STC_PORT} --run=${run}
+				--stc_port=${STC_PORT} \
+				${SMS_DATA_OPT} --run=${run}
 
 			${LS} -lt ${dir} | ${HEAD}
 
