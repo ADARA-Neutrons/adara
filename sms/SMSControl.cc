@@ -4035,10 +4035,17 @@ void SMSControl::buildFastMetaPackets(PulsePtr &pulse)
 			//<< std::hex << fmit->first << std::dec
 			//<< " size=" << fmit->second.size());
 
-		//int cnt=0;
-		for (it = fmit->second.begin(); it != end /*&& cnt++ < 4*/ ; ++it)
+		if ( fmit->second.size() > 3 )
 		{
-			m_fastmeta->sendUpdate(pulse_id, it->pixel, it->tof);
+			m_fastmeta->sendMultUpdate(pulse_id, fmit->second);
+		}
+
+		else
+		{
+			for (it = fmit->second.begin(); it != end ; ++it)
+			{
+				m_fastmeta->sendUpdate(pulse_id, it->pixel, it->tof);
+			}
 		}
 	}
 }
