@@ -141,13 +141,13 @@ public:
 	static void init(void);
 	static void late_config(const boost::property_tree::ptree &conf);
 
+	typedef std::vector<ADARA::Event> EventVector;
+
 private:
 	SMSControl();
 	~SMSControl();
 
 	typedef std::pair<uint64_t, uint32_t> PulseIdentifier;
-
-	typedef std::vector<ADARA::Event> EventVector;
 
 	struct EventSource {
 		EventSource( uint32_t intraPulse, uint32_t tofField ) :
