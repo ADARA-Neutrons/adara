@@ -548,6 +548,11 @@ StreamParser::rxPacket
         case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
         case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
         case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
+        case ADARA::PacketType::MULT_VAR_VALUE_U32_TYPE:
+        case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_TYPE:
+        case ADARA::PacketType::MULT_VAR_VALUE_STRING_TYPE:
+        case ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_TYPE:
+        case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_TYPE:
         case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
             PROCESS_IN_STATES(PROCESSING_RUN_HEADER|PROCESSING_EVENTS)
 
@@ -4861,11 +4866,6 @@ StreamParser::rxPacket
 
 
 //------------------------------------------------------------------------
-// ADARA Variable (uint32) packet processing
-//------------------------------------------------------------------------
-
-
-//------------------------------------------------------------------------
 // StreamParser Inline / Template Method Implementations
 //------------------------------------------------------------------------
 
@@ -5215,6 +5215,11 @@ template void StreamParser::pvValueUpdate< std::vector<double> >(
     std::vector<double> a_value, const timespec &a_timestamp );
 
 
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Variable (uint32) packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
 /*! \brief This method processes unsigned integer Variable Update ADARA packets
  *  \return Always returns false to allow parsing to continue
  *
@@ -5333,6 +5338,301 @@ StreamParser::rxPacket
 {
     pvValueUpdate< vector<double> >( a_pkt.devId(), a_pkt.varId(),
         a_pkt.value(), a_pkt.timestamp() );
+
+    return false;
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Multiple Variable (uint32) packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes unsigned integer Multiple Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA unsigned integer Multiple Variable Update packets.
+ * See the pvValueUpdate() template method in StreamParser.h
+ * for more details.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::MultVariableU32Pkt &a_pkt  ///< [in] The ADARA Multiple Variable Update packet to process
+)
+{
+    vector<uint32_t>::const_iterator it_vals = a_pkt.values().begin();
+    vector<uint32_t>::const_iterator it_tofs = a_pkt.tofs().begin();
+
+    uint32_t numVals = a_pkt.numValues();
+
+    for ( uint32_t i=0 ; i < numVals ; i++ )
+    {
+        struct timespec ts = a_pkt.timestamp();
+
+        // Make Sure We Don't Run Out of Values or TOFs... ;-D
+        if ( it_vals == a_pkt.values().end()
+                || it_tofs == a_pkt.tofs().end() )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %s=%u %s=%u %s i=%u/%u at %lu.%09lu",
+                g_pid, "STC Error:", "MultVariableU32Pkt()",
+                "devId", a_pkt.devId(),
+                "varId", a_pkt.varId(),
+                "Premature End of Value or TOF Vector", i, numVals,
+                ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, ts.tv_nsec );
+            give_syslog_a_chance;
+            return false;
+        }
+
+        ts.tv_nsec += *it_tofs++;
+
+        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
+            ts.tv_nsec -= 1000U * 1000 * 1000;
+            ts.tv_sec++;
+        }
+
+        pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(),
+            *it_vals++, ts );
+    }
+
+    return false;
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Multiple Variable (double) packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes double-prec floating point Multiple Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA double-precision floating point Multiple Variable
+ * Update packets.
+ * See the pvValueUpdate() template method in StreamParser.h
+ * for more details.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::MultVariableDoublePkt &a_pkt ///< [in] The ADARA Multiple Variable Update packet to process
+)
+{
+    std::vector<double>::const_iterator it_vals = a_pkt.values().begin();
+    std::vector<uint32_t>::const_iterator it_tofs = a_pkt.tofs().begin();
+
+    uint32_t numVals = a_pkt.numValues();
+
+    for ( uint32_t i=0 ; i < numVals ; i++ )
+    {
+        struct timespec ts = a_pkt.timestamp();
+
+        // Make Sure We Don't Run Out of Values or TOFs... ;-D
+        if ( it_vals == a_pkt.values().end()
+                || it_tofs == a_pkt.tofs().end() )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %s=%u %s=%u %s i=%u/%u at %lu.%09lu",
+                g_pid, "STC Error:", "MultVariableDoublePkt()",
+                "devId", a_pkt.devId(),
+                "varId", a_pkt.varId(),
+                "Premature End of Value or TOF Vector", i, numVals,
+                ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, ts.tv_nsec );
+            give_syslog_a_chance;
+            return false;
+        }
+
+        ts.tv_nsec += *it_tofs++;
+
+        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
+            ts.tv_nsec -= 1000U * 1000 * 1000;
+            ts.tv_sec++;
+        }
+
+        pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(),
+            *it_vals++, ts );
+    }
+
+    return false;
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Multiple Variable (string) packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes character string Multiple Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA character string Multiple Variable Update packets.
+ * See the pvValueUpdate() template method in StreamParser.h
+ * for more details.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::MultVariableStringPkt &a_pkt ///< [in] The ADARA Multiple Variable Update packet to process
+)
+{
+    std::vector<string>::const_iterator it_vals = a_pkt.values().begin();
+    std::vector<uint32_t>::const_iterator it_tofs = a_pkt.tofs().begin();
+
+    uint32_t numVals = a_pkt.numValues();
+
+    for ( uint32_t i=0 ; i < numVals ; i++ )
+    {
+        struct timespec ts = a_pkt.timestamp();
+
+        // Make Sure We Don't Run Out of Values or TOFs... ;-D
+        if ( it_vals == a_pkt.values().end()
+                || it_tofs == a_pkt.tofs().end() )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %s=%u %s=%u %s i=%u/%u at %lu.%09lu",
+                g_pid, "STC Error:", "MultVariableStringPkt()",
+                "devId", a_pkt.devId(),
+                "varId", a_pkt.varId(),
+                "Premature End of Value or TOF Vector", i, numVals,
+                ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, ts.tv_nsec );
+            give_syslog_a_chance;
+            return false;
+        }
+
+        ts.tv_nsec += *it_tofs++;
+
+        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
+            ts.tv_nsec -= 1000U * 1000 * 1000;
+            ts.tv_sec++;
+        }
+
+        pvValueUpdate<string>( a_pkt.devId(), a_pkt.varId(),
+            *it_vals++, ts );
+    }
+
+    return false;
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Multiple Variable (uint32 array) packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes unsigned integer array Multiple Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA unsigned integer array Multiple Variable Update
+ * packets.
+ * See the pvValueUpdate() template method in StreamParser.h
+ * for more details.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::MultVariableU32ArrayPkt &a_pkt  ///< [in] The ADARA Multiple Variable Update packet to process
+)
+{
+    std::vector< vector<uint32_t> >::const_iterator it_vals =
+        a_pkt.values().begin();
+    std::vector<uint32_t>::const_iterator it_tofs = a_pkt.tofs().begin();
+
+    uint32_t numVals = a_pkt.numValues();
+
+    for ( uint32_t i=0 ; i < numVals ; i++ )
+    {
+        struct timespec ts = a_pkt.timestamp();
+
+        // Make Sure We Don't Run Out of Values or TOFs... ;-D
+        if ( it_vals == a_pkt.values().end()
+                || it_tofs == a_pkt.tofs().end() )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %s=%u %s=%u %s i=%u/%u at %lu.%09lu",
+                g_pid, "STC Error:", "MultVariableU32ArrayPkt()",
+                "devId", a_pkt.devId(),
+                "varId", a_pkt.varId(),
+                "Premature End of Value or TOF Vector", i, numVals,
+                ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, ts.tv_nsec );
+            give_syslog_a_chance;
+            return false;
+        }
+
+        ts.tv_nsec += *it_tofs++;
+
+        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
+            ts.tv_nsec -= 1000U * 1000 * 1000;
+            ts.tv_sec++;
+        }
+
+        pvValueUpdate< vector<uint32_t> >( a_pkt.devId(), a_pkt.varId(),
+            *it_vals++, ts );
+    }
+
+    return false;
+}
+
+
+//---------------------------------------------------------------------------------------------------------------------
+// ADARA Multiple Variable (double array) packet processing
+//---------------------------------------------------------------------------------------------------------------------
+
+
+/*! \brief This method processes double-prec floating point array Multiple Variable Update ADARA packets
+ *  \return Always returns false to allow parsing to continue
+ *
+ * This method processes ADARA double-precision floating point array
+ * Multiple Variable Update packets.
+ * See the pvValueUpdate() template method in StreamParser.h
+ * for more details.
+ */
+bool
+StreamParser::rxPacket
+(
+    const ADARA::MultVariableDoubleArrayPkt &a_pkt ///< [in] The ADARA Multiple Variable Update packet to process
+)
+{
+    std::vector< vector<double> >::const_iterator it_vals =
+        a_pkt.values().begin();
+    std::vector<uint32_t>::const_iterator it_tofs = a_pkt.tofs().begin();
+
+    uint32_t numVals = a_pkt.numValues();
+
+    for ( uint32_t i=0 ; i < numVals ; i++ )
+    {
+        struct timespec ts = a_pkt.timestamp();
+
+        // Make Sure We Don't Run Out of Values or TOFs... ;-D
+        if ( it_vals == a_pkt.values().end()
+                || it_tofs == a_pkt.tofs().end() )
+        {
+            syslog( LOG_ERR,
+                "[%i] %s %s %s=%u %s=%u %s i=%u/%u at %lu.%09lu",
+                g_pid, "STC Error:", "MultVariableDoubleArrayPkt()",
+                "devId", a_pkt.devId(),
+                "varId", a_pkt.varId(),
+                "Premature End of Value or TOF Vector", i, numVals,
+                ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, ts.tv_nsec );
+            give_syslog_a_chance;
+            return false;
+        }
+
+        ts.tv_nsec += *it_tofs++;
+
+        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
+            ts.tv_nsec -= 1000U * 1000 * 1000;
+            ts.tv_sec++;
+        }
+
+        pvValueUpdate< vector<double> >( a_pkt.devId(), a_pkt.varId(),
+            *it_vals++, ts );
+    }
 
     return false;
 }
@@ -7448,6 +7748,16 @@ StreamParser::getPktName(
             ss << "VVP U32 ARRAY"; break;
         case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
             ss << "VVP DBL ARRAY"; break;
+        case ADARA::PacketType::MULT_VAR_VALUE_U32_TYPE:
+            ss << "Mult VVP U32"; break;
+        case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_TYPE:
+            ss << "Mult VVP DBL"; break;
+        case ADARA::PacketType::MULT_VAR_VALUE_STRING_TYPE:
+            ss << "Mult VVP STR"; break;
+        case ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_TYPE:
+            ss << "Mult VVP U32 ARRAY"; break;
+        case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_TYPE:
+            ss << "Mult VVP DBL ARRAY"; break;
         default:
             ss << "Unknown (0x" << hex << type << dec << ")";
             break;
