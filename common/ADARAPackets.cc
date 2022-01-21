@@ -1463,7 +1463,7 @@ VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " VariableValue (string) packet has invalid status: "
+		ss << " VariableValue (String) packet has invalid status: "
 			<< status();
 		throw invalid_packet(ss.str());
 	}
@@ -1472,7 +1472,7 @@ VariableStringPkt::VariableStringPkt(const uint8_t *data, uint32_t len) :
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
-		ss << " VariableValue (string) packet has invalid severity: "
+		ss << " VariableValue (String) packet has invalid severity: "
 			<< severity();
 		throw invalid_packet(ss.str());
 	}
@@ -1514,7 +1514,7 @@ VariableU32ArrayPkt::VariableU32ArrayPkt(
 		throw invalid_packet(ss.str());
 	}
 
-	count = m_fields[3];
+	count = elemCount();
 	size = count * sizeof(uint32_t);
 	if (m_version == 0x00
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
@@ -1596,7 +1596,7 @@ VariableDoubleArrayPkt::VariableDoubleArrayPkt(
 		throw invalid_packet(ss.str());
 	}
 
-	count = m_fields[3];
+	count = elemCount();
 	size = count * sizeof(double);
 	if (m_version == 0x00
 			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
@@ -1650,5 +1650,625 @@ VariableDoubleArrayPkt::VariableDoubleArrayPkt(
 VariableDoubleArrayPkt::VariableDoubleArrayPkt(
 		const VariableDoubleArrayPkt &pkt ) :
 	Packet(pkt), m_fields((const uint32_t *)payload()), m_val(pkt.m_val)
+{}
+
+/* -------------------------------------------------------------------- */
+
+MultVariableU32Pkt::MultVariableU32Pkt(const uint8_t *data, uint32_t len) :
+	Packet(data, len), m_fields((const uint32_t *)payload())
+{
+	uint32_t numVals;
+	size_t size;
+
+	// Check Versus Base Header Size...
+	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (U32) V0 packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version > ADARA::PacketType::MULT_VAR_VALUE_U32_VERSION
+			&& m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer MultVariableValue (U32) packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+
+	// Check Versus Base Header Size Plus NumValues TOF + U32 Values...
+	numVals = numValues();
+	size = numVals * 2 * sizeof(uint32_t); // TOF + Value
+	if (m_version == 0x00
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (U32) V0 packet"
+			<< " has Undersize U32 TOF/Value arrays: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version
+				> ADARA::PacketType::MULT_VAR_VALUE_U32_VERSION
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer MultVariableValue (U32) packet"
+			<< " has Undersize U32 TOF/Value arrays: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
+	}
+
+	if (validate_status(status())) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (U32) packet has invalid status: "
+			<< status();
+		throw invalid_packet(ss.str());
+	}
+
+	if (validate_severity(severity())) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (U32) packet has invalid severity: "
+			<< severity();
+		throw invalid_packet(ss.str());
+	}
+
+	// Copy Over NumValues TOF and U32 Values from Payload...
+
+	const uint32_t *ptr = (const uint32_t *) &m_fields[4];
+
+	/* TODO it would be better to create the array on access
+	 * rather than object construction; the user may not care.
+	 */
+
+	for ( uint32_t i=0 ; i < numVals ; i++ ) {
+
+		// Next TOF...
+		m_tofs.push_back( *ptr++ );
+
+		// Next U32 Value...
+		m_vals.push_back( *ptr++ );
+	}
+}
+
+MultVariableU32Pkt::MultVariableU32Pkt(const MultVariableU32Pkt &pkt) :
+	Packet(pkt), m_fields((const uint32_t *)payload()),
+	m_vals(pkt.m_vals), m_tofs(pkt.m_tofs)
+{}
+
+/* -------------------------------------------------------------------- */
+
+MultVariableDoublePkt::MultVariableDoublePkt(
+		const uint8_t *data, uint32_t len) :
+	Packet(data, len), m_fields((const uint32_t *)payload())
+{
+	uint32_t numVals;
+	size_t size;
+
+	// Check Versus Base Header Size...
+	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (Double) V0 packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version > ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_VERSION
+			&& m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer MultVariableValue (Double) packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+
+	// Check Versus Base Header Size Plus NumValues TOF + Double Values...
+	numVals = numValues();
+	size = numVals * (sizeof(uint32_t) + sizeof(double)); // TOF + Value
+	if (m_version == 0x00
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (Double) V0 packet"
+			<< " has Undersize Double TOF/Value arrays: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version
+				> ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_VERSION
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer MultVariableValue (Double) packet"
+			<< " has Undersize Double TOF/Value arrays: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
+	}
+
+	if (validate_status(status())) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (Double) packet has invalid status: "
+			<< status();
+		throw invalid_packet(ss.str());
+	}
+
+	if (validate_severity(severity())) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (Double) packet has invalid severity: "
+			<< severity();
+		throw invalid_packet(ss.str());
+	}
+
+	/* TODO it would be better to create the array on access
+	 * rather than object construction; the user may not care.
+	 */
+	m_vals = std::vector<double>( numVals );
+	m_tofs = std::vector<uint32_t>( numVals );
+
+	// Copy Over NumValues TOF and Double Values from Payload...
+
+	const uint32_t *ptr = (const uint32_t *) &m_fields[4];
+
+	/* TODO it would be better to create the array on access
+	 * rather than object construction; the user may not care.
+	 */
+
+	for ( uint32_t i=0 ; i < numVals ; i++ ) {
+
+		// Next TOF...
+		m_tofs.push_back( *ptr++ );
+
+		// Next Double Value...
+		m_vals.push_back( *((double *)ptr++) );
+	}
+}
+
+MultVariableDoublePkt::MultVariableDoublePkt(
+		const MultVariableDoublePkt &pkt) :
+	Packet(pkt), m_fields((const uint32_t *)payload()),
+	m_vals(pkt.m_vals), m_tofs(pkt.m_tofs)
+{}
+
+/* -------------------------------------------------------------------- */
+
+MultVariableStringPkt::MultVariableStringPkt(
+		const uint8_t *data, uint32_t len) :
+	Packet(data, len), m_fields((const uint32_t *)payload())
+{
+	uint32_t numVals;
+	uint32_t size;
+
+	// Check Versus Base Header Size...
+	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (String) V0 packet is too short "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version > ADARA::PacketType::MULT_VAR_VALUE_STRING_VERSION
+			&& m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer MultVariableValue (String) packet is too short "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+
+	// Check Versus Base Header Size Plus NumValues TOF + String Lengths...
+	numVals = numValues();
+	size = numVals * 2 * sizeof(uint32_t); // TOF + Length...
+	if (m_version == 0x00
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (String) V0 packet"
+			<< " has Undersize String TOF/Length arrays: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version
+				> ADARA::PacketType::MULT_VAR_VALUE_STRING_VERSION
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer MultVariableValue (String) packet"
+			<< " has Undersize String TOF/Length arrays: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
+	}
+
+	if (validate_status(status())) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (String) packet has invalid status: "
+			<< status();
+		throw invalid_packet(ss.str());
+	}
+
+	if (validate_severity(severity())) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (String) packet has invalid severity: "
+			<< severity();
+		throw invalid_packet(ss.str());
+	}
+
+	// Check & Copy Over NumValues Strings from Payload...
+
+	const uint32_t *ptr = (const uint32_t *) &m_fields[4];
+	uint32_t payload_remaining = m_payload_len - (4 * sizeof(uint32_t));
+
+	for ( uint32_t i=0 ; i < numVals ; i++ ) {
+
+		// Next TOF...
+		m_tofs.push_back( *ptr++ );
+
+		// Next String Size...
+		size = *ptr++;
+
+		// Next String...
+		const char *str = (const char *) ptr;
+
+		if (m_version == 0x00
+				&& payload_remaining < (size + (2 * sizeof(uint32_t)))) {
+			std::stringstream ss;
+			ss << ( (uint32_t) (m_pulseId >> 32) )
+				<< "." << ( (uint32_t) m_pulseId );
+			ss << " MultVariableValue (String) V0 packet"
+				<< " has Undersize String Values array: " << size;
+			ss << " vs remaining payload " << payload_remaining;
+			ss << " [";
+			for ( uint32_t i=0 ;
+					i < payload_remaining - sizeof(uint32_t) ; i++ ) {
+				if ( ! ((uint8_t) *(str + i)) )
+					ss << "#000";
+				else
+					ss << *(str + i);
+			}
+			ss << "]";
+			throw invalid_packet(ss.str());
+		}
+		else if (m_version
+					> ADARA::PacketType::MULT_VAR_VALUE_STRING_VERSION
+				&& payload_remaining < (size + (2 * sizeof(uint32_t)))) {
+			std::stringstream ss;
+			ss << ( (uint32_t) (m_pulseId >> 32) )
+				<< "." << ( (uint32_t) m_pulseId );
+			ss << " Newer MultVariableValue (String) packet"
+				<< " has Undersize String Values array: " << size;
+			ss << " vs remaining payload " << payload_remaining;
+			ss << " [";
+			for ( uint32_t i=0 ;
+					i < payload_remaining - sizeof(uint32_t) ; i++ ) {
+				if ( ! ((uint8_t) *(str + i)) )
+					ss << "#000";
+				else
+					ss << *(str + i);
+			}
+			ss << "]";
+			throw invalid_packet(ss.str());
+		}
+
+		/* TODO it would be better to create the string on access
+		 * rather than object construction; the user may not care.
+		 */
+		m_vals[i].assign(str, size);
+
+		// "roundup(N,4)" bytes of null padded chars...
+		uint32_t roundup = ( size + sizeof(uint32_t) - 1 )
+			/ sizeof(uint32_t);
+
+		ptr += roundup;
+		payload_remaining -= ( roundup + 2 ) * sizeof(uint32_t);
+	}
+}
+
+MultVariableStringPkt::MultVariableStringPkt(
+		const MultVariableStringPkt &pkt) :
+	Packet(pkt), m_fields((const uint32_t *)payload()),
+	m_vals(pkt.m_vals), m_tofs(pkt.m_tofs)
+{}
+
+/* -------------------------------------------------------------------- */
+
+MultVariableU32ArrayPkt::MultVariableU32ArrayPkt(
+		const uint8_t *data, uint32_t len ) :
+	Packet(data, len), m_fields((const uint32_t *)payload())
+{
+	uint32_t numVals;
+	size_t size;
+
+	// Check Versus Base Header Size...
+	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (U32 Array) V0 packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version
+				> ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_VERSION
+			&& m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer MultVariableValue (U32 Array) packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+
+	// Check Versus Base Header Size
+	// Plus NumValues TOF + U32 Array Lengths
+	numVals = numValues();
+	size = numVals * 2 * sizeof(uint32_t); // TOF + Length...
+	if (m_version == 0x00
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (U32 Array) V0 packet"
+			<< " has Undersize U32 Array TOF/Length arrays: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version
+				> ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_VERSION
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer MultVariableValue (U32 Array) packet"
+			<< " has Undersize U32 Array TOF/Length arrays: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
+	}
+
+	if (validate_status(status())) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (U32 Array) packet has invalid status: "
+			<< status();
+		throw invalid_packet(ss.str());
+	}
+
+	if (validate_severity(severity())) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (U32 Array) packet"
+			<< " has invalid severity: "
+			<< severity();
+		throw invalid_packet(ss.str());
+	}
+
+	// Check & Copy Over NumValues U32 Arrays from Payload...
+
+	const uint32_t *ptr = (const uint32_t *) &m_fields[4];
+	uint32_t payload_remaining = m_payload_len - (4 * sizeof(uint32_t));
+
+	for ( uint32_t i=0 ; i < numVals ; i++ ) {
+
+		// Next TOF...
+		m_tofs.push_back( *ptr++ );
+
+		// Next U32 Array Size...
+		size = *ptr++;
+
+		// Next U32 Array...
+		const uint32_t *arr = (const uint32_t *) ptr;
+
+		if (m_version == 0x00
+				&& payload_remaining < (( size + 2 ) * sizeof(uint32_t))) {
+			std::stringstream ss;
+			ss << ( (uint32_t) (m_pulseId >> 32) )
+				<< "." << ( (uint32_t) m_pulseId );
+			ss << " MultVariableValue (U32 Array) V0 packet"
+				<< " has Undersize U32 Array Values array: " << size;
+			ss << " vs remaining payload " << payload_remaining;
+			throw invalid_packet(ss.str());
+		}
+		else if (m_version
+					> ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_VERSION
+				&& payload_remaining < (( size + 2 ) * sizeof(uint32_t))) {
+			std::stringstream ss;
+			ss << ( (uint32_t) (m_pulseId >> 32) )
+				<< "." << ( (uint32_t) m_pulseId );
+			ss << " Newer MultVariableValue (U32 Array) packet"
+				<< " has Undersize U32 Array Values array: " << size;
+			ss << " vs remaining payload " << payload_remaining;
+			throw invalid_packet(ss.str());
+		}
+
+		/* TODO it would be better to create the array on access
+		 * rather than object construction; the user may not care.
+		 */
+		m_vals[i] = std::vector<uint32_t>( size );
+		memcpy(const_cast<uint32_t *> (m_vals[i].data()),
+			arr, size * sizeof(uint32_t));
+
+		ptr += size;
+		payload_remaining -= ( size + 2 ) * sizeof(uint32_t);
+	}
+}
+
+MultVariableU32ArrayPkt::MultVariableU32ArrayPkt(
+		const MultVariableU32ArrayPkt &pkt) :
+	Packet(pkt), m_fields((const uint32_t *)payload()),
+	m_vals(pkt.m_vals), m_tofs(pkt.m_tofs)
+{}
+
+/* -------------------------------------------------------------------- */
+
+MultVariableDoubleArrayPkt::MultVariableDoubleArrayPkt(
+		const uint8_t *data, uint32_t len ) :
+	Packet(data, len), m_fields((const uint32_t *)payload())
+{
+	uint32_t numVals;
+	size_t size;
+
+	// Check Versus Base Header Size...
+	if (m_version == 0x00 && m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (Double Array) V0 packet is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version
+				> ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_VERSION
+			&& m_payload_len < (4 * sizeof(uint32_t))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer MultVariableValue (Double Array) packet"
+			<< " is too short: "
+			<< m_payload_len;
+		throw invalid_packet(ss.str());
+	}
+
+	// Check Versus Base Header Size
+	// Plus NumValues TOF + Double Array Lengths...
+	numVals = numValues();
+	size = numVals * 2 * sizeof(uint32_t); // TOF + Length...
+	if (m_version == 0x00
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (Double Array) V0 packet has Undersize "
+			<< "Double Array TOF/Length arrays: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
+	}
+	else if (m_version
+				> ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_VERSION
+			&& m_payload_len < (size + (4 * sizeof(uint32_t)))) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " Newer MultVariableValue (Double Array) packet"
+			<< " has Undersize Double Array TOF/Length arrays: " << size;
+		ss << " vs payload "
+			<< ( m_payload_len - (4 * sizeof(uint32_t)) );
+		throw invalid_packet(ss.str());
+	}
+
+	if (validate_status(status())) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (Double Array) packet"
+			<< " has invalid status: "
+			<< status();
+		throw invalid_packet(ss.str());
+	}
+
+	if (validate_severity(severity())) {
+		std::stringstream ss;
+		ss << ( (uint32_t) (m_pulseId >> 32) )
+			<< "." << ( (uint32_t) m_pulseId );
+		ss << " MultVariableValue (Double Array) packet"
+			<< " has invalid severity: "
+			<< severity();
+		throw invalid_packet(ss.str());
+	}
+
+	// Check & Copy Over NumValues Double Arrays from Payload...
+
+	const uint32_t *ptr = (const uint32_t *) &m_fields[4];
+	uint32_t payload_remaining = m_payload_len - (4 * sizeof(uint32_t));
+
+	for ( uint32_t i=0 ; i < numVals ; i++ ) {
+
+		// Next TOF...
+		m_tofs.push_back( *ptr++ );
+
+		// Next Double Array Size...
+		size = *ptr++;
+
+		// Next Double Array...
+		const double *arr = (const double *) ptr;
+
+		if (m_version == 0x00
+				&& payload_remaining
+					< (( size * sizeof(double) )
+						+ ( 2 * sizeof(uint32_t) ))) {
+			std::stringstream ss;
+			ss << ( (uint32_t) (m_pulseId >> 32) )
+				<< "." << ( (uint32_t) m_pulseId );
+			ss << " MultVariableValue (Double Array) V0 packet"
+				<< " has Undersize Double Array Values array: " << size;
+			ss << " vs remaining payload " << payload_remaining;
+			throw invalid_packet(ss.str());
+		}
+		else if (m_version >
+					ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_VERSION
+				&& payload_remaining
+					< (( size * sizeof(double) )
+						+ ( 2 * sizeof(uint32_t) ))) {
+			std::stringstream ss;
+			ss << ( (uint32_t) (m_pulseId >> 32) )
+				<< "." << ( (uint32_t) m_pulseId );
+			ss << " Newer MultVariableValue (Double Array) packet"
+				<< " has Undersize Double Array Values array: " << size;
+			ss << " vs remaining payload " << payload_remaining;
+			throw invalid_packet(ss.str());
+		}
+
+		/* TODO it would be better to create the array on access
+		 * rather than object construction; the user may not care.
+		 */
+		m_vals[i] = std::vector<double>( size );
+		memcpy(const_cast<double *> (m_vals[i].data()),
+			arr, size * sizeof(double));
+
+		// Size of Double Array in Uint32's... ;-D
+		uint32_t dblsize = size * sizeof(double) / sizeof(uint32_t);
+
+		ptr += dblsize;
+		payload_remaining -= ( dblsize + 2 ) * sizeof(uint32_t);
+	}
+}
+
+MultVariableDoubleArrayPkt::MultVariableDoubleArrayPkt(
+		const MultVariableDoubleArrayPkt &pkt ) :
+	Packet(pkt), m_fields((const uint32_t *)payload()),
+	m_vals(pkt.m_vals), m_tofs(pkt.m_tofs)
 {}
 
