@@ -7,6 +7,8 @@
 #include <string>
 #include <map>
 
+#include "SMSControl.h"
+
 class MetaDataMgr;
 
 class FastMeta {
@@ -25,6 +27,8 @@ public:
 	}
 
 	void sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof);
+
+	void sendMultUpdate(uint64_t pulse_id, SMSControl::EventVector events);
 
 private:
 	struct Variable {
