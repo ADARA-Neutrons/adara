@@ -203,6 +203,11 @@ public:
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32ArrayPkt &pkt);
 	bool rxPacket(const ADARA::VariableDoubleArrayPkt &pkt);
+	bool rxPacket(const ADARA::MultVariableU32Pkt &pkt);
+	bool rxPacket(const ADARA::MultVariableDoublePkt &pkt);
+	bool rxPacket(const ADARA::MultVariableStringPkt &pkt);
+	bool rxPacket(const ADARA::MultVariableU32ArrayPkt &pkt);
+	bool rxPacket(const ADARA::MultVariableDoubleArrayPkt &pkt);
 
 	void addRunStatus( uint32_t m_run_number, uint32_t m_run_start_epoch,
 		uint32_t m_run_file_number, ADARA::RunStatus::Enum status );
@@ -1560,6 +1565,160 @@ bool MungeParser::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 			case 22: PKT->remapDeviceId( 17 ); break;
 			default: break;
 		}
+	}
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::MultVariableU32Pkt &pkt)
+{
+	if ( !m_terse ) {
+		fprintf( stderr,
+			"%u.%09u MULT U32 VARIABLE (0x%x,v%u) [%u bytes]\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    numValues %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.numValues() );
+	}
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		if ( !m_terse ) {
+			std::cerr << "Warning in MultVariableU32Pkt:"
+				<< " Device Id " << pkt.devId()
+				<< " > Max Device Id " << MAX_DEVICE_ID
+				<< " - Ignoring Munge Cases for this Device...!"
+				<< std::endl;
+		}
+
+		return false;
+	}
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::MultVariableDoublePkt &pkt)
+{
+	if ( !m_terse ) {
+		fprintf( stderr,
+			"%u.%09u MULT DOUBLE VARIABLE (0x%x,v%u) [%u bytes]\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    numValues %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.numValues() );
+	}
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		if ( !m_terse ) {
+			std::cerr << "Warning in MultVariableDoublePkt:"
+				<< " Device Id " << pkt.devId()
+				<< " > Max Device Id " << MAX_DEVICE_ID
+				<< " - Ignoring Munge Cases for this Device...!"
+				<< std::endl;
+		}
+
+		return false;
+	}
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::MultVariableStringPkt &pkt)
+{
+	if ( !m_terse ) {
+		fprintf( stderr,
+			"%u.%09u MULT String VARIABLE (0x%x,v%u) [%u bytes]\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    numValues %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.numValues() );
+	}
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		if ( !m_terse ) {
+			std::cerr << "Warning in MultVariableStringPkt:"
+				<< " Device Id " << pkt.devId()
+				<< " > Max Device Id " << MAX_DEVICE_ID
+				<< " - Ignoring Munge Cases for this Device...!"
+				<< std::endl;
+		}
+
+		return false;
+	}
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::MultVariableU32ArrayPkt &pkt)
+{
+	//uint32_t i;
+
+	if ( !m_terse ) {
+		fprintf( stderr,
+			"%u.%09u MULT U32 ARRAY VARIABLE (0x%x,v%u) [%u bytes]\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    numValues %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.numValues() );
+	}
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		if ( !m_terse ) {
+			std::cerr << "Warning in MultVariableU32ArrayPkt:"
+				<< " Device Id " << pkt.devId()
+				<< " > Max Device Id " << MAX_DEVICE_ID
+				<< " - Ignoring Munge Cases for this Device...!"
+				<< std::endl;
+		}
+
+		return false;
+	}
+
+	return false;
+}
+
+bool MungeParser::rxPacket(const ADARA::MultVariableDoubleArrayPkt &pkt)
+{
+	//uint32_t i;
+
+	if ( !m_terse ) {
+		fprintf( stderr,
+			"%u.%09u MULT DOUBLE ARRAY VARIABLE (0x%x,v%u) [%u bytes]\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    numValues %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.numValues() );
+	}
+
+	if ( pkt.devId() >= MAX_DEVICE_ID )
+	{
+		if ( !m_terse ) {
+			std::cerr << "Warning in MultVariableDoubleArrayPkt:"
+				<< " Device Id " << pkt.devId()
+				<< " > Max Device Id " << MAX_DEVICE_ID
+				<< " - Ignoring Munge Cases for this Device...!"
+				<< std::endl;
+		}
+
+		return false;
 	}
 
 	return false;
