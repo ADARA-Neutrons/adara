@@ -2790,11 +2790,11 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	struct timespec now;
 	clock_gettime( CLOCK_REALTIME_COARSE, &now );
 
-	// Event Count Per Second (Updated Every 3 Seconds)
-	if ( m_last_second_time.tv_sec + 3 < now.tv_sec ) {
+	// Event Count Per Second (Updated Every 3 Seconds Or So...)
+	if ( m_last_second_time.tv_sec + 3 <= now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
-		// (*Don't* Log Bandwidth Per Second Here, Do With RTDL... ;-)
-		updateBandwidthSecond( now, false );
+		// Log Bandwidth Per Second Every 20 Seconds...
+		updateBandwidthSecond( now, !( now.tv_sec % 20 ) );
 		// Reset "Last Second"...
 		m_last_second_time = now;
 	}
@@ -3035,13 +3035,11 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// RTDL Count Per "Read"...
 	m_rtdl_pkt_counts++;
 
-	// Pulse Count Per Second (Updated Every 3 Seconds)
-	static uint32_t log_secs_cnt = 0;
-	if ( m_last_second_time.tv_sec + 3 < now.tv_sec ) {
+	// Pulse Count Per Second (Updated Every 3 Seconds Or So...)
+	if ( m_last_second_time.tv_sec + 3 <= now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
-		// Log Bandwidth Per Second Every 20th Time...
-		// (About Once Per Minute... ;-)
-		updateBandwidthSecond( now, !( ++log_secs_cnt % 20 ) );
+		// Log Bandwidth Per Second Every 20 Seconds...
+		updateBandwidthSecond( now, !( now.tv_sec % 20 ) );
 		// Reset "Last Second"...
 		m_last_second_time = now;
 	}
@@ -3093,28 +3091,15 @@ void DataSource::resetBandwidthStatistics(void)
 	m_err_count_tenmin = 0;
 
 	// Time Trackers...
-	m_last_second_time.tv_sec = -1;
-	m_last_second_time.tv_nsec = -1;
+	clock_gettime( CLOCK_REALTIME_COARSE, &m_last_second_time );
+		// Properly Initialize a Starting Time for BW Seconds...
 	m_last_minute = -1;
 	m_last_tenmin = -1;
 }
 
 void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 {
-	// Compute _Actual_ Elapsed Time...! ;-D
-	double elapsed;
-	if ( m_last_second_time.tv_sec > 0 ) {
-		elapsed =
-			( ( ((double) ( now.tv_sec - m_last_second_time.tv_sec ))
-					* NANO_PER_SECOND_D )
-				+ ( now.tv_nsec - m_last_second_time.tv_nsec ) )
-			/ NANO_PER_SECOND_D;
-	}
-	// If "Last Second" Time was Reset,
-	// then "Just Guess" It's Been 3 Seconds... ;-D
-	else {
-		elapsed = 3.0;
-	}
+	double elapsed = calcDiffSeconds( now, m_last_second_time );
 
 	// Log the Second-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
@@ -3191,9 +3176,13 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Minute for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_minute
+			<< " (" << ( m_pulse_count_minute / 60 ) << "/sec)"
 			<< " Events=" << m_event_count_minute
+			<< " (" << ( m_event_count_minute / 60 ) << "/sec)"
 			<< " Meta=" << m_meta_count_minute
-			<< " Err=" << m_err_count_minute );
+			<< " (" << ( m_meta_count_minute / 60 ) << "/sec)"
+			<< " Err=" << m_err_count_minute
+			<< " (" << ( m_err_count_minute / 60 ) << "/sec)" );
 	}
 
 	// Update Bandwidth Count Per Minute PVs...
@@ -3221,8 +3210,14 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 					<< "Bandwidth Per Minute for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
 					<< " Events=" << it->second->m_event_count_minute
+					<< " (" << ( it->second->m_event_count_minute / 60 )
+						<< "/sec)"
 					<< " Meta=" << it->second->m_meta_count_minute
-					<< " Err=" << it->second->m_err_count_minute );
+					<< " (" << ( it->second->m_meta_count_minute / 60 )
+						<< "/sec)"
+					<< " Err=" << it->second->m_err_count_minute
+					<< " (" << ( it->second->m_err_count_minute / 60 )
+						<< "/sec)" );
 			}
 			it->second->m_pvHWSourceEventBandwidthMinute->update(
 				it->second->m_event_count_minute, &now,
@@ -3247,9 +3242,13 @@ void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Ten Minutes for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_tenmin
+			<< " (" << ( m_pulse_count_tenmin / 600 ) << "/sec)"
 			<< " Events=" << m_event_count_tenmin
+			<< " (" << ( m_event_count_tenmin / 600 ) << "/sec)"
 			<< " Meta=" << m_meta_count_tenmin
-			<< " Err=" << m_err_count_tenmin );
+			<< " (" << ( m_meta_count_tenmin / 600 ) << "/sec)"
+			<< " Err=" << m_err_count_tenmin
+			<< " (" << ( m_err_count_tenmin / 600 ) << "/sec)" );
 	}
 
 	// Update Bandwidth Count Per Ten Minutes PVs...
@@ -3277,8 +3276,14 @@ void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 					<< "Bandwidth Per Ten Minutes for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
 					<< " Events=" << it->second->m_event_count_tenmin
+					<< " (" << ( it->second->m_event_count_tenmin / 600 )
+						<< "/sec)"
 					<< " Meta=" << it->second->m_meta_count_tenmin
-					<< " Err=" << it->second->m_err_count_tenmin );
+					<< " (" << ( it->second->m_meta_count_tenmin / 600 )
+						<< "/sec)"
+					<< " Err=" << it->second->m_err_count_tenmin
+					<< " (" << ( it->second->m_err_count_tenmin / 600 )
+						<< "/sec)" );
 			}
 			it->second->m_pvHWSourceEventBandwidthTenMin->update(
 				it->second->m_event_count_tenmin, &now,
