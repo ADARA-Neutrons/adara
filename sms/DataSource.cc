@@ -3101,32 +3101,33 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 {
 	double elapsed = calcDiffSeconds( now, m_last_second_time );
 
+	uint32_t pulse_rate = (uint32_t)(
+		((double) m_pulse_count_second) / elapsed );
+	uint32_t event_rate = (uint32_t)(
+		((double) m_event_count_second) / elapsed );
+	uint32_t meta_rate = (uint32_t)(
+		((double) m_meta_count_second) / elapsed );
+	uint32_t err_rate = (uint32_t)(
+		((double) m_err_count_second) / elapsed );
+
 	// Log the Second-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Second for " << m_name << ":"
-			<< " Pulses="
-				<< (uint32_t)( ((double) m_pulse_count_second) / elapsed )
-			<< " Events="
-				<< (uint32_t)( ((double) m_event_count_second) / elapsed )
-			<< " Meta="
-				<< (uint32_t)( ((double) m_meta_count_second) / elapsed )
-			<< " Err="
-				<< (uint32_t)( ((double) m_err_count_second) / elapsed ) );
+			<< " Pulses=" << pulse_rate
+			<< " Events=" << event_rate
+			<< " Meta=" << meta_rate
+			<< " Err=" << err_rate );
 	}
 
 	// Update Bandwidth Count Per Second PVs...
-	m_pvPulseBandwidthSecond->update(
-		(uint32_t)( ((double) m_pulse_count_second) / elapsed ), &now,
+	m_pvPulseBandwidthSecond->update( pulse_rate, &now,
 		true /* no_log */ );
-	m_pvEventBandwidthSecond->update(
-		(uint32_t)( ((double) m_event_count_second) / elapsed ), &now,
+	m_pvEventBandwidthSecond->update( event_rate, &now,
 		true /* no_log */ );
-	m_pvMetaBandwidthSecond->update(
-		(uint32_t)( ((double) m_meta_count_second) / elapsed ), &now,
+	m_pvMetaBandwidthSecond->update( meta_rate, &now,
 		true /* no_log */ );
-	m_pvErrBandwidthSecond->update(
-		(uint32_t)( ((double) m_err_count_second) / elapsed ), &now,
+	m_pvErrBandwidthSecond->update( err_rate, &now,
 		true /* no_log */ );
 
 	// Reset Counters for Next Second...
@@ -3139,29 +3140,26 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
+			event_rate = (uint32_t)(
+				((double) it->second->m_event_count_second) / elapsed );
+			meta_rate = (uint32_t)(
+				((double) it->second->m_meta_count_second) / elapsed );
+			err_rate = (uint32_t)(
+				((double) it->second->m_err_count_second) / elapsed );
 			if ( do_log && it->second->m_event_count_second > 0 ) {
 				INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Bandwidth Per Second for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
-					<< " Events="
-					<< it->second->m_event_count_second
-					<< " Meta="
-					<< it->second->m_meta_count_second
-					<< " Err="
-					<< it->second->m_err_count_second );
+					<< " Events=" << event_rate
+					<< " Meta=" << meta_rate
+					<< " Err=" << err_rate );
 			}
 			it->second->m_pvHWSourceEventBandwidthSecond->update(
-				(uint32_t)( ((double) it->second->m_event_count_second)
-					/ elapsed ), &now,
-				true /* no_log */ );
+				event_rate, &now, true /* no_log */ );
 			it->second->m_pvHWSourceMetaBandwidthSecond->update(
-				(uint32_t)( ((double) it->second->m_meta_count_second)
-					/ elapsed ), &now,
-				true /* no_log */ );
+				meta_rate, &now, true /* no_log */ );
 			it->second->m_pvHWSourceErrBandwidthSecond->update(
-				(uint32_t)( ((double) it->second->m_err_count_second)
-					/ elapsed ), &now,
-				true /* no_log */ );
+				err_rate, &now, true /* no_log */ );
 		}
 		it->second->m_event_count_second = 0;
 		it->second->m_meta_count_second = 0;
