@@ -1899,7 +1899,7 @@ void MungeParser::parse(int argc, char **argv)
 			"Manually Entered Run Stop Time")
 		("savepkts,p",
 			po::value<std::vector<uint32_t> >(&m_save_pkts)->multitoken(),
-			"List of Packet Types (UINT32) to Save")
+			"List of Packet Types (UINT32) to Save WITH VERSION")
 		("deviceid,d",
 			po::value<std::vector<uint32_t> >(&m_device_ids)->multitoken(),
 			"List of Device IDs (UINT32) to Filter Saved Packets")
