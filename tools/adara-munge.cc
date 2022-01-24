@@ -338,6 +338,12 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 		{
 			if ( pkt.type() == m_save_pkts[i] )
 			{
+				std::cerr << "[Matching Packet Type " << pkt.type()
+					<< " (0x" << std::hex << pkt.type()
+						<< std::dec << ")"
+					<< " Found for Saving Packets."
+					<< "]" << std::endl;
+
 				// Check for Specific Device IDs on Variable Value Pkts...
 				// Skip Saving Packet if the Device ID is _Not_ on List.
 				if ( m_device_ids.size() > 0 )
@@ -351,9 +357,8 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 								<< m_last_device_id
 								<< " (0x" << std::hex << m_last_device_id
 									<< std::dec << ")"
-								<< "]"
 								<< " - Save Packet."
-								<< std::endl;
+								<< "]" << std::endl;
 							skip_this = false;
 						}
 					}
@@ -364,9 +369,8 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 							<< m_last_device_id
 							<< " (0x" << std::hex << m_last_device_id
 								<< std::dec << ")"
-							<< "]"
 							<< " - Skipping Save of Packet...!"
-							<< std::endl;
+							<< "]" << std::endl;
 						continue;
 					}
 				}
