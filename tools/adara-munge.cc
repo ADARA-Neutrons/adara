@@ -347,12 +347,28 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 					{
 						if ( m_last_device_id == m_device_ids[d] )
 						{
+							std::cerr << "[Matching Device ID "
+								<< m_last_device_id
+								<< " (0x" << std::hex << m_last_device_id
+									<< std::dec << ")"
+								<< "]"
+								<< " - Save Packet."
+								<< std::endl;
 							skip_this = false;
 						}
 					}
 
 					if ( skip_this )
+					{
+						std::cerr << "[No Matching Device ID Found for "
+							<< m_last_device_id
+							<< " (0x" << std::hex << m_last_device_id
+								<< std::dec << ")"
+							<< "]"
+							<< " - Skipping Save of Packet...!"
+							<< std::endl;
 						continue;
+					}
 				}
 
 				m_save_out.write( (const char *)pkt.packet(),
