@@ -250,6 +250,8 @@ private:
 
 	std::string m_save_file;
 	std::vector<uint32_t> m_save_pkts;
+	std::vector<uint32_t> m_device_ids;
+	uint32_t m_last_device_id;
 	uint32_t m_save_count;
 	std::ofstream m_save_out;
 
@@ -260,6 +262,8 @@ private:
 bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 {
 	bool ret = false;
+
+	m_last_device_id = 0;
 
 	try {
 		ret = ADARA::POSIXParser::rxPacket(pkt);
@@ -334,6 +338,23 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 		{
 			if ( pkt.type() == m_save_pkts[i] )
 			{
+				// Check for Specific Device IDs on Variable Value Pkts...
+				// Skip Saving Packet if the Device ID is _Not_ on List.
+				if ( m_device_ids.size() > 0 )
+				{
+					bool skip_this = true;
+					for ( uint32_t d=0 ; d < m_device_ids.size() ; d++ )
+					{
+						if ( m_last_device_id == m_device_ids[d] )
+						{
+							skip_this = false;
+						}
+					}
+
+					if ( skip_this )
+						continue;
+				}
+
 				m_save_out.write( (const char *)pkt.packet(),
 					pkt.packet_length() );
 				m_save_count++;
@@ -977,6 +998,10 @@ bool MungeParser::rxPacket(const ADARA::DeviceDescriptorPkt &pkt)
 		fprintf( stderr, "%s\n", pkt.description().c_str() );
 	}
 
+	// Note the Device ID for this Device Descriptor Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
+
 	//
 	// Evil Device Id Re-Numbering Issue (beamline.xml Changed Mid-Run!)
 	//
@@ -1074,6 +1099,10 @@ bool MungeParser::rxPacket(const ADARA::VariableU32Pkt &pkt)
 			severityString(pkt.severity()), pkt.value() );
 	}
 
+	// Note the Device ID for this Variable Value Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
+
 	if ( pkt.devId() >= MAX_DEVICE_ID )
 	{
 		if ( !m_terse ) {
@@ -1163,6 +1192,10 @@ bool MungeParser::rxPacket(const ADARA::VariableDoublePkt &pkt)
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
 			severityString(pkt.severity()), pkt.value() );
 	}
+
+	// Note the Device ID for this Variable Value Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
 
 	// CNCS FitSam "Off-By-11-Minutes" Bug, November 2017...
 	// - correct timing by 667.908933229 seconds...
@@ -1299,6 +1332,10 @@ bool MungeParser::rxPacket(const ADARA::VariableStringPkt &pkt)
 			severityString(pkt.severity()), pkt.value().c_str() );
 	}
 
+	// Note the Device ID for this Variable Value Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
+
 	if ( pkt.devId() >= MAX_DEVICE_ID )
 	{
 		if ( !m_terse ) {
@@ -1395,6 +1432,10 @@ bool MungeParser::rxPacket(const ADARA::VariableU32ArrayPkt &pkt)
 		}
 		fprintf( stderr, "\n" );
 	}
+
+	// Note the Device ID for this Variable Value Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
 
 	if ( pkt.devId() >= MAX_DEVICE_ID )
 	{
@@ -1493,6 +1534,10 @@ bool MungeParser::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 		fprintf( stderr, "\n" );
 	}
 
+	// Note the Device ID for this Variable Value Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
+
 	if ( pkt.devId() >= MAX_DEVICE_ID )
 	{
 		if ( !m_terse ) {
@@ -1584,6 +1629,10 @@ bool MungeParser::rxPacket(const ADARA::MultVariableU32Pkt &pkt)
 			severityString(pkt.severity()), pkt.numValues() );
 	}
 
+	// Note the Device ID for this Variable Value Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
+
 	if ( pkt.devId() >= MAX_DEVICE_ID )
 	{
 		if ( !m_terse ) {
@@ -1614,6 +1663,10 @@ bool MungeParser::rxPacket(const ADARA::MultVariableDoublePkt &pkt)
 			severityString(pkt.severity()), pkt.numValues() );
 	}
 
+	// Note the Device ID for this Variable Value Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
+
 	if ( pkt.devId() >= MAX_DEVICE_ID )
 	{
 		if ( !m_terse ) {
@@ -1643,6 +1696,10 @@ bool MungeParser::rxPacket(const ADARA::MultVariableStringPkt &pkt)
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
 			severityString(pkt.severity()), pkt.numValues() );
 	}
+
+	// Note the Device ID for this Variable Value Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
 
 	if ( pkt.devId() >= MAX_DEVICE_ID )
 	{
@@ -1676,6 +1733,10 @@ bool MungeParser::rxPacket(const ADARA::MultVariableU32ArrayPkt &pkt)
 			severityString(pkt.severity()), pkt.numValues() );
 	}
 
+	// Note the Device ID for this Variable Value Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
+
 	if ( pkt.devId() >= MAX_DEVICE_ID )
 	{
 		if ( !m_terse ) {
@@ -1707,6 +1768,10 @@ bool MungeParser::rxPacket(const ADARA::MultVariableDoubleArrayPkt &pkt)
 			pkt.devId(), pkt.varId(), statusString(pkt.status()),
 			severityString(pkt.severity()), pkt.numValues() );
 	}
+
+	// Note the Device ID for this Variable Value Packet...
+	// (For Device ID Filtering of Saved Packets...)
+	m_last_device_id = pkt.devId();
 
 	if ( pkt.devId() >= MAX_DEVICE_ID )
 	{
@@ -1815,6 +1880,9 @@ void MungeParser::parse(int argc, char **argv)
 		("savepkts,p",
 			po::value<std::vector<uint32_t> >(&m_save_pkts)->multitoken(),
 			"List of Packet Types (UINT32) to Save")
+		("deviceid,d",
+			po::value<std::vector<uint32_t> >(&m_device_ids)->multitoken(),
+			"List of Device IDs (UINT32) to Filter Saved Packets")
 		("savefile,F", po::value<std::string>(&m_save_file),
 			"Save Certain Packet Types to Given File")
 		("skippkts",
@@ -1895,10 +1963,16 @@ void MungeParser::parse(int argc, char **argv)
 	}
 
 	// Save Packets Options...
-	if ( m_save_pkts.size() || m_genStart || m_genStop ) {
+	if ( m_save_pkts.size() || m_device_ids.size()
+			|| m_genStart || m_genStop ) {
 		for ( uint32_t i=0 ; i < m_save_pkts.size() ; i++ ) {
 			std::cerr << "Packet Type " << m_save_pkts[i]
 				<< " (0x" << std::hex << m_save_pkts[i] << std::dec << ")"
+			<< " Selected for Saving." << std::endl;
+		}
+		for ( uint32_t i=0 ; i < m_device_ids.size() ; i++ ) {
+			std::cerr << "Device IDs " << m_device_ids[i]
+				<< " (0x" << std::hex << m_device_ids[i] << std::dec << ")"
 			<< " Selected for Saving." << std::endl;
 		}
 		if ( m_save_file.size() ) {
@@ -1919,6 +1993,7 @@ void MungeParser::parse(int argc, char **argv)
 				<< std::endl;
 			m_save_out.close();
 			m_save_pkts.clear();
+			m_device_ids.clear();
 		}
 	}
 	else if ( m_save_file.size() && !m_genStart && !m_genStop ) {
