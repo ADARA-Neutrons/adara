@@ -147,6 +147,9 @@ public:
 		m_skip_pkt(false),
 		m_addRunEnd(false),
 		m_genStart(false), m_genStop(false),
+		m_saveStart(false), m_saveStop(false),
+		m_skipStart(false), m_skipStop(false),
+		m_isStart(false), m_isStop(false),
 		m_hysterical(false),
 		m_filterafter(false), m_filterbefore(false),
 		m_clearemptydata(false),
@@ -236,6 +239,12 @@ private:
 	bool m_addRunEnd;
 	bool m_genStart;
 	bool m_genStop;
+	bool m_saveStart;
+	bool m_saveStop;
+	bool m_skipStart;
+	bool m_skipStop;
+	bool m_isStart;
+	bool m_isStop;
 	bool m_hysterical;
 	bool m_filterafter;
 	bool m_filterbefore;
@@ -264,6 +273,9 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 	bool ret = false;
 
 	m_last_device_id = 0;
+
+	m_isStart = false;
+	m_isStop = false;
 
 	try {
 		ret = ADARA::POSIXParser::rxPacket(pkt);
@@ -310,7 +322,31 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 			m_skip_pkt = true;
 		}
 	}
-	
+
+	// Skip Run Start...
+	if ( m_skipStart && m_isStart )
+	{
+		std::cerr << "[Skipping Run Start Packet,"
+			<< " Run Status Type " << pkt.type()
+			<< " (0x" << std::hex << pkt.type()
+				<< std::dec << ")"
+			<< "]" << std::endl;
+
+		m_skip_pkt = true;
+	}
+
+	// Skip Run Stop...
+	if ( m_skipStop && m_isStop )
+	{
+		std::cerr << "[Skipping Run Stop Packet,"
+			<< " Run Status Type " << pkt.type()
+			<< " (0x" << std::hex << pkt.type()
+				<< std::dec << ")"
+			<< "]" << std::endl;
+
+		m_skip_pkt = true;
+	}
+
 	// Pass Packet Through to Output Stream...
 	if ( !m_skip_pkt )
 	{
@@ -379,6 +415,34 @@ bool MungeParser::rxPacket(const ADARA::Packet &pkt)
 					pkt.packet_length() );
 				m_save_count++;
 			}
+		}
+
+		// Save Run Start...
+		if ( m_saveStart && m_isStart )
+		{
+			std::cerr << "[Saving Run Start Packet,"
+				<< " Run Status Type " << pkt.type()
+				<< " (0x" << std::hex << pkt.type()
+					<< std::dec << ")"
+				<< "]" << std::endl;
+
+			m_save_out.write( (const char *)pkt.packet(),
+				pkt.packet_length() );
+			m_save_count++;
+		}
+
+		// Save Run Stop...
+		if ( m_saveStop && m_isStop )
+		{
+			std::cerr << "[Saving Run Stop Packet,"
+				<< " Run Status Type " << pkt.type()
+				<< " (0x" << std::hex << pkt.type()
+					<< std::dec << ")"
+				<< "]" << std::endl;
+
+			m_save_out.write( (const char *)pkt.packet(),
+				pkt.packet_length() );
+			m_save_count++;
 		}
 	}
 
@@ -664,6 +728,7 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 			break;
 		case ADARA::RunStatus::NEW_RUN:
 			fprintf( stderr, "    New run\n" );
+			m_isStart = true;
 			break;
 		case ADARA::RunStatus::RUN_EOF:
 			fprintf( stderr, "    End of file (run continues)\n" );
@@ -673,6 +738,7 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 			break;
 		case ADARA::RunStatus::END_RUN:
 			fprintf( stderr, "    End of run\n" );
+			m_isStop = true;
 			break;
 		case ADARA::RunStatus::PROLOGUE:
 			fprintf( stderr, "    [PROLOGUE]\n" );
@@ -1903,11 +1969,15 @@ void MungeParser::parse(int argc, char **argv)
 		("deviceid,d",
 			po::value<std::vector<uint32_t> >(&m_device_ids)->multitoken(),
 			"List of Device IDs (UINT32) to Filter Saved Packets")
+		("savestart", "Save Run Start Run Status Packet")
+		("savestop", "Save Run Stop Run Status Packet")
 		("savefile,F", po::value<std::string>(&m_save_file),
 			"Save Certain Packet Types to Given File")
 		("skippkts",
 			po::value<std::vector<uint32_t> >(&m_skip_pkts)->multitoken(),
 			"List of Packet Types (UINT32) to SKIP (i.e. Throw Away)")
+		("skipstart", "Skip Run Start Run Status Packet")
+		("skipstop", "Skip Run Stop Run Status Packet")
 		("hysterical,H", "Set Hysterical Run Start/End Times")
 		("starttime", po::value<std::string>(&m_starttime_str),
 			"Hysterical Start Time for Experiment Data")
@@ -1982,9 +2052,13 @@ void MungeParser::parse(int argc, char **argv)
 		}
 	}
 
+	m_saveStart = vm.count("savestart");
+
+	m_saveStop = vm.count("savestop");
+
 	// Save Packets Options...
 	if ( m_save_pkts.size() || m_device_ids.size()
-			|| m_genStart || m_genStop ) {
+			|| m_genStart || m_genStop || m_saveStart || m_saveStop ) {
 		for ( uint32_t i=0 ; i < m_save_pkts.size() ; i++ ) {
 			std::cerr << "Packet Type " << m_save_pkts[i]
 				<< " (0x" << std::hex << m_save_pkts[i] << std::dec << ")"
@@ -2016,11 +2090,16 @@ void MungeParser::parse(int argc, char **argv)
 			m_device_ids.clear();
 		}
 	}
-	else if ( m_save_file.size() && !m_genStart && !m_genStop ) {
+	else if ( m_save_file.size()
+			&& !m_genStart && !m_genStop && !m_saveStart && !m_saveStop ) {
 		std::cerr << "Warning: Save Packets File Specified "
 			<< "with NO Selected Packet Types! Ignoring..."
 			<< std::endl;
 	}
+
+	m_skipStart = vm.count("skipstart");
+
+	m_skipStop = vm.count("skipstop");
 
 	// Skip Packets Options...
 	if ( m_skip_pkts.size() ) {
