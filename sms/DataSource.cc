@@ -2270,6 +2270,11 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
 		case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
 		case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_U32_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_STRING_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_TYPE:
 		case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
 			/* We use a 0 pulse id to indicate that we don't have an
 			 * active pulse, and nothing should ever send one to us.
@@ -3451,6 +3456,126 @@ bool DataSource::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 	return false;
 }
 
+bool DataSource::rxPacket(const ADARA::MultVariableU32Pkt &pkt)
+{
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Multiple Variable Value Packet...
+		boost::shared_ptr<ADARA::MultVariableU32Pkt> vvp;
+		vvp = boost::make_shared<ADARA::MultVariableU32Pkt>(pkt);
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
+	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::MultVariableDoublePkt &pkt)
+{
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Multiple Variable Value Packet...
+		boost::shared_ptr<ADARA::MultVariableDoublePkt> vvp;
+		vvp = boost::make_shared<ADARA::MultVariableDoublePkt>(pkt);
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
+	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::MultVariableStringPkt &pkt)
+{
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Multiple Variable Value Packet...
+		boost::shared_ptr<ADARA::MultVariableStringPkt> vvp;
+		vvp = boost::make_shared<ADARA::MultVariableStringPkt>(pkt);
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
+	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::MultVariableU32ArrayPkt &pkt)
+{
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Multiple Variable Value Packet...
+		boost::shared_ptr<ADARA::MultVariableU32ArrayPkt> vvp;
+		vvp = boost::make_shared<ADARA::MultVariableU32ArrayPkt>(pkt);
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
+	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::MultVariableDoubleArrayPkt &pkt)
+{
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Multiple Variable Value Packet...
+		boost::shared_ptr<ADARA::MultVariableDoubleArrayPkt> vvp;
+		vvp = boost::make_shared<ADARA::MultVariableDoubleArrayPkt>(pkt);
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
+	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
 bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 {
 	// Meter Live Control PV Updates...
@@ -3670,12 +3795,70 @@ void DataSource::onSavePrologue( bool UNUSED(capture_last) )
 		StorageManager::addSavePrologue(
 			dev_pkt->packet(), dev_pkt->packet_length(), m_smsSourceId );
 
-		VariablePktMap &varPkts = dev.m_variablePkts;
-		VariablePktMap::iterator vit, vend = varPkts.end();
+		VariablePktMap &varPktMap = dev.m_variablePkts;
+		VariablePktMap::iterator vit, vend = varPktMap.end();
 
-		for ( vit = varPkts.begin(); vit != vend; ++vit ) {
+		for ( vit = varPktMap.begin(); vit != vend; ++vit ) {
 
 			ADARA::Packet *var_pkt = vit->second.get();
+
+			// Handle Multiple Variable Value Packets!
+			// (Strip Off "Last" Variable Value and Create
+			// New Single Variable Value Packet for Save Prologue...)
+
+			ADARA::PacketSharedPtr newPkt;
+			bool is_mult = false;
+
+			if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_U32_TYPE )
+			{
+				ADARA::MultVariableU32Pkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				m_ctrl->extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_TYPE )
+			{
+				ADARA::MultVariableDoublePkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				m_ctrl->extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_STRING_TYPE )
+			{
+				ADARA::MultVariableStringPkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				m_ctrl->extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_TYPE )
+			{
+				ADARA::MultVariableU32ArrayPkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				m_ctrl->extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_TYPE)
+			{
+				ADARA::MultVariableDoubleArrayPkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				m_ctrl->extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+
+			if ( is_mult )
+			{
+				// Replace Multiple Variable Value Packet for
+				// This Device PV with New Single Variable Value Packet
+				vit->second.swap( newPkt );
+
+				// Use New Packet in Save Prologue...
+				var_pkt = vit->second.get();
+			}
 
 			StorageManager::addSavePrologue(
 				var_pkt->packet(), var_pkt->packet_length(),

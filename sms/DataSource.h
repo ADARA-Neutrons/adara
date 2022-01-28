@@ -218,6 +218,11 @@ private:
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32ArrayPkt &pkt);
 	bool rxPacket(const ADARA::VariableDoubleArrayPkt &pkt);
+	bool rxPacket(const ADARA::MultVariableU32Pkt &pkt);
+	bool rxPacket(const ADARA::MultVariableDoublePkt &pkt);
+	bool rxPacket(const ADARA::MultVariableStringPkt &pkt);
+	bool rxPacket(const ADARA::MultVariableU32ArrayPkt &pkt);
+	bool rxPacket(const ADARA::MultVariableDoubleArrayPkt &pkt);
 	bool rxPacket(const ADARA::AnnotationPkt &pkt);
 	bool rxPacket(const ADARA::HeartbeatPkt &pkt);
 
@@ -231,13 +236,12 @@ private:
 
 	// Device Descriptor and Variable Packet Tracking
 	// (for Saved Input Stream File Prologue...)
-	typedef boost::shared_ptr<ADARA::Packet> PacketSharedPtr;
-	typedef std::map<uint32_t, PacketSharedPtr> VariablePktMap;
+	typedef std::map<uint32_t, ADARA::PacketSharedPtr> VariablePktMap;
 
 	struct DeviceVariables {
 		uint32_t    m_devId;
 		// No Need for a Source Tag here (a la MetaDataMgr.h)
-		PacketSharedPtr m_descriptorPkt;
+		ADARA::PacketSharedPtr m_descriptorPkt;
 		VariablePktMap  m_variablePkts;
 	};
 
