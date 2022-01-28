@@ -4143,3 +4143,64 @@ void SMSControl::updateValue(const ADARA::VariableDoubleArrayPkt &pkt,
 	m_meta->updateValue(pkt, sourceId);
 }
 
+void SMSControl::updateValue(const ADARA::MultVariableU32Pkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::MultVariableDoublePkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::MultVariableStringPkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::MultVariableU32ArrayPkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::MultVariableDoubleArrayPkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::extractLastValue( ADARA::MultVariableU32Pkt inPkt,
+		ADARA::PacketSharedPtr &outPkt)
+{
+	m_meta->extractLastValue(inPkt, outPkt);
+}
+
+void SMSControl::extractLastValue( ADARA::MultVariableDoublePkt inPkt,
+		ADARA::PacketSharedPtr &outPkt)
+{
+	m_meta->extractLastValue(inPkt, outPkt);
+}
+
+void SMSControl::extractLastValue( ADARA::MultVariableStringPkt inPkt,
+		ADARA::PacketSharedPtr &outPkt)
+{
+	m_meta->extractLastValue(inPkt, outPkt);
+}
+
+void SMSControl::extractLastValue( ADARA::MultVariableU32ArrayPkt inPkt,
+		ADARA::PacketSharedPtr &outPkt)
+{
+	m_meta->extractLastValue(inPkt, outPkt);
+}
+
+void SMSControl::extractLastValue(
+		ADARA::MultVariableDoubleArrayPkt inPkt,
+		ADARA::PacketSharedPtr &outPkt)
+{
+	m_meta->extractLastValue(inPkt, outPkt);
+}
+

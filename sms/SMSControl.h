@@ -114,6 +114,27 @@ public:
 			uint32_t sourceId);
 	void updateValue(const ADARA::VariableDoubleArrayPkt &pkt,
 			uint32_t sourceId);
+	void updateValue(const ADARA::MultVariableU32Pkt &pkt,
+			uint32_t sourceId);
+	void updateValue(const ADARA::MultVariableDoublePkt &pkt,
+			uint32_t sourceId);
+	void updateValue(const ADARA::MultVariableStringPkt &pkt,
+			uint32_t sourceId);
+	void updateValue(const ADARA::MultVariableU32ArrayPkt &pkt,
+			uint32_t sourceId);
+	void updateValue(const ADARA::MultVariableDoubleArrayPkt &pkt,
+			uint32_t sourceId);
+
+	void extractLastValue(ADARA::MultVariableU32Pkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableDoublePkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableStringPkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableU32ArrayPkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableDoubleArrayPkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
 
 	bool getRecording(void);
 
