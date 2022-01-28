@@ -61,7 +61,7 @@ void MetaDataMgr::upstreamDisconnected(
 
 	for ( vit = varPkts.begin(); vit != vend; vit++ ) {
 
-		PacketSharedPtr orig = vit->second;
+		ADARA::PacketSharedPtr orig = vit->second;
 
 		len = orig->packet_length();
 		if ( len > pktSize ) {
@@ -149,7 +149,7 @@ void MetaDataMgr::dropSourceTag( uint32_t srcTag )
 			// *Don't* Save Variable Value Packets on a Disconnect...
 			// - Go Ahead and Clear Out Any Previous Values, We'll Get
 			// _New_ Values on a Re-Connect... ;-D
-			// (cleaner this way, plus doesn't break "continuous" tests! :-)
+			// (cleaner this way, plus doesn't break "continuous" tests!)
 			m_oldDevices[dit->first].m_variablePkts.clear();
 			m_devices.erase(dit++);
 			dropped = true;
@@ -237,7 +237,7 @@ uint32_t MetaDataMgr::lookupOldMappedDeviceId(
 		m_devices[mapped_dev].m_descriptorPkt =
 			odit->second.m_descriptorPkt;
 		m_devices[mapped_dev].m_variablePkts =
-			odit->second.m_variablePkts;   // (cleared out on disconnect...)
+			odit->second.m_variablePkts;   // (cleared out on disconnect)
 
 		m_oldDevices.erase(odit);
 
@@ -305,7 +305,8 @@ uint32_t MetaDataMgr::allocDev( uint32_t dev, uint32_t srcTag,
 	return mapped_dev;
 }
 
-void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
+void MetaDataMgr::updateDescriptor(
+		const ADARA::DeviceDescriptorPkt &inPkt,
 		uint32_t srcTag )
 {
 	/* Rate-limited log that we received a DeviceDescriptorPkt. */
@@ -365,7 +366,8 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 		if ( devPkt->packet_length() == inPkt.packet_length()
 				&& devPkt->description().size()
 					== inPkt.description().size()
-				&& !devPkt->description().compare( inPkt.description() ) ) {
+				&& !devPkt->description().compare(
+					inPkt.description() ) ) {
 			if ( do_log ) {
 				DEBUG("Inbound Descriptor is Identical");
 			}
@@ -410,7 +412,7 @@ void MetaDataMgr::updateDescriptor( const ADARA::DeviceDescriptorPkt &inPkt,
 	boost::shared_ptr<ADARA::DeviceDescriptorPkt> ddp;
 	ddp = boost::make_shared<ADARA::DeviceDescriptorPkt>(inPkt);
 	ddp->remapDeviceId(mapped_dev);
-	PacketSharedPtr pkt(ddp);
+	ADARA::PacketSharedPtr pkt(ddp);
 
 	/* Add the descriptor to the stream before we squirrel it away; this
 	 * keeps us from writing it twice in close proximity if we start
@@ -452,7 +454,8 @@ void MetaDataMgr::addFastMetaDDP( const timespec &ts, uint32_t mapped_dev,
 			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR( log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "addFastMetaDDP(): Tried to Add Existing (Mapped) Device"
+				<< "addFastMetaDDP():"
+				<< " Tried to Add Existing (Mapped) Device"
 				<< " mapped_dev=" << mapped_dev );
 		}
 		return;
@@ -533,7 +536,7 @@ void MetaDataMgr::updateValue( const ADARA::VariableU32Pkt &inPkt,
 	boost::shared_ptr<ADARA::VariableU32Pkt> vup;
 	vup = boost::make_shared<ADARA::VariableU32Pkt>(inPkt);
 	vup->remapDeviceId(mapped_dev);
-	PacketSharedPtr pkt(vup);
+	ADARA::PacketSharedPtr pkt(vup);
 
 	updateVariable( mapped_dev, inPkt.varId(), pkt, srcTag );
 }
@@ -554,7 +557,8 @@ void MetaDataMgr::updateValue( const ADARA::VariableDoublePkt &inPkt,
 			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR( log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "updateValue(Double): Device Lookup Failed for Variable!"
+				<< "updateValue(Double):"
+				<< " Device Lookup Failed for Variable!"
 				<< " srcTag=" << srcTag
 				<< " devId=" << inPkt.devId()
 				<< " varId=" << inPkt.varId() );
@@ -566,7 +570,7 @@ void MetaDataMgr::updateValue( const ADARA::VariableDoublePkt &inPkt,
 	boost::shared_ptr<ADARA::VariableDoublePkt> vup;
 	vup = boost::make_shared<ADARA::VariableDoublePkt>(inPkt);
 	vup->remapDeviceId(mapped_dev);
-	PacketSharedPtr pkt(vup);
+	ADARA::PacketSharedPtr pkt(vup);
 
 	updateVariable( mapped_dev, inPkt.varId(), pkt, srcTag );
 }
@@ -587,7 +591,8 @@ void MetaDataMgr::updateValue( const ADARA::VariableStringPkt &inPkt,
 			SMSControl *ctrl = SMSControl::getInstance();
 			ERROR( log_info
 				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
-				<< "updateValue(String): Device Lookup Failed for Variable!"
+				<< "updateValue(String):"
+				<< " Device Lookup Failed for Variable!"
 				<< " srcTag=" << srcTag
 				<< " devId=" << inPkt.devId()
 				<< " varId=" << inPkt.varId() );
@@ -599,7 +604,7 @@ void MetaDataMgr::updateValue( const ADARA::VariableStringPkt &inPkt,
 	boost::shared_ptr<ADARA::VariableStringPkt> vup;
 	vup = boost::make_shared<ADARA::VariableStringPkt>(inPkt);
 	vup->remapDeviceId(mapped_dev);
-	PacketSharedPtr pkt(vup);
+	ADARA::PacketSharedPtr pkt(vup);
 
 	updateVariable( mapped_dev, inPkt.varId(), pkt, srcTag );
 }
@@ -633,7 +638,7 @@ void MetaDataMgr::updateValue( const ADARA::VariableU32ArrayPkt &inPkt,
 	boost::shared_ptr<ADARA::VariableU32ArrayPkt> vup;
 	vup = boost::make_shared<ADARA::VariableU32ArrayPkt>(inPkt);
 	vup->remapDeviceId(mapped_dev);
-	PacketSharedPtr pkt(vup);
+	ADARA::PacketSharedPtr pkt(vup);
 
 	updateVariable( mapped_dev, inPkt.varId(), pkt, srcTag );
 }
@@ -667,24 +672,540 @@ void MetaDataMgr::updateValue( const ADARA::VariableDoubleArrayPkt &inPkt,
 	boost::shared_ptr<ADARA::VariableDoubleArrayPkt> vup;
 	vup = boost::make_shared<ADARA::VariableDoubleArrayPkt>(inPkt);
 	vup->remapDeviceId(mapped_dev);
-	PacketSharedPtr pkt(vup);
+	ADARA::PacketSharedPtr pkt(vup);
 
 	updateVariable( mapped_dev, inPkt.varId(), pkt, srcTag );
 }
 
-void MetaDataMgr::updateMappedVariable( uint32_t mapped_dev, uint32_t varId,
+void MetaDataMgr::updateValue( const ADARA::MultVariableU32Pkt &inPkt,
+		uint32_t srcTag )
+{
+	uint32_t mapped_dev = lookupMappedDeviceId( inPkt.devId(), srcTag );
+
+	if ( !mapped_dev ) {
+		/* Rate-limited logging of Device/Source Tag Lookup failed...? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << inPkt.devId() << "/" << srcTag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_UNABLE_REMAP_U32_VAR, ss.str(),
+				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
+			ERROR( log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "updateValue(Mult U32):"
+				<< " Device Lookup Failed for Variable!"
+				<< " srcTag=" << srcTag
+				<< " devId=" << inPkt.devId()
+				<< " varId=" << inPkt.varId() );
+		}
+		return;
+	}
+
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::MultVariableU32Pkt> vup;
+	vup = boost::make_shared<ADARA::MultVariableU32Pkt>(inPkt);
+	vup->remapDeviceId(mapped_dev);
+	ADARA::PacketSharedPtr pkt(vup);
+
+	updateVariable( mapped_dev, inPkt.varId(), pkt, srcTag );
+}
+
+void MetaDataMgr::updateValue( const ADARA::MultVariableDoublePkt &inPkt,
+		uint32_t srcTag )
+{
+	uint32_t mapped_dev = lookupMappedDeviceId( inPkt.devId(), srcTag );
+
+	if ( !mapped_dev ) {
+		/* Rate-limited logging of Device/Source Tag Lookup failed...? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << inPkt.devId() << "/" << srcTag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_UNABLE_REMAP_DBL_VAR, ss.str(),
+				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
+			ERROR( log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "updateValue(Mult Double):"
+				<< " Device Lookup Failed for Variable!"
+				<< " srcTag=" << srcTag
+				<< " devId=" << inPkt.devId()
+				<< " varId=" << inPkt.varId() );
+		}
+		return;
+	}
+
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::MultVariableDoublePkt> vup;
+	vup = boost::make_shared<ADARA::MultVariableDoublePkt>(inPkt);
+	vup->remapDeviceId(mapped_dev);
+	ADARA::PacketSharedPtr pkt(vup);
+
+	updateVariable( mapped_dev, inPkt.varId(), pkt, srcTag );
+}
+
+void MetaDataMgr::updateValue( const ADARA::MultVariableStringPkt &inPkt,
+		uint32_t srcTag )
+{
+	uint32_t mapped_dev = lookupMappedDeviceId( inPkt.devId(), srcTag );
+
+	if ( !mapped_dev ) {
+		/* Rate-limited logging of Device/Source Tag Lookup failed...? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << inPkt.devId() << "/" << srcTag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_UNABLE_REMAP_STR_VAR, ss.str(),
+				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
+			ERROR( log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "updateValue(Mult String):"
+				<< " Device Lookup Failed for Variable!"
+				<< " srcTag=" << srcTag
+				<< " devId=" << inPkt.devId()
+				<< " varId=" << inPkt.varId() );
+		}
+		return;
+	}
+
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::MultVariableStringPkt> vup;
+	vup = boost::make_shared<ADARA::MultVariableStringPkt>(inPkt);
+	vup->remapDeviceId(mapped_dev);
+	ADARA::PacketSharedPtr pkt(vup);
+
+	updateVariable( mapped_dev, inPkt.varId(), pkt, srcTag );
+}
+
+void MetaDataMgr::updateValue( const ADARA::MultVariableU32ArrayPkt &inPkt,
+		uint32_t srcTag )
+{
+	uint32_t mapped_dev = lookupMappedDeviceId( inPkt.devId(), srcTag );
+
+	if ( !mapped_dev ) {
+		/* Rate-limited logging of Device/Source Tag Lookup failed...? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << inPkt.devId() << "/" << srcTag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_UNABLE_REMAP_U32_VAR, ss.str(),
+				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
+			ERROR( log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "updateValue(Mult U32 Array):"
+				<< " Device Lookup Failed for Variable!"
+				<< " srcTag=" << srcTag
+				<< " devId=" << inPkt.devId()
+				<< " varId=" << inPkt.varId() );
+		}
+		return;
+	}
+
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::MultVariableU32ArrayPkt> vup;
+	vup = boost::make_shared<ADARA::MultVariableU32ArrayPkt>(inPkt);
+	vup->remapDeviceId(mapped_dev);
+	ADARA::PacketSharedPtr pkt(vup);
+
+	updateVariable( mapped_dev, inPkt.varId(), pkt, srcTag );
+}
+
+void MetaDataMgr::updateValue(
+		const ADARA::MultVariableDoubleArrayPkt &inPkt,
+		uint32_t srcTag )
+{
+	uint32_t mapped_dev = lookupMappedDeviceId( inPkt.devId(), srcTag );
+
+	if ( !mapped_dev ) {
+		/* Rate-limited logging of Device/Source Tag Lookup failed...? */
+		std::string log_info;
+		std::stringstream ss;
+		ss << inPkt.devId() << "/" << srcTag;
+		if ( RateLimitedLogging::checkLog( RLLHistory_MetaDataMgr,
+				RLL_UNABLE_REMAP_DBL_VAR, ss.str(),
+				60, 3, 10, log_info ) ) {
+			SMSControl *ctrl = SMSControl::getInstance();
+			ERROR( log_info
+				<< ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "updateValue(Mult Double Array):"
+				<< " Device Lookup Failed for Variable!"
+				<< " srcTag=" << srcTag
+				<< " devId=" << inPkt.devId()
+				<< " varId=" << inPkt.varId() );
+		}
+		return;
+	}
+
+	/* Fix the device id in the packet before further processing... */
+	boost::shared_ptr<ADARA::MultVariableDoubleArrayPkt> vup;
+	vup = boost::make_shared<ADARA::MultVariableDoubleArrayPkt>(inPkt);
+	vup->remapDeviceId(mapped_dev);
+	ADARA::PacketSharedPtr pkt(vup);
+
+	updateVariable( mapped_dev, inPkt.varId(), pkt, srcTag );
+}
+
+void MetaDataMgr::extractLastValue( ADARA::MultVariableU32Pkt inPkt,
+		ADARA::PacketSharedPtr &outPkt )
+{
+	// Snag Last Value & TOF from Multiple Variable Value Packet...
+
+	std::vector<uint32_t> vals = inPkt.values();
+	std::vector<uint32_t> tofs = inPkt.tofs();
+
+	uint32_t numVals = inPkt.numValues();
+
+	uint32_t val = vals[ numVals - 1 ];
+
+	uint32_t tof = tofs[ numVals - 1 ];
+
+	// Create New Single Variable Value Packet...
+
+	uint32_t pkt[4 + (sizeof(ADARA::Header) / sizeof(uint32_t))];
+
+	pkt[0] = 4 * sizeof(uint32_t);
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::VAR_VALUE_U32_TYPE,
+		ADARA::PacketType::VAR_VALUE_U32_VERSION );
+
+	// Convert Timestamp Back into EPICS Time & Add TOF Value...
+
+	struct timespec ts = inPkt.timestamp();
+
+	ts.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+
+	ts.tv_nsec += tof;
+
+	// TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+	while ( ts.tv_nsec >= (1000U * 1000 * 1000) ) {
+		ts.tv_nsec -= 1000U * 1000 * 1000;
+		ts.tv_sec++;
+	}
+
+	pkt[2] = ts.tv_sec;
+	pkt[3] = ts.tv_nsec;
+
+	// Populate Variable Value Packet with Last Value from Multiple...
+
+	pkt[4] = inPkt.devId();
+	pkt[5] = inPkt.varId();
+
+	pkt[6] = inPkt.status() << 16;
+	pkt[6] |= inPkt.severity();
+
+	pkt[7] = val;
+
+	ADARA::VariableU32Pkt vvu( (const uint8_t *) pkt, sizeof(pkt) );
+
+	// Return New Packet Shared Pointer...
+	boost::shared_ptr<ADARA::VariableU32Pkt> vup;
+	vup = boost::make_shared<ADARA::VariableU32Pkt>(vvu);
+	outPkt = vup;
+
+	// DEBUG("extractLastValue(MultVariableU32Pkt):"
+		// << " Extracted Last Value for Prologue = " << val
+		// << " at " << ts.tv_sec
+		// << "." << std::setfill('0') << std::setw(9)
+		// << ts.tv_nsec << std::setw(0));
+}
+
+void MetaDataMgr::extractLastValue( ADARA::MultVariableDoublePkt inPkt,
+		ADARA::PacketSharedPtr &outPkt )
+{
+	// Snag Last Value & TOF from Multiple Variable Value Packet...
+
+	std::vector<double> vals = inPkt.values();
+	std::vector<uint32_t> tofs = inPkt.tofs();
+
+	uint32_t numVals = inPkt.numValues();
+
+	double val = vals[ numVals - 1 ];
+
+	uint32_t tof = tofs[ numVals - 1 ];
+
+	// Create New Single Variable Value Packet...
+
+	uint32_t size = 3 + ( sizeof(ADARA::Header) / sizeof(uint32_t) )
+		+ ( sizeof(double) / sizeof(uint32_t) );
+
+	uint32_t pkt[ size ];
+
+	pkt[0] = sizeof(double) + ( 3 * sizeof(uint32_t) );
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::VAR_VALUE_DOUBLE_TYPE,
+		ADARA::PacketType::VAR_VALUE_DOUBLE_VERSION );
+
+	// Convert Timestamp Back into EPICS Time & Add TOF Value...
+
+	struct timespec ts = inPkt.timestamp();
+
+	ts.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+
+	ts.tv_nsec += tof;
+
+	// TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+	while ( ts.tv_nsec >= (1000U * 1000 * 1000) ) {
+		ts.tv_nsec -= 1000U * 1000 * 1000;
+		ts.tv_sec++;
+	}
+
+	pkt[2] = ts.tv_sec;
+	pkt[3] = ts.tv_nsec;
+
+	// Populate Variable Value Packet with Last Value from Multiple...
+
+	pkt[4] = inPkt.devId();
+	pkt[5] = inPkt.varId();
+
+	pkt[6] = inPkt.status() << 16;
+	pkt[6] |= inPkt.severity();
+
+	double *ptr = (double *) &(pkt[7]);
+	*ptr = val;
+
+	ADARA::VariableDoublePkt vvu( (const uint8_t *) pkt, sizeof(pkt) );
+
+	// Return New Packet Shared Pointer...
+	boost::shared_ptr<ADARA::VariableDoublePkt> vup;
+	vup = boost::make_shared<ADARA::VariableDoublePkt>(vvu);
+	outPkt = vup;
+
+	// DEBUG("extractLastValue(MultVariableDoublePkt):"
+		// << " Extracted Last Value for Prologue = " << val
+		// << " at " << ts.tv_sec
+		// << "." << std::setfill('0') << std::setw(9)
+		// << ts.tv_nsec << std::setw(0));
+}
+
+void MetaDataMgr::extractLastValue( ADARA::MultVariableStringPkt inPkt,
+		ADARA::PacketSharedPtr &outPkt )
+{
+	// Snag Last Value & TOF from Multiple Variable Value Packet...
+
+	std::vector<std::string> vals = inPkt.values();
+	std::vector<uint32_t> tofs = inPkt.tofs();
+
+	uint32_t numVals = inPkt.numValues();
+
+	std::string val = vals[ numVals - 1 ];
+
+	uint32_t tof = tofs[ numVals - 1 ];
+
+	// Create New Single Variable Value Packet...
+
+	uint32_t roundup = ( val.size() + sizeof(uint32_t) - 1 )
+		/ sizeof(uint32_t);
+
+	uint32_t size = 4 + ( sizeof(ADARA::Header) / sizeof(uint32_t) )
+		+ roundup;
+
+	uint32_t pkt[ size ];
+
+	pkt[0] = ( roundup + 4 ) * sizeof(uint32_t);
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::VAR_VALUE_STRING_TYPE,
+		ADARA::PacketType::VAR_VALUE_STRING_VERSION );
+
+	// Convert Timestamp Back into EPICS Time & Add TOF Value...
+
+	struct timespec ts = inPkt.timestamp();
+
+	ts.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+
+	ts.tv_nsec += tof;
+
+	// TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+	while ( ts.tv_nsec >= (1000U * 1000 * 1000) ) {
+		ts.tv_nsec -= 1000U * 1000 * 1000;
+		ts.tv_sec++;
+	}
+
+	pkt[2] = ts.tv_sec;
+	pkt[3] = ts.tv_nsec;
+
+	// Populate Variable Value Packet with Last Value from Multiple...
+
+	pkt[4] = inPkt.devId();
+	pkt[5] = inPkt.varId();
+
+	pkt[6] = inPkt.status() << 16;
+	pkt[6] |= inPkt.severity();
+
+	pkt[7] = val.size();
+
+	memcpy( pkt + 8, val.data(), val.size() );
+
+	ADARA::VariableStringPkt vvu( (const uint8_t *) pkt, sizeof(pkt) );
+
+	// Return New Packet Shared Pointer...
+	boost::shared_ptr<ADARA::VariableStringPkt> vup;
+	vup = boost::make_shared<ADARA::VariableStringPkt>(vvu);
+	outPkt = vup;
+
+	// DEBUG("extractLastValue(MultVariableStringPkt):"
+		// << " Extracted Last Value for Prologue = " << val
+		// << " at " << ts.tv_sec
+		// << "." << std::setfill('0') << std::setw(9)
+		// << ts.tv_nsec << std::setw(0));
+}
+
+void MetaDataMgr::extractLastValue( ADARA::MultVariableU32ArrayPkt inPkt,
+		ADARA::PacketSharedPtr &outPkt )
+{
+	// Snag Last Value & TOF from Multiple Variable Value Packet...
+
+	std::vector< std::vector<uint32_t> > vals = inPkt.values();
+	std::vector<uint32_t> tofs = inPkt.tofs();
+
+	uint32_t numVals = inPkt.numValues();
+
+	std::vector<uint32_t> val = vals[ numVals - 1 ];
+
+	uint32_t tof = tofs[ numVals - 1 ];
+
+	// Create New Single Variable Value Packet...
+
+	uint32_t size = 4 + ( sizeof(ADARA::Header) / sizeof(uint32_t) )
+		+ val.size();
+
+	uint32_t pkt[ size ];
+
+	pkt[0] = ( val.size() + 4 ) * sizeof(uint32_t);
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE,
+		ADARA::PacketType::VAR_VALUE_U32_ARRAY_VERSION );
+
+	// Convert Timestamp Back into EPICS Time & Add TOF Value...
+
+	struct timespec ts = inPkt.timestamp();
+
+	ts.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+
+	ts.tv_nsec += tof;
+
+	// TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+	while ( ts.tv_nsec >= (1000U * 1000 * 1000) ) {
+		ts.tv_nsec -= 1000U * 1000 * 1000;
+		ts.tv_sec++;
+	}
+
+	pkt[2] = ts.tv_sec;
+	pkt[3] = ts.tv_nsec;
+
+	// Populate Variable Value Packet with Last Value from Multiple...
+
+	pkt[4] = inPkt.devId();
+	pkt[5] = inPkt.varId();
+
+	pkt[6] = inPkt.status() << 16;
+	pkt[6] |= inPkt.severity();
+
+	pkt[7] = val.size();
+
+	memcpy( pkt + 8, val.data(), val.size() * sizeof(uint32_t) );
+
+	ADARA::VariableU32ArrayPkt vvu( (const uint8_t *) pkt, sizeof(pkt) );
+
+	// Return New Packet Shared Pointer...
+	boost::shared_ptr<ADARA::VariableU32ArrayPkt> vup;
+	vup = boost::make_shared<ADARA::VariableU32ArrayPkt>(vvu);
+	outPkt = vup;
+
+	// DEBUG("extractLastValue(MultVariableU32ArrayPkt):"
+		// << " Extracted Last Value for Prologue, size=" << val.size()
+		// << " at " << ts.tv_sec
+		// << "." << std::setfill('0') << std::setw(9)
+		// << ts.tv_nsec << std::setw(0));
+}
+
+void MetaDataMgr::extractLastValue(
+		ADARA::MultVariableDoubleArrayPkt inPkt,
+		ADARA::PacketSharedPtr &outPkt )
+{
+	// Snag Last Value & TOF from Multiple Variable Value Packet...
+
+	std::vector< std::vector<double> > vals = inPkt.values();
+	std::vector<uint32_t> tofs = inPkt.tofs();
+
+	uint32_t numVals = inPkt.numValues();
+
+	std::vector<double> val = vals[ numVals - 1 ];
+
+	uint32_t tof = tofs[ numVals - 1 ];
+
+	// Create New Single Variable Value Packet...
+
+	uint32_t size = 4 + ( sizeof(ADARA::Header) / sizeof(uint32_t) )
+		+ ( val.size() * sizeof(double) / sizeof(uint32_t) );
+
+	uint32_t pkt[ size ];
+
+	pkt[0] = ( val.size() * sizeof(double) ) + ( 4 * sizeof(uint32_t) );
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE,
+		ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_VERSION );
+
+	// Convert Timestamp Back into EPICS Time & Add TOF Value...
+
+	struct timespec ts = inPkt.timestamp();
+
+	ts.tv_sec -= ADARA::EPICS_EPOCH_OFFSET;
+
+	ts.tv_nsec += tof;
+
+	// TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+	while ( ts.tv_nsec >= (1000U * 1000 * 1000) ) {
+		ts.tv_nsec -= 1000U * 1000 * 1000;
+		ts.tv_sec++;
+	}
+
+	pkt[2] = ts.tv_sec;
+	pkt[3] = ts.tv_nsec;
+
+	// Populate Variable Value Packet with Last Value from Multiple...
+
+	pkt[4] = inPkt.devId();
+	pkt[5] = inPkt.varId();
+
+	pkt[6] = inPkt.status() << 16;
+	pkt[6] |= inPkt.severity();
+
+	pkt[7] = val.size();
+
+	memcpy( pkt + 8, val.data(), val.size() * sizeof(double) );
+
+	ADARA::VariableDoubleArrayPkt vvu(
+		(const uint8_t *) pkt, sizeof(pkt) );
+
+	// Return New Packet Shared Pointer...
+	boost::shared_ptr<ADARA::VariableDoubleArrayPkt> vup;
+	vup = boost::make_shared<ADARA::VariableDoubleArrayPkt>(vvu);
+	outPkt = vup;
+
+	// DEBUG("extractLastValue(MultVariableDoubleArrayPkt):"
+		// << " Extracted Last Value for Prologue, size=" << val.size()
+		// << " at " << ts.tv_sec
+		// << "." << std::setfill('0') << std::setw(9)
+		// << ts.tv_nsec << std::setw(0));
+}
+
+void MetaDataMgr::updateMappedVariable(
+		uint32_t mapped_dev, uint32_t varId,
 		const uint8_t *data, uint32_t size )
 {
 	/* We need to make a copy of the packet, but can only copy from
 	 * another Packet object, so create a wrapper object then copy it.
 	 */
 	ADARA::Packet pkt( data, sizeof(size) );
-	PacketSharedPtr copy(new ADARA::Packet(pkt));
+	ADARA::PacketSharedPtr copy(new ADARA::Packet(pkt));
 	updateVariable( mapped_dev, varId, copy, 0 );
 }
 
 void MetaDataMgr::updateVariable( uint32_t dev, uint32_t varId,
-		PacketSharedPtr &inPkt, uint32_t srcTag )
+		ADARA::PacketSharedPtr &inPkt, uint32_t srcTag )
 {
 	DeviceMap::iterator dit = m_devices.find(dev);
 
@@ -755,7 +1276,9 @@ void MetaDataMgr::updateVariable( uint32_t dev, uint32_t varId,
 void MetaDataMgr::onPrologue( bool UNUSED(capture_last) )
 {
 	DeviceMap::iterator dit, dend = m_devices.end();
+
 	for ( dit = m_devices.begin(); dit != dend; ++dit ) {
+
 		DeviceVariables &dev = dit->second;
 		ADARA::Packet *dev_pkt = dev.m_descriptorPkt.get();
 
@@ -765,10 +1288,72 @@ void MetaDataMgr::onPrologue( bool UNUSED(capture_last) )
 
 		VariablePktMap &varPkts = dev.m_variablePkts;
 		VariablePktMap::iterator vit, vend = varPkts.end();
+
 		for ( vit = varPkts.begin(); vit != vend; ++vit ) {
+
 			ADARA::Packet *var_pkt = vit->second.get();
+
+			// Handle Multiple Variable Value Packets!
+			// (Extract "Last" Variable Value and Create
+			// New Single Variable Value Packet for Prologue...)
+
+			ADARA::PacketSharedPtr newPkt;
+			bool is_mult = false;
+
+			if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_U32_TYPE )
+			{
+				ADARA::MultVariableU32Pkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_TYPE )
+			{
+				ADARA::MultVariableDoublePkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_STRING_TYPE )
+			{
+				ADARA::MultVariableStringPkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_TYPE )
+			{
+				ADARA::MultVariableU32ArrayPkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_TYPE)
+			{
+				ADARA::MultVariableDoubleArrayPkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+
+			if ( is_mult )
+			{
+				// Replace Multiple Variable Value Packet for
+				// This Device PV with New Single Variable Value Packet
+				vit->second.swap( newPkt );
+
+				// Use New Packet in Prologue...
+				var_pkt = vit->second.get();
+			}
+
 			StorageManager::addPrologue( var_pkt->packet(),
 				var_pkt->packet_length() );
 		}
 	}
 }
+

@@ -35,6 +35,27 @@ public:
 			uint32_t srcTag);
 	void updateValue(const ADARA::VariableDoubleArrayPkt &inPkt,
 			uint32_t srcTag);
+	void updateValue(const ADARA::MultVariableU32Pkt &inPkt,
+			uint32_t srcTag);
+	void updateValue(const ADARA::MultVariableDoublePkt &inPkt,
+			uint32_t srcTag);
+	void updateValue(const ADARA::MultVariableStringPkt &inPkt,
+			uint32_t srcTag);
+	void updateValue(const ADARA::MultVariableU32ArrayPkt &inPkt,
+			uint32_t srcTag);
+	void updateValue(const ADARA::MultVariableDoubleArrayPkt &inPkt,
+			uint32_t srcTag);
+
+	void extractLastValue(ADARA::MultVariableU32Pkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableDoublePkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableStringPkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableU32ArrayPkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableDoubleArrayPkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
 
 	/* addFastMetaDDP() and updateMappedVariable() require the use of
 	 * the remapped device identifier from allocDev() -- they do not
@@ -52,13 +73,12 @@ public:
 			bool do_log, bool &reconnected);
 
 private:
-	typedef boost::shared_ptr<ADARA::Packet> PacketSharedPtr;
-	typedef std::map<uint32_t, PacketSharedPtr> VariablePktMap;
+	typedef std::map<uint32_t, ADARA::PacketSharedPtr> VariablePktMap;
 
 	struct DeviceVariables {
 		uint32_t	m_devId;
 		uint32_t	m_srcTag;
-		PacketSharedPtr	m_descriptorPkt;
+		ADARA::PacketSharedPtr	m_descriptorPkt;
 		VariablePktMap	m_variablePkts;
 	};
 
@@ -79,7 +99,7 @@ private:
 			bool &reconnected);
 
 	void updateVariable(uint32_t dev, uint32_t varId,
-			    PacketSharedPtr &inPkt, uint32_t srcTag);
+			    ADARA::PacketSharedPtr &inPkt, uint32_t srcTag);
 
 	void onPrologue( bool capture_last );
 };
