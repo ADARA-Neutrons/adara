@@ -658,6 +658,11 @@ StreamMonitor::rxPacket( const ADARA::Packet &a_pkt )
             case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
             case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
             case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
+            case ADARA::PacketType::MULT_VAR_VALUE_U32_TYPE:
+            case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_TYPE:
+            case ADARA::PacketType::MULT_VAR_VALUE_STRING_TYPE:
+            case ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_TYPE:
+            case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_TYPE:
             case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
             case ADARA::PacketType::BEAM_MONITOR_EVENT_TYPE:
             case ADARA::PacketType::BANKED_EVENT_TYPE:
@@ -1815,6 +1820,279 @@ StreamMonitor::rxPacket( const ADARA::VariableDoubleArrayPkt &a_pkt )
 
     pvValueUpdate< vector<double> >( a_pkt.devId(), a_pkt.varId(),
         a_pkt.value(), a_pkt.timestamp(), a_pkt.status() );
+
+    return false;
+}
+
+
+/**
+ * \brief ADARA multiple variable update packet (uint32)
+ */
+bool
+StreamMonitor::rxPacket( const ADARA::MultVariableU32Pkt &a_pkt )
+{
+    m_proc_state = TS_PKT_VAR_VALUE_U32;
+
+    vector<uint32_t>::const_iterator it_vals = a_pkt.values().begin();
+    vector<uint32_t>::const_iterator it_tofs = a_pkt.tofs().begin();
+
+    uint32_t numVals = a_pkt.numValues();
+
+    // struct timespec Ts = a_pkt.timestamp();
+    // syslog( LOG_ERR, "%s %s=%u %s=%u %s=%u at %lu.%09lu",
+        // "MultVariableU32Pkt()",
+        // "devId", a_pkt.devId(), "varId", a_pkt.varId(),
+        // "numVals", numVals,
+        // Ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, Ts.tv_nsec );
+    // usleep(30000); // give syslog a chance...
+
+    for ( uint32_t i=0 ; i < numVals ; i++ )
+    {
+        struct timespec ts = a_pkt.timestamp();
+
+        // Make Sure We Don't Run Out of Values or TOFs... ;-D
+        if ( it_vals == a_pkt.values().end()
+                || it_tofs == a_pkt.tofs().end() )
+        {
+            syslog( LOG_ERR, "%s %s=%u %s=%u %s i=%u/%u at %lu.%09lu",
+                "MultVariableU32Pkt()",
+                "devId", a_pkt.devId(), "varId", a_pkt.varId(),
+                "Premature End of Value or TOF Vector", i, numVals,
+                ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, ts.tv_nsec );
+            usleep(30000); // give syslog a chance...
+            return false;
+        }
+
+        ts.tv_nsec += *it_tofs++;
+
+        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
+            ts.tv_nsec -= 1000U * 1000 * 1000;
+            ts.tv_sec++;
+        }
+
+        pvValueUpdate<uint32_t>( a_pkt.devId(), a_pkt.varId(),
+            *it_vals++, ts, a_pkt.status() );
+    }
+
+    return false;
+}
+
+
+/**
+ * \brief ADARA multiple variable update packet (double)
+ */
+bool
+StreamMonitor::rxPacket( const ADARA::MultVariableDoublePkt &a_pkt )
+{
+    m_proc_state = TS_PKT_VAR_VALUE_DOUBLE;
+
+    std::vector<double>::const_iterator it_vals = a_pkt.values().begin();
+    std::vector<uint32_t>::const_iterator it_tofs = a_pkt.tofs().begin();
+
+    uint32_t numVals = a_pkt.numValues();
+
+    // struct timespec Ts = a_pkt.timestamp();
+    // syslog( LOG_ERR, "%s %s=%u %s=%u %s=%u at %lu.%09lu",
+        // "MultVariableDoublePkt()",
+        // "devId", a_pkt.devId(), "varId", a_pkt.varId(),
+        // "numVals", numVals,
+        // Ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, Ts.tv_nsec );
+    // usleep(30000); // give syslog a chance...
+
+    for ( uint32_t i=0 ; i < numVals ; i++ )
+    {
+        struct timespec ts = a_pkt.timestamp();
+
+        // Make Sure We Don't Run Out of Values or TOFs... ;-D
+        if ( it_vals == a_pkt.values().end()
+                || it_tofs == a_pkt.tofs().end() )
+        {
+            syslog( LOG_ERR, "%s %s=%u %s=%u %s i=%u/%u at %lu.%09lu",
+                "MultVariableDoublePkt()",
+                "devId", a_pkt.devId(), "varId", a_pkt.varId(),
+                "Premature End of Value or TOF Vector", i, numVals,
+                ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, ts.tv_nsec );
+            usleep(30000); // give syslog a chance...
+            return false;
+        }
+
+        ts.tv_nsec += *it_tofs++;
+
+        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
+            ts.tv_nsec -= 1000U * 1000 * 1000;
+            ts.tv_sec++;
+        }
+
+        pvValueUpdate<double>( a_pkt.devId(), a_pkt.varId(),
+            *it_vals++, ts, a_pkt.status() );
+    }
+
+    return false;
+}
+
+
+/**
+ * \brief ADARA multiple variable update packet (string)
+ */
+bool
+StreamMonitor::rxPacket( const ADARA::MultVariableStringPkt &a_pkt )
+{
+    m_proc_state = TS_PKT_VAR_VALUE_STRING;
+
+    std::vector<string>::const_iterator it_vals = a_pkt.values().begin();
+    std::vector<uint32_t>::const_iterator it_tofs = a_pkt.tofs().begin();
+
+    uint32_t numVals = a_pkt.numValues();
+
+    // struct timespec Ts = a_pkt.timestamp();
+    // syslog( LOG_ERR, "%s %s=%u %s=%u %s=%u at %lu.%09lu",
+        // "MultVariableStringPkt()",
+        // "devId", a_pkt.devId(), "varId", a_pkt.varId(),
+        // "numVals", numVals,
+        // Ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, Ts.tv_nsec );
+    // usleep(30000); // give syslog a chance...
+
+    for ( uint32_t i=0 ; i < numVals ; i++ )
+    {
+        struct timespec ts = a_pkt.timestamp();
+
+        // Make Sure We Don't Run Out of Values or TOFs... ;-D
+        if ( it_vals == a_pkt.values().end()
+                || it_tofs == a_pkt.tofs().end() )
+        {
+            syslog( LOG_ERR, "%s %s=%u %s=%u %s i=%u/%u at %lu.%09lu",
+                "MultVariableStringPkt()",
+                "devId", a_pkt.devId(), "varId", a_pkt.varId(),
+                "Premature End of Value or TOF Vector", i, numVals,
+                ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, ts.tv_nsec );
+            usleep(30000); // give syslog a chance...
+            return false;
+        }
+
+        ts.tv_nsec += *it_tofs++;
+
+        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
+            ts.tv_nsec -= 1000U * 1000 * 1000;
+            ts.tv_sec++;
+        }
+
+        pvValueUpdate<string>( a_pkt.devId(), a_pkt.varId(),
+            *it_vals++, ts, a_pkt.status() );
+    }
+
+    return false;
+}
+
+
+/**
+ * \brief ADARA multiple variable update packet (uint32 array)
+ */
+bool
+StreamMonitor::rxPacket( const ADARA::MultVariableU32ArrayPkt &a_pkt )
+{
+    m_proc_state = TS_PKT_VAR_VALUE_U32_ARRAY;
+
+    std::vector< vector<uint32_t> >::const_iterator it_vals =
+        a_pkt.values().begin();
+    std::vector<uint32_t>::const_iterator it_tofs = a_pkt.tofs().begin();
+
+    uint32_t numVals = a_pkt.numValues();
+
+    // struct timespec Ts = a_pkt.timestamp();
+    // syslog( LOG_ERR, "%s %s=%u %s=%u %s=%u at %lu.%09lu",
+        // "MultVariableU32ArrayPkt()",
+        // "devId", a_pkt.devId(), "varId", a_pkt.varId(),
+        // "numVals", numVals,
+        // Ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, Ts.tv_nsec );
+    // usleep(30000); // give syslog a chance...
+
+    for ( uint32_t i=0 ; i < numVals ; i++ )
+    {
+        struct timespec ts = a_pkt.timestamp();
+
+        // Make Sure We Don't Run Out of Values or TOFs... ;-D
+        if ( it_vals == a_pkt.values().end()
+                || it_tofs == a_pkt.tofs().end() )
+        {
+            syslog( LOG_ERR,
+                "%s %s=%u %s=%u %s i=%u/%u at %lu.%09lu",
+                "MultVariableU32ArrayPkt()",
+                "devId", a_pkt.devId(), "varId", a_pkt.varId(),
+                "Premature End of Value or TOF Vector", i, numVals,
+                ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, ts.tv_nsec );
+            usleep(30000); // give syslog a chance...
+            return false;
+        }
+
+        ts.tv_nsec += *it_tofs++;
+
+        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
+            ts.tv_nsec -= 1000U * 1000 * 1000;
+            ts.tv_sec++;
+        }
+
+        pvValueUpdate< vector<uint32_t> >( a_pkt.devId(), a_pkt.varId(),
+            *it_vals++, ts, a_pkt.status() );
+    }
+
+    return false;
+}
+
+
+/**
+ * \brief ADARA multiple variable update packet (double array)
+ */
+bool
+StreamMonitor::rxPacket( const ADARA::MultVariableDoubleArrayPkt &a_pkt )
+{
+    m_proc_state = TS_PKT_VAR_VALUE_DOUBLE_ARRAY;
+
+    std::vector< vector<double> >::const_iterator it_vals =
+        a_pkt.values().begin();
+    std::vector<uint32_t>::const_iterator it_tofs = a_pkt.tofs().begin();
+
+    uint32_t numVals = a_pkt.numValues();
+
+    // struct timespec Ts = a_pkt.timestamp();
+    // syslog( LOG_ERR, "%s %s=%u %s=%u %s=%u at %lu.%09lu",
+        // "MultVariableDoubleArrayPkt()",
+        // "devId", a_pkt.devId(), "varId", a_pkt.varId(),
+        // "numVals", numVals,
+        // Ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, Ts.tv_nsec );
+    // usleep(30000); // give syslog a chance...
+
+    for ( uint32_t i=0 ; i < numVals ; i++ )
+    {
+        struct timespec ts = a_pkt.timestamp();
+
+        // Make Sure We Don't Run Out of Values or TOFs... ;-D
+        if ( it_vals == a_pkt.values().end()
+                || it_tofs == a_pkt.tofs().end() )
+        {
+            syslog( LOG_ERR, "%s %s=%u %s=%u %s i=%u/%u at %lu.%09lu",
+                "MultVariableDoubleArrayPkt()",
+                "devId", a_pkt.devId(), "varId", a_pkt.varId(),
+                "Premature End of Value or TOF Vector", i, numVals,
+                ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET, ts.tv_nsec );
+            usleep(30000); // give syslog a chance...
+            return false;
+        }
+
+        ts.tv_nsec += *it_tofs++;
+
+        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
+        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
+            ts.tv_nsec -= 1000U * 1000 * 1000;
+            ts.tv_sec++;
+        }
+
+        pvValueUpdate< vector<double> >( a_pkt.devId(), a_pkt.varId(),
+            *it_vals++, ts, a_pkt.status() );
+    }
 
     return false;
 }

@@ -411,6 +411,11 @@ private:
     bool        rxPacket( const ADARA::VariableStringPkt &a_pkt );
     bool        rxPacket( const ADARA::VariableU32ArrayPkt &a_pkt );
     bool        rxPacket( const ADARA::VariableDoubleArrayPkt &a_pkt );
+    bool        rxPacket( const ADARA::MultVariableU32Pkt &a_pkt );
+    bool        rxPacket( const ADARA::MultVariableDoublePkt &a_pkt );
+    bool        rxPacket( const ADARA::MultVariableStringPkt &a_pkt );
+    bool        rxPacket( const ADARA::MultVariableU32ArrayPkt &a_pkt );
+    bool        rxPacket( const ADARA::MultVariableDoubleArrayPkt &a_pkt );
     bool        rxPacket( const ADARA::AnnotationPkt &a_pkt );
 
     // Shunt remaining rxPacket flavors to base class implementations
