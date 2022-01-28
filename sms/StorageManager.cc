@@ -1842,6 +1842,11 @@ void StorageManager::savePacket( IoVector &iovec, uint32_t dataSourceId,
 		case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
 		case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
 		case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_U32_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_STRING_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_TYPE:
 			ignore_pkt_timestamp = true;
 			break;
 
