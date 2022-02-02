@@ -209,6 +209,16 @@ system.
 		\ref{section:protocol_variable_value_u32_array} \\
 	0x8005.0 & Variable Value (Double Array) &
 		\ref{section:protocol_variable_value_double_array} \\
+	0x8101.0 & Mult Variable Value (U32) &
+		\ref{section:protocol_mult_variable_value_u32} \\
+	0x8102.0 & Mult Variable Value (Double) &
+		\ref{section:protocol_mult_variable_value_double} \\
+	0x8103.0 & Mult Variable Value (String) &
+		\ref{section:protocol_mult_variable_value_string} \\
+	0x8104.0 & Mult Variable Value (U32 Array) &
+		\ref{section:protocol_mult_variable_value_u32_array} \\
+	0x8105.0 & Mult Variable Value (Double Array) &
+		\ref{section:protocol_mult_variable_value_double_array} \\
     \end{tabular}
   \end{center}
   \caption {Assigned Packet Formats}
@@ -3553,5 +3563,382 @@ in the IEEE 754 double floating point numerical array (vector)
 that follows.
 \item{\bf Variable Value} is an array (vector) of ``$N$''
 IEEE 754 double floating point values for this variable.
+\end{itemize}
+
+\newpage
+\subsubsection{Multiple Variable Value (U32) Packet}
+\label{section:protocol_mult_variable_value_u32}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}[bitwidth=1em]{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{16 + 8$M$} \\
+    \wordbox{1}{0x00810100} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Device ID (u32)} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \bitbox{16}{Status} &
+    \bitbox{16}{Severity} \\
+	\wordbox{1}{Number of Updates (``$M$'', u32)} \\
+    \wordbox{1}{Update Timestamp (``TOF'') - Number 1 (u32)} \\
+    \wordbox{1}{Variable Value - Number 1 (u32)} \\
+    \wordbox{1}{. . .} \\
+    \wordbox{1}{Update Timestamp (``TOF'') - Number ``$M$'' (u32)} \\
+    \wordbox{1}{Variable Value - Number ``$M$'' (u32)} \\
+  \end{bytefield}
+  \caption{Packet Type 0x8101.0: Multiple Variable Value (U32) Packet}
+  \label{fig:protocol_mult_packet_value_u32}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 16 bytes plus the number
+of individual {\bf Update Timestamps} and {\bf Variable Values}
+for each value update of the field,
+which in this case is a set of ``$M$'' {\it pairs} of
+unsigned 32 bit integer (u32) ``TOF'' (Time-of-Flight, see below)
+timestamps
+and unsigned 32 bit integer (u32) numerical values.
+\item{\bf Timestamp} indicates the overall {\it starting} time when
+this set of Variable Value Updates began occurring,
+and therefore is the ``base'' timestamp that
+all the following Update Timestamps (``TOF'', see below)
+are added to, for generating the absolute time of each value update.
+\item{\bf Device ID} indicates the device this variable is from.
+\item{\bf Variable ID} indicates the variable that changed.
+\item{\bf Status} of this variable from
+Table~\ref{table:protocol_variable_status_values}
+\item{\bf Severity} of this variable from
+Table~\ref{table:protocol_variable_severity_values}
+\item{\bf Number of Updates}
+is the number of Variable Value Updates ``$M$''
+that follow for the unsigned 32 bit integer (u32) numerical field.
+\item{\bf Update Timestamp - Number ``$i$''} is an
+unsigned 32 bit integer (u32) indexed Timestamp, Number ``$i$'',
+from a set of ``$M$'' Variable Value Updates,
+with each individual Timestamp or ``TOF'' (Time-of-Flight)
+being associated with the specific Variable Value for a given update;
+adding this TOF to the Overall Packet Timestamp gives the
+absolute wallclock time when Variable Value Update ``$i$'' occurred.
+\item{\bf Variable Value - Number ``$i$''} is an
+unsigned 32 bit integer (u32) indexed Variable Value, Number ``$i$'',
+for a given update from the set of ``$M$'' Variable Value Updates,
+which occurred at the corresponding Update Timestamp ``$i$''.
+\end{itemize}
+
+Note that this packet type is also used to carry enumerated and boolean values.
+The specific interpretation of the value is dictated by the Device Descriptor
+associated with the Device ID.
+
+
+\newpage
+\subsubsection{Multiple Variable Value (Double) Packet}
+\label{section:protocol_mult_variable_value_double}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}[bitwidth=1em]{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{16 + 12$M$} \\
+    \wordbox{1}{0x00810200} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Device ID (u32)} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \bitbox{16}{Status} &
+    \bitbox{16}{Severity} \\
+	\wordbox{1}{Number of Updates (``$M$'', u32)} \\
+	\wordbox{1}{Update Timestamp (``TOF'') - Number 1 (u32)} \\
+	\wordbox{2}{Variable Value - Number 1 (IEEE 754 double)} \\
+	\wordbox{1}{. . .} \\
+	\wordbox{1}{Update Timestamp (``TOF'') - Number ``$M$'' (u32)} \\
+	\wordbox{2}{Variable Value - Number ``$M$'' (IEEE 754 double)} \\
+  \end{bytefield}
+  \caption{Packet Type 0x8102.0: Variable Value (Double) Packet}
+  \label{fig:protocol_mult_packet_value_double}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 16 bytes plus the number
+of individual {\bf Update Timestamps} and {\bf Variable Values}
+for each value update of the field,
+which in this case is a set of ``$M$'' {\it pairs} of
+unsigned 32 bit integer (u32) ``TOF'' (Time-of-Flight, see below)
+timestamps
+and IEEE 754 double floating point numerical values
+(12 bytes per value update ``pair'').
+\item{\bf Timestamp} indicates the overall {\it starting} time when
+this set of Variable Value Updates began occurring,
+and therefore is the ``base'' timestamp that
+all the following Update Timestamps (``TOF'', see below)
+are added to, for generating the absolute time of each value update.
+\item{\bf Device ID} indicates the device this variable is from.
+\item{\bf Variable ID} indicates the variable that changed.
+\item{\bf Status} of this variable from
+Table~\ref{table:protocol_variable_status_values}
+\item{\bf Severity} of this variable from
+Table~\ref{table:protocol_variable_severity_values}
+\item{\bf Number of Updates}
+is the number of Variable Value Updates ``$M$''
+that follow for the IEEE 754 double floating point numerical field.
+\item{\bf Update Timestamp - Number ``$i$''} is an
+unsigned 32 bit integer (u32) indexed Timestamp, Number ``$i$'',
+from a set of ``$M$'' Variable Value Updates,
+with each individual Timestamp or ``TOF'' (Time-of-Flight)
+being associated with the specific Variable Value for a given update;
+adding this TOF to the Overall Packet Timestamp gives the
+absolute wallclock time when Variable Value Update ``$i$'' occurred.
+\item{\bf Variable Value - Number ``$i$''} is an
+IEEE 754 double floating point indexed Variable Value, Number ``$i$'',
+for a given update from the set of ``$M$'' Variable Value Updates,
+which occurred at the corresponding Update Timestamp ``$i$''.
+\end{itemize}
+
+
+\newpage
+\subsubsection{Multiple Variable Value (String) Packet}
+\label{section:protocol_mult_variable_value_string}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}[bitwidth=1em]{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{16 + 8$M$ + $Sum_i$\{roundup($N[i]$, 4)\}} \\
+    \wordbox{1}{0x00810300} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Device ID (u32)} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \bitbox{16}{Status} &
+    \bitbox{16}{Severity} \\
+	\wordbox{1}{Number of Updates (``$M$'', u32)} \\
+	\wordbox{1}{Update Timestamp (``TOF'') - Number 1 (u32)} \\
+    \wordbox{1}{String Length - Number 1 (``$N[1]$'', u32)} \\
+	\wordbox{2}{Variable Value - Number 1 \\ (``roundup($N[1]$, 4)'' bytes of string data, null padded)} \\
+	\wordbox{1}{. . .} \\
+	\wordbox{1}{Update Timestamp (``TOF'') - Number ``$M$'' (u32)} \\
+    \wordbox{1}{String Length - Number ``$M$'' (``$N[M]$'', u32)} \\
+	\wordbox{2}{Variable Value - Number ``$M$'' \\ (``roundup($N[M]$, 4)'' bytes of string data, null padded)} \\
+  \end{bytefield}
+  \caption{Packet Type 0x8103.0: Variable Value (String) Packet}
+  \label{fig:protocol_mult_packet_value_string}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 16 bytes plus the number
+of individual {\bf Update Timestamps} and {\bf String Lengths}
+for each UTF-8 encoded string value update of the field,
+which in this case is a set of ``$M$'' {\it pairs} of
+unsigned 32 bit integer (u32) ``TOF'' (Time-of-Flight, see below)
+timestamps
+and unsigned 32 bit integer (u32) string lengths
+(8 bytes per value update ``pair''),
+additionally plus the {\bf Sum Total} of the Length of All
+{\bf Variable Value} Strings ``$i$'',
+where the storage for each UTF-8 encoded string is rounded up
+from the actual string length ``$N[i]$'' to the next multiple of four.
+\item{\bf Timestamp} indicates the overall {\it starting} time when
+this set of Variable Value Updates began occurring,
+and therefore is the ``base'' timestamp that
+all the following Update Timestamps (``TOF'', see below)
+are added to, for generating the absolute time of each value update.
+\item{\bf Device ID} indicates the device this variable is from.
+\item{\bf Variable ID} indicates the variable that changed.
+\item{\bf Status} of this variable from
+Table~\ref{table:protocol_variable_status_values}
+\item{\bf Severity} of this variable from
+Table~\ref{table:protocol_variable_severity_values}
+\item{\bf Number of Updates}
+is the number of Variable Value Updates ``$M$''
+that follow for the UTF-8 encoded string variable field.
+\item{\bf Update Timestamp - Number ``$i$''} is an
+unsigned 32 bit integer (u32) indexed Timestamp, Number ``$i$'',
+from a set of ``$M$'' Variable Value Updates,
+with each individual Timestamp or ``TOF'' (Time-of-Flight)
+being associated with the specific Variable Value for a given update;
+adding this TOF to the Overall Packet Timestamp gives the
+absolute wallclock time when Variable Value Update ``$i$'' occurred.
+\item{\bf String Length - Number ``$i$''} is the
+unsigned 32 bit integer (u32) indexed String Length, Number ``$i$''
+(``$N[i]$''),
+from a set of ``$M$'' Variable Value Updates,
+of the specific String Value Update ``$i$'' that follows,
+not including padding.
+\item{\bf Variable Value - Number ``$i$''} is a
+UTF-8 encoded string indexed Variable Value, Number ``$i$'',
+for a given update from the set of ``$M$'' Variable Value Updates,
+which occurred at the corresponding Update Timestamp ``$i$''.
+This field is padded by zeros to the nearest multiple of 4 bytes.
+\end{itemize}
+
+
+\newpage
+\subsubsection{Multiple Variable Value (U32 Array) Packet}
+\label{section:protocol_mult_variable_value_u32_array}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}[bitwidth=1em]{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{16 + 8$M$ + $Sum_i$\{4$N[i]$\}} \\
+    \wordbox{1}{0x00810400} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Device ID (u32)} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \bitbox{16}{Status} &
+    \bitbox{16}{Severity} \\
+	\wordbox{1}{Number of Updates (``$M$'', u32)} \\
+	\wordbox{1}{Update Timestamp (``TOF'') - Number 1 (u32)} \\
+	\wordbox{1}{Element Count - Number 1 (``$N[1]$'', u32)} \\
+    \wordbox{1}{Variable Value - Number 1, Array Element 1 (u32)} \\
+    \wordbox{1}{. . .} \\
+    \wordbox{1}{Variable Value - Number 1, Array Element ``$N[1]$'' (u32)} \\
+	\wordbox{1}{. . .} \\
+	\wordbox{1}{Update Timestamp (``TOF'') - Number ``$M$'' (u32)} \\
+	\wordbox{1}{Element Count - Number ``$M$'' (``$N[M]$'', u32)} \\
+    \wordbox{1}{Variable Value - Number ``$M$'', Array Element 1 (u32)} \\
+    \wordbox{1}{. . .} \\
+    \wordbox{1}{Variable Value - Number ``$M$'', Array Element ``$N[M]$'' (u32)} \\
+  \end{bytefield}
+  \caption{Packet Type 0x8104.0: Variable Value (U32 Array) Packet}
+  \label{fig:protocol_mult_packet_value_u32_array}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 16 bytes plus the number
+of individual {\bf Update Timestamps} and {\bf Element Counts}
+for each unsigned 32 bit integer (u32) numerical array (vector)
+value update of the field,
+which in this case is a set of ``$M$'' {\it pairs} of
+unsigned 32 bit integer (u32) ``TOF'' (Time-of-Flight, see below)
+timestamps
+and unsigned 32 bit integer (u32) element counts
+(8 bytes per value update ``pair''),
+additionally plus the {\bf Sum Total} of the Length of All
+{\bf Variable Value} U32 Arrays ``$i$''.
+\item{\bf Timestamp} indicates the overall {\it starting} time when
+this set of Variable Value Updates began occurring,
+and therefore is the ``base'' timestamp that
+all the following Update Timestamps (``TOF'', see below)
+are added to, for generating the absolute time of each value update.
+\item{\bf Device ID} indicates the device this variable is from.
+\item{\bf Variable ID} indicates the variable that changed.
+\item{\bf Status} of this variable from
+Table~\ref{table:protocol_variable_status_values}
+\item{\bf Severity} of this variable from
+Table~\ref{table:protocol_variable_severity_values}
+\item{\bf Number of Updates}
+is the number of Variable Value Updates ``$M$'' that follow
+for the unsigned 32 bit integer (u32) array (vector) variable field.
+\item{\bf Update Timestamp - Number ``$i$''} is an
+unsigned 32 bit integer (u32) indexed Timestamp, Number ``$i$'',
+from a set of ``$M$'' Variable Value Updates,
+with each individual Timestamp or ``TOF'' (Time-of-Flight)
+being associated with the specific Variable Value for a given update;
+adding this TOF to the Overall Packet Timestamp gives the
+absolute wallclock time when Variable Value Update ``$i$'' occurred.
+\item{\bf Element Count - Number ``$i$''} is the
+unsigned 32 bit integer (u32) indexed Element Count, Number ``$i$''
+(``$N[i]$''),
+from a set of ``$M$'' Variable Value Updates,
+of the specific U32 Array Update ``$i$'' that follows.
+\item{\bf Variable Value - Number ``$i$'', Array Element ``$j$''} is
+the ``$j$''th value out of ``$N[i]$'' array (vector) elements
+of the unsigned 32 bit integer (u32) indexed numerical array (vector)
+Variable Value, Number ``$i$'',
+for a given update from the set of ``$M$'' Variable Value Updates,
+which occurred at the corresponding Update Timestamp ``$i$''.
+\end{itemize}
+
+
+\newpage
+\subsubsection{Multiple Variable Value (Double Array) Packet}
+\label{section:protocol_mult_variable_value_double_array}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}[bitwidth=1em]{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{16 + 8$M$ + $Sum_i$\{8$N[i]$\}} \\
+    \wordbox{1}{0x00810500} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,16,15,0} \\
+    \wordbox{1}{Device ID (u32)} \\
+    \wordbox{1}{Variable ID (u32)} \\
+    \bitbox{16}{Status} &
+    \bitbox{16}{Severity} \\
+	\wordbox{1}{Number of Updates (``$M$'', u32)} \\
+	\wordbox{1}{Update Timestamp (``TOF'') - Number 1 (u32)} \\
+	\wordbox{1}{Element Count - Number 1 (``$N[1]$'', u32)} \\
+	\wordbox{2}{Variable Value - Number 1, Array Element 1 (IEEE 754 double)} \\
+	\wordbox{1}{. . .} \\
+	\wordbox{2}{Variable Value - Number 1, Array Element ``$N[1]$'' (IEEE 754 double)} \\
+	\wordbox{1}{. . .} \\
+	\wordbox{1}{Update Timestamp (``TOF'') - Number ``$M$'' (u32)} \\
+	\wordbox{1}{Element Count - Number ``$M$'' (``$N[M]$'', u32)} \\
+	\wordbox{2}{Variable Value - Number ``$M$'', Array Element 1 (IEEE 754 double)} \\
+	\wordbox{1}{. . .} \\
+	\wordbox{2}{Variable Value - Number ``$M$'', Array Element ``$N[M]$'' (IEEE 754 double)} \\
+  \end{bytefield}
+  \caption{Packet Type 0x8105.0: Variable Value (Double Array) Packet}
+  \label{fig:protocol_mult_packet_value_double_array}
+\end{figure}
+
+\begin{itemize}
+\item{\bf Length} is 16 bytes plus the number
+of individual {\bf Update Timestamps} and {\bf Element Counts}
+for each IEEE 754 double floating point numerical array (vector)
+value update of the field,
+which in this case is a set of ``$M$'' {\it pairs} of
+unsigned 32 bit integer (u32) ``TOF'' (Time-of-Flight, see below)
+timestamps
+and unsigned 32 bit integer (u32) element counts
+(8 bytes per value update ``pair''),
+additionally plus the {\bf Sum Total} of the Length of All
+{\bf Variable Value} Double Arrays ``$i$''.
+\item{\bf Timestamp} indicates the overall {\it starting} time when
+this set of Variable Value Updates began occurring,
+and therefore is the ``base'' timestamp that
+all the following Update Timestamps (``TOF'', see below)
+are added to, for generating the absolute time of each value update.
+\item{\bf Device ID} indicates the device this variable is from.
+\item{\bf Variable ID} indicates the variable that changed.
+\item{\bf Status} of this variable from
+Table~\ref{table:protocol_variable_status_values}
+\item{\bf Severity} of this variable from
+Table~\ref{table:protocol_variable_severity_values}
+\item{\bf Number of Updates}
+is the number of Variable Value Updates ``$M$'' that follow
+for the IEEE 754 double floating point array (vector) variable field.
+\item{\bf Update Timestamp - Number ``$i$''} is an
+unsigned 32 bit integer (u32) indexed Timestamp, Number ``$i$'',
+from a set of ``$M$'' Variable Value Updates,
+with each individual Timestamp or ``TOF'' (Time-of-Flight)
+being associated with the specific Variable Value for a given update;
+adding this TOF to the Overall Packet Timestamp gives the
+absolute wallclock time when Variable Value Update ``$i$'' occurred.
+\item{\bf Element Count - Number ``$i$''} is the
+unsigned 32 bit integer (u32) indexed Element Count, Number ``$i$''
+(``$N[i]$''),
+from a set of ``$M$'' Variable Value Updates,
+of the specific Double Array Update ``$i$'' that follows.
+\item{\bf Variable Value - Number ``$i$'', Array Element ``$j$''} is
+the ``$j$''th value out of ``$N[i]$'' array (vector) elements
+of the IEEE 754 double floating point indexed numerical array (vector)
+Variable Value, Number ``$i$'',
+for a given update from the set of ``$M$'' Variable Value Updates,
+which occurred at the corresponding Update Timestamp ``$i$''.
 \end{itemize}
 
