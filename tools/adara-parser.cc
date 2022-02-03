@@ -405,7 +405,7 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 			"    dataFlags=%s 0x%x (%s)\n"
 			"    flavor %d (%s)\n"
 			"    intrapulse %luns tofOffset %luns%s\n"
-			"    charge %lupC period %ups\n",
+			"    charge %lupC ringPeriod %ups\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
