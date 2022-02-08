@@ -266,8 +266,8 @@ void FastMeta::sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof)
 	uint32_t ns = tof + (pulse_id & 0xffffffff);
 
 	pkt[2] = pulse_id >> 32;
-	while (ns >= (1000U * 1000 * 1000)) {
-		ns -= 1000U * 1000 * 1000;
+	while (ns >= NANO_PER_SECOND_LL) {
+		ns -= NANO_PER_SECOND_LL;
 		pkt[2]++;
 	}
 	pkt[3] = ns;

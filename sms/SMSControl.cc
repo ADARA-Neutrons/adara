@@ -4006,8 +4006,8 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 			ns += tof;
 
 			pkt[2] = pulse->m_id.first >> 32;
-			if (ns >= (1000U * 1000 * 1000)) {
-				ns -= 1000U * 1000 * 1000;
+			if (ns >= NANO_PER_SECOND_LL) {
+				ns -= NANO_PER_SECOND_LL;
 				pkt[2]++;
 			}
 			pkt[3] = ns;

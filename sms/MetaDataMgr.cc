@@ -879,9 +879,8 @@ void MetaDataMgr::extractLastValue( ADARA::MultVariableU32Pkt inPkt,
 
 	ts.tv_nsec += tof;
 
-	// TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
-	while ( ts.tv_nsec >= (1000U * 1000 * 1000) ) {
-		ts.tv_nsec -= 1000U * 1000 * 1000;
+	while ( ts.tv_nsec >= NANO_PER_SECOND_LL ) {
+		ts.tv_nsec -= NANO_PER_SECOND_LL;
 		ts.tv_sec++;
 	}
 
@@ -946,9 +945,8 @@ void MetaDataMgr::extractLastValue( ADARA::MultVariableDoublePkt inPkt,
 
 	ts.tv_nsec += tof;
 
-	// TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
-	while ( ts.tv_nsec >= (1000U * 1000 * 1000) ) {
-		ts.tv_nsec -= 1000U * 1000 * 1000;
+	while ( ts.tv_nsec >= NANO_PER_SECOND_LL ) {
+		ts.tv_nsec -= NANO_PER_SECOND_LL;
 		ts.tv_sec++;
 	}
 
@@ -1017,9 +1015,8 @@ void MetaDataMgr::extractLastValue( ADARA::MultVariableStringPkt inPkt,
 
 	ts.tv_nsec += tof;
 
-	// TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
-	while ( ts.tv_nsec >= (1000U * 1000 * 1000) ) {
-		ts.tv_nsec -= 1000U * 1000 * 1000;
+	while ( ts.tv_nsec >= NANO_PER_SECOND_LL ) {
+		ts.tv_nsec -= NANO_PER_SECOND_LL;
 		ts.tv_sec++;
 	}
 
@@ -1086,9 +1083,8 @@ void MetaDataMgr::extractLastValue( ADARA::MultVariableU32ArrayPkt inPkt,
 
 	ts.tv_nsec += tof;
 
-	// TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
-	while ( ts.tv_nsec >= (1000U * 1000 * 1000) ) {
-		ts.tv_nsec -= 1000U * 1000 * 1000;
+	while ( ts.tv_nsec >= NANO_PER_SECOND_LL ) {
+		ts.tv_nsec -= NANO_PER_SECOND_LL;
 		ts.tv_sec++;
 	}
 
@@ -1156,9 +1152,8 @@ void MetaDataMgr::extractLastValue(
 
 	ts.tv_nsec += tof;
 
-	// TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
-	while ( ts.tv_nsec >= (1000U * 1000 * 1000) ) {
-		ts.tv_nsec -= 1000U * 1000 * 1000;
+	while ( ts.tv_nsec >= NANO_PER_SECOND_LL ) {
+		ts.tv_nsec -= NANO_PER_SECOND_LL;
 		ts.tv_sec++;
 	}
 

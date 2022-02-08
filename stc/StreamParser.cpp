@@ -5387,9 +5387,8 @@ StreamParser::rxPacket
 
         ts.tv_nsec += *it_tofs++;
 
-        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
-        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
-            ts.tv_nsec -= 1000U * 1000 * 1000;
+        while (ts.tv_nsec >= NANO_PER_SECOND_LL) {
+            ts.tv_nsec -= NANO_PER_SECOND_LL;
             ts.tv_sec++;
         }
 
@@ -5446,9 +5445,8 @@ StreamParser::rxPacket
 
         ts.tv_nsec += *it_tofs++;
 
-        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
-        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
-            ts.tv_nsec -= 1000U * 1000 * 1000;
+        while (ts.tv_nsec >= NANO_PER_SECOND_LL) {
+            ts.tv_nsec -= NANO_PER_SECOND_LL;
             ts.tv_sec++;
         }
 
@@ -5504,9 +5502,8 @@ StreamParser::rxPacket
 
         ts.tv_nsec += *it_tofs++;
 
-        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
-        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
-            ts.tv_nsec -= 1000U * 1000 * 1000;
+        while (ts.tv_nsec >= NANO_PER_SECOND_LL) {
+            ts.tv_nsec -= NANO_PER_SECOND_LL;
             ts.tv_sec++;
         }
 
@@ -5564,9 +5561,8 @@ StreamParser::rxPacket
 
         ts.tv_nsec += *it_tofs++;
 
-        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
-        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
-            ts.tv_nsec -= 1000U * 1000 * 1000;
+        while (ts.tv_nsec >= NANO_PER_SECOND_LL) {
+            ts.tv_nsec -= NANO_PER_SECOND_LL;
             ts.tv_sec++;
         }
 
@@ -5624,9 +5620,8 @@ StreamParser::rxPacket
 
         ts.tv_nsec += *it_tofs++;
 
-        // TODO Replace with NANO_PER_SECOND_LL...?? (U vs LL...?)
-        while (ts.tv_nsec >= (1000U * 1000 * 1000)) {
-            ts.tv_nsec -= 1000U * 1000 * 1000;
+        while (ts.tv_nsec >= NANO_PER_SECOND_LL) {
+            ts.tv_nsec -= NANO_PER_SECOND_LL;
             ts.tv_sec++;
         }
 
