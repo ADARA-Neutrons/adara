@@ -2384,7 +2384,16 @@ StreamMonitor::dbThread()
         ++m_db_ticker;
         m_db_state = TS_CONNECTING;
 
+        syslog( LOG_INFO,
+            "Connecting to Database (%s=%s %s=%s %s=%s %s=%s)",
+            "host", m_db_info->host.c_str(),
+            "port", boost::lexical_cast<string>(m_db_info->port).c_str(),
+            "user", m_db_info->user.c_str(),
+            "dbname", m_db_info->name.c_str() );
+        usleep(30000); // give syslog a chance...
+
         conn = PQconnectdb( connect_string.c_str() );
+
         if ( conn )
         {
             syslog( LOG_INFO, "Database Connected." );
