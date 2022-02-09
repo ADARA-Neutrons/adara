@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Python Script for Copying Image Files
 from the MCP PC at SNAP/VENUS/CG1D Beamlines
@@ -22,6 +22,7 @@ import re
 import subprocess
 import traceback
 import requests
+import pathlib
 
 
 def remove_leading_directory(path_1):
@@ -188,8 +189,10 @@ def copy_images(file_path, proposal, run_number, source_dir, target_dir):
 
 
 def get_creds():
-	file_name = 'creds_do_not_persist.txt' 
-	with open(file_name, 'r') as file:
+	creds_path = pathlib.Path(__file__).parent.resolve()
+	file_name = 'creds_do_not_persist.txt'
+	file_path = os.path.join(creds_path, file_name) 
+	with open(file_path, 'r') as file:
 		creds = file.read().replace('\n', '')
 	return creds
 
