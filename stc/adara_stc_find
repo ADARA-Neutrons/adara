@@ -212,6 +212,9 @@ for host in ${STC_HOSTS} ; do
 
 		if [[ ${TERSE} == 0 ]]; then
 			echo "${logs}"
+		else
+			nout=`echo "${logs}" | ${WC} | ${AWK} '{print $1}'`
+			echo "[${nout} Logs]"
 		fi
 
 		# Capture *All* STC Instance Logs...
