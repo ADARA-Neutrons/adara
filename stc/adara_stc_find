@@ -24,6 +24,10 @@ STC_OLD="${STC1_OLD} ${STC2_OLD}"
 
 STC_ALL="${STC_NEW} ${STC_OLD}"
 
+STCVIEW="/SNS/users/y8y/stuff/exec/stcview"
+
+STCRUN="/SNS/users/y8y/stuff/exec/stcrun"
+
 SORT="/usr/bin/sort"
 TAIL="/usr/bin/tail"
 Less="/usr/bin/less"
@@ -205,7 +209,7 @@ for host in ${STC_HOSTS} ; do
 
 	echo -e "\n${host}:"
 
-	logs=`ssh -AY ${USER}@${host} stcrun ${RUN_NUMBER} ${GREP_CMD}`
+	logs=`ssh -AY ${USER}@${host} ${STCRUN} ${RUN_NUMBER} ${GREP_CMD}`
 
 	# Only Process Non-Empty Log Results... ;-D
 	if [[ -n "${logs}" ]] ; then
@@ -317,7 +321,7 @@ if [[ $DO_ALL_LOGS == 0 ]]; then
 	CHECK_PROCEED "Run STC View on Final Instance PID=${PID} on ${HOST}"
 
 	if [[ $? == 0 ]]; then
-		ssh -AY ${USER}@${HOST} stcview ${PID} \
+		ssh -AY ${USER}@${HOST} ${STCVIEW} ${PID} \
 			| ${Less} +/"Run: ${RUN_NUMBER}"
 	fi
 
