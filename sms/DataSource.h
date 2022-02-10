@@ -276,6 +276,8 @@ private:
 	uint32_t	m_err_count_tenmin;
 
 	struct timespec	m_last_second_time;
+	struct timespec	m_last_minute_time;
+	struct timespec	m_last_tenmin_time;
 	uint32_t	m_last_minute;
 	uint32_t	m_last_tenmin;
 
