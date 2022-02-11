@@ -256,6 +256,7 @@ STCClientMgr::STCClientMgr() :
 
 STCClientMgr::~STCClientMgr()
 {
+	SMSControl *ctrl = SMSControl::getInstance();
 	if (m_connect_timer) {
 		m_connect_timer->cancel();
 		delete m_connect_timer;
@@ -283,7 +284,9 @@ STCClientMgr::~STCClientMgr()
 		m_fdreg = NULL;
 	}
 	if (m_fd >= 0) {
-		DEBUG("Close m_fd=" << m_fd);
+		if (ctrl->verbose() > 0) {
+			DEBUG("Close m_fd=" << m_fd);
+		}
 		close(m_fd);
 		m_fd = -1;
 	}
@@ -536,7 +539,9 @@ void STCClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 	// Free Any Previous File Descriptor...
 	// (If it got passed down into STCClient(), then we already cleared it!)
 	if (m_fd >= 0) {
-		DEBUG("Close m_fd=" << m_fd);
+		if (ctrl->verbose() > 0) {
+			DEBUG("Close m_fd=" << m_fd);
+		}
 		close(m_fd);
 		m_fd = -1;
 	}
@@ -547,7 +552,9 @@ void STCClientMgr::lookupComplete(const struct signalfd_siginfo &info)
 		m_fd = -1;   // just to be sure... ;-b
 		goto error;
 	}
-	DEBUG("New Socket m_fd=" << m_fd);
+	if (ctrl->verbose() > 0) {
+		DEBUG("New Socket m_fd=" << m_fd);
+	}
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
 	if (flags < 0)
@@ -775,12 +782,15 @@ void STCClientMgr::connectComplete(void)
 
 void STCClientMgr::connectFailed(void)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
 	if (m_fdreg) {
 		delete m_fdreg;
 		m_fdreg = NULL;
 	}
 	if (m_fd >= 0) {
-		DEBUG("connectFailed(): Close m_fd=" << m_fd);
+		if (ctrl->verbose() > 0) {
+			DEBUG("connectFailed(): Close m_fd=" << m_fd);
+		}
 		close(m_fd);
 		m_fd = -1;
 	}

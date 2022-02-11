@@ -12,6 +12,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.SignalEvents"));
 #include "EPICS.h"
 #include "ReadyAdapter.h"
 #include "SignalEvents.h"
+#include "SMSControl.h"
 
 SignalEvents::SignalEvents()
 	: m_read(NULL), m_fd(-1)
@@ -20,13 +21,16 @@ SignalEvents::SignalEvents()
 
 SignalEvents::~SignalEvents()
 {
+	SMSControl *ctrl = SMSControl::getInstance();
 	if ( m_read ) {
 		delete m_read;
 		m_read = NULL;   // just to be sure... ;-b
 	}
 
 	if ( m_fd >= 0 ) {
-		DEBUG("Close m_fd=" << m_fd);
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("Close m_fd=" << m_fd);
+		}
 		close( m_fd );
 		m_fd = -1;   // just to be sure... ;-b
 	}
@@ -34,6 +38,8 @@ SignalEvents::~SignalEvents()
 
 void SignalEvents::check_init(void)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	if (m_fd >= 0)
 		return;
 
@@ -53,7 +59,9 @@ void SignalEvents::check_init(void)
 		}
 		throw std::runtime_error(msg);
 	}
-	DEBUG("New SignalEvent SignalFD m_fd=" << m_fd);
+	if ( ctrl->verbose() > 0 ) {
+		DEBUG("New SignalEvent SignalFD m_fd=" << m_fd);
+	}
 
 	// Free Any Previous ReadyAdapter...
 	if ( m_read ) {
@@ -64,7 +72,7 @@ void SignalEvents::check_init(void)
 	try {
 		m_read = new ReadyAdapter(m_fd, fdrRead,
 			boost::bind(&SignalEvents::signaled, this),
-			1 /* verbose */);
+			ctrl->verbose());
 	} catch (std::exception &e) {
 		std::string msg(
 			"Exception Creating ReadyAdapter in check_init() - ");
@@ -72,7 +80,9 @@ void SignalEvents::check_init(void)
 		ERROR(msg);
 		m_read = NULL;   // just to be sure... ;-b
 		if (m_fd >= 0) {
-			DEBUG("Close m_fd=" << m_fd);
+			if ( ctrl->verbose() > 0 ) {
+				DEBUG("Close m_fd=" << m_fd);
+			}
 			close(m_fd);
 			m_fd = -1;   // just to be sure... ;-b
 		}
@@ -83,7 +93,9 @@ void SignalEvents::check_init(void)
 		ERROR(msg);
 		m_read = NULL;   // just to be sure... ;-b
 		if (m_fd >= 0) {
-			DEBUG("Close m_fd=" << m_fd);
+			if ( ctrl->verbose() > 0 ) {
+				DEBUG("Close m_fd=" << m_fd);
+			}
 			close(m_fd);
 			m_fd = -1;   // just to be sure... ;-b
 		}
@@ -93,6 +105,8 @@ void SignalEvents::check_init(void)
 
 void SignalEvents::registerHandler(int sig, cbFunc cb)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	int rc;
 
 	check_init();
@@ -106,7 +120,9 @@ void SignalEvents::registerHandler(int sig, cbFunc cb)
 			m_read = NULL;   // just to be sure... ;-b
 		}
 		if (m_fd >= 0) {
-			DEBUG("Close m_fd=" << m_fd);
+			if (ctrl->verbose() > 0) {
+				DEBUG("Close m_fd=" << m_fd);
+			}
 			close(m_fd);
 			m_fd = -1;   // just to be sure... ;-b
 		}
@@ -145,7 +161,9 @@ void SignalEvents::registerHandler(int sig, cbFunc cb)
 			m_read = NULL;   // just to be sure... ;-b
 		}
 		if (m_fd >= 0) {
-			DEBUG("Close m_fd=" << m_fd);
+			if (ctrl->verbose() > 0) {
+				DEBUG("Close m_fd=" << m_fd);
+			}
 			close(m_fd);
 			m_fd = -1;   // just to be sure... ;-b
 		}
@@ -170,7 +188,9 @@ void SignalEvents::registerHandler(int sig, cbFunc cb)
 		}
 		if (m_fd >= 0) {
 			signalfd(m_fd, &m_sig_set, SFD_NONBLOCK | SFD_CLOEXEC);
-			DEBUG("Close m_fd=" << m_fd);
+			if (ctrl->verbose() > 0) {
+				DEBUG("Close m_fd=" << m_fd);
+			}
 			close(m_fd);
 			m_fd = -1;   // just to be sure... ;-b
 		}
@@ -180,6 +200,8 @@ void SignalEvents::registerHandler(int sig, cbFunc cb)
 
 int SignalEvents::allocateRTsig(cbFunc cb)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	int sig;
 
 	check_init();
@@ -197,7 +219,9 @@ int SignalEvents::allocateRTsig(cbFunc cb)
 		m_read = NULL;   // just to be sure... ;-b
 	}
 	if (m_fd >= 0) {
-		DEBUG("Close m_fd=" << m_fd);
+		if (ctrl->verbose() > 0) {
+			DEBUG("Close m_fd=" << m_fd);
+		}
 		close(m_fd);
 		m_fd = -1;   // just to be sure... ;-b
 	}
@@ -211,6 +235,8 @@ bool SignalEvents::valid(void)
 
 void SignalEvents::signaled(void)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// Note: *Don't* Throw Exceptions in signaled()...!
 	// (It will unnecessarily crash the SMS, so just let whatever
 	// communication "time out" and retry...! ;-D)
@@ -251,7 +277,9 @@ void SignalEvents::signaled(void)
 				m_read = NULL;   // just to be sure... ;-b
 			}
 			if (m_fd >= 0) {
-				DEBUG("Close m_fd=" << m_fd);
+				if (ctrl->verbose() > 0) {
+					DEBUG("Close m_fd=" << m_fd);
+				}
 				close(m_fd);
 				m_fd = -1;   // just to be sure... ;-b
 			}

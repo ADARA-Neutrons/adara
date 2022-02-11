@@ -176,6 +176,8 @@ exception:
 
 STCClient::~STCClient()
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	m_contConnection.disconnect();
 	m_fileConnection.disconnect();
 
@@ -196,7 +198,9 @@ STCClient::~STCClient()
 	}
 
 	if (m_stc_fd >= 0) {
-		DEBUG("Close m_stc_fd=" << m_stc_fd);
+		if (ctrl->verbose() > 0) {
+			DEBUG("Close m_stc_fd=" << m_stc_fd);
+		}
 		close(m_stc_fd);
 		m_stc_fd = -1;
 	}
@@ -324,7 +328,9 @@ void STCClient::writable(void)
 				delete this;
 				return;
 			}
-			DEBUG("Using Data File Descriptor m_file_fd=" << m_file_fd);
+			if ( ctrl->verbose() > 0 ) {
+				DEBUG("Using Data File Descriptor m_file_fd=" << m_file_fd);
+			}
 		}
 
 		len = f->size() - m_cur_offset;

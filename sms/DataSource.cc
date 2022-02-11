@@ -1338,7 +1338,7 @@ DataSource::~DataSource()
 		m_fdreg = NULL;
 	}
 	if (m_fd >= 0) {
-		if ( m_ctrl->verbose() )
+		if ( m_ctrl->verbose() > 0 )
 			DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
@@ -1604,7 +1604,7 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 		m_fdreg = NULL;
 	}
 	if (m_fd >= 0) {
-		if ( m_ctrl->verbose() )
+		if ( m_ctrl->verbose() > 0 )
 			DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
@@ -1812,7 +1812,7 @@ void DataSource::startConnect(void)
 		m_fd = -1;   // just to be sure... ;-b
 		goto error;
 	}
-	if ( m_ctrl->verbose() ) {
+	if ( m_ctrl->verbose() > 0 ) {
 		DEBUG("New Socket for " << m_name << " m_fd=" << m_fd);
 	}
 
@@ -1904,7 +1904,7 @@ void DataSource::startConnect(void)
 error_fd:
 
 	if (m_fd >= 0) {
-		if ( m_ctrl->verbose() )
+		if ( m_ctrl->verbose() > 0 )
 			DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
