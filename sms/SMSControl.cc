@@ -1795,7 +1795,7 @@ void SMSControl::unregisterEventSource(uint32_t srcId, uint32_t smsId)
 				if (++next != m_pulses.end())
 					correctPChargeVeto(it->second, next->second);
 				else {
-					/* Rate-limited logging of global sawtooth pulse */
+					/* Rate-limited logging of no more pulses */
 					std::string log_info;
 					if ( RateLimitedLogging::checkLog(
 							RLLHistory_SMSControl,
@@ -2001,7 +2001,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_GLOBAL_SAWTOOTH_PULSE, "none",
-					2, 10, 100, log_info ) ) {
+					2, 10, 1000, log_info ) ) {
 				ERROR(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "getPulse: Global SAWTOOTH Pulse(0x"
@@ -2035,7 +2035,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_GLOBAL_SAWTOOTH_LAST, "none",
-					2, 10, 100, log_info ) ) {
+					2, 10, 1000, log_info ) ) {
 				ERROR(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "getPulse: Global SAWTOOTH Pulse(0x"
@@ -2112,7 +2112,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					if (++next != m_pulses.end())
 						correctPChargeVeto(it->second, next->second);
 					else {
-						/* Rate-limited logging of global sawtooth pulse */
+						/* Rate-limited logging of no more pulses */
 						std::string log_info;
 						if ( RateLimitedLogging::checkLog(
 								RLLHistory_SMSControl,
@@ -2660,7 +2660,10 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		pulse->m_charge = pulse->m_rtdl->pulseCharge();
 	}
 	else {
-		if ( !m_noRTDLPulses ) {
+		// Only Log 1st Occurrence "Missing RTDL for Setting Proton Charge"
+		// - i.e. If the Pulse Charge has _Not Yet_ Been Set from Data Pkt
+		// or If the Data Packet Pulse Charge "Changed" (yikes)... ;-D
+		if ( !m_noRTDLPulses && pulse->m_charge != pkt.pulseCharge() ) {
 			// Rate-Limited Log Missing RTDL for Setting Proton Charge...
 			std::stringstream ss;
 			// Just Use Hardware ID for RLL Key...
@@ -2669,7 +2672,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 			if ( RateLimitedLogging::checkLog(
 					RLLHistory_SMSControl,
 					RLL_MISSING_RTDL_PROTON_CHARGE, ss.str(),
-					2, 10, 5000, log_info ) ) {
+					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "pulseEvents():"
@@ -2849,7 +2852,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					if ( RateLimitedLogging::checkLog(
 							RLLHistory_SMSControl,
 							RLL_UNKNOWN_FAST_META_PIXEL_ID, ss.str(),
-							2, 10, 100, log_info ) ) {
+							2, 10, 5000, log_info ) ) {
 						ERROR(log_info
 							<< ( m_recording ? "[RECORDING] " : "" )
 							<< "pulseEvents():"
@@ -3310,7 +3313,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 				correctPChargeVeto(it->second, next->second);
 			}
 			else {
-				/* Rate-limited logging of global sawtooth pulse */
+				/* Rate-limited logging of no more pulses */
 				std::string log_info;
 				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
@@ -3432,7 +3435,7 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 				RLL_PULSE_PCHG_UNCORRECTED, "none",
-				2, 10, 100, log_info ) ) {
+				2, 10, 5000, log_info ) ) {
 			ERROR(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "correctPChargeVeto: *** Next Pulse Out of Range -"
@@ -3499,7 +3502,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 				std::string log_info;
 				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 						RLL_NO_RTDL_FOR_PULSE, "none",
-						2, 10, 100, log_info ) ) {
+						2, 10, 5000, log_info ) ) {
 					ERROR(log_info
 						<< ( m_recording ? "[RECORDING] " : "" )
 						<< "recordPulse: NO RTDL for Pulse"
