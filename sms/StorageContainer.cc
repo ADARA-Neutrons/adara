@@ -44,6 +44,8 @@ void StorageContainer::terminateFile(
 		bool do_terminate,
 		const struct timespec &newStart ) // EPICS Time...!
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	if ( !(it->m_file) )
 	{
 		std::stringstream ss;
@@ -110,10 +112,13 @@ void StorageContainer::terminateFile(
 	}
 	it->m_maxTime = maxTime;
 
-	DEBUG("terminateFile(): Setting Current PauseMode " << it->m_numModes
-		<< " maxTime=" << it->m_maxTime.tv_sec << "."
-		<< std::setfill('0') << std::setw(9)
-		<< it->m_maxTime.tv_nsec << std::setw(0));
+	if ( ctrl->verbose() > 0 ) {
+		DEBUG("terminateFile():"
+			<< " Setting Current PauseMode " << it->m_numModes
+			<< " maxTime=" << it->m_maxTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_maxTime.tv_nsec << std::setw(0));
+	}
 
 	// Do We Terminate This PauseMode Now, or Keep It Alive on the Stack?
 	if ( do_terminate )
@@ -178,6 +183,8 @@ void StorageContainer::newFile(
 		std::list<struct PauseMode>::iterator &it,
 		bool paused, const struct timespec &minTime ) // EPICS Time...!
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	if ( it->m_file )
 	{
 		ERROR("newFile(): StorageFile Already Exists "
@@ -207,23 +214,24 @@ void StorageContainer::newFile(
 		return;
 	}
 
-	// REMOVEME
-	DEBUG("newFile(): Create New StorageFile"
-		<< " minTime=" << minTime.tv_sec << "."
-		<< std::setfill('0') << std::setw(9)
-		<< minTime.tv_nsec << std::setw(0)
-		<< " paused=" << paused
-		<< " from m_paused=" << it->m_paused
-		<< " m_numModes=" << it->m_numModes
-		<< " m_numFiles=" << it->m_numFiles
-		<< " m_numPauseFiles=" << it->m_numPauseFiles
-		<< " m_pendingFiles.size()="
-			<< it->m_pendingFiles.size()
-		<< " m_lastPrologueFile="
-		<< ( ( it->m_lastPrologueFile ) ?
-			it->m_lastPrologueFile->path() : "(null)" )
-		<< " - Btw, the PauseMode Stack now has "
-		<< m_pauseModeStack.size() << " elements");
+	if ( ctrl->verbose() > 0 ) {
+		DEBUG("newFile(): Create New StorageFile"
+			<< " minTime=" << minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< minTime.tv_nsec << std::setw(0)
+			<< " paused=" << paused
+			<< " from m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_pendingFiles.size()="
+				<< it->m_pendingFiles.size()
+			<< " m_lastPrologueFile="
+			<< ( ( it->m_lastPrologueFile ) ?
+				it->m_lastPrologueFile->path() : "(null)" )
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements");
+	}
 
 	it->m_paused = paused;
 
@@ -320,8 +328,10 @@ void StorageContainer::newFile(
 			it->m_pendingFiles.clear();
 		}
 
-		DEBUG("newFile(): Adding File to Container File List "
-			<< it->m_file->path());
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("newFile(): Adding File to Container File List "
+				<< it->m_file->path());
+		}
 
 		m_files.push_back( it->m_file );
 
@@ -366,11 +376,13 @@ void StorageContainer::newFile(
 	// Then Just Append That File Directly Now...
 	if ( it->m_lastPrologueFile )
 	{
-		DEBUG("newFile():"
-			<< " Directly Appending Last Prologue File "
-			<< it->m_lastPrologueFile->path()
-			<< " for New File "
-			<< it->m_file->path());
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("newFile():"
+				<< " Directly Appending Last Prologue File "
+				<< it->m_lastPrologueFile->path()
+				<< " for New File "
+				<< it->m_file->path());
+		}
 
 		it->m_file->catFile( it->m_lastPrologueFile );
 	}
@@ -379,8 +391,10 @@ void StorageContainer::newFile(
 	// add the prologue before anyone else sees it.
 	else
 	{
-		DEBUG("newFile(): Append Normal FileCreated File Prologue to "
-			<< it->m_file->path());
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("newFile(): Append Normal FileCreated File Prologue to "
+				<< it->m_file->path());
+		}
 
 		StorageManager::fileCreated( it->m_file,
 			false /* capture_last */ );
@@ -394,8 +408,10 @@ void StorageContainer::newFile(
 	// If This Isn't the Oldest PauseMode on the Stack...
 	if ( next == m_pauseModeStack.end() )
 	{
-		DEBUG("newFile(): FileAdded Notify for "
-			<< it->m_file->path());
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("newFile(): FileAdded Notify for "
+				<< it->m_file->path());
+		}
 
 		// Note: New File Already Pushed Onto Container File List Above...
 
