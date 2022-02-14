@@ -310,7 +310,7 @@ public:
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_DUPLICATE_PULSE, m_name,
-					2, 10, 100, log_info ) ) {
+					2, 10, 5000, log_info ) ) {
 				ERROR(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "findPulseSequence(): New Pulse (RawDataPkt):"
