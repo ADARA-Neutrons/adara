@@ -3182,10 +3182,16 @@ void StorageManager::backgroundIo(void)
 	 * m_ioCompleteEvent	IO thread, signal IO request is complete
 	 * m_purgedBlocks	IO thread, indicate how many blocks were purged
 	 */
+
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	scanStorage();
 
-	DEBUG("backgroundIo(): Sending Value IOCMD_INITIAL = " << IOCMD_INITIAL
-		<< "/0x" << std::hex << IOCMD_INITIAL << std::dec);
+	if ( ctrl->verbose() > 2 ) {
+		DEBUG("backgroundIo(): Sending Value IOCMD_INITIAL = "
+			<< IOCMD_INITIAL
+			<< "/0x" << std::hex << IOCMD_INITIAL << std::dec);
+	}
 	if ( !m_ioCompleteEvent->signal( IOCMD_INITIAL ) ) {
 		ERROR("backgroundIo(): Error Signaling I/O Complete Event"
 			<< " with IOCMD_INITIAL Completion = " << IOCMD_INITIAL
@@ -3203,8 +3209,10 @@ void StorageManager::backgroundIo(void)
 				<< " - Continuing...");
 			continue;
 		}
-		DEBUG("backgroundIo(): Received cmd = " << cmd
-			<< "/0x" << std::hex << cmd << std::dec);
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG("backgroundIo(): Received cmd = " << cmd
+				<< "/0x" << std::hex << cmd << std::dec);
+		}
 
 		/* We only accept two commands -- shutdown, and the
 		 * minimum number of blocks to purge.
@@ -3214,8 +3222,11 @@ void StorageManager::backgroundIo(void)
 		else
 			m_purgedBlocks += purgeData( cmd );
 
-		DEBUG("backgroundIo(): Sending Value IOCMD_DONE = " << IOCMD_DONE
-			<< "/0x" << std::hex << IOCMD_DONE << std::dec);
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG("backgroundIo(): Sending Value IOCMD_DONE = "
+				<< IOCMD_DONE
+				<< "/0x" << std::hex << IOCMD_DONE << std::dec);
+		}
 		if ( !m_ioCompleteEvent->signal( IOCMD_DONE ) ) {
 			ERROR("backgroundIo(): Error Signaling I/O Complete Event"
 				<< " with IOCMD_DONE Completion = " << IOCMD_DONE
@@ -3226,7 +3237,11 @@ void StorageManager::backgroundIo(void)
 
 void StorageManager::ioCompleted(void)
 {
-	DEBUG("ioCompleted() entry");
+	SMSControl *ctrl = SMSControl::getInstance();
+
+	if ( ctrl->verbose() > 2 ) {
+		DEBUG("ioCompleted() entry");
+	}
 
 	uint64_t val = 0;
 
@@ -3238,8 +3253,10 @@ void StorageManager::ioCompleted(void)
 		ERROR("ioCompleted() failure exit");
 		return;
 	}
-	DEBUG("ioCompleted(): Received val = " << val
-		<< "/0x" << std::hex << val << std::dec);
+	if ( ctrl->verbose() > 2 ) {
+		DEBUG("ioCompleted(): Received val = " << val
+			<< "/0x" << std::hex << val << std::dec);
+	}
 
 	// Initial Data Directory Scan Results...
 	if ( val == IOCMD_INITIAL ) {
@@ -3278,7 +3295,9 @@ void StorageManager::ioCompleted(void)
 
 	m_ioActive = false;
 
-	DEBUG("ioCompleted() exit");
+	if ( ctrl->verbose() > 2 ) {
+		DEBUG("ioCompleted() exit");
+	}
 }
 
 void StorageManager::requestPurge( uint64_t goal, std::string logStr )
@@ -3300,8 +3319,10 @@ void StorageManager::requestPurge( uint64_t goal, std::string logStr )
 		<< logStr );
 
 	m_ioActive = true;
-	DEBUG("requestPurge(): Sending goal = " << goal
-		<< "/0x" << std::hex << goal << std::dec);
+	if ( ctrl->verbose() > 2 ) {
+		DEBUG("requestPurge(): Sending goal = " << goal
+			<< "/0x" << std::hex << goal << std::dec);
+	}
 	if ( !m_ioStartEvent->signal( goal ) ) {
 		ERROR("requestPurge(): Error Signaling I/O Start Event"
 			<< " with Goal = " << goal
@@ -3395,6 +3416,9 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 	 * reasonably small, so go for the simple code for now. We
 	 * can revisit if CPU usage is too high.
 	 */
+
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	std::list<fs::path> containers;
 	fs::directory_iterator end, it(dir);
 	for (; it != end; ++it) {
@@ -3449,12 +3473,15 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 		if ( (numParsed = sscanf((*cit).filename().c_str(),
 				"%8u-%6u.%9u-run-%u",
 				&date, &secs, &nanosecs, &run)) == 4 ) {
-			INFO("purgeDaily(): Parsed Run Number of"
-				<< " [" << (*cit).filename() << "]"
-				<< " from [" << cpath.string() << "]"
-				<< " in [" << dir << "]"
-				<< " as " << run
-				<< " (" << date << ", " << secs << "." << nanosecs << ")");
+			if ( ctrl->verbose() > 2 ) {
+				INFO("purgeDaily(): Parsed Run Number of"
+					<< " [" << (*cit).filename() << "]"
+					<< " from [" << cpath.string() << "]"
+					<< " in [" << dir << "]"
+					<< " as " << run
+					<< " (" << date << ", "
+						<< secs << "." << nanosecs << ")");
+			}
 		}
 		else if ( numParsed < 3 ) {
 			ERROR("purgeDaily():"
@@ -3464,7 +3491,7 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 				<< " in [" << dir << "]"
 				<< " (" << date << ", " << secs << "." << nanosecs << ")");
 		}
-		else {
+		else if ( ctrl->verbose() > 2 ) {
 			INFO("purgeDaily(): Parsed In-Between-Run Date/Time of"
 				<< " [" << (*cit).filename() << "]"
 				<< " from [" << cpath.string() << "]"
@@ -3482,9 +3509,11 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 		// Skip the Last Container in the Last Daily Folder...
 		// (Because This is the One We're Currently Writing To...! ;-O)
 		if ( last && cit == cend ) {
-			DEBUG("purgeDaily():"
-				<< " Skipping Last Container in Last Daily Folder"
-				<< " (Active?) " << cpath.string());
+			if ( ctrl->verbose() > 2 ) {
+				DEBUG("purgeDaily():"
+					<< " Skipping Last Container in Last Daily Folder"
+					<< " (Active?) " << cpath.string());
+			}
 			continue;
 		}
 
@@ -3520,8 +3549,10 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 		if ( path_deleted ) {
 			subs = daily_map.find( cpath.string() );
 			if ( subs != subs_end ) {
-				DEBUG("purgeDaily(): Removing Container "
-					<< cpath.string() << " from Daily Cache Map");
+				if ( ctrl->verbose() > 2 ) {
+					DEBUG("purgeDaily(): Removing Container "
+						<< cpath.string() << " from Daily Cache Map");
+				}
 				daily_map.erase( subs );
 			}
 		}
@@ -3597,8 +3628,10 @@ uint64_t StorageManager::purgeData(uint64_t purgeRequested)
 			continue;
 		}
 
-		DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
-			<< "Purging Daily " << it->first);
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG( ( ctrl->getRecording() ? "[RECORDING] " : "" )
+				<< "Purging Daily " << it->first);
+		}
 
 		/* We need to know when we're working on the last known
 		 * daily directory so we can tell purgeDir(). It will use

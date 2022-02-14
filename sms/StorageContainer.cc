@@ -2293,6 +2293,8 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path,
 uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 		std::string &propId, bool &path_deleted )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	std::string cpath;
 	struct timespec ts;
 	uint32_t run;
@@ -2336,8 +2338,10 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 		if (prop_ck == 0) {
 			propId = file.string().substr(prop_ck
 				+ sizeof(m_proposal_id_marker_prefix) + 1);
-			DEBUG("purge(): Found ProposalId Marker, "
-				<< "Set ProposalId for Container to: " << propId);
+			if ( ctrl->verbose() > 2 ) {
+				DEBUG("purge(): Found ProposalId Marker, "
+					<< "Set ProposalId for Container to: " << propId);
+			}
 			continue;
 		}
 
@@ -2348,13 +2352,17 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 	}
 
 	if (manual) {
-		DEBUG("Skipping purge of container '" << path << "' (manual)");
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG("Skipping purge of container '" << path << "' (manual)");
+		}
 		return 0;
 	}
 
 	if (run && !translated) {
-		DEBUG("Skipping purge of container '" << path
-		      << "' (untranslated)");
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG("Skipping purge of container '" << path
+		      	<< "' (untranslated)");
+		}
 		return 0;
 	}
 
@@ -2412,7 +2420,9 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 			// Remove Overall Container Directory
 			remove(base);
 
-			DEBUG("Removed container " << base);
+			if ( ctrl->verbose() > 2 ) {
+				DEBUG("Removed container " << base);
+			}
 		} catch(fs::filesystem_error err) {
 			WARN("Error removing container: " << err.what());
 			path_deleted = false;
@@ -2428,6 +2438,8 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 
 void StorageContainer::purgeBackups(const std::string &path)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	fs::directory_iterator end, it(path);
 	StorageFile::SharedPtr f;
 
@@ -2444,8 +2456,10 @@ void StorageContainer::purgeBackups(const std::string &path)
 		/* Check for Raw Data "BACKUP" Files, "${datafile}.BACKUP-$$" */
 		size_t backup_ck = file.string().find(".BACKUP-");
 		if (backup_ck != std::string::npos) {
-			DEBUG("purgeBackups(): Found Raw Data BACKUP File - "
-				<< it->path());
+			if ( ctrl->verbose() > 2 ) {
+				DEBUG("purgeBackups(): Found Raw Data BACKUP File - "
+					<< it->path());
+			}
 			remove(it->path());
 			continue;
 		}
@@ -2453,8 +2467,10 @@ void StorageContainer::purgeBackups(const std::string &path)
 		/* Check for Raw Data "NEW" Files, "${datafile}.NEW-$$" */
 		size_t new_ck = file.string().find(".NEW-");
 		if (new_ck != std::string::npos) {
-			DEBUG("purgeBackups(): Found Raw Data NEW File - "
-				<< it->path());
+			if ( ctrl->verbose() > 2 ) {
+				DEBUG("purgeBackups(): Found Raw Data NEW File - "
+					<< it->path());
+			}
 			remove(it->path());
 			continue;
 		}

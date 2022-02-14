@@ -168,10 +168,12 @@ bool EventFd::do_read( uint64_t & val )
 	}
 
 	if ( len == 0 ) {
-		DEBUG("do_read(): " << ss.str() << "Done. "
-			<< "Read " << sizeof(val) << " Bytes. "
-			<< "Value = " << val << "/0x"
-				<< std::hex << val << std::dec);
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG("do_read(): " << ss.str() << "Done. "
+				<< "Read " << sizeof(val) << " Bytes. "
+				<< "Value = " << val << "/0x"
+					<< std::hex << val << std::dec);
+		}
 		return( true );
 	}
 	else {
@@ -231,7 +233,7 @@ bool EventFd::do_write( uint64_t val )
 					m_fd = -1;
 				}
 				return( false );
-			} else {
+			} else if ( ctrl->verbose() > 2 ) {
 				DEBUG("do_write(): Write Returned rc=" << rc
 					<< " Continuing..." << " (cnt=" << cnt << ")");
 			}
@@ -245,10 +247,12 @@ bool EventFd::do_write( uint64_t val )
 	}
 
 	if ( len == 0 ) {
-		DEBUG("do_write(): " << ss.str() << "Done. "
-			<< "Wrote " << sizeof(val) << " Bytes. "
-			<< "Value = " << val << "/0x"
-				<< std::hex << val << std::dec);
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG("do_write(): " << ss.str() << "Done. "
+				<< "Wrote " << sizeof(val) << " Bytes. "
+				<< "Value = " << val << "/0x"
+					<< std::hex << val << std::dec);
+		}
 		return( true );
 	}
 	else {
