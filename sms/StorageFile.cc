@@ -23,6 +23,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.StorageFile"));
 #include "StorageFile.h"
 #include "StorageContainer.h"
 #include "StorageManager.h"
+#include "SMSControl.h"
 #include "utils.h"
 
 namespace fs = boost::filesystem;
@@ -98,13 +99,17 @@ int StorageFile::get_fd(void)
 
 void StorageFile::put_fd(void)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	//TODO C++ way for this?
 	//assert(m_fd_refs);
 
 	m_fdRefs--;
 	if (!m_fdRefs) {
 		if (m_fd >= 0) {
-			DEBUG("Close m_fd=" << m_fd);
+			if (ctrl->verbose() > 0) {
+				DEBUG("Close m_fd=" << m_fd);
+			}
 			::close(m_fd);
 			m_fd = -1;
 		}
@@ -162,6 +167,8 @@ void StorageFile::makePath(bool is_prologue)
 
 void StorageFile::open(int flags)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	//assert(m_fd < 0 && !m_fd_refs);
 	m_fd = openat(StorageManager::base_fd(), m_path.c_str(), flags, 0660);
 	if (m_fd < 0) {
@@ -174,7 +181,9 @@ void StorageFile::open(int flags)
 		m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error("StorageFile::" + msg);
 	}
-	DEBUG("New File Descriptor m_fd=" << m_fd);
+	if (ctrl->verbose() > 0) {
+		DEBUG("New File Descriptor m_fd=" << m_fd);
+	}
 
 	m_fdRefs = 1;
 }
@@ -359,7 +368,7 @@ bool StorageFile::write(IoVector &iovec, uint32_t len, bool do_notify,
 						<< " of " << iovec.size() << " total"
 						<< " (" << remaining << " bytes remaining");
 				}
-				retry_count = 3; // kick out of retry loop, not recoverable!
+				retry_count = 3; // kick out of retry loop, not recoverable
 				ret = false;
 				break;	// still need to check file oversize...
 			}
@@ -517,7 +526,7 @@ bool StorageFile::save(IoVector &iovec, uint32_t len, uint32_t *written)
 						<< " of " << iovec.size() << " total"
 						<< " (" << remaining << " bytes remaining");
 				}
-				retry_count = 3; // kick out of retry loop, not recoverable!
+				retry_count = 3; // kick out of retry loop, not recoverable
 				ret = false;
 				break;	// still need to check file oversize...
 			}
@@ -603,7 +612,8 @@ StorageFile::StorageFile(OwnerPtr &owner, bool paused,
 	m_startTime(0), // Wallclock Time...!
 	m_persist(true), m_oversize(false),
 	m_active(false), m_paused(paused), m_addendum(false),
-	m_size(0), m_sizeLastUpdate(0), m_syncDistance(0), m_fd(-1), m_fdRefs(0)
+	m_size(0), m_sizeLastUpdate(0), m_syncDistance(0),
+	m_fd(-1), m_fdRefs(0)
 {
 	StorageContainer::SharedPtr c = m_owner.lock();
 	if (c) {
@@ -639,6 +649,8 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 	StorageFile::SharedPtr f(
 		new StorageFile(runInfo, /* paused */ false, 0, 0, 0) );
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	f->m_path = basePath + "/SMS-State-XXXXXX";
 
 	/* We don't assume C++11 compliance, so we cannot rely on
@@ -664,7 +676,9 @@ StorageFile::SharedPtr StorageFile::stateFile(OwnerPtr runInfo,
 		f->m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error("StorageFile::" + msg);
 	}
-	DEBUG("New State File Descriptor m_fd=" << f->m_fd);
+	if (ctrl->verbose() > 0) {
+		DEBUG("New State File Descriptor m_fd=" << f->m_fd);
+	}
 
 	try {
 		/* We did not increase the string length, but there is no
@@ -949,6 +963,8 @@ uint64_t StorageFile::fileSize(const std::string &path)
 
 bool StorageFile::catFile(StorageFile::SharedPtr src)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	char buf[1024];
 	uint8_t *p;
 
@@ -997,7 +1013,7 @@ bool StorageFile::catFile(StorageFile::SharedPtr src)
 		rc = ::read( src_fd, buf, sizeof(buf) );
 
 		if ( rc == (ssize_t) -1 ) {
-			if (errno != EAGAIN && errno != EINTR) {
+			if ( errno != EAGAIN && errno != EINTR ) {
 				int e = errno;
 				ERROR("catFile():"
 					<< " [" << m_path << "]"
@@ -1007,7 +1023,9 @@ bool StorageFile::catFile(StorageFile::SharedPtr src)
 				// *Don't* Throw Exception Here, Just Limp Along
 				// and Wait for Help/Restart... ;-D
 				if ( src_fd >= 0 ) {
-					DEBUG("Close Dead src_fd=" << src_fd);
+					if ( ctrl->verbose() > 0 ) {
+						DEBUG("Close Dead src_fd=" << src_fd);
+					}
 					src->put_fd();
 					src_fd = -1;
 				}

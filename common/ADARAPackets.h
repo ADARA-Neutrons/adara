@@ -1,6 +1,8 @@
 #ifndef __ADARA_PACKETS_H
 #define __ADARA_PACKETS_H
 
+#include <boost/smart_ptr.hpp>
+
 #include <stdint.h>
 #include <string>
 #include <sstream>
@@ -97,6 +99,8 @@ private:
 	Packet();
 	Packet &operator=(const Packet &pkt);
 };
+
+typedef boost::shared_ptr<ADARA::Packet> PacketSharedPtr;
 
 class RawDataPkt : public Packet {
 public:
@@ -833,10 +837,10 @@ public:
 		fields[0] = dev;
 	};
 
+	VariableU32Pkt(const uint8_t *data, uint32_t len);
+
 private:
 	const uint32_t *m_fields;
-
-	VariableU32Pkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
 };
@@ -866,10 +870,10 @@ public:
 		*((double *) &fields[3]) = value;
 	};
 
+	VariableDoublePkt(const uint8_t *data, uint32_t len);
+
 private:
 	const uint32_t *m_fields;
-
-	VariableDoublePkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
 };
@@ -894,11 +898,11 @@ public:
 		fields[0] = dev;
 	};
 
+	VariableStringPkt(const uint8_t *data, uint32_t len);
+
 private:
 	const uint32_t *m_fields;
 	std::string m_val;
-
-	VariableStringPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
 };
@@ -917,18 +921,18 @@ public:
 							(m_fields[2] & 0xffff);
 	}
 	uint32_t elemCount(void) const { return m_fields[3]; }
-	const std::vector<uint32_t> value(void) const { return m_val; }
+	const std::vector<uint32_t> &value(void) const { return m_val; }
 
 	void remapDeviceId(uint32_t dev) {
 		uint32_t *fields = (uint32_t *)const_cast<uint8_t *>(payload());
 		fields[0] = dev;
 	};
 
+	VariableU32ArrayPkt(const uint8_t *data, uint32_t len);
+
 private:
 	const uint32_t *m_fields;
 	std::vector<uint32_t> m_val;
-
-	VariableU32ArrayPkt(const uint8_t *data, uint32_t len);
 
 	friend class Parser;
 };
@@ -947,18 +951,193 @@ public:
 							(m_fields[2] & 0xffff);
 	}
 	uint32_t elemCount(void) const { return m_fields[3]; }
-	const std::vector<double> value(void) const { return m_val; }
+	const std::vector<double> &value(void) const { return m_val; }
 
 	void remapDeviceId(uint32_t dev) {
 		uint32_t *fields = (uint32_t *)const_cast<uint8_t *>(payload());
 		fields[0] = dev;
 	};
 
+	VariableDoubleArrayPkt(const uint8_t *data, uint32_t len);
+
 private:
 	const uint32_t *m_fields;
 	std::vector<double> m_val;
 
-	VariableDoubleArrayPkt(const uint8_t *data, uint32_t len);
+	friend class Parser;
+};
+
+class MultVariableU32Pkt : public Packet {
+public:
+	MultVariableU32Pkt(const MultVariableU32Pkt &pkt);
+
+	uint32_t devId(void) const { return m_fields[0]; }
+	uint32_t varId(void) const { return m_fields[1]; }
+	VariableStatus::Enum status(void) const {
+		return static_cast<VariableStatus::Enum> (m_fields[2] >> 16);
+	}
+	VariableSeverity::Enum severity(void) const {
+		return static_cast<VariableSeverity::Enum>
+							(m_fields[2] & 0xffff);
+	}
+	uint32_t numValues(void) const { return m_fields[3]; }
+	const std::vector<uint32_t> &values(void) const { return m_vals; }
+	const std::vector<uint32_t> &tofs(void) const { return m_tofs; }
+
+	void remapDeviceId(uint32_t dev) {
+		uint32_t *fields = (uint32_t *)const_cast<uint8_t *>(payload());
+		fields[0] = dev;
+	};
+
+	MultVariableU32Pkt(const uint8_t *data, uint32_t len);
+
+private:
+	const uint32_t *m_fields;
+	std::vector<uint32_t> m_vals;
+	std::vector<uint32_t> m_tofs;
+
+	friend class Parser;
+};
+
+class MultVariableDoublePkt : public Packet {
+public:
+	MultVariableDoublePkt(const MultVariableDoublePkt &pkt);
+
+	uint32_t devId(void) const { return m_fields[0]; }
+	uint32_t varId(void) const { return m_fields[1]; }
+	VariableStatus::Enum status(void) const {
+		return static_cast<VariableStatus::Enum> (m_fields[2] >> 16);
+	}
+	VariableSeverity::Enum severity(void) const {
+		return static_cast<VariableSeverity::Enum>
+							(m_fields[2] & 0xffff);
+	}
+	uint32_t numValues(void) const { return m_fields[3]; }
+	const std::vector<double> &values(void) const { return m_vals; }
+	const std::vector<uint32_t> &tofs(void) const { return m_tofs; }
+
+	void remapDeviceId(uint32_t dev) {
+		uint32_t *fields = (uint32_t *)const_cast<uint8_t *>(payload());
+		fields[0] = dev;
+	};
+
+	void updateValue(double value) {
+		uint32_t *fields = (uint32_t *)const_cast<uint8_t *>(payload());
+		*((double *) &fields[3]) = value;
+	};
+
+	MultVariableDoublePkt(const uint8_t *data, uint32_t len);
+
+private:
+	const uint32_t *m_fields;
+	std::vector<double> m_vals;
+	std::vector<uint32_t> m_tofs;
+
+	friend class Parser;
+};
+
+class MultVariableStringPkt : public Packet {
+public:
+	MultVariableStringPkt(const MultVariableStringPkt &pkt);
+
+	uint32_t devId(void) const { return m_fields[0]; }
+	uint32_t varId(void) const { return m_fields[1]; }
+	VariableStatus::Enum status(void) const {
+		return static_cast<VariableStatus::Enum> (m_fields[2] >> 16);
+	}
+	VariableSeverity::Enum severity(void) const {
+		return static_cast<VariableSeverity::Enum>
+						(m_fields[2] & 0xffff);
+	}
+	uint32_t numValues(void) const { return m_fields[3]; }
+	const std::vector<std::string> &values(void) const { return m_vals; }
+	const std::vector<uint32_t> &tofs(void) const { return m_tofs; }
+
+	void remapDeviceId(uint32_t dev) {
+		uint32_t *fields = (uint32_t *)const_cast<uint8_t *>(payload());
+		fields[0] = dev;
+	};
+
+	MultVariableStringPkt(const uint8_t *data, uint32_t len);
+
+private:
+	const uint32_t *m_fields;
+	std::vector<std::string> m_vals;
+	std::vector<uint32_t> m_tofs;
+
+	friend class Parser;
+};
+
+class MultVariableU32ArrayPkt : public Packet {
+public:
+	MultVariableU32ArrayPkt(const MultVariableU32ArrayPkt &pkt);
+
+	uint32_t devId(void) const { return m_fields[0]; }
+	uint32_t varId(void) const { return m_fields[1]; }
+	VariableStatus::Enum status(void) const {
+		return static_cast<VariableStatus::Enum> (m_fields[2] >> 16);
+	}
+	VariableSeverity::Enum severity(void) const {
+		return static_cast<VariableSeverity::Enum>
+							(m_fields[2] & 0xffff);
+	}
+	uint32_t numValues(void) const { return m_fields[3]; }
+	uint32_t elemCount(uint32_t index) const {
+		return( ( index < numValues() ) ? m_vals[index].size() : 0 );
+	}
+	const std::vector<std::vector<uint32_t> > values(void) const {
+		return m_vals;
+	}
+	const std::vector<uint32_t> &tofs(void) const { return m_tofs; }
+
+	void remapDeviceId(uint32_t dev) {
+		uint32_t *fields = (uint32_t *)const_cast<uint8_t *>(payload());
+		fields[0] = dev;
+	};
+
+	MultVariableU32ArrayPkt(const uint8_t *data, uint32_t len);
+
+private:
+	const uint32_t *m_fields;
+	std::vector<std::vector<uint32_t> > m_vals;
+	std::vector<uint32_t> m_tofs;
+
+	friend class Parser;
+};
+
+class MultVariableDoubleArrayPkt : public Packet {
+public:
+	MultVariableDoubleArrayPkt(const MultVariableDoubleArrayPkt &pkt);
+
+	uint32_t devId(void) const { return m_fields[0]; }
+	uint32_t varId(void) const { return m_fields[1]; }
+	VariableStatus::Enum status(void) const {
+		return static_cast<VariableStatus::Enum> (m_fields[2] >> 16);
+	}
+	VariableSeverity::Enum severity(void) const {
+		return static_cast<VariableSeverity::Enum>
+							(m_fields[2] & 0xffff);
+	}
+	uint32_t numValues(void) const { return m_fields[3]; }
+	uint32_t elemCount(uint32_t index) const {
+		return( ( index < numValues() ) ? m_vals[index].size() : 0 );
+	}
+	const std::vector<std::vector<double> > values(void) const {
+		return m_vals;
+	}
+	const std::vector<uint32_t> &tofs(void) const { return m_tofs; }
+
+	void remapDeviceId(uint32_t dev) {
+		uint32_t *fields = (uint32_t *)const_cast<uint8_t *>(payload());
+		fields[0] = dev;
+	};
+
+	MultVariableDoubleArrayPkt(const uint8_t *data, uint32_t len);
+
+private:
+	const uint32_t *m_fields;
+	std::vector<std::vector<double> > m_vals;
+	std::vector<uint32_t> m_tofs;
 
 	friend class Parser;
 };

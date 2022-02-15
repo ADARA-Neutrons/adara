@@ -1795,7 +1795,7 @@ void SMSControl::unregisterEventSource(uint32_t srcId, uint32_t smsId)
 				if (++next != m_pulses.end())
 					correctPChargeVeto(it->second, next->second);
 				else {
-					/* Rate-limited logging of global sawtooth pulse */
+					/* Rate-limited logging of no more pulses */
 					std::string log_info;
 					if ( RateLimitedLogging::checkLog(
 							RLLHistory_SMSControl,
@@ -2001,7 +2001,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_GLOBAL_SAWTOOTH_PULSE, "none",
-					2, 10, 100, log_info ) ) {
+					2, 10, 1000, log_info ) ) {
 				ERROR(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "getPulse: Global SAWTOOTH Pulse(0x"
@@ -2035,7 +2035,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 					RLL_GLOBAL_SAWTOOTH_LAST, "none",
-					2, 10, 100, log_info ) ) {
+					2, 10, 1000, log_info ) ) {
 				ERROR(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "getPulse: Global SAWTOOTH Pulse(0x"
@@ -2112,7 +2112,7 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 					if (++next != m_pulses.end())
 						correctPChargeVeto(it->second, next->second);
 					else {
-						/* Rate-limited logging of global sawtooth pulse */
+						/* Rate-limited logging of no more pulses */
 						std::string log_info;
 						if ( RateLimitedLogging::checkLog(
 								RLLHistory_SMSControl,
@@ -2660,7 +2660,10 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		pulse->m_charge = pulse->m_rtdl->pulseCharge();
 	}
 	else {
-		if ( !m_noRTDLPulses ) {
+		// Only Log 1st Occurrence "Missing RTDL for Setting Proton Charge"
+		// - i.e. If the Pulse Charge has _Not Yet_ Been Set from Data Pkt
+		// or If the Data Packet Pulse Charge "Changed" (yikes)... ;-D
+		if ( !m_noRTDLPulses && pulse->m_charge != pkt.pulseCharge() ) {
 			// Rate-Limited Log Missing RTDL for Setting Proton Charge...
 			std::stringstream ss;
 			// Just Use Hardware ID for RLL Key...
@@ -2669,7 +2672,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 			if ( RateLimitedLogging::checkLog(
 					RLLHistory_SMSControl,
 					RLL_MISSING_RTDL_PROTON_CHARGE, ss.str(),
-					2, 10, 5000, log_info ) ) {
+					2, 10, 100, log_info ) ) {
 				ERROR(log_info
 					<< ( m_recording ? "[RECORDING] " : "" )
 					<< "pulseEvents():"
@@ -2744,6 +2747,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	uint32_t i, count = pkt.num_events();
 	uint32_t phys, base_phys, logical;
 	uint32_t state;
+	uint32_t key;
 	uint16_t bank = 0;
 
 	bool got_neutrons = false;
@@ -2829,11 +2833,12 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				 * mapping for it. If not, let it fall through to the
 				 * common error pixel handling.
 				 */
-				if (m_fastmeta->validVariable(phys)) {
-					if (pulse->m_fastMetaEvents.empty()) {
-						pulse->m_fastMetaEvents.reserve(m_fastMetaReserve);
+				if (m_fastmeta->validVariable(phys, key)) {
+					if (pulse->m_fastMetaEvents[key].empty()) {
+						pulse->m_fastMetaEvents[key].reserve(
+							m_fastMetaReserve);
 					}
-					pulse->m_fastMetaEvents.push_back(events[i]);
+					pulse->m_fastMetaEvents[key].push_back(events[i]);
 					meta_count++;
 					continue;
 				}
@@ -2847,7 +2852,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					if ( RateLimitedLogging::checkLog(
 							RLLHistory_SMSControl,
 							RLL_UNKNOWN_FAST_META_PIXEL_ID, ss.str(),
-							2, 10, 100, log_info ) ) {
+							2, 10, 5000, log_info ) ) {
 						ERROR(log_info
 							<< ( m_recording ? "[RECORDING] " : "" )
 							<< "pulseEvents():"
@@ -3308,7 +3313,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 				correctPChargeVeto(it->second, next->second);
 			}
 			else {
-				/* Rate-limited logging of global sawtooth pulse */
+				/* Rate-limited logging of no more pulses */
 				std::string log_info;
 				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 						RLL_PULSE_PCHG_BUFFER_EMPTY, "none",
@@ -3430,7 +3435,7 @@ void SMSControl::correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse)
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 				RLL_PULSE_PCHG_UNCORRECTED, "none",
-				2, 10, 100, log_info ) ) {
+				2, 10, 5000, log_info ) ) {
 			ERROR(log_info
 				<< ( m_recording ? "[RECORDING] " : "" )
 				<< "correctPChargeVeto: *** Next Pulse Out of Range -"
@@ -3497,7 +3502,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 				std::string log_info;
 				if ( RateLimitedLogging::checkLog( RLLHistory_SMSControl,
 						RLL_NO_RTDL_FOR_PULSE, "none",
-						2, 10, 100, log_info ) ) {
+						2, 10, 5000, log_info ) ) {
 					ERROR(log_info
 						<< ( m_recording ? "[RECORDING] " : "" )
 						<< "recordPulse: NO RTDL for Pulse"
@@ -4004,8 +4009,8 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 			ns += tof;
 
 			pkt[2] = pulse->m_id.first >> 32;
-			if (ns >= (1000U * 1000 * 1000)) {
-				ns -= 1000U * 1000 * 1000;
+			if (ns >= NANO_PER_SECOND_LL) {
+				ns -= NANO_PER_SECOND_LL;
 				pkt[2]++;
 			}
 			pkt[3] = ns;
@@ -4022,10 +4027,30 @@ void SMSControl::buildChopperPackets(PulsePtr &pulse)
 void SMSControl::buildFastMetaPackets(PulsePtr &pulse)
 {
 	uint64_t pulse_id = pulse->m_id.first;
-	EventVector::iterator it, end = pulse->m_fastMetaEvents.end();
 
-	for (it = pulse->m_fastMetaEvents.begin(); it != end; ++it)
-		m_fastmeta->sendUpdate(pulse_id, it->pixel, it->tof);
+	FastMetaMap::iterator fmit, fmend = pulse->m_fastMetaEvents.end();
+	for (fmit = pulse->m_fastMetaEvents.begin(); fmit != fmend; ++fmit)
+	{
+		EventVector::iterator it, end = fmit->second.end();
+
+		// REMOVEME
+		//DEBUG("buildFastMetaPackets(): key="
+			//<< std::hex << fmit->first << std::dec
+			//<< " size=" << fmit->second.size());
+
+		if ( fmit->second.size() > 3 )
+		{
+			m_fastmeta->sendMultUpdate(pulse_id, fmit->second);
+		}
+
+		else
+		{
+			for (it = fmit->second.begin(); it != end ; ++it)
+			{
+				m_fastmeta->sendUpdate(pulse_id, it->pixel, it->tof);
+			}
+		}
+	}
 }
 
 uint32_t SMSControl::pulseEnergy(uint32_t ringPeriod)
@@ -4119,5 +4144,66 @@ void SMSControl::updateValue(const ADARA::VariableDoubleArrayPkt &pkt,
 			uint32_t sourceId)
 {
 	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::MultVariableU32Pkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::MultVariableDoublePkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::MultVariableStringPkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::MultVariableU32ArrayPkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::updateValue(const ADARA::MultVariableDoubleArrayPkt &pkt,
+			uint32_t sourceId)
+{
+	m_meta->updateValue(pkt, sourceId);
+}
+
+void SMSControl::extractLastValue( ADARA::MultVariableU32Pkt inPkt,
+		ADARA::PacketSharedPtr &outPkt)
+{
+	m_meta->extractLastValue(inPkt, outPkt);
+}
+
+void SMSControl::extractLastValue( ADARA::MultVariableDoublePkt inPkt,
+		ADARA::PacketSharedPtr &outPkt)
+{
+	m_meta->extractLastValue(inPkt, outPkt);
+}
+
+void SMSControl::extractLastValue( ADARA::MultVariableStringPkt inPkt,
+		ADARA::PacketSharedPtr &outPkt)
+{
+	m_meta->extractLastValue(inPkt, outPkt);
+}
+
+void SMSControl::extractLastValue( ADARA::MultVariableU32ArrayPkt inPkt,
+		ADARA::PacketSharedPtr &outPkt)
+{
+	m_meta->extractLastValue(inPkt, outPkt);
+}
+
+void SMSControl::extractLastValue(
+		ADARA::MultVariableDoubleArrayPkt inPkt,
+		ADARA::PacketSharedPtr &outPkt)
+{
+	m_meta->extractLastValue(inPkt, outPkt);
 }
 

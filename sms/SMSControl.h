@@ -114,6 +114,27 @@ public:
 			uint32_t sourceId);
 	void updateValue(const ADARA::VariableDoubleArrayPkt &pkt,
 			uint32_t sourceId);
+	void updateValue(const ADARA::MultVariableU32Pkt &pkt,
+			uint32_t sourceId);
+	void updateValue(const ADARA::MultVariableDoublePkt &pkt,
+			uint32_t sourceId);
+	void updateValue(const ADARA::MultVariableStringPkt &pkt,
+			uint32_t sourceId);
+	void updateValue(const ADARA::MultVariableU32ArrayPkt &pkt,
+			uint32_t sourceId);
+	void updateValue(const ADARA::MultVariableDoubleArrayPkt &pkt,
+			uint32_t sourceId);
+
+	void extractLastValue(ADARA::MultVariableU32Pkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableDoublePkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableStringPkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableU32ArrayPkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
+	void extractLastValue(ADARA::MultVariableDoubleArrayPkt inPkt,
+			ADARA::PacketSharedPtr &outPkt);
 
 	bool getRecording(void);
 
@@ -141,13 +162,13 @@ public:
 	static void init(void);
 	static void late_config(const boost::property_tree::ptree &conf);
 
+	typedef std::vector<ADARA::Event> EventVector;
+
 private:
 	SMSControl();
 	~SMSControl();
 
 	typedef std::pair<uint64_t, uint32_t> PulseIdentifier;
-
-	typedef std::vector<ADARA::Event> EventVector;
 
 	struct EventSource {
 		EventSource( uint32_t intraPulse, uint32_t tofField ) :
@@ -185,6 +206,8 @@ private:
 
 	typedef std::map<uint32_t, ChopperEvents> ChopperMap;
 
+	typedef std::map<uint32_t, EventVector> FastMetaMap;
+
 	struct Pulse {
 		Pulse(const PulseIdentifier &id, const SourceSet &srcs) :
 				m_id(id), m_pending(srcs), m_numEventSources(srcs.count()),
@@ -200,7 +223,7 @@ private:
 		SourceMap				m_pulseSources;
 		MonitorMap				m_monitors;
 		ChopperMap				m_chopperEvents;
-		EventVector				m_fastMetaEvents;
+		FastMetaMap				m_fastMetaEvents;
 		uint32_t				m_numEvents;
 		uint32_t				m_numBanks;
 		uint32_t				m_numMonEvents;

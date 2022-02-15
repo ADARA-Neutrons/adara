@@ -310,7 +310,7 @@ public:
 			std::string log_info;
 			if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 					RLL_LOCAL_DUPLICATE_PULSE, m_name,
-					2, 10, 100, log_info ) ) {
+					2, 10, 5000, log_info ) ) {
 				ERROR(log_info
 					<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "findPulseSequence(): New Pulse (RawDataPkt):"
@@ -1338,7 +1338,7 @@ DataSource::~DataSource()
 		m_fdreg = NULL;
 	}
 	if (m_fd >= 0) {
-		if ( m_ctrl->verbose() )
+		if ( m_ctrl->verbose() > 0 )
 			DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
@@ -1604,7 +1604,7 @@ void DataSource::connectionFailed(bool dumpStats, bool dumpDiscarded,
 		m_fdreg = NULL;
 	}
 	if (m_fd >= 0) {
-		if ( m_ctrl->verbose() )
+		if ( m_ctrl->verbose() > 0 )
 			DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
@@ -1812,7 +1812,7 @@ void DataSource::startConnect(void)
 		m_fd = -1;   // just to be sure... ;-b
 		goto error;
 	}
-	if ( m_ctrl->verbose() ) {
+	if ( m_ctrl->verbose() > 0 ) {
 		DEBUG("New Socket for " << m_name << " m_fd=" << m_fd);
 	}
 
@@ -1904,7 +1904,7 @@ void DataSource::startConnect(void)
 error_fd:
 
 	if (m_fd >= 0) {
-		if ( m_ctrl->verbose() )
+		if ( m_ctrl->verbose() > 0 )
 			DEBUG("Close m_fd=" << m_fd);
 		close(m_fd);
 		m_fd = -1;
@@ -2270,6 +2270,11 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 		case ADARA::PacketType::VAR_VALUE_STRING_TYPE:
 		case ADARA::PacketType::VAR_VALUE_U32_ARRAY_TYPE:
 		case ADARA::PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_U32_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_STRING_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_TYPE:
+		case ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_TYPE:
 		case ADARA::PacketType::STREAM_ANNOTATION_TYPE:
 			/* We use a 0 pulse id to indicate that we don't have an
 			 * active pulse, and nothing should ever send one to us.
@@ -2790,12 +2795,12 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	struct timespec now;
 	clock_gettime( CLOCK_REALTIME_COARSE, &now );
 
-	// Event Count Per Second (Updated Every 3 Seconds)
-	if ( m_last_second_time.tv_sec + 3 < now.tv_sec ) {
+	// Event Count Per Second (Updated Every 3 Seconds Or So...)
+	if ( m_last_second_time.tv_sec + 3 <= now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
-		// (*Don't* Log Bandwidth Per Second Here, Do With RTDL... ;-)
-		updateBandwidthSecond( now, false );
-		// Reset "Last Second"...
+		// Log Bandwidth Per Second Every 20 Seconds...
+		updateBandwidthSecond( now, !( now.tv_sec % 20 ) );
+		// Reset "Last Second" Time...
 		m_last_second_time = now;
 	}
 	m_event_count_second += event_count;
@@ -2810,6 +2815,8 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	if ( m_last_minute != min ) {
 		// Update Bandwidth Count Per Minute PVs...
 		updateBandwidthMinute( now, true );
+		// Reset "Last Minute" Time...
+		m_last_minute_time = now;
 		// Reset "Last Minute"...
 		m_last_minute = min;
 	}
@@ -2825,6 +2832,8 @@ bool DataSource::handleDataPkt(const ADARA::RawDataPkt *pkt,
 	if ( m_last_tenmin != tenmin ) {
 		// Update Bandwidth Count Per Ten Minutes PVs...
 		updateBandwidthTenMin( now, true );
+		// Reset "Last Ten Minutes" Time...
+		m_last_tenmin_time = now;
 		// Reset "Last Ten Minutes"...
 		m_last_tenmin = tenmin;
 	}
@@ -3035,14 +3044,12 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	// RTDL Count Per "Read"...
 	m_rtdl_pkt_counts++;
 
-	// Pulse Count Per Second (Updated Every 3 Seconds)
-	static uint32_t log_secs_cnt = 0;
-	if ( m_last_second_time.tv_sec + 3 < now.tv_sec ) {
+	// Pulse Count Per Second (Updated Every 3 Seconds Or So...)
+	if ( m_last_second_time.tv_sec + 3 <= now.tv_sec ) {
 		// Update Bandwidth Count Per Second PVs...
-		// Log Bandwidth Per Second Every 20th Time...
-		// (About Once Per Minute... ;-)
-		updateBandwidthSecond( now, !( ++log_secs_cnt % 20 ) );
-		// Reset "Last Second"...
+		// Log Bandwidth Per Second Every 20 Seconds...
+		updateBandwidthSecond( now, !( now.tv_sec % 20 ) );
+		// Reset "Last Second" Time...
 		m_last_second_time = now;
 	}
 	m_pulse_count_second++;
@@ -3052,6 +3059,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	if ( m_last_minute != min ) {
 		// Update Bandwidth Count Per Minute PVs...
 		updateBandwidthMinute( now, true );
+		// Reset "Last Minute" Time...
+		m_last_minute_time = now;
 		// Reset "Last Minute"...
 		m_last_minute = min;
 	}
@@ -3062,6 +3071,8 @@ bool DataSource::rxPacket(const ADARA::RTDLPkt &pkt)
 	if ( m_last_tenmin != tenmin ) {
 		// Update Bandwidth Count Per Ten Minutes PVs...
 		updateBandwidthTenMin( now, true );
+		// Reset "Last Ten Minutes" Time...
+		m_last_tenmin_time = now;
 		// Reset "Last Ten Minutes"...
 		m_last_tenmin = tenmin;
 	}
@@ -3092,56 +3103,51 @@ void DataSource::resetBandwidthStatistics(void)
 	m_meta_count_tenmin = 0;
 	m_err_count_tenmin = 0;
 
+	// Get Current Time for "Elapsed" Bandwidth Calculations...
+	struct timespec now;
+	clock_gettime( CLOCK_REALTIME_COARSE, &now );
+	// Properly Initialize a Starting Time for BW Seconds...
+	m_last_second_time = now;
+	// Properly Initialize a Starting Time for BW Minutes...
+	m_last_minute_time = now;
+	// Properly Initialize a Starting Time for BW Ten Minutes...
+	m_last_tenmin_time = now;
 	// Time Trackers...
-	m_last_second_time.tv_sec = -1;
-	m_last_second_time.tv_nsec = -1;
 	m_last_minute = -1;
 	m_last_tenmin = -1;
 }
 
 void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 {
-	// Compute _Actual_ Elapsed Time...! ;-D
-	double elapsed;
-	if ( m_last_second_time.tv_sec > 0 ) {
-		elapsed =
-			( ( ((double) ( now.tv_sec - m_last_second_time.tv_sec ))
-					* NANO_PER_SECOND_D )
-				+ ( now.tv_nsec - m_last_second_time.tv_nsec ) )
-			/ NANO_PER_SECOND_D;
-	}
-	// If "Last Second" Time was Reset,
-	// then "Just Guess" It's Been 3 Seconds... ;-D
-	else {
-		elapsed = 3.0;
-	}
+	double elapsed = calcDiffSeconds( now, m_last_second_time );
+
+	uint32_t pulse_rate = (uint32_t)(
+		((double) m_pulse_count_second) / elapsed );
+	uint32_t event_rate = (uint32_t)(
+		((double) m_event_count_second) / elapsed );
+	uint32_t meta_rate = (uint32_t)(
+		((double) m_meta_count_second) / elapsed );
+	uint32_t err_rate = (uint32_t)(
+		((double) m_err_count_second) / elapsed );
 
 	// Log the Second-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Second for " << m_name << ":"
-			<< " Pulses="
-				<< (uint32_t)( ((double) m_pulse_count_second) / elapsed )
-			<< " Events="
-				<< (uint32_t)( ((double) m_event_count_second) / elapsed )
-			<< " Meta="
-				<< (uint32_t)( ((double) m_meta_count_second) / elapsed )
-			<< " Err="
-				<< (uint32_t)( ((double) m_err_count_second) / elapsed ) );
+			<< " Pulses=" << pulse_rate
+			<< " Events=" << event_rate
+			<< " Meta=" << meta_rate
+			<< " Err=" << err_rate );
 	}
 
 	// Update Bandwidth Count Per Second PVs...
-	m_pvPulseBandwidthSecond->update(
-		(uint32_t)( ((double) m_pulse_count_second) / elapsed ), &now,
+	m_pvPulseBandwidthSecond->update( pulse_rate, &now,
 		true /* no_log */ );
-	m_pvEventBandwidthSecond->update(
-		(uint32_t)( ((double) m_event_count_second) / elapsed ), &now,
+	m_pvEventBandwidthSecond->update( event_rate, &now,
 		true /* no_log */ );
-	m_pvMetaBandwidthSecond->update(
-		(uint32_t)( ((double) m_meta_count_second) / elapsed ), &now,
+	m_pvMetaBandwidthSecond->update( meta_rate, &now,
 		true /* no_log */ );
-	m_pvErrBandwidthSecond->update(
-		(uint32_t)( ((double) m_err_count_second) / elapsed ), &now,
+	m_pvErrBandwidthSecond->update( err_rate, &now,
 		true /* no_log */ );
 
 	// Reset Counters for Next Second...
@@ -3154,29 +3160,26 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 	for ( HWSrcMap::iterator it = m_hwSources.begin();
 			it != m_hwSources.end() ; it++ ) {
 		if ( it->second->m_hwIndex >= 0 ) {
+			event_rate = (uint32_t)(
+				((double) it->second->m_event_count_second) / elapsed );
+			meta_rate = (uint32_t)(
+				((double) it->second->m_meta_count_second) / elapsed );
+			err_rate = (uint32_t)(
+				((double) it->second->m_err_count_second) / elapsed );
 			if ( do_log && it->second->m_event_count_second > 0 ) {
 				INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 					<< "Bandwidth Per Second for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
-					<< " Events="
-					<< it->second->m_event_count_second
-					<< " Meta="
-					<< it->second->m_meta_count_second
-					<< " Err="
-					<< it->second->m_err_count_second );
+					<< " Events=" << event_rate
+					<< " Meta=" << meta_rate
+					<< " Err=" << err_rate );
 			}
 			it->second->m_pvHWSourceEventBandwidthSecond->update(
-				(uint32_t)( ((double) it->second->m_event_count_second)
-					/ elapsed ), &now,
-				true /* no_log */ );
+				event_rate, &now, true /* no_log */ );
 			it->second->m_pvHWSourceMetaBandwidthSecond->update(
-				(uint32_t)( ((double) it->second->m_meta_count_second)
-					/ elapsed ), &now,
-				true /* no_log */ );
+				meta_rate, &now, true /* no_log */ );
 			it->second->m_pvHWSourceErrBandwidthSecond->update(
-				(uint32_t)( ((double) it->second->m_err_count_second)
-					/ elapsed ), &now,
-				true /* no_log */ );
+				err_rate, &now, true /* no_log */ );
 		}
 		it->second->m_event_count_second = 0;
 		it->second->m_meta_count_second = 0;
@@ -3186,14 +3189,20 @@ void DataSource::updateBandwidthSecond( struct timespec &now, bool do_log )
 
 void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 {
+	double elapsed = calcDiffSeconds( now, m_last_minute_time );
+
 	// Log the Minute-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Minute for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_minute
+			<< " (" << ( m_pulse_count_minute / elapsed ) << "/sec)"
 			<< " Events=" << m_event_count_minute
+			<< " (" << ( m_event_count_minute / elapsed ) << "/sec)"
 			<< " Meta=" << m_meta_count_minute
-			<< " Err=" << m_err_count_minute );
+			<< " (" << ( m_meta_count_minute / elapsed ) << "/sec)"
+			<< " Err=" << m_err_count_minute
+			<< " (" << ( m_err_count_minute / elapsed ) << "/sec)" );
 	}
 
 	// Update Bandwidth Count Per Minute PVs...
@@ -3221,8 +3230,17 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 					<< "Bandwidth Per Minute for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
 					<< " Events=" << it->second->m_event_count_minute
+					<< " ("
+						<< ( it->second->m_event_count_minute / elapsed )
+						<< "/sec)"
 					<< " Meta=" << it->second->m_meta_count_minute
-					<< " Err=" << it->second->m_err_count_minute );
+					<< " ("
+						<< ( it->second->m_meta_count_minute / elapsed )
+						<< "/sec)"
+					<< " Err=" << it->second->m_err_count_minute
+					<< " ("
+						<< ( it->second->m_err_count_minute / elapsed )
+						<< "/sec)" );
 			}
 			it->second->m_pvHWSourceEventBandwidthMinute->update(
 				it->second->m_event_count_minute, &now,
@@ -3242,14 +3260,20 @@ void DataSource::updateBandwidthMinute( struct timespec &now, bool do_log )
 
 void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 {
+	double elapsed = calcDiffSeconds( now, m_last_tenmin_time );
+
 	// Log the Ten-Minute-Based Bandwidth Statistics Updates...
 	if ( do_log ) {
 		INFO( ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "Bandwidth Per Ten Minutes for " << m_name << ":"
 			<< " Pulses=" << m_pulse_count_tenmin
+			<< " (" << ( m_pulse_count_tenmin / elapsed ) << "/sec)"
 			<< " Events=" << m_event_count_tenmin
+			<< " (" << ( m_event_count_tenmin / elapsed ) << "/sec)"
 			<< " Meta=" << m_meta_count_tenmin
-			<< " Err=" << m_err_count_tenmin );
+			<< " (" << ( m_meta_count_tenmin / elapsed ) << "/sec)"
+			<< " Err=" << m_err_count_tenmin
+			<< " (" << ( m_err_count_tenmin / elapsed ) << "/sec)" );
 	}
 
 	// Update Bandwidth Count Per Ten Minutes PVs...
@@ -3277,8 +3301,17 @@ void DataSource::updateBandwidthTenMin( struct timespec &now, bool do_log )
 					<< "Bandwidth Per Ten Minutes for " << m_name << ":"
 					<< " HWSource HwId=" << it->second->hwId()
 					<< " Events=" << it->second->m_event_count_tenmin
+					<< " ("
+						<< ( it->second->m_event_count_tenmin / elapsed )
+						<< "/sec)"
 					<< " Meta=" << it->second->m_meta_count_tenmin
-					<< " Err=" << it->second->m_err_count_tenmin );
+					<< " ("
+						<< ( it->second->m_meta_count_tenmin / elapsed )
+						<< "/sec)"
+					<< " Err=" << it->second->m_err_count_tenmin
+					<< " ("
+						<< ( it->second->m_err_count_tenmin / elapsed )
+						<< "/sec)" );
 			}
 			it->second->m_pvHWSourceEventBandwidthTenMin->update(
 				it->second->m_event_count_tenmin, &now,
@@ -3441,6 +3474,126 @@ bool DataSource::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 		// Save Variable Value Packet...
 		boost::shared_ptr<ADARA::VariableDoubleArrayPkt> vvp;
 		vvp = boost::make_shared<ADARA::VariableDoubleArrayPkt>(pkt);
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
+	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::MultVariableU32Pkt &pkt)
+{
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Multiple Variable Value Packet...
+		boost::shared_ptr<ADARA::MultVariableU32Pkt> vvp;
+		vvp = boost::make_shared<ADARA::MultVariableU32Pkt>(pkt);
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
+	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::MultVariableDoublePkt &pkt)
+{
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Multiple Variable Value Packet...
+		boost::shared_ptr<ADARA::MultVariableDoublePkt> vvp;
+		vvp = boost::make_shared<ADARA::MultVariableDoublePkt>(pkt);
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
+	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::MultVariableStringPkt &pkt)
+{
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Multiple Variable Value Packet...
+		boost::shared_ptr<ADARA::MultVariableStringPkt> vvp;
+		vvp = boost::make_shared<ADARA::MultVariableStringPkt>(pkt);
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
+	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::MultVariableU32ArrayPkt &pkt)
+{
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Multiple Variable Value Packet...
+		boost::shared_ptr<ADARA::MultVariableU32ArrayPkt> vvp;
+		vvp = boost::make_shared<ADARA::MultVariableU32ArrayPkt>(pkt);
+		varPktMap[ pkt.varId() ] = vvp;
+	}
+
+	m_ctrl->updateValue(pkt, m_smsSourceId);
+	return false;
+}
+
+bool DataSource::rxPacket(const ADARA::MultVariableDoubleArrayPkt &pkt)
+{
+	// * For Saved Input Stream Prologue *
+	// Save the Latest Variable Value Update Packet for Each PV/Device...
+	DeviceMap::iterator dit = m_devices.find( pkt.devId() );
+	// Make Sure We Already Saw the Device Descriptor Packet for This PV!
+	if ( dit != m_devices.end() ) {
+		// Look for Existing Variable Value Update Packet for this Device
+		VariablePktMap &varPktMap = dit->second.m_variablePkts;
+		VariablePktMap::iterator vit = varPktMap.find( pkt.varId() );
+		// Remove Any Former Variable Value Packet for This Device PV...
+		if ( vit != varPktMap.end() ) {
+			varPktMap.erase(vit);
+		}
+		// Save Multiple Variable Value Packet...
+		boost::shared_ptr<ADARA::MultVariableDoubleArrayPkt> vvp;
+		vvp = boost::make_shared<ADARA::MultVariableDoubleArrayPkt>(pkt);
 		varPktMap[ pkt.varId() ] = vvp;
 	}
 
@@ -3667,12 +3820,70 @@ void DataSource::onSavePrologue( bool UNUSED(capture_last) )
 		StorageManager::addSavePrologue(
 			dev_pkt->packet(), dev_pkt->packet_length(), m_smsSourceId );
 
-		VariablePktMap &varPkts = dev.m_variablePkts;
-		VariablePktMap::iterator vit, vend = varPkts.end();
+		VariablePktMap &varPktMap = dev.m_variablePkts;
+		VariablePktMap::iterator vit, vend = varPktMap.end();
 
-		for ( vit = varPkts.begin(); vit != vend; ++vit ) {
+		for ( vit = varPktMap.begin(); vit != vend; ++vit ) {
 
 			ADARA::Packet *var_pkt = vit->second.get();
+
+			// Handle Multiple Variable Value Packets!
+			// (Strip Off "Last" Variable Value and Create
+			// New Single Variable Value Packet for Save Prologue...)
+
+			ADARA::PacketSharedPtr newPkt;
+			bool is_mult = false;
+
+			if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_U32_TYPE )
+			{
+				ADARA::MultVariableU32Pkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				m_ctrl->extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_TYPE )
+			{
+				ADARA::MultVariableDoublePkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				m_ctrl->extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_STRING_TYPE )
+			{
+				ADARA::MultVariableStringPkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				m_ctrl->extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_U32_ARRAY_TYPE )
+			{
+				ADARA::MultVariableU32ArrayPkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				m_ctrl->extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+			else if ( var_pkt->base_type()
+					== ADARA::PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_TYPE)
+			{
+				ADARA::MultVariableDoubleArrayPkt mult_var_pkt(
+					var_pkt->packet(), var_pkt->packet_length() );
+				m_ctrl->extractLastValue( mult_var_pkt, newPkt );
+				is_mult = true;
+			}
+
+			if ( is_mult )
+			{
+				// Replace Multiple Variable Value Packet for
+				// This Device PV with New Single Variable Value Packet
+				vit->second.swap( newPkt );
+
+				// Use New Packet in Save Prologue...
+				var_pkt = vit->second.get();
+			}
 
 			StorageManager::addSavePrologue(
 				var_pkt->packet(), var_pkt->packet_length(),

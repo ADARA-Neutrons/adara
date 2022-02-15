@@ -159,6 +159,8 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 
 LiveClient::~LiveClient()
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	ERROR("client " << m_clientName << " disconnected");
 
 	if ( m_clientId >= 0 ) {
@@ -183,7 +185,9 @@ LiveClient::~LiveClient()
 	delete m_timer;
 
 	if (m_client_fd >= 0) {
-		DEBUG("Close m_client_fd=" << m_client_fd);
+		if (ctrl->verbose() > 0) {
+			DEBUG("Close m_client_fd=" << m_client_fd);
+		}
 		close(m_client_fd);
 		m_client_fd = -1;
 	}
@@ -258,7 +262,7 @@ void LiveClient::writable(void)
 				// So Disconnect Any File Updated Notifications...
 				if ( m_fileConnection.connected() )
 				{
-					if ( ctrl->verbose() )
+					if ( ctrl->verbose() > 0 )
 					{
 						DEBUG("writable(): Disconnecting Paused"
 								<< " File Updated Notify"
@@ -288,7 +292,7 @@ void LiveClient::writable(void)
 					if ( !(m_fileConnection.connected())
 							&& it->first->active() )
 					{
-						if ( ctrl->verbose() )
+						if ( ctrl->verbose() > 0 )
 						{
 							DEBUG("writable():"
 								<< " Connecting Next File Updated Notify"
@@ -451,7 +455,7 @@ void LiveClient::writable(void)
 		// So Disconnect Any File Updated Notifications...
 		if ( m_fileConnection.connected() )
 		{
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 0 )
 			{
 				DEBUG("writable(): Disconnecting File Updated Notify"
 					<< " file=" << f->path()
@@ -480,7 +484,7 @@ void LiveClient::writable(void)
 			if ( !(m_fileConnection.connected())
 					&& it->first->active() )
 			{
-				if ( ctrl->verbose() )
+				if ( ctrl->verbose() > 0 )
 				{
 					DEBUG("writable(): Connecting Next File Updated Notify"
 						<< " file=" << it->first->path()
@@ -565,7 +569,7 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 		// Connect to Container File Added Notify...
 		if ( !(m_contConnection.connected()) )
 		{
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 0 )
 			{
 				DEBUG("containerChange():"
 					<< " Connecting New Container File Added Notify "
@@ -646,7 +650,7 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 				{
 					if ( m_contConnection.connected() )
 					{
-						if ( ctrl->verbose() )
+						if ( ctrl->verbose() > 0 )
 						{
 							DEBUG("containerChange():"
 								<< " Disconnecting Current Container "
@@ -736,7 +740,7 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 									if ( !(m_fileConnection.connected())
 											&& (*fit)->active() )
 									{
-										if ( ctrl->verbose() )
+										if ( ctrl->verbose() > 0 )
 										{
 											DEBUG("containerChange():"
 												<< " Connecting"
@@ -772,7 +776,7 @@ void LiveClient::containerChange( StorageContainer::SharedPtr &c,
 							//    to File Added Notify
 							if ( next_starting )
 							{
-								if ( ctrl->verbose() )
+								if ( ctrl->verbose() > 0 )
 								{
 									DEBUG("containerChange():"
 										<< " Connecting Next Container"
@@ -878,7 +882,7 @@ void LiveClient::historicalFile( StorageFile::SharedPtr &f, off_t start )
 		if ( !(m_fileConnection.connected())
 				&& f->active() )
 		{
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 0 )
 			{
 				DEBUG("historicalFile(): Connecting File Updated Notify"
 					<< " file=" << f->path()
@@ -929,7 +933,7 @@ void LiveClient::fileAdded( StorageFile::SharedPtr &f )
 		if ( !(m_fileConnection.connected())
 				&& f->active() )
 		{
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 0 )
 			{
 				DEBUG("fileAdded(): Connecting File Updated Notify"
 					<< " file=" << f->path()
@@ -961,7 +965,7 @@ void LiveClient::fileUpdated( const StorageFile &f )
 	// If the File is No Longer Active, Cancel the File Updated Notifies...
 	if ( !f.active() )
 	{
-		if ( ctrl->verbose() )
+		if ( ctrl->verbose() > 0 )
 		{
 			DEBUG("fileUpdated():"
 				<< " Disconnecting Inactive File Updated Notify"
@@ -1133,7 +1137,7 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 		// Connect to Container File Added Notify...
 		if ( !(m_contConnection.connected()) )
 		{
-			if ( ctrl->verbose() )
+			if ( ctrl->verbose() > 0 )
 			{
 				DEBUG("rxPacket(ClientHelloPkt):"
 					<< " Connecting New Container File Added Notify "
@@ -1194,7 +1198,9 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 			m_write = NULL; // just to be sure... ;-b
 			// Close Our Client Socket to Allow Graceful Cleanup...
 			if ( m_client_fd >= 0 ) {
-				DEBUG("Close m_client_fd=" << m_client_fd);
+				if ( ctrl->verbose() > 0 ) {
+					DEBUG("Close m_client_fd=" << m_client_fd);
+				}
 				close(m_client_fd);
 				m_client_fd = -1;
 			}
@@ -1208,7 +1214,9 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 			m_write = NULL; // just to be sure... ;-b
 			// Close Our Client Socket to Allow Graceful Cleanup...
 			if ( m_client_fd >= 0 ) {
-				DEBUG("Close m_client_fd=" << m_client_fd);
+				if ( ctrl->verbose() > 0 ) {
+					DEBUG("Close m_client_fd=" << m_client_fd);
+				}
 				close(m_client_fd);
 				m_client_fd = -1;
 			}

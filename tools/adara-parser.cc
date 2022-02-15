@@ -160,9 +160,10 @@ public:
 	Parser() :
 		ADARA::POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
 		m_hexDump(false), m_wordDump(false), m_showEvents(false),
-		m_showVars(true), m_showDDP(false), m_lowRate(false ),
-		m_showRunInfo(false), m_showGeom(false), m_showFrame(false),
-		m_posixRead(false), m_terse(false), m_catch(false)
+		m_showVars(true), m_showMults(false), m_showDDP(false),
+		m_lowRate(false), m_showRunInfo(false), m_showGeom(false),
+		m_showFrame(false), m_posixRead(false), m_terse(false),
+		m_catch(false)
 	{ }
 
 	void parse(int argc, char **argv);
@@ -209,6 +210,11 @@ public:
 	bool rxPacket(const ADARA::VariableStringPkt &pkt);
 	bool rxPacket(const ADARA::VariableU32ArrayPkt &pkt);
 	bool rxPacket(const ADARA::VariableDoubleArrayPkt &pkt);
+	bool rxPacket(const ADARA::MultVariableU32Pkt &pkt);
+	bool rxPacket(const ADARA::MultVariableDoublePkt &pkt);
+	bool rxPacket(const ADARA::MultVariableStringPkt &pkt);
+	bool rxPacket(const ADARA::MultVariableU32ArrayPkt &pkt);
+	bool rxPacket(const ADARA::MultVariableDoubleArrayPkt &pkt);
 
 	using ADARA::POSIXParser::rxPacket;
 
@@ -217,6 +223,7 @@ private:
 	bool m_wordDump;
 	bool m_showEvents;
 	bool m_showVars;
+	bool m_showMults;
 	bool m_showDDP;
 	bool m_lowRate;
 	bool m_showRunInfo;
@@ -398,7 +405,7 @@ bool Parser::rxPacket(const ADARA::RTDLPkt &pkt)
 			"    dataFlags=%s 0x%x (%s)\n"
 			"    flavor %d (%s)\n"
 			"    intrapulse %luns tofOffset %luns%s\n"
-			"    charge %lupC period %ups\n",
+			"    charge %lupC ringPeriod %ups\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length(),
 			pkt.cycle(), pkt.badCycle() ? " (BAD)" : "",
@@ -1133,6 +1140,162 @@ bool Parser::rxPacket(const ADARA::VariableDoubleArrayPkt &pkt)
 	return false;
 }
 
+bool Parser::rxPacket(const ADARA::MultVariableU32Pkt &pkt)
+{
+	if ( !m_terse && m_showVars ) {
+		printf("%u.%09u MULT U32 VARIABLE (0x%x,v%u) [%u bytes]\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    numValues %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.numValues());
+		if ( m_showMults ) {
+			double base_secs = (double) (pkt.pulseId() >> 32);
+			double s;
+			uint32_t nsecs = (uint32_t) pkt.pulseId();
+			uint32_t i;
+			uint32_t tof;
+			for (i = 0; i < pkt.numValues(); i++) {
+				tof = pkt.tofs()[i];
+				s = base_secs + ((double)(nsecs + tof) / 1.0e9);
+				printf("\t  %u: tof=%09u %08u    (%0.7f seconds)\n",
+					i, tof, pkt.values()[i], s);
+			}
+			printf("\n");
+		}
+	}
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::MultVariableDoublePkt &pkt)
+{
+	if ( !m_terse && m_showVars ) {
+		printf("%u.%09u MULT DOUBLE VARIABLE (0x%x,v%u) [%u bytes]\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    numValues %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.numValues());
+		if ( m_showMults ) {
+			double base_secs = (double) (pkt.pulseId() >> 32);
+			double s;
+			uint32_t nsecs = (uint32_t) pkt.pulseId();
+			uint32_t i;
+			uint32_t tof;
+			for (i = 0; i < pkt.numValues(); i++) {
+				tof = pkt.tofs()[i];
+				s = base_secs + ((double)(nsecs + tof) / 1.0e9);
+				printf("\t  %u: tof=%09u %0.7f    (%0.7f seconds)\n",
+					i, tof, pkt.values()[i], s);
+			}
+			printf("\n");
+		}
+	}
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::MultVariableStringPkt &pkt)
+{
+	if ( !m_terse && m_showVars ) {
+		printf("%u.%09u MULT String VARIABLE (0x%x,v%u) [%u bytes]\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    numValues %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.numValues());
+		if ( m_showMults ) {
+			double base_secs = (double) (pkt.pulseId() >> 32);
+			double s;
+			uint32_t nsecs = (uint32_t) pkt.pulseId();
+			uint32_t i;
+			uint32_t tof;
+			for (i = 0; i < pkt.numValues(); i++) {
+				tof = pkt.tofs()[i];
+				s = base_secs + ((double)(nsecs + tof) / 1.0e9);
+				printf("\t  %u: tof=%09u %s    (%0.7f seconds)\n",
+					i, tof, pkt.values()[i].c_str(), s);
+			}
+			printf("\n");
+		}
+	}
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::MultVariableU32ArrayPkt &pkt)
+{
+	if ( !m_terse && m_showVars ) {
+		printf("%u.%09u MULT U32 ARRAY VARIABLE (0x%x,v%u) [%u bytes]\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    numValues %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.numValues());
+		if ( m_showMults ) {
+			double base_secs = (double) (pkt.pulseId() >> 32);
+			double s;
+			uint32_t nsecs = (uint32_t) pkt.pulseId();
+			uint32_t i, j;
+			uint32_t tof;
+			for (i = 0; i < pkt.numValues(); i++) {
+				tof = pkt.tofs()[i];
+				s = base_secs + ((double)(nsecs + tof) / 1.0e9);
+				printf("\t  %u: tof=%09u %08lu    (%0.7f seconds)\n",
+					i, tof, pkt.values()[i].size(), s);
+				for (j = 0; j < pkt.elemCount(i); j++) {
+					printf("\t\t  %u:  %u\n", j, pkt.values()[i][j]);
+				}
+			}
+			printf("\n");
+		}
+	}
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::MultVariableDoubleArrayPkt &pkt)
+{
+	if ( !m_terse && m_showVars ) {
+		printf("%u.%09u MULT DOUBLE ARRAY VARIABLE (0x%x,v%u) [%u bytes]\n"
+			"    Device %u Variable %u\n"
+			"    Status %s Severity %s\n"
+			"    numValues %u\n",
+			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
+			pkt.base_type(), pkt.version(), pkt.packet_length(),
+			pkt.devId(), pkt.varId(), statusString(pkt.status()),
+			severityString(pkt.severity()), pkt.numValues());
+		if ( m_showMults ) {
+			double base_secs = (double) (pkt.pulseId() >> 32);
+			double s;
+			uint32_t nsecs = (uint32_t) pkt.pulseId();
+			uint32_t i, j;
+			uint32_t tof;
+			for (i = 0; i < pkt.numValues(); i++) {
+				tof = pkt.tofs()[i];
+				s = base_secs + ((double)(nsecs + tof) / 1.0e9);
+				printf("\t  %u: tof=%09u %08lu    (%0.7f seconds)\n",
+					i, tof, pkt.values()[i].size(), s);
+				for (j = 0; j < pkt.elemCount(i); j++) {
+					printf("\t\t  %u:  %0.7lf\n", j, pkt.values()[i][j]);
+				}
+			}
+			printf("\n");
+		}
+	}
+
+	return false;
+}
+
 void Parser::parse_file(FILE *f)
 {
 	size_t len;
@@ -1209,6 +1372,7 @@ void Parser::parse(int argc, char **argv)
 	("hexdump,x", "Dump the contents of each packet in hex (bytes)")
 	("worddump,w", "Dump the contents of each packet in hex (words)")
 	("hidevars,H", "Hide variable update packets")
+	("showmults,M", "Show multiple variable update packet values")
 	("showddp,D", "Show payload of device descriptor packets")
 	("low,l", "Set low data rate mode (uses very small buffer size)")
 	("events,e", "Show events")
@@ -1261,6 +1425,7 @@ void Parser::parse(int argc, char **argv)
 	m_wordDump = !!vm.count("worddump");
 	m_showEvents = !!vm.count("events");
 	m_showVars = !vm.count("hidevars");
+	m_showMults = vm.count("showmults");
 	m_showDDP = vm.count("showddp");
 	m_lowRate = vm.count("low");
 	m_showRunInfo = vm.count("showrun");

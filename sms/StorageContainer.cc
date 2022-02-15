@@ -44,6 +44,8 @@ void StorageContainer::terminateFile(
 		bool do_terminate,
 		const struct timespec &newStart ) // EPICS Time...!
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	if ( !(it->m_file) )
 	{
 		std::stringstream ss;
@@ -110,10 +112,13 @@ void StorageContainer::terminateFile(
 	}
 	it->m_maxTime = maxTime;
 
-	DEBUG("terminateFile(): Setting Current PauseMode " << it->m_numModes
-		<< " maxTime=" << it->m_maxTime.tv_sec << "."
-		<< std::setfill('0') << std::setw(9)
-		<< it->m_maxTime.tv_nsec << std::setw(0));
+	if ( ctrl->verbose() > 0 ) {
+		DEBUG("terminateFile():"
+			<< " Setting Current PauseMode " << it->m_numModes
+			<< " maxTime=" << it->m_maxTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< it->m_maxTime.tv_nsec << std::setw(0));
+	}
 
 	// Do We Terminate This PauseMode Now, or Keep It Alive on the Stack?
 	if ( do_terminate )
@@ -178,6 +183,8 @@ void StorageContainer::newFile(
 		std::list<struct PauseMode>::iterator &it,
 		bool paused, const struct timespec &minTime ) // EPICS Time...!
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	if ( it->m_file )
 	{
 		ERROR("newFile(): StorageFile Already Exists "
@@ -207,23 +214,24 @@ void StorageContainer::newFile(
 		return;
 	}
 
-	// REMOVEME
-	DEBUG("newFile(): Create New StorageFile"
-		<< " minTime=" << minTime.tv_sec << "."
-		<< std::setfill('0') << std::setw(9)
-		<< minTime.tv_nsec << std::setw(0)
-		<< " paused=" << paused
-		<< " from m_paused=" << it->m_paused
-		<< " m_numModes=" << it->m_numModes
-		<< " m_numFiles=" << it->m_numFiles
-		<< " m_numPauseFiles=" << it->m_numPauseFiles
-		<< " m_pendingFiles.size()="
-			<< it->m_pendingFiles.size()
-		<< " m_lastPrologueFile="
-		<< ( ( it->m_lastPrologueFile ) ?
-			it->m_lastPrologueFile->path() : "(null)" )
-		<< " - Btw, the PauseMode Stack now has "
-		<< m_pauseModeStack.size() << " elements");
+	if ( ctrl->verbose() > 0 ) {
+		DEBUG("newFile(): Create New StorageFile"
+			<< " minTime=" << minTime.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< minTime.tv_nsec << std::setw(0)
+			<< " paused=" << paused
+			<< " from m_paused=" << it->m_paused
+			<< " m_numModes=" << it->m_numModes
+			<< " m_numFiles=" << it->m_numFiles
+			<< " m_numPauseFiles=" << it->m_numPauseFiles
+			<< " m_pendingFiles.size()="
+				<< it->m_pendingFiles.size()
+			<< " m_lastPrologueFile="
+			<< ( ( it->m_lastPrologueFile ) ?
+				it->m_lastPrologueFile->path() : "(null)" )
+			<< " - Btw, the PauseMode Stack now has "
+			<< m_pauseModeStack.size() << " elements");
+	}
 
 	it->m_paused = paused;
 
@@ -320,8 +328,10 @@ void StorageContainer::newFile(
 			it->m_pendingFiles.clear();
 		}
 
-		DEBUG("newFile(): Adding File to Container File List "
-			<< it->m_file->path());
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("newFile(): Adding File to Container File List "
+				<< it->m_file->path());
+		}
 
 		m_files.push_back( it->m_file );
 
@@ -366,11 +376,13 @@ void StorageContainer::newFile(
 	// Then Just Append That File Directly Now...
 	if ( it->m_lastPrologueFile )
 	{
-		DEBUG("newFile():"
-			<< " Directly Appending Last Prologue File "
-			<< it->m_lastPrologueFile->path()
-			<< " for New File "
-			<< it->m_file->path());
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("newFile():"
+				<< " Directly Appending Last Prologue File "
+				<< it->m_lastPrologueFile->path()
+				<< " for New File "
+				<< it->m_file->path());
+		}
 
 		it->m_file->catFile( it->m_lastPrologueFile );
 	}
@@ -379,8 +391,10 @@ void StorageContainer::newFile(
 	// add the prologue before anyone else sees it.
 	else
 	{
-		DEBUG("newFile(): Append Normal FileCreated File Prologue to "
-			<< it->m_file->path());
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("newFile(): Append Normal FileCreated File Prologue to "
+				<< it->m_file->path());
+		}
 
 		StorageManager::fileCreated( it->m_file,
 			false /* capture_last */ );
@@ -394,8 +408,10 @@ void StorageContainer::newFile(
 	// If This Isn't the Oldest PauseMode on the Stack...
 	if ( next == m_pauseModeStack.end() )
 	{
-		DEBUG("newFile(): FileAdded Notify for "
-			<< it->m_file->path());
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("newFile(): FileAdded Notify for "
+				<< it->m_file->path());
+		}
 
 		// Note: New File Already Pushed Onto Container File List Above...
 
@@ -2293,6 +2309,8 @@ StorageContainer::SharedPtr StorageContainer::scan(const std::string &path,
 uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 		std::string &propId, bool &path_deleted )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	std::string cpath;
 	struct timespec ts;
 	uint32_t run;
@@ -2336,8 +2354,10 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 		if (prop_ck == 0) {
 			propId = file.string().substr(prop_ck
 				+ sizeof(m_proposal_id_marker_prefix) + 1);
-			DEBUG("purge(): Found ProposalId Marker, "
-				<< "Set ProposalId for Container to: " << propId);
+			if ( ctrl->verbose() > 2 ) {
+				DEBUG("purge(): Found ProposalId Marker, "
+					<< "Set ProposalId for Container to: " << propId);
+			}
 			continue;
 		}
 
@@ -2348,13 +2368,17 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 	}
 
 	if (manual) {
-		DEBUG("Skipping purge of container '" << path << "' (manual)");
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG("Skipping purge of container '" << path << "' (manual)");
+		}
 		return 0;
 	}
 
 	if (run && !translated) {
-		DEBUG("Skipping purge of container '" << path
-		      << "' (untranslated)");
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG("Skipping purge of container '" << path
+		      	<< "' (untranslated)");
+		}
 		return 0;
 	}
 
@@ -2412,7 +2436,9 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 			// Remove Overall Container Directory
 			remove(base);
 
-			DEBUG("Removed container " << base);
+			if ( ctrl->verbose() > 2 ) {
+				DEBUG("Removed container " << base);
+			}
 		} catch(fs::filesystem_error err) {
 			WARN("Error removing container: " << err.what());
 			path_deleted = false;
@@ -2428,6 +2454,8 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 
 void StorageContainer::purgeBackups(const std::string &path)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	fs::directory_iterator end, it(path);
 	StorageFile::SharedPtr f;
 
@@ -2444,8 +2472,10 @@ void StorageContainer::purgeBackups(const std::string &path)
 		/* Check for Raw Data "BACKUP" Files, "${datafile}.BACKUP-$$" */
 		size_t backup_ck = file.string().find(".BACKUP-");
 		if (backup_ck != std::string::npos) {
-			DEBUG("purgeBackups(): Found Raw Data BACKUP File - "
-				<< it->path());
+			if ( ctrl->verbose() > 2 ) {
+				DEBUG("purgeBackups(): Found Raw Data BACKUP File - "
+					<< it->path());
+			}
 			remove(it->path());
 			continue;
 		}
@@ -2453,8 +2483,10 @@ void StorageContainer::purgeBackups(const std::string &path)
 		/* Check for Raw Data "NEW" Files, "${datafile}.NEW-$$" */
 		size_t new_ck = file.string().find(".NEW-");
 		if (new_ck != std::string::npos) {
-			DEBUG("purgeBackups(): Found Raw Data NEW File - "
-				<< it->path());
+			if ( ctrl->verbose() > 2 ) {
+				DEBUG("purgeBackups(): Found Raw Data NEW File - "
+					<< it->path());
+			}
 			remove(it->path());
 			continue;
 		}

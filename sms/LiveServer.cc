@@ -178,6 +178,8 @@ LiveServer::LiveServer() :
 
 LiveServer::~LiveServer()
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	if ( m_addrinfo != NULL ) {
 		freeaddrinfo( m_addrinfo );
 		m_addrinfo = NULL;
@@ -187,7 +189,9 @@ LiveServer::~LiveServer()
 		m_fdreg = NULL;
 	}
 	if ( m_fd >= 0 ) {
-		DEBUG("Close m_fd=" << m_fd);
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("Close m_fd=" << m_fd);
+		}
 		close( m_fd );
 		m_fd = -1;
 	}
@@ -195,6 +199,8 @@ LiveServer::~LiveServer()
 
 void LiveServer::setupListener(void)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// Cancel Any Pending Listen Retry Timer...
 
 	m_listen_timer->cancel();
@@ -212,14 +218,14 @@ void LiveServer::setupListener(void)
 	}
 
 	if ( m_fd >= 0 ) {
-		DEBUG("Close m_fd=" << m_fd);
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("Close m_fd=" << m_fd);
+		}
 		close( m_fd );
 		m_fd = -1;
 	}
 
 	// Set Up New Listener Connection
-
-	SMSControl *ctrl = SMSControl::getInstance();
 
 	struct addrinfo hints;
 	int val, rc, flags;
@@ -277,7 +283,9 @@ void LiveServer::setupListener(void)
 		m_fd = -1;   // just to be sure... ;-b
 		goto error;
 	}
-	DEBUG("New Listener Socket m_fd=" << m_fd);
+	if ( ctrl->verbose() > 0 ) {
+		DEBUG("New Listener Socket m_fd=" << m_fd);
+	}
 
 	flags = fcntl(m_fd, F_GETFL, NULL);
 	if (flags < 0 || fcntl(m_fd, F_SETFL, flags | O_NONBLOCK) < 0) {
@@ -351,7 +359,9 @@ void LiveServer::setupListener(void)
 error_fd:
 
 	if ( m_fd >= 0 ) {
-		DEBUG("Close m_fd=" << m_fd);
+		if ( ctrl->verbose() > 0 ) {
+			DEBUG("Close m_fd=" << m_fd);
+		}
 		close(m_fd);
 		m_fd = -1;
 	}
@@ -382,6 +392,8 @@ error:
 
 void LiveServer::newConnection(void)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	DEBUG("newConnection() entry");
 
 	// Verify We Actually (Still) Have a Listener Socket Here... ;-D
@@ -419,7 +431,9 @@ void LiveServer::newConnection(void)
 			<< " m_fd=" << m_fd << " (" << strerror(err) << ")");
 		return;
 	}
-	DEBUG("New Accept Socket rc=" << rc);
+	if ( ctrl->verbose() > 0 ) {
+		DEBUG("New Accept Socket rc=" << rc);
+	}
 
 	try {
 		// TODO may want to put LiveClient on list

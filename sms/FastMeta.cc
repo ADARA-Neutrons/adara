@@ -241,6 +241,10 @@ void FastMeta::addDevice(const std::string &name,
 
 void FastMeta::sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof)
 {
+	// NOTE: All Fast Meta-Data PVs MUST Be of Some Base Integer Type!
+	// So We Always Send it as a U32 Variable Value Update.
+	// (No "U32 Array" Support Yet Either for Fast Meta-Data!)
+
 	/* TODO Buffer is currently sized for a U32 update; change this
 	 * if we start doing math and want to push double updates as well.
 	 */
@@ -262,8 +266,8 @@ void FastMeta::sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof)
 	uint32_t ns = tof + (pulse_id & 0xffffffff);
 
 	pkt[2] = pulse_id >> 32;
-	while (ns >= (1000U * 1000 * 1000)) {
-		ns -= 1000U * 1000 * 1000;
+	while (ns >= NANO_PER_SECOND_LL) {
+		ns -= NANO_PER_SECOND_LL;
 		pkt[2]++;
 	}
 	pkt[3] = ns;
@@ -301,3 +305,94 @@ void FastMeta::sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof)
 	} else
 		StorageManager::addPacket(pkt, sizeof(pkt));
 }
+
+void FastMeta::sendMultUpdate( uint64_t pulse_id,
+		SMSControl::EventVector events )
+{
+	// (This should never happen, check caller... ;-D)
+	if ( events.size() == 0 ) {
+		ERROR("sendMultUpdate(): Fast Meta-Data (Mult) Update"
+			<< " has NO DATA...! Ignoring...");
+		return;
+	}
+
+	// NOTE: All Fast Meta-Data PVs MUST Be of Some Base Integer Type!
+	// So We Always Send it as a (Mult) U32 Variable Value Update.
+	// (No "U32 Array" Support Yet Either for Fast Meta-Data!)
+
+	// Compute Mult U32 Variable Value Update Packet Size (in Uint32's)
+	uint32_t size = (sizeof(ADARA::Header) / sizeof(uint32_t))
+		+ 4 + ( events.size() * 2 ); // TOF + Value
+
+	uint32_t pkt[size];
+
+	pkt[0] = ( 4 + ( events.size() * 2 ) ) * sizeof(uint32_t);
+	pkt[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::MULT_VAR_VALUE_U32_TYPE,
+		ADARA::PacketType::MULT_VAR_VALUE_U32_VERSION );
+
+	pkt[2] = pulse_id >> 32;
+	pkt[3] = pulse_id & 0xffffffff;
+
+	/* The device/type ID is the upper 15 bits of the fastmeta
+	 * pixel ID; just use that directly as a key. The lower 16 bits
+	 * indicate the ADC value, or the rising/falling edge, so it
+	 * will be the variable update value.
+	 *
+	 * TODO perhaps we can do something smart with the ADC values?
+	 * Allow user to specify a formula to convert it to a
+	 * meaningful unit?
+	 *
+	 * Then again, it could depend on temperature and other info
+	 * that we don't have available to us.
+	 */
+
+	// Use 1st Event to Get Device Key/Fast Meta-Data Info...
+	uint32_t pixel = events.begin()->pixel;
+	uint32_t tof;
+
+	uint32_t key = pixel & ~0xffff;
+	uint32_t val;
+	const Variable &var = m_vars[key];
+	pkt[4] = var.m_devId;
+	pkt[5] = var.m_varId;
+	pkt[6] = ADARA::VariableStatus::OK << 16;
+	pkt[6] |= ADARA::VariableSeverity::OK;
+
+	pkt[7] = events.size();
+
+	SMSControl::EventVector::iterator it;
+
+	uint32_t *ptr = &(pkt[8]);
+
+	for (it = events.begin(); it != events.end() ; ++it) {
+
+		pixel = it->pixel;
+		tof = it->tof;
+
+		/* TOF is originally in units of 100ns.
+		 * Note that we strip any cycle field from the TOF.
+		 */
+		tof &= ((1U << 21) - 1);
+		tof *= 100;
+
+		*ptr++ = tof;
+
+		val = pixel & 0xffff;
+
+		*ptr++ = val;
+	}
+
+	if (var.m_persist) {
+		/* Fast metadata updates are implicitly owned by SMS and not
+		 * by a data source; it would be nice to change that, but the
+		 * corner cases of handling a device with variables coming
+		 * through multiple sources (preprocessors) complicate knowing
+		 * when we can really drop the device.
+		 */
+		m_meta->updateMappedVariable(pkt[4], pkt[5], (uint8_t *) pkt,
+					sizeof(pkt));
+	} else
+		StorageManager::addPacket(pkt, sizeof(pkt));
+}
+

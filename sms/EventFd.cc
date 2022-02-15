@@ -17,6 +17,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.EventFd"));
 
 #include "ReadyAdapter.h"
 #include "EventFd.h"
+#include "SMSControl.h"
 
 EventFd::EventFd( bool nonBlocking )
 	: m_ready(NULL), m_nonBlocking(nonBlocking)
@@ -30,11 +31,12 @@ EventFd::EventFd( bool nonBlocking )
 EventFd::EventFd( callback cb )
 	: m_ready(NULL)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
 	m_nonBlocking = true;
 	init( EFD_NONBLOCK );
 	// File Descriptor Created in init() (or std::runtime_error thrown...)
 	try {
-		m_ready = new ReadyAdapter( m_fd, fdrRead, cb, 1 /* verbose */ );
+		m_ready = new ReadyAdapter( m_fd, fdrRead, cb, ctrl->verbose() );
 	} catch (std::exception &e) {
 		ERROR("EventFd(): Exception Creating ReadyAdapter: " << e.what());
 		m_ready = NULL; // just to be sure... ;-b
@@ -48,13 +50,17 @@ EventFd::EventFd( callback cb )
 
 EventFd::~EventFd()
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	if (m_ready) {
 		delete m_ready;
 		m_ready = NULL;
 	}
 
 	if (m_fd >= 0) {
-		DEBUG("Close m_fd=" << m_fd);
+		if (ctrl->verbose() > 0) {
+			DEBUG("Close m_fd=" << m_fd);
+		}
 		close( m_fd );
 		m_fd = -1;
 	}
@@ -62,6 +68,7 @@ EventFd::~EventFd()
 
 void EventFd::init( int flags )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
 	m_fd = eventfd( 0, flags );
 	if ( m_fd < 0 ) {
 		int e = errno;
@@ -73,7 +80,9 @@ void EventFd::init( int flags )
 		m_fd = -1;   // just to be sure... ;-b
 		throw std::runtime_error(msg);
 	}
-	DEBUG("New EventFD m_fd=" << m_fd);
+	if ( ctrl->verbose() > 0 ) {
+		DEBUG("New EventFD m_fd=" << m_fd);
+	}
 }
 
 bool EventFd::read( uint64_t & val )
@@ -103,6 +112,8 @@ bool EventFd::signal( uint64_t val )
 
 bool EventFd::do_read( uint64_t & val )
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	char *bufptr = (char *) &val;
 	ssize_t len = sizeof(val);
 	ssize_t rc;
@@ -136,7 +147,9 @@ bool EventFd::do_read( uint64_t & val )
 				// *Don't* Throw Exception Here, Just Limp Along
 				// and Wait for Help/Restart... ;-D
 				if ( m_fd >= 0 ) {
-					DEBUG("Close Dead m_fd=" << m_fd);
+					if ( ctrl->verbose() > 0 ) {
+						DEBUG("Close Dead m_fd=" << m_fd);
+					}
 					close( m_fd );
 					m_fd = -1;
 				}
@@ -155,10 +168,12 @@ bool EventFd::do_read( uint64_t & val )
 	}
 
 	if ( len == 0 ) {
-		DEBUG("do_read(): " << ss.str() << "Done. "
-			<< "Read " << sizeof(val) << " Bytes. "
-			<< "Value = " << val << "/0x"
-				<< std::hex << val << std::dec);
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG("do_read(): " << ss.str() << "Done. "
+				<< "Read " << sizeof(val) << " Bytes. "
+				<< "Value = " << val << "/0x"
+					<< std::hex << val << std::dec);
+		}
 		return( true );
 	}
 	else {
@@ -175,7 +190,9 @@ bool EventFd::do_read( uint64_t & val )
 	}
 }
 
-bool EventFd::do_write( uint64_t val ) {
+bool EventFd::do_write( uint64_t val )
+{
+	SMSControl *ctrl = SMSControl::getInstance();
 
 	char *bufptr = (char *) &val;
 	ssize_t len = sizeof(val);
@@ -209,12 +226,14 @@ bool EventFd::do_write( uint64_t val ) {
 				// *Don't* Throw Exception Here, Just Limp Along
 				// and Wait for Help/Restart... ;-D
 				if ( m_fd >= 0 ) {
-					DEBUG("Close Dead m_fd=" << m_fd);
+					if ( ctrl->verbose() > 0 ) {
+						DEBUG("Close Dead m_fd=" << m_fd);
+					}
 					close( m_fd );
 					m_fd = -1;
 				}
 				return( false );
-			} else {
+			} else if ( ctrl->verbose() > 2 ) {
 				DEBUG("do_write(): Write Returned rc=" << rc
 					<< " Continuing..." << " (cnt=" << cnt << ")");
 			}
@@ -228,10 +247,12 @@ bool EventFd::do_write( uint64_t val ) {
 	}
 
 	if ( len == 0 ) {
-		DEBUG("do_write(): " << ss.str() << "Done. "
-			<< "Wrote " << sizeof(val) << " Bytes. "
-			<< "Value = " << val << "/0x"
-				<< std::hex << val << std::dec);
+		if ( ctrl->verbose() > 2 ) {
+			DEBUG("do_write(): " << ss.str() << "Done. "
+				<< "Wrote " << sizeof(val) << " Bytes. "
+				<< "Value = " << val << "/0x"
+					<< std::hex << val << std::dec);
+		}
 		return( true );
 	}
 	else {
