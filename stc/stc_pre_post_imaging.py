@@ -47,7 +47,8 @@ def determine_subdirectories(file_path):
 	Determines image file subdirectory underneath IPTS directory.
 	"""
 	head_tail = os.path.split(file_path.replace('\\', '/'))
-	subdir = head_tail[0].replace('C:/data/','')
+	driveless_path = os.path.splitdrive(head_tail[0])[1] 
+	subdir = driveless_path.replace('/data/','')
 	subdir = remove_leading_directory(subdir)
 	if subdir:
 		new_subdir = subdir
