@@ -25,40 +25,55 @@ import requests
 import pathlib
 
 
-def remove_leading_directory(path_1):
+def split_leading_directory(file_path):
 	"""
-	Returns specified path with leading directory removed.
-	"""
-	path_2=''
-	while path_1:
-		head_tail = os.path.split(path_1)
-		new_path_1 = head_tail[0]
-		new_path_2 = os.path.join(head_tail[1], path_2)
-		if not new_path_1:
-			return path_2.rstrip('/')
-		else:
-			path_1 = new_path_1
-			path_2 = new_path_2
-	return ''
+	Splits away leading directory of path.
 
+	Presumes '/' path delimiter.
+	"""
+	path_split = file_path.split('/')
+	if len(path_split) > 0:
+		lead_dir = path_split[0]
+	else:
+		lead_dir = ''
+	if len(path_split) > 1:
+		rest = path_split[1:]
+	else:
+		rest = ''
+	return lead_dir, rest
+
+
+def remove_drive(file_path):
+	"""
+	Remove drive from specified Windows path.
+	"""
+	if ':' in file_path:
+		path_parts = pathlib.PureWindowsPath(file_path.replace('/', '\\')).parts
+		if len(path_parts) > 1:
+			driveless_path = '\\' + '\\'.join(path_parts[1:])
+		else:
+			driverless_path = '\\'
+	else:
+		driveless_path = file_path
+	return driveless_path
 
 def determine_subdirectories(file_path):
 	"""
 	Determines image file subdirectory underneath IPTS directory.
 	"""
 	head_tail = os.path.split(file_path.replace('\\', '/'))
-	driveless_path = os.path.splitdrive(head_tail[0])[1] 
+	driveless_path = remove_drive(head_tail[0]).replace('\\', '/') 
 	subdir = driveless_path.replace('/data/','')
-	subdir = remove_leading_directory(subdir)
+	lead_dir, subdir = split_leading_directory(subdir)
 	if subdir:
 		new_subdir = subdir
 	else:
 		new_subdir = 'SubdirectoryUnspecified'
-	print('\n\nhead_tail: {}\nsubdir: {}\nnew_subdir: {}\n\n'.format(head_tail, subdir, new_subdir))
-	return subdir, new_subdir
+	print('\n\nhead_tail: {}\ndriveless_path: {}\nlead_dir: {}\nsubdir: {}\nnew_subdir: {}\n\n'.format(head_tail, driveless_path, lead_dir, subdir, new_subdir))
+	return subdir, new_subdir, lead_dir
 
 
-def determine_source_and_target_directories(source_dir, target_dir, proposal, subdir, new_subdir, run_number):
+def determine_source_and_target_directories(source_dir, lead_dir, target_dir, proposal, subdir, new_subdir, run_number):
 	"""
 	Determines source and target directories for copying.
 	"""
@@ -67,7 +82,12 @@ def determine_source_and_target_directories(source_dir, target_dir, proposal, su
 		source_dir = os.path.expanduser(source_dir)
 	else:
 		source_dir = '/mcp'
-	initial_image_dir = "{}/{}/{}".format(source_dir, proposal, subdir)
+
+	# Check lead directory for match with proposal.
+	if not lead_dir == proposal:
+		print(f'\n\nWARNING: Unexpected input: lead directory ({lead_dir}) does not match current proposal ({proposal}).\n\n')
+	
+	initial_image_dir = "{}/{}/{}".format(source_dir, lead_dir, subdir)
 	if target_dir is not None:
 		# expand away tilde if present.
 		target_dir = os.path.expanduser(target_dir)
@@ -170,10 +190,10 @@ def copy_images(file_path, proposal, run_number, source_dir, target_dir):
 	print('\n\nIn copy_images().\nfile_path: {}\nproposal: {}\nrun_number: {}\n\n'.format(file_path, proposal, run_number))
 
 	# Determine proper subdirectories.
-	subdir, new_subdir = determine_subdirectories(file_path)
+	subdir, new_subdir, lead_dir = determine_subdirectories(file_path)
 
 	# Determine source and target directories.
-	initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, target_dir, proposal, subdir, new_subdir, run_number)
+	initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, lead_dir, target_dir, proposal, subdir, new_subdir, run_number)
 			
 	# Identify target files (for use in cataloging).
 	target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
