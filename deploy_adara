@@ -211,7 +211,7 @@ hfir_cg_ck=`hostname -A | sed 's/ /\n/g' | grep '^cg' \
 # STC New VM Host Names: stc[123].ornl.gov
 stc_ck=`hostname -A | sed 's/ /\n/g' | grep -e '^stc' \
 	| wc | awk '{print $1}'`
-# STC Old Host Names: sns-stc[12].sns.gov [REMOVE ME LATER]
+# STC Old Host Names: sns-stc[12].sns.gov [REMOVE ME LATER] 
 stc_old_ck=`hostname -A | sed 's/ /\n/g' | grep -e '^sns' \
 	| wc | awk '{print $1}'`
 
