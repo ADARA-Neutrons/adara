@@ -156,7 +156,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.6.5"
+DEPLOY_VERSION="1.6.6"
 
 TMP_DIR="/tmp"
 
@@ -209,8 +209,10 @@ hfir_cg_ck=`hostname -A | sed 's/ /\n/g' | grep '^cg' \
 	| wc | awk '{print $1}'`
 
 # STC New VM Host Names: stc[123].ornl.gov
-# STC Old Host Names: sns-stc[12].sns.gov
-stc_ck=`hostname -A | sed 's/ /\n/g' | grep -e '^sns' -e '^stc' \
+stc_ck=`hostname -A | sed 's/ /\n/g' | grep -e '^stc' \
+	| wc | awk '{print $1}'`
+# STC Old Host Names: sns-stc[12].sns.gov [REMOVE ME LATER]
+stc_old_ck=`hostname -A | sed 's/ /\n/g' | grep -e '^sns' \
 	| wc | awk '{print $1}'`
 
 now_ck=`hostname -A | sed 's/ /\n/g' | grep 'now[0-9]' \
@@ -225,7 +227,11 @@ elif [[ $hfir_cg_ck != 0 ]]; then
 		| tee -a $LOG
 	HOST_PREFIX="cg"
 elif [[ $stc_ck != 0 ]]; then
-	echo -e "\nInstalling on an STC Server Computer System." \
+	echo -e "\nInstalling on a New STC VM Server Computer System." \
+		| tee -a $LOG
+	HOST_PREFIX=""
+elif [[ $stc_old_ck != 0 ]]; then
+	echo -e "\nInstalling on an Old STC Server Computer System." \
 		| tee -a $LOG
 	HOST_PREFIX="sns"
 elif [[ $now_ck != 0 ]]; then
@@ -246,9 +252,14 @@ PV_PREFIX=""
 
 if [ $IS_STC == 1 ]; then
 	install_host=`hostname`
-	install_branch=`echo "$install_host" | sed -e 's/sns-//' -e 's/\..*//'`
-	# Handle "All-in-One" Host Install Suffixes...
-	if [[ $HOST_PREFIX != "sns" ]]; then
+	install_branch=`echo "$install_host" \
+		| sed -e "s/${HOST_PREFIX}.*-//" -e 's/\..*//'`
+	# Old Physical STC Servers [REMOVE ME LATER]
+	if [[ $HOST_PREFIX == "sns" ]]; then
+		install_branch="${install_branch}-old"
+	# Handle Other "All-in-One" Host Install Suffixes...
+	elif [[ $HOST_PREFIX == "bl" ]]; then
+		install_branch=`echo "$install_host" | sed -e 's/\..*//'`
 		install_suffix=`echo "$install_host" | sed 's/\..*//' \
 			| sed "s/${HOST_PREFIX}.*-//"`
 		if [[ "#$install_suffix#" != '##' ]]; then
