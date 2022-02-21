@@ -31,13 +31,14 @@ def split_leading_directory(file_path):
 
 	Presumes '/' path delimiter.
 	"""
-	path_split = file_path.split('/')
+	delim = '/'
+	path_split = file_path.split(delim)
 	if len(path_split) > 0:
 		lead_dir = path_split[0]
 	else:
 		lead_dir = ''
 	if len(path_split) > 1:
-		rest = path_split[1:]
+		rest = delim.join(path_split[1:])
 	else:
 		rest = ''
 	return lead_dir, rest
@@ -56,6 +57,7 @@ def remove_drive(file_path):
 	else:
 		driveless_path = file_path
 	return driveless_path
+
 
 def determine_subdirectories(file_path):
 	"""
