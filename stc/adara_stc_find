@@ -43,7 +43,7 @@ USAGE()
 	echo "    [--stc1-old|--stc2-old|--stc-old] \\"
 	echo "    [--stc-all (default)] \\"
 	echo "    [--all][--last (default)] \\"
-	echo "    [--start][--status (default)][--end] \\"
+	echo "    [--start][--status (default)][--end][--any] \\"
 	echo "    [--terse] \\"
 	echo "    [--help|-h]"
 	echo
@@ -141,6 +141,11 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--end#' ]]; then
 		DO_END=1
 		echo -e "\nCapturing STC \"End\" Logs."
+	elif [[ "#$key#" == '#--any#' ]]; then
+		DO_START=1
+		DO_STATUS=1
+		DO_END=1
+		echo -e "\nCapturing Any STC Log: \"Start\", \"Status\" or \"End\"."
 	elif [[ "#$key#" == '#--terse#' ]]; then
 		TERSE=1
 		# Don't Log that Terse Mode Requested - It's Terse Mode! :-D
