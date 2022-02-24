@@ -571,7 +571,8 @@ void SMSControl::addSource(const std::string &name,
 }
 
 SMSControl::SMSControl() :
-	m_currentRunNumber(0), m_recording(false), m_nextSrcId(1),
+	m_currentRunNumber(0), m_recording(false),
+	m_nextSrcId(1), // Note: Must Start From 1, SMS Internal Uses 0...!
 	m_numConnectedDataSources(0),
 	m_noRegisteredEventSources(true), m_noRegisteredEventSourcesCount(0),
 	m_lastPulseId(0), m_lastRingPeriod(0),
@@ -2863,6 +2864,15 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 							<< std::hex << phys << std::dec
 							<< " (Device ID " << ss.str() << ")");
 					}
+					// Add Generic Fast Meta-Data Device for This PixelId
+					m_fastmeta->addGenericDevice(phys, key);
+					if (pulse->m_fastMetaEvents[key].empty()) {
+						pulse->m_fastMetaEvents[key].reserve(
+							m_fastMetaReserve);
+					}
+					pulse->m_fastMetaEvents[key].push_back(events[i]);
+					meta_count++;
+					continue;
 				}
 				// No mapping, Error Pixel...
 				/* FALLTHROUGH */
