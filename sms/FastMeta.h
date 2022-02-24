@@ -26,6 +26,8 @@ public:
 		return !!m_vars.count(key);
 	}
 
+	void addGenericDevice(uint32_t pixel, uint32_t &key);
+
 	void sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof);
 
 	void sendMultUpdate(uint64_t pulse_id, SMSControl::EventVector events);

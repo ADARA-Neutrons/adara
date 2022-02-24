@@ -171,7 +171,6 @@ void FastMeta::addDevice(const std::string &name,
 {
 	ptree::const_assoc_iterator path;
 	std::stringstream ddp;
-	VarMap vars;
 
 	path = info.find("description");
 	if (path == info.not_found()) {
@@ -187,7 +186,8 @@ void FastMeta::addDevice(const std::string &name,
 	readFile(name, path->second.data(), ddp);
 
 	bool reconnected = false; // ignored for FastMeta devices...
-	uint32_t devId = m_meta->allocDev(++m_numDevs, 0, true, reconnected);
+	uint32_t devId = m_meta->allocDev(++m_numDevs,
+		0 /* srcTag=0, for SMS Internal */, true /* do_log */, reconnected);
 	uint32_t varId, key;
 	bool persist;
 	BOOST_FOREACH(const ptree::value_type &v, info) {
@@ -228,6 +228,105 @@ void FastMeta::addDevice(const std::string &name,
 		m_vars[key].m_varId = varId;
 		m_vars[key].m_persist = persist;
 	}
+
+	/* Now that we know we can parse the variable map from the config,
+	 * add the DDP to the stream. We'll carry it around even if we don't
+	 * end up seeing the fast metadata, but we don't have to perform
+	 * a mostly useless check for each event.
+	 */
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_meta->addFastMetaDDP(now, devId, ddp.str());
+}
+
+void FastMeta::addGenericDevice(uint32_t pixel, uint32_t &key)
+{
+	std::stringstream devName;
+	std::stringstream pvName;
+	std::stringstream ddp;
+
+	uint32_t devNum = pixel >> 16;
+
+	devName << "GenericFastMetaDevice0x"
+		<< std::hex << devNum << std::dec;
+
+	std::string pvType;
+
+	switch ( pixel >> 28 ) {
+		case 5:
+			pvName << "SignalTrigger0x"
+				<< std::hex << devNum << std::dec;
+			pvType = "Digital Trigger";
+			break;
+		case 6:
+			pvName << "SignalAnalog0x"
+				<< std::hex << devNum << std::dec;
+			pvType = "Analog Signal";
+			break;
+		default:
+			pvName << "SignalUnknown0x"
+				<< std::hex << devNum << std::dec;
+			pvType = "Unknown Signal";
+			break;
+	}
+
+	// Only 1 PV Per Generic Fast Meta-Data Device... ;-D
+	uint32_t varId = 1;
+
+	ddp << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+	ddp << "<device"
+		<< " xmlns=\"http://public.sns.gov/schema/device.xsd\""
+		<< " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+		<< " xsi:schemaLocation=\"http://public.sns.gov/schema/device.xsd"
+		<< " http://public.sns.gov/schema/device.xsd\">\n";
+	ddp << "<device_name>" << devName.str() << "</device_name>\n";
+	ddp << "<process_variables>\n";
+	ddp << "    <process_variable>\n";
+	ddp << "        <pv_name>" << pvName.str() << "</pv_name>\n";
+	ddp << "        <pv_id>1</pv_id>\n";
+	ddp << "        <pv_description>"
+		<< pvType << " for PixelId 0x"
+		<< std::hex << devNum << std::dec
+		<< "XXXX"
+		<< "</pv_description>\n";
+	ddp << "        <pv_type>integer</pv_type>\n";
+	ddp << "    </process_variable>\n";
+	ddp << "</process_variables>\n";
+	ddp << "</device>\n";
+
+	// Construct Key from Pixel ID...
+	key = pixel & ~0xffff;
+
+	// Map Next SMS Internal Device ID...
+	bool reconnected = false; // ignored for FastMeta devices...
+	uint32_t devId = m_meta->allocDev(++m_numDevs,
+		0 /* srcTag=0, for SMS Internal */, true /* do_log */, reconnected);
+
+	// Default to Non-Persistent PVs for Generic Fast Meta-Data Devices...
+	bool persist = false;
+
+	if (m_vars.count(key)) {
+		std::string msg("fastmeta '");
+		msg += devName.str();
+		msg += "' variable '";
+		msg += pvName.str();
+		msg += "' adds duplicate pixel ID";
+		throw std::runtime_error(msg);
+	}
+
+	DEBUG("addGenericDevice(): Creating New Descriptor for"
+		<< " Generic Fast Meta-Data Device"
+		<< " [" << devName.str() << "]"
+		<< " PV=[" << pvName.str() << "]"
+		<< " ddp=[" << ddp.str() << "]"
+		<< " devId=" << devId
+		<< " varId=" << varId
+		<< " key=0x" << std::hex << key << std::dec
+		<< " persist=" << persist);
+
+	m_vars[key].m_devId = devId;
+	m_vars[key].m_varId = varId;
+	m_vars[key].m_persist = persist;
 
 	/* Now that we know we can parse the variable map from the config,
 	 * add the DDP to the stream. We'll carry it around even if we don't
