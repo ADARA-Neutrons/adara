@@ -111,8 +111,11 @@ def get_files_to_copy(initial_image_dir, run_number):
 	for file_in_dir in files_to_copy_ini:
 		if re.search('Run_{}'.format(run_number), file_in_dir):
 			files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
-	
-	print('\n\nfiles_to_copy:\n{}\n\n'.format('\n'.join(str(f) for f in files_to_copy)))
+
+	# Temporarily only print last 15 characters of file name to reduce log file load.	
+	print('\n\nNumber of files to copy:\n{}\n\n'.format(len(files_to_copy)))
+	# print('\n\nfiles_to_copy (last 15 chars):\n{}\n\n'.format('\n'.join(str(f[-15:]) for f in files_to_copy)))
+	# print('\n\nfiles_to_copy:\n{}\n\n'.format('\n'.join(str(f) for f in files_to_copy)))
 	# print('\n\nfiles_to_copy:\n{}\n\n'.format(files_to_copy))
 	return files_to_copy
 
