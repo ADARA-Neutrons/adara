@@ -19,6 +19,7 @@ import sys
 import os
 import errno
 import re
+import time
 import subprocess
 import traceback
 import requests
@@ -112,8 +113,8 @@ def get_files_to_copy(initial_image_dir, run_number):
 		if re.search('Run_{}'.format(run_number), file_in_dir):
 			files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
 
+	# print('\n\nNumber of files to copy:\n{}\n\n'.format(len(files_to_copy)))
 	# Temporarily only print last 15 characters of file name to reduce log file load.	
-	print('\n\nNumber of files to copy:\n{}\n\n'.format(len(files_to_copy)))
 	# print('\n\nfiles_to_copy (last 15 chars):\n{}\n\n'.format('\n'.join(str(f[-15:]) for f in files_to_copy)))
 	# print('\n\nfiles_to_copy:\n{}\n\n'.format('\n'.join(str(f) for f in files_to_copy)))
 	# print('\n\nfiles_to_copy:\n{}\n\n'.format(files_to_copy))
@@ -188,6 +189,40 @@ def get_target_files(initial_image_dir, run_number, target_dir):
 	return target_files
 
 
+def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_period_sec=30.0, interval_period_sec=5.0):
+	"""
+	Construct list of taget files, but don't presume they all exist yet.
+
+	Wait until there has been no increase in the number of files for the specified wait period.
+	Files will be checked every interval according to the specified interval period.
+
+	"""
+	stable_files_count_time = 0.0
+	source_files = get_files_to_copy(initial_image_dir, run_number)
+	file_count = len(source_files)
+	time_val = time.time()
+	print('\nWaiting for stable file count. Current number of files to copy:{} stable file count time: {} (sec)\n'.format(file_count, stable_files_count_time))
+	while stable_files_count_time < wait_period_sec:
+		time.sleep(interval_period_sec)
+		source_files_now = get_files_to_copy(initial_image_dir, run_number)
+		file_count_now = len(source_files_now)
+		time_val_now = time.time()
+		if file_count_now == file_count:
+			stable_files_count_time += (time_val_now - time_val)
+		else:
+			stable_files_count_time = 0.0
+		time_val = time_val_now
+		source_files = source_files_now
+		file_count = file_count_now
+		print('\nWaiting for stable file count. Current number of files to copy:{} stable file count time: {} (sec)\n'.format(file_count, stable_files_count_time))
+
+	target_files = []
+	for source_file in source_files:
+		head_tail = os.path.split(source_file)
+		target_files.append(os.path.join(target_dir, head_tail[1]))
+	return target_files
+
+
 def copy_images(file_path, proposal, run_number, source_dir, target_dir):
 	"""
 	Copies image files for the specified run.
@@ -200,8 +235,9 @@ def copy_images(file_path, proposal, run_number, source_dir, target_dir):
 	# Determine source and target directories.
 	initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, lead_dir, target_dir, proposal, subdir, new_subdir, run_number)
 			
-	# Identify target files (for use in cataloging).
-	target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
+	# Identify target files (for use in cataloging). Wait for file count to be stable for at least 30.0 seconds.
+	# target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
+	target_files = get_target_files_patiently(initial_image_dir, run_number, new_image_dir, wait_period_sec=30.0)
 
 	print('\n\nIn copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
 
