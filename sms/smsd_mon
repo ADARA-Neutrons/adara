@@ -16,7 +16,8 @@ fi
 # Default Settings
 #
 
-LOG_HOME="/SNS/users/y8y"
+#LOG_HOME="/SNS/users/y8y"
+LOG_HOME="$HOME"
 
 SMS_HOME="/SNSlocal"
 
@@ -26,16 +27,18 @@ host=`hostname`
 host_short=`echo $host | awk -F '.' '{print $1}'`
 #echo "host_short=$host_short"
 
-LOGFILE="$LOG_HOME/smsd_mon/smsd_mon.$host_short.log"
-LOGLOGFILE="$LOG_HOME/smsd_mon/smsd_mon.$host_short-log.log"
+PROG="smsd_mon"
+
+LOG_DIR="${PROG}"
+
+LOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short.log"
+LOGLOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short-log.log"
 
 SMSD_USER="snsdata"
 SMSD="smsd"
 SMS="sms"
 
 SMSD_LOG="/var/log/${SMSD}.log"
-
-PROG="smsd_mon"
 
 TIME="/usr/bin/time" # for Test Harness, duh... ;-b
 
@@ -45,6 +48,11 @@ S="[[:space:]]"
 
 ALT="" # for Alternate/Secondary SMS Deployments... ;-D
 ALTLABEL=""
+
+# The Minute When We Gasp Our Dying Breath and Beg for Help... ;-D
+SOS_MIN=0
+
+NL=""
 
 #
 # Parse Command Line Options... ;-)
@@ -65,25 +73,34 @@ for arg in "$@" ; do
 		ALT="$value"
 		ALTLABEL=`echo "$value" | tr '[:lower:]' '[:upper:]'`
 		# Also Update All the Associated Config...
-		LOGFILE="$LOG_HOME/smsd_mon/smsd_mon.$host_short${ALT}.log"
-		LOGLOGFILE="$LOG_HOME/smsd_mon/smsd_mon.$host_short${ALT}-log.log"
+		LOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short${ALT}.log"
+		LOGLOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short${ALT}-log.log"
 		SMSD="smsd${ALT}"
 		SMS="sms${ALT}"
 		SMSD_LOG="/var/log/${SMSD}.log"
 	elif [ "#$key#" == '#--help#' ]; then
-		echo -n "usage:  smsd_mon [--no_notify] [--smsd_user=y8y]"
+		echo -n "usage:  ${PROG} [--no_notify] [--smsd_user=y8y]"
 		echo " [--alt=\"-mon\"]"
 		exit 0
 	fi
 
 done
 
-#
-# Get SMS Daemon process status...
-#
+# Get Date (and Hours/Minutes for Sub-Schedule Control...)
 
 date=`date`
 #echo "date=$date"
+
+hour=`echo $date | awk '{print $4}' | awk -F ":" '{print $1}' \
+	| sed 's/^0//g'`
+#echo "hour=$hour"
+min=`echo $date | awk '{print $4}' | awk -F ":" '{print $2}' \
+	| sed 's/^0//g'`
+#echo "min=$min"
+
+#
+# Get SMS Daemon process status...
+#
 
 status=`ps augxww | grep $SMSD | grep -v -e $PROG -e $TIME -e grep | grep $SMSD_USER`
 #echo "status=$status"
@@ -149,7 +166,7 @@ if [ $do_notify == 1 ]; then
 			caget ${WAIT} -S "${prefix}:SMS:SummaryReason"
 
 		else
-			
+
 			# Strip Off Actual Summary Status Value...
 			summary=`echo "${summary}" \
 				| grep -v "Warning" | awk '{print $2}'`
@@ -217,27 +234,58 @@ log="$log time=$cpuT"
 # Dump SMS Daemon Status Snapshot into Log file...
 #
 
-echo -e "$log" >> $LOGFILE
+# If Log Sub-Directory Doesn't Exist, Try to Create It... ;-D
+if [[ ! -d "${LOG_HOME}/${LOG_DIR}" ]]; then
+
+	ckd=`mkdir -p "${LOG_HOME}/${LOG_DIR}" 2>&1`
+
+	# Only Whine Once Per Hour If There's No Log Sub-Directory
+	# (And We Can't Create It...)
+	if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
+		echo -e "${NL}Error Creating SMS Daemon Monitor Log Sub-Directory!"
+		echo -e "\n${ckd}"
+		NL="\n"
+	fi
+
+fi
+
+# If Log File Doesn't Exist, Try to Create It... ;-D
+if [[ ! -e "${LOGFILE}" ]]; then
+
+	ckt=`touch "${LOGFILE}" 2>&1`
+
+	# Only Whine Once Per Hour If There's No Log File
+	# (And We Can't Create It...)
+	if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
+		echo -e "${NL}Error Creating SMS Daemon Monitor Log File!"
+		echo -e "\n${ckt}"
+		NL="\n"
+	fi
+
+fi
+
+if [[ -w "${LOGFILE}" ]]; then
+
+	echo -e "$log" >> ${LOGFILE}
+
+# Only Whine Once Per Hour If We've Become Disconnected from the Universe...
+elif [[ $min -eq ${SOS_MIN} ]]; then
+
+	echo -e "${NL}Error: SMS Daemon Monitor Log File Unwritable!"
+	echo -e "\n$log"
+	NL="\n"
+
+fi
 
 #
 # Check on the SMS Daemon Log File size/usage...
 #
-
-hour=`echo $date | awk '{print $4}' | awk -F ":" '{print $1}' \
-	| sed 's/^0//g'`
-#echo "hour=$hour"
-min=`echo $date | awk '{print $4}' | awk -F ":" '{print $2}' \
-	| sed 's/^0//g'`
-#echo "min=$min"
 
 # Only check once or twice per day maybe...?
 if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 
 	log_bytes=`/bin/ls -l $SMSD_LOG | awk '{print $5}'`
 	log_hbytes=`/bin/ls -lh $SMSD_LOG | awk '{print $5}'`
-
-	touch $LOGLOGFILE
-	echo "$date $host $SMSD_LOG = $log_hbytes" >> $LOGLOGFILE
 
 	smsd_top_logdir=`echo $SMSD_LOG | awk -F '/' '{print "/"$2}'`
 
@@ -252,9 +300,43 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 	pct_used=$(( $log_used * 100 / $log_total ))
 	#echo "pct_used=$pct_used"
 
-	echo \
-	"   Log is $log_bytes = $pct_log% of usage, Disk is $pct_used% full." \
-		>> $LOGLOGFILE
+	# If Log Log File Doesn't Exist, Try to Create It... ;-D
+	if [[ ! -e "${LOGLOGFILE}" ]]; then
+
+		ckt=`touch "${LOGLOGFILE}" 2>&1`
+
+		# Only Whine Once Per Hour If There's No Log Log File
+		# (And We Can't Create It...)
+		if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
+			echo -e "${NL}Error Creating SMS Daemon Monitor Log Log File!"
+			echo -e "\n${ckt}"
+			NL="\n"
+		fi
+
+	fi
+
+	if [[ -w "${LOGLOGFILE}" ]]; then
+
+		echo "$date $host $SMSD_LOG = $log_hbytes" >> ${LOGLOGFILE}
+
+		echo -n "   Log is $log_bytes = $pct_log% of usage," \
+			>> ${LOGLOGFILE}
+		echo " Disk is $pct_used% full." >> ${LOGLOGFILE}
+
+	# Only Whine Once Per Hour If We've Become
+	# Disconnected from the Universe...
+	elif [[ $min -eq ${SOS_MIN} ]]; then
+
+		echo -e "${NL}Error: SMS Daemon Monitor Log Log File Unwritable!"
+
+		echo "\n$date $host $SMSD_LOG = $log_hbytes"
+
+		echo -n "   Log is $log_bytes = $pct_log% of usage,"
+		echo " Disk is $pct_used% full."
+
+		NL="\n"
+
+	fi
 
 	# Seemed like a good idea at the time... ;-D
 	# if [[ $pct_log -gt 80 ]]; then
