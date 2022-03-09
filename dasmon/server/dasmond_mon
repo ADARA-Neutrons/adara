@@ -6,14 +6,18 @@
 # (and maybe even notify via email or text message on a crash...! :-)
 #
 
+# Set Shared/External Mount Directory for Logging
+# LOG_HOME="/SNS/users/y8y"
+LOG_HOME="$HOME"
+
 host=`hostname`
 #echo "host=$host"
 
 host_short=`echo $host | awk -F '.' '{print $1}'`
 #echo "host_short=$host_short"
 
-LOGFILE="$HOME/dasmond_mon/dasmond_mon.$host_short.log"
-LOGLOGFILE="$HOME/dasmond_mon/dasmond_mon.$host_short-log.log"
+LOGFILE="$LOG_HOME/dasmond_mon/dasmond_mon.$host_short.log"
+LOGLOGFILE="$LOG_HOME/dasmond_mon/dasmond_mon.$host_short-log.log"
 
 DASMOND_USER="dasmon"
 DASMOND="/usr/sbin/dasmond"
