@@ -108,6 +108,8 @@ PARSE_RUN_NUMBERS()
 	echo -e "\nAdding Run Number(s) ${_runlistall} to Run List."
 }
 
+ERROR_ONLY_PROMPTING=0
+
 CHECK_PROCEED()
 {
 	local _proceed_query="Proceed"
@@ -118,8 +120,17 @@ CHECK_PROCEED()
 
 	local _proceed_ck=""
 
-	echo -e -n "\n${_proceed_query} (yes/No)? "
+	echo -e -n "\n${_proceed_query} (yes/No)[YES/NO]? "
 	read _proceed_ck
+
+	# Activate/Deactivate "Error-Only Prompting"...
+	if [[ "${_proceed_ck}" == "YES" ]]; then
+		ERROR_ONLY_PROMPTING=1
+		echo -e "\n[Error-Only Prompting ACTIVATED!]"
+	elif [[ "${_proceed_ck}" == "NO" ]]; then
+		ERROR_ONLY_PROMPTING=0
+		echo -e "\n[Error-Only Prompting Deactivated.]"
+	fi
 
 	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
 
@@ -251,6 +262,13 @@ if [[ -n "${RUN_NUMBERS}" ]]; then
 
 	echo -e "\n   [${RUN_NUMBERS}]"
 
+	CHECK_PROCEED
+
+	if [[ $? != 0 ]]; then
+		echo -e "\nExiting ADARA Retranslate Manual at User's Request.\n"
+		exit 0
+	fi
+
 	for run in ${RUN_NUMBERS} ; do
 
 		echo -e "\nLooking for Run ${run}:"
@@ -297,6 +315,8 @@ fi
 
 # Process Raw Data Directories...
 
+LAST_RUN_ADD_END=0
+
 if [[ -n "${DIRS}" ]]; then
 	echo -e "\nProcessing Collected Raw Data Directories in Turn:"
 else
@@ -306,6 +326,8 @@ else
 fi
 
 for dir in ${DIRS} ; do
+
+	# Get Basic Raw Data (Run Directory) Information...
 
 	echo -e "\n$dir"
 
@@ -323,15 +345,68 @@ for dir in ${DIRS} ; do
 
 	echo -e "\nfile=[$basefile]"
 
-	CHECK_PROCEED "Continue with This Run..."
+	# Decide Whether to Process This Run...
 
-	if [[ $? == 0 ]]; then
+	do_process_run=0
+
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+
+		CHECK_PROCEED "Continue with This Run..."
+
+		if [[ $? == 0 ]]; then
+			do_process_run=1
+		fi
+
+	elif [[ -n ${run} && -n ${file} && -n ${basefile} ]]; then
+
+		echo -e "\nAutomatically Continuing with This Run..."
+
+		do_process_run=1
+
+	else
+
+		echo -e "\nSomething Seems Awry...!"
+
+		CHECK_PROCEED "Continue with This Run..."
+
+		if [[ $? == 0 ]]; then
+			do_process_run=1
+		fi
+
+	fi
+
+	if [[ ${do_process_run} == 1 ]]; then
+
+		# Check Whether ADARA Add Run End is Required...
+
+		do_add_run_end=0
 
 		${ADARA_PARSER} $file | ${TAIL}
 
-		CHECK_PROCEED "Continue with ADARA Add Run End..."
+		if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
 
-		if [[ $? == 0 ]]; then
+			CHECK_PROCEED "Continue with ADARA Add Run End..."
+
+			if [[ $? == 0 ]]; then
+				do_add_run_end=1
+			fi
+
+		else
+
+			if [[ ${LAST_RUN_ADD_END} == 1 ]]; then
+				echo -e "\nAutomatically Proceeding with ADARA Add Run End."
+			else
+				echo -e "\nSkipping ADARA Add Run End Just Like Last Time."
+			fi
+
+			do_add_run_end=${LAST_RUN_ADD_END}
+
+		fi
+
+		# Do the ADARA Add Run End...
+		if [[ ${do_add_run_end} == 1 ]]; then
+
+			LAST_RUN_ADD_END=1
 
 			${ADARA_ADD_RUN_END} --inst=$INST --facility=${FACILITY} \
 				${STC_HOST} ${STC_SERVICE} \
@@ -342,9 +417,27 @@ for dir in ${DIRS} ; do
 
 		else
 
-			CHECK_PROCEED "Continue with SMS Rescan Run Dir..."
+			LAST_RUN_ADD_END=0
 
-			if [[ $? == 0 ]]; then
+			do_rescan_run_dir=0
+
+			if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+
+				CHECK_PROCEED "Continue with SMS Rescan Run Dir..."
+
+				if [[ $? == 0 ]]; then
+					do_rescan_run_dir=1
+				fi
+
+			else
+
+				echo -e "\nAutomatically Proceeding with Rescan Run Dir."
+
+				do_rescan_run_dir=1
+
+			fi
+
+			if [[ ${do_rescan_run_dir} == 1 ]]; then
 
 				pushd $dir
 
@@ -368,7 +461,11 @@ for dir in ${DIRS} ; do
 
 				${LS} -lt | ${HEAD}
 
-				CHECK_PROCEED "Continue"
+				if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+					CHECK_PROCEED "Continue"
+				else
+					echo -e "\nContinuing with Next Run."
+				fi
 
 				popd
 
