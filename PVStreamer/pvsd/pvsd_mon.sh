@@ -57,6 +57,8 @@ NL=""
 # Parse Command Line Options... ;-)
 #
 
+SKIP_PVS=0
+
 do_notify=1
 
 for arg in "$@" ; do
@@ -66,10 +68,12 @@ for arg in "$@" ; do
 
 	if [ "#$key#" == '#--no_notify#' ]; then
 		do_notify=0
+	elif [ "#$key#" == '#--skip_pvs#' ]; then
+		SKIP_PVS=1
 	elif [ "#$key#" == '#--pvsd_user#' ]; then
 		PVSD_USER="$value"
 	elif [ "#$key#" == '#--help#' ]; then
-		echo "usage:  ${PROG} [--no_notify] [--pvsd_user=y8y]"
+		echo "usage:  ${PROG} [--no_notify] [--skip_pvs] [--pvsd_user=y8y]"
 		exit 0
 	fi
 
@@ -110,7 +114,7 @@ fi
 # Check ADARA Monitor Status PVs...
 #
 
-if [ $do_notify == 1 ]; then
+if [[ $do_notify == 1 && ${SKIP_PVS} == 0 ]]; then
 
 	for pv in ${ADARA_MONITOR_PVS} ; do
 
