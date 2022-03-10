@@ -22,8 +22,7 @@ ADARA_MONITOR_PVS="${BL}:CS:Adara:PVStreamer \
 	${BL}:CS:Adara:Stat"
 
 LOG_HOME="/SNS/users/y8y"
-
-S="[[:space:]]"
+#LOG_HOME="$HOME"
 
 host=`hostname`
 #echo "host=$host"
@@ -31,19 +30,28 @@ host=`hostname`
 host_short=`echo $host | awk -F '.' '{print $1}'`
 #echo "host_short=$host_short"
 
-LOGFILE="$LOG_HOME/pvsd_mon/pvsd_mon.$host_short.log"
-LOGLOGFILE="$LOG_HOME/pvsd_mon/pvsd_mon.$host_short-log.log"
+PROG="pvsd_mon"
+
+LOG_DIR="${PROG}"
+
+LOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short.log"
+LOGLOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short-log.log"
 
 PVSD_USER="root"
 PVSD="pvsd"
 
 PVSD_LOG="/var/log/pvsd.log"
 
-PROG="pvsd_mon"
-
 TIME="/usr/bin/time" # for Test Harness, duh... ;-b
 
 WAIT="-w 9" # for caget wait... ;-)
+
+S="[[:space:]]"
+
+# The Minute When We Gasp Our Dying Breath and Beg for Help... ;-D
+SOS_MIN=0
+
+NL=""
 
 #
 # Parse Command Line Options... ;-)
@@ -61,18 +69,27 @@ for arg in "$@" ; do
 	elif [ "#$key#" == '#--pvsd_user#' ]; then
 		PVSD_USER="$value"
 	elif [ "#$key#" == '#--help#' ]; then
-		echo "usage:  pvsd_mon [--no_notify] [--pvsd_user=y8y]"
+		echo "usage:  ${PROG} [--no_notify] [--pvsd_user=y8y]"
 		exit 0
 	fi
 
 done
 
-#
-# Get PVSD process status...
-#
+# Get Date (and Hours/Minutes for Sub-Schedule Control...)
 
 date=`date`
 #echo "date=$date"
+
+hour=`echo $date | awk '{print $4}' | awk -F ":" '{print $1}' \
+	| sed 's/^0//g'`
+#echo "hour=$hour"
+min=`echo $date | awk '{print $4}' | awk -F ":" '{print $2}' \
+	| sed 's/^0//g'`
+#echo "min=$min"
+
+#
+# Get PVSD process status...
+#
 
 status=`ps augxww | grep $PVSD | grep -v -e $PROG -e $TIME -e grep | grep $PVSD_USER`
 #echo "status=$status"
@@ -116,7 +133,7 @@ if [ $do_notify == 1 ]; then
 			else
 				break
 			fi
-			
+
 		done
 
 		if [[ "$pvstat" =~ Channel${S}connect${S}timed${S}out ]]; then
@@ -189,27 +206,58 @@ log="$log time=$cpuT"
 # Dump PVSD Status Snapshot into Log file...
 #
 
-echo -e "$log" >> $LOGFILE
+# If Log Sub-Directory Doesn't Exist, Try to Create It... ;-D
+if [[ ! -d "${LOG_HOME}/${LOG_DIR}" ]]; then
+
+	ckd=`mkdir -p "${LOG_HOME}/${LOG_DIR}" 2>&1`
+
+	# Only Whine Once Per Hour If There's No Log Sub-Directory
+	# (And We Can't Create It...)
+	if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
+		echo -e "${NL}Error Creating PVSD Monitor Log Sub-Directory!"
+		echo -e "\n${ckd}"
+		NL="\n"
+	fi
+
+fi
+
+# If Log File Doesn't Exist, Try to Create It... ;-D
+if [[ ! -e "${LOGFILE}" ]]; then
+
+	ckt=`touch "${LOGFILE}" 2>&1`
+
+	# Only Whine Once Per Hour If There's No Log File
+	# (And We Can't Create It...)
+	if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
+		echo -e "${NL}Error Creating PVSD Monitor Log File!"
+		echo -e "\n${ckt}"
+		NL="\n"
+	fi
+
+fi
+
+if [[ -w "${LOGFILE}" ]]; then
+
+	echo -e "$log" >> ${LOGFILE}
+
+# Only Whine Once Per Hour If We've Become Disconnected from the Universe...
+elif [[ $min -eq ${SOS_MIN} ]]; then
+
+	echo -e "${NL}Error: PVSD Monitor Log File Unwritable!"
+	echo -e "\n$log"
+	NL="\n"
+
+fi
 
 #
 # Check on the PVSD Log File size/usage...
 #
-
-hour=`echo $date | awk '{print $4}' | awk -F ":" '{print $1}' \
-	| sed 's/^0//g'`
-#echo "hour=$hour"
-min=`echo $date | awk '{print $4}' | awk -F ":" '{print $2}' \
-	| sed 's/^0//g'`
-#echo "min=$min"
 
 # Only check once or twice per day maybe...?
 if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 
 	log_bytes=`/bin/ls -l $PVSD_LOG | awk '{print $5}'`
 	log_hbytes=`/bin/ls -lh $PVSD_LOG | awk '{print $5}'`
-
-	touch $LOGLOGFILE
-	echo "$date $host $PVSD_LOG = $log_hbytes" >> $LOGLOGFILE
 
 	pvsd_top_logdir=`echo $PVSD_LOG | awk -F '/' '{print "/"$2}'`
 
@@ -224,9 +272,43 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 	pct_used=$(( $log_used * 100 / $log_total ))
 	#echo "pct_used=$pct_used"
 
-	echo \
-	"   Log is $log_bytes = $pct_log% of usage, Disk is $pct_used% full." \
-		>> $LOGLOGFILE
+	# If Log Log File Doesn't Exist, Try to Create It... ;-D
+	if [[ ! -e "${LOGLOGFILE}" ]]; then
+
+		ckt=`touch "${LOGLOGFILE}" 2>&1`
+
+		# Only Whine Once Per Hour If There's No Log Log File
+		# (And We Can't Create It...)
+		if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
+			echo -e "${NL}Error Creating PVSD Monitor Log Log File!"
+			echo -e "\n${ckt}"
+			NL="\n"
+		fi
+
+	fi
+
+	if [[ -w "${LOGLOGFILE}" ]]; then
+
+		echo "$date $host $PVSD_LOG = $log_hbytes" >> ${LOGLOGFILE}
+
+		echo -n "   Log is $log_bytes = $pct_log% of usage," \
+			>> ${LOGLOGFILE}
+		echo " Disk is $pct_used% full." >> ${LOGLOGFILE}
+
+	# Only Whine Once Per Hour If We've Become
+	# Disconnected from the Universe...
+	elif [[ $min -eq ${SOS_MIN} ]]; then
+
+		echo -e "${NL}Error: PVSD Monitor Log Log File Unwritable!"
+
+		echo "\n$date $host $PVSD_LOG = $log_hbytes"
+
+		echo -n "   Log is $log_bytes = $pct_log% of usage,"
+		echo " Disk is $pct_used% full."
+
+		NL="\n"
+
+	fi
 
 	# Seemed like a good idea at the time... ;-D
 	# if [[ $pct_log -gt 80 ]]; then
