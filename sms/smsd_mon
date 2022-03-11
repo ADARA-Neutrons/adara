@@ -270,9 +270,10 @@ if [ $do_notify == 1 ]; then
 				if [[ $do_report == 1 ]]; then
 					echo -e \
 						"${NL}Channel Connect Timed Out on: ${summaryPV}..."
-					cnt=$(( $cnt + 1 ))
 					NL="\n"
 				fi
+
+				cnt=$(( $cnt + 1 ))
 
 			else
 				break
@@ -298,6 +299,8 @@ if [ $do_notify == 1 ]; then
 				caget ${WAIT} "${summaryPV}"
 				caget ${WAIT} -S "${prefix}:SMS:SummaryReason"
 
+				echo
+
 			fi
 
 		else
@@ -322,6 +325,8 @@ if [ $do_notify == 1 ]; then
 					caget ${WAIT} "${prefix}:SMS:RunNumber"
 					caget ${WAIT} "${summaryPV}"
 					caget ${WAIT} -S "${prefix}:SMS:SummaryReason"
+
+					echo
 
 				fi
 
