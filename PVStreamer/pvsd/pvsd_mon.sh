@@ -91,6 +91,104 @@ min=`echo $date | awk '{print $4}' | awk -F ":" '{print $2}' \
 	| sed 's/^0//g'`
 #echo "min=$min"
 
+# If Log Sub-Directory Doesn't Exist, Try to Create It... ;-D
+if [[ ! -d "${LOG_HOME}/${LOG_DIR}" ]]; then
+
+	ckd=`mkdir -p "${LOG_HOME}/${LOG_DIR}" 2>&1`
+
+	# Only Whine Once Per Hour If There's No Log Sub-Directory
+	# (And We Can't Create It...)
+	if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
+		echo -e "${NL}Error Creating PVSD Monitor Log Sub-Directory!"
+		echo -e "\n${ckd}"
+		NL="\n"
+	fi
+
+fi
+
+# If Log File Doesn't Exist, Try to Create It... ;-D
+if [[ ! -e "${LOGFILE}" ]]; then
+
+	ckt=`touch "${LOGFILE}" 2>&1`
+
+	# Only Whine Once Per Hour If There's No Log File
+	# (And We Can't Create It...)
+	if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
+		echo -e "${NL}Error Creating PVSD Monitor Log File!"
+		echo -e "\n${ckt}"
+		NL="\n"
+	fi
+
+fi
+
+# Track Any Error Count Already Retrieved for This Invocation...
+ERROR_COUNT=0
+
+# Check Error Count Embedded in Last Line of Log File...
+GET_ERROR_COUNT()
+{
+	# Only Retrieve Error Count from Log File If Not Already Set...!
+	if [[ $ERROR_COUNT == 0 ]]; then
+		if [[ -r "${LOGFILE}" ]]; then
+			local _last=`tail -1 "${LOGFILE}"`
+			if [[ "${_last}" =~ ErrorCount= ]]; then
+				ERROR_COUNT=`echo "${_last}" | awk -F "=" '{print $2}'`
+			fi
+		fi
+		# Add 1 for This Invocation's New Error...
+		ERROR_COUNT=$(( ERROR_COUNT + 1 ))
+	fi
+}
+
+# Set Error Count, Append as Last Line of Log File...
+SET_ERROR_COUNT()
+{
+	if [[ -w "${LOGFILE}" ]]; then
+
+		echo "ErrorCount=${ERROR_COUNT}" >> ${LOGFILE}
+
+	# Only Whine Once Per Hour If We've Become
+	# Disconnected from the Universe...
+	elif [[ $min -eq ${SOS_MIN} ]]; then
+		echo -e -n "${NL}Error Writing Error Count (${ERROR_COUNT})"
+		echo " to PVSD Monitor Log File!"
+		echo -e "\n${ckt}"
+		NL="\n"
+	fi
+}
+
+# We've Just Encountered an Error...!
+# Implement Exponential Error Reporting Fall Off...
+# (Based on Cron Job Check Every 10 Minutes)
+CHECK_ERROR_REPORTING()
+{
+	local _do_report=1
+
+	# Check for Any Saved "Error Count" from Last Invocation...
+	GET_ERROR_COUNT
+
+	# After First 3 Days, Report Once Per Week...
+	if [[ ${ERROR_COUNT} -gt 433 ]]; then
+		if [[ $(( ( ERROR_COUNT - 1 ) % 1008 )) != 0 ]]; then
+			_do_report=0
+		fi
+
+	# After First 3 Hours, Report Once Per Day...
+	elif [[ ${ERROR_COUNT} -gt 19 ]]; then
+		if [[ $(( ( ERROR_COUNT - 1 ) % 144 )) != 0 ]]; then
+			_do_report=0
+		fi
+
+	# Report First 3 Occurrences in a Row, Then Once Per Hour...
+	elif [[ ${ERROR_COUNT} -gt 3 ]]; then
+		if [[ $(( ( ERROR_COUNT - 1 ) % 6 )) != 0 ]]; then
+			_do_report=0
+		fi
+	fi
+
+	return ${_do_report}
+}
+
 #
 # Get PVSD process status...
 #
@@ -101,9 +199,26 @@ status=`ps augxww | grep $PVSD | grep -v -e $PROG -e $TIME -e grep | grep $PVSD_
 if [ "#$status#" == '##' ]; then
 
 	if [ $do_notify == 1 ]; then
-		echo \
-		"Error on ${host}: PVSD $PVSD Not Running as User $PVSD_USER!"
+
+		CHECK_ERROR_REPORTING
+		do_report="$?"
+
+		# Report Error...
+		if [[ $do_report == 1 ]]; then
+
+			echo -e -n "${NL}Error on ${host}:"
+			echo " PVSD $PVSD Not Running as User $PVSD_USER!"
+			NL="\n"
+
+		fi
+
+		# Set Error Count for Next Invocation,
+		if [[ ${ERROR_COUNT} -gt 0 ]]; then
+			SET_ERROR_COUNT
+		fi
+
 		exit -1
+
 	else
 		# Just Exit Cleanly, Nothing to log here... ;-D
 		exit 0
@@ -132,8 +247,18 @@ if [[ $do_notify == 1 && ${SKIP_PVS} == 0 ]]; then
 
 			# Did We Time Out Connecting to the Status PV...?
 			if [[ "$pvstat" =~ Channel${S}connect${S}timed${S}out ]]; then
-				echo "Channel Connect Timed Out on: ${pv}..."
+
+				CHECK_ERROR_REPORTING
+				do_report="$?"
+
+				# Report Error...
+				if [[ $do_report == 1 ]]; then
+					echo "${NL}Channel Connect Timed Out on: ${pv}..."
+					NL="\n"
+				fi
+
 				cnt=$(( $cnt + 1 ))
+
 			else
 				break
 			fi
@@ -142,14 +267,23 @@ if [[ $do_notify == 1 && ${SKIP_PVS} == 0 ]]; then
 
 		if [[ "$pvstat" =~ Channel${S}connect${S}timed${S}out ]]; then
 
-			echo -e -n "Error on ${host}: Timed Out $cnt Times"
-			echo -e " on ADARA Monitor Status PV!"
-			echo -e "   [${pv}]"
-			echo -e "      -> ${pvstat}"
+			CHECK_ERROR_REPORTING
+			do_report="$?"
 
-			caget ${WAIT} "${pv}"
+			# Report Error...
+			if [[ $do_report == 1 ]]; then
 
-			echo
+				echo -e -n "${NL}Error on ${host}: Timed Out $cnt Times"
+				echo -e " on ADARA Monitor Status PV!"
+				echo -e "   [${pv}]"
+				echo -e "      -> ${pvstat}"
+				NL="\n"
+
+				caget ${WAIT} "${pv}"
+
+				echo
+
+			fi
 
 		else
 
@@ -159,12 +293,22 @@ if [[ $do_notify == 1 && ${SKIP_PVS} == 0 ]]; then
 
 			if [[ "${pvstat}" != "OK" ]]; then
 
-				echo -e "Error on ${host}: ADARA Monitor Status Not OK!"
-				echo -e "   [${pv}] -> ${pvstat}"
+				CHECK_ERROR_REPORTING
+				do_report="$?"
 
-				caget ${WAIT} "${pv}"
+				# Report Error...
+				if [[ $do_report == 1 ]]; then
 
-				echo
+					echo -e -n "${NL}Error on ${host}:"
+					echo -e " ADARA Monitor Status Not OK!"
+					echo -e "   [${pv}] -> ${pvstat}"
+					NL="\n"
+
+					caget ${WAIT} "${pv}"
+
+					echo
+
+				fi
 
 			fi
 
@@ -174,7 +318,9 @@ if [[ $do_notify == 1 && ${SKIP_PVS} == 0 ]]; then
 
 fi
 
-# Extract statistics of interest
+#
+# Extract & log statistics of interest
+#
 
 log="$date $host $PVSD as ${PVSD_USER}:\n  "
 
@@ -209,36 +355,6 @@ log="$log time=$cpuT"
 #
 # Dump PVSD Status Snapshot into Log file...
 #
-
-# If Log Sub-Directory Doesn't Exist, Try to Create It... ;-D
-if [[ ! -d "${LOG_HOME}/${LOG_DIR}" ]]; then
-
-	ckd=`mkdir -p "${LOG_HOME}/${LOG_DIR}" 2>&1`
-
-	# Only Whine Once Per Hour If There's No Log Sub-Directory
-	# (And We Can't Create It...)
-	if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
-		echo -e "${NL}Error Creating PVSD Monitor Log Sub-Directory!"
-		echo -e "\n${ckd}"
-		NL="\n"
-	fi
-
-fi
-
-# If Log File Doesn't Exist, Try to Create It... ;-D
-if [[ ! -e "${LOGFILE}" ]]; then
-
-	ckt=`touch "${LOGFILE}" 2>&1`
-
-	# Only Whine Once Per Hour If There's No Log File
-	# (And We Can't Create It...)
-	if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
-		echo -e "${NL}Error Creating PVSD Monitor Log File!"
-		echo -e "\n${ckt}"
-		NL="\n"
-	fi
-
-fi
 
 if [[ -w "${LOGFILE}" ]]; then
 
@@ -316,15 +432,49 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 
 	# Seemed like a good idea at the time... ;-D
 	# if [[ $pct_log -gt 80 ]]; then
-	# 	echo "Error on ${host}: PVSD Log is $pct_log% of Usage!"
-	# 	echo "   $PVSD_LOG $log_bytes ($log_hbytes)"
-	# 	exit -2
+	#	CHECK_ERROR_REPORTING
+	#	do_report="$?"
+	#	# Report Error...
+	#	if [[ $do_report == 1 ]]; then
+	#		echo -e -n "${NL}Error on ${host}:"
+	#		echo " PVSD Log is $pct_log% of Usage!"
+	#		echo "   $PVSD_LOG $log_bytes ($log_hbytes)"
+	#		NL="\n"
+	#	fi
+	#	# Set Error Count for Next Invocation,
+	#	if [[ ${ERROR_COUNT} -gt 0 ]]; then
+	#		SET_ERROR_COUNT
+	#	fi
+	#	exit -2
 	# fi
 
 	if [[ $pct_used -gt 80 ]]; then
-		echo "Error on ${host}: $pvsd_top_logdir is $pct_used% Full!"
-		echo "   $PVSD_LOG $log_bytes ($log_hbytes)"
+
+		CHECK_ERROR_REPORTING
+		do_report="$?"
+
+		# Report Error...
+		if [[ $do_report == 1 ]]; then
+			echo -e -n "${NL}Error on ${host}:"
+			echo " $pvsd_top_logdir is $pct_used% Full!"
+			echo "   $PVSD_LOG $log_bytes ($log_hbytes)"
+			NL="\n"
+		fi
+
+		# Set Error Count for Next Invocation,
+		if [[ ${ERROR_COUNT} -gt 0 ]]; then
+			SET_ERROR_COUNT
+		fi
+
 		exit -3
+
 	fi
+
+fi
+
+# Set Error Count for Next Invocation,
+if [[ ${ERROR_COUNT} -gt 0 ]]; then
+	SET_ERROR_COUNT
+	exit -4
 fi
 
