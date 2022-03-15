@@ -2598,10 +2598,24 @@ StreamMonitor::dbThread()
                 {
                     string cmd_prefix = "select \"pvStringUpdate\"";
 
+                    string strpv_value = istrpv->second;
+
+                    if ( Utils::sanitizeString( strpv_value,
+                            false /* a_preserve_uri */,
+                            true /* a_preserve_whitespace */ ) )
+                    {
+                        syslog( LOG_WARNING,
+                      "String PV \"%s\" Value Sanitized from [%s] to [%s]",
+                            istrpv->first.m_name.c_str(),
+                            istrpv->second.c_str(),
+                            strpv_value.c_str() );
+                        usleep(30000); // give syslog a chance...
+                    }
+
                     size_t sz = cmd_prefix.size() + 1
                         + 1 + m_beam_info.m_beam_sname.size() + 1 + 1
                         + 1 + istrpv->first.m_name.size() + 1 + 1
-                        + 1 + istrpv->second.size() + 1 + 1
+                        + 1 + strpv_value.size() + 1 + 1
                         + 10 + 1 + 10 + 1 + 1; // Trailing '\0'...
                         // Note: Max UInt32 = 4294967295 (10 Digits)...
 
@@ -2612,7 +2626,7 @@ StreamMonitor::dbThread()
                         ss << cmd_prefix << "("
                             << "'" << m_beam_info.m_beam_sname << "',"
                             << "'" << istrpv->first.m_name << "',"
-                            << "'" << istrpv->second.substr(0,99)
+                            << "'" << strpv_value.substr(0,99)
                                 << "..." << "',"
                             << istrpv->first.m_status << ","
                             << istrpv->first.m_time << ")";
@@ -2630,7 +2644,7 @@ StreamMonitor::dbThread()
                             cmd_prefix.c_str(),
                             m_beam_info.m_beam_sname.c_str(),
                             istrpv->first.m_name.c_str(),
-                            istrpv->second.c_str(),
+                            strpv_value.c_str(),
                             istrpv->first.m_status,
                             istrpv->first.m_time );
                     }
