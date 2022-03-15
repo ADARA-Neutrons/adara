@@ -190,14 +190,20 @@ public:
 	 * @brief Sanitizes Strings for Various Nefarious Purposes.
 	 * @param a_str - string to sanitize
 	 * @param a_preserve_uri - protect any "proto://host:service" syntax
+	 * @param a_preserve_whitespace - protect PV values, don't break stuff
+	 * Note: a_preserve_uri overrides a_preserve_whitespace setting,
+	 *    because URIs can't have any whitespace.
 	 * @return true if string changed/was sanitized, else return false
 	 **/
-	static bool sanitizeString( std::string & a_str, bool a_preserve_uri )
+	static bool sanitizeString( std::string & a_str,
+			bool a_preserve_uri, bool a_preserve_whitespace = false )
 	{
 		std::string all_bad = " \t\'\",.;:<>[]{}()|/\\?~!@#$%^&*+=";
 		std::string uri_bad = " \t\'\";<>[]{}|\\~!@#$%^*+";
+		std::string all_values = "\'\";<>|?~!#$&*";
 
-		std::string bad = ( a_preserve_uri ) ? uri_bad : all_bad;
+		std::string bad = ( a_preserve_uri ) ? uri_bad :
+			( ( a_preserve_whitespace ) ? all_values : all_bad );
 
 		size_t next, last;
 
