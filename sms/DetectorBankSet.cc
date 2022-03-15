@@ -461,7 +461,8 @@ public:
 			bool changed = false;
 
 			// Sanitize Suffix String for NeXus File NXentry Usage...
-			if ( Utils::sanitizeString( suffix, false ) )
+			if ( Utils::sanitizeString( suffix,
+					false /* a_preserve_uri */ ) )
 			{
 				ERROR("DetBankSetSuffixPV changed(): Sanitized"
 					<< " Throttle NXentry Suffix for Detector Bank Set "
@@ -951,7 +952,8 @@ DetectorBankSet::DetectorBankSet(const boost::property_tree::ptree & conf)
 		suffix = it->second.get<std::string>("suffix", "throttled");
 
 		// Sanitize Suffix String for NeXus File NXentry Usage...
-		if ( Utils::sanitizeString( suffix, false ) ) {
+		if ( Utils::sanitizeString( suffix,
+				false /* a_preserve_uri */ ) ) {
 			WARN("DetectorBankSet: Sanitized"
 				<< " Throttle NXentry Suffix for Detector Bank Set "
 				<< detBankSetName
