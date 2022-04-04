@@ -155,6 +155,11 @@ DO_SUMMARY()
 
 	/bin/rm "${CACHE_DIR}/${SUMMARY}" > /dev/null 2>&1
 
+	# Leave "Previous" Breadcrumb for Next ADARA Summary... ;-D
+	# Note: Touch Marker File *Before* Creating the Summary, So We
+	# Don't Clear Any New Error Logs from _During_ the Summary...! ;-D
+	touch "${CACHE_DIR}/${PREVIOUS}"
+
 	# Remove Globbed File List If None Found...
 	shopt -s nullglob
 
@@ -191,9 +196,6 @@ DO_SUMMARY()
 		fi
 	
 	done
-
-	# Leave "Previous" Breadcrumb for Next ADARA Summary... ;-D
-	touch "${CACHE_DIR}/${PREVIOUS}"
 
 	echo -n "Summary Done: "
 	date
