@@ -35,7 +35,8 @@ if [[ $? != 0 ]]; then
 	/bin/cp -i ${ADARA_SUMMARY} ${USERS}/${ADARA}/
 fi
 
-nED_ON_WHEELS="bl0-now02.sns.gov bl0-now04.sns.gov"
+nED_ON_WHEELS="bl0b-now1.sns.gov bl0d-now1.sns.gov"
+	# Note: bl0g-now1 and bl0n-now1 mount /SNS/users/y8y/... ;-D
 
 for i in ${nED_ON_WHEELS} ; do
 
