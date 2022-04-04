@@ -281,8 +281,6 @@ if [[ $do_notify == 1 && ${SKIP_PVS} == 0 ]]; then
 
 				caget ${WAIT} "${pv}"
 
-				echo
-
 			fi
 
 		else
@@ -305,8 +303,6 @@ if [[ $do_notify == 1 && ${SKIP_PVS} == 0 ]]; then
 					NL="\n"
 
 					caget ${WAIT} "${pv}"
-
-					echo
 
 				fi
 
