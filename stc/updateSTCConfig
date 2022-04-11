@@ -2,14 +2,16 @@
 
 #
 # Production-Deployed STC Configuration Files
-#    - on sns-stc1.sns.gov
-#    - on sns-stc2.sns.gov
+#    - on stc1.ornl.gov
+#    - on stc2.ornl.gov
+#    - on stc3.ornl.gov
 #
 
 STC_DIR="/SNS/users/y8y"
 
-STC_SSH="ssh -AY sns-stc1.sns.gov"
-#STC_SSH="ssh -AY sns-stc2.sns.gov"
+STC_SSH="ssh -AY stc1.ornl.gov"
+#STC_SSH="ssh -AY stc2.ornl.gov"
+#STC_SSH="ssh -AY stc3.ornl.gov"
 
 STC_PROD="/SNS/snfs1/stcdata/stc_config.xml"
 STC_TEST="/SNS/snfs1/stcdata_test/stc_config.xml"

@@ -85,8 +85,9 @@ XINETD_DIR="/etc/xinetd.d"
 
 ARCHIVE_PATH="/"
 
-STC1="sns-stc1.sns.gov"
-STC2="sns-stc2.sns.gov"
+STC1="stc1.ornl.gov"
+STC2="stc2.ornl.gov"
+STC3="stc3.ornl.gov"
 
 TRUNCATE="/usr/bin/truncate"
 Editor="/usr/bin/vim"
@@ -121,7 +122,7 @@ USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
 	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
-	echo "    [--stc1|--stc2|--stc_host=<STC_HOST>] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc_host=<STC_HOST>] \\"
 	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
 	echo "    [--stc_port=<STCPort>] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
@@ -275,6 +276,9 @@ for arg in "$@" ; do
 		echo -e "\nSetting STC Host to: ${STC_HOST}"
 	elif [[ "#$key#" == '#--stc2#' ]]; then
 		STC_HOST="${STC2}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc3#' ]]; then
+		STC_HOST="${STC3}"
 		echo -e "\nSetting STC Host to: ${STC_HOST}"
 	elif [[ "#$key#" == '#--stc_host#' ]]; then
 		STC_HOST="${value}"

@@ -40,7 +40,7 @@ USAGE()
 {
 	echo -e "\nusage: adara_retranslate_manual \\"
 	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
-	echo "    [--stc1|--stc2|--stc_host=<STC_HOST>] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc_host=<STC_HOST>] \\"
 	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
 	echo "    [--stc_devel|--stc_master] (ADARA Test Harness Use Only) \\"
 	echo "    [--stc_port=<STCPort>] \\"
@@ -178,7 +178,9 @@ for arg in "$@" ; do
 			echo -e "\nERROR: Unknown Facility Keyword \"${FACILITY}\"...!"
 			echo -e "\nCannot Deduce STC Port...!"
 		fi
-	elif [[ "#$key#" == '#--stc1#' || "#$key#" == '#--stc2#' ]]; then
+	elif [[ "#$key#" == '#--stc1#' \
+			|| "#$key#" == '#--stc2#' \
+			|| "#$key#" == '#--stc3#' ]]; then
 		STC_HOST="${key}"
 		echo -e "\nSetting STC Host to: ${STC_HOST}"
 		STC_HOST_NAME=`echo "${STC_HOST}" | ${SED} 's/^--//'`

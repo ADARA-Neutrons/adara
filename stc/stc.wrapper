@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # STC Wrapper Script
-#    - to be installed in "/usr/local/bin/stc" on sns-stc[12].sns.gov
+#    - to be installed in "/usr/local/bin/stc" on stc[123].ornl.gov
 #    - invoked by the STC XInetD Script in /etc/xinetd.d/stc
 #
 # This wrapper calls:
