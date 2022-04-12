@@ -128,8 +128,7 @@ STCClientMgr::STCClientMgr() :
 			"uninitialized SMSControl obj for STCClientMgr!");
 	}
 
-	std::string prefix(ctrl->getBeamlineId());
-	prefix += ":SMS";
+	std::string prefix(ctrl->getPVPrefix());
 	prefix += ":STCClient";
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new

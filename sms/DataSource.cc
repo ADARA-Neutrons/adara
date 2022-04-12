@@ -866,8 +866,7 @@ DataSource::DataSource( const std::string &name,
 	// Create Run-Time Status and Configuration PV Prefix
 	//    - Full Set of PVs Per Data Source Index...
 
-	std::string prefix(m_ctrl->getBeamlineId());
-	prefix += ":SMS";
+	std::string prefix(m_ctrl->getPVPrefix());
 	prefix += ":DataSource:";
 
 	std::stringstream ss;
@@ -2414,8 +2413,7 @@ boost::shared_ptr<HWSource> DataSource::getHWSource( uint32_t hwId )
 			// Make New HWSource PVs, as needed...
 			if ( (uint32_t) hwIndex >= m_pvHWSourceHwIds.size() ) {
 
-				std::string prefix(m_ctrl->getBeamlineId());
-				prefix += ":SMS";
+				std::string prefix(m_ctrl->getPVPrefix());
 				prefix += ":DataSource:";
 
 				std::stringstream ss;

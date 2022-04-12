@@ -728,8 +728,7 @@ void StorageManager::lateInit(void)
 			"uninitialized SMSControl obj for StorageManager!");
 	}
 
-	std::string prefix(ctrl->getBeamlineId());
-	prefix += ":SMS";
+	std::string prefix(ctrl->getPVPrefix());
 	prefix += ":StorageManager";
 
 	m_pvPoolsize = boost::shared_ptr<PoolsizePV>(new

@@ -523,8 +523,7 @@ public:
 
 		SMSControl *ctrl = SMSControl::getInstance();
 
-		std::string prefix(ctrl->getBeamlineId());
-		prefix += ":SMS";
+		std::string prefix(ctrl->getPVPrefix());
 		prefix += ":DetectorBankSet:";
 
 		std::stringstream ss;
@@ -825,8 +824,7 @@ DetectorBankSet::DetectorBankSet(const boost::property_tree::ptree & conf)
 
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	std::string prefix(ctrl->getBeamlineId());
-	prefix += ":SMS";
+	std::string prefix(ctrl->getPVPrefix());
 
 	m_pvNumDetBankSets = boost::shared_ptr<smsUint32PV>( new
 						smsUint32PV(prefix + ":Control:NumDetBankSets") );

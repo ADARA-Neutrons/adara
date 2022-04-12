@@ -286,8 +286,7 @@ ComBusSMSMon::start(void)
 			throw std::logic_error(
 				"uninitialized SMSControl obj for ComBusSMSMon!");
 		}
-		std::string prefix(ctrl->getBeamlineId());
-		prefix += ":SMS";
+		std::string prefix(ctrl->getPVPrefix());
 		prefix += ":Combus";
 
 		m_pvRestartComBus = boost::shared_ptr<RestartComBusPV>(new
