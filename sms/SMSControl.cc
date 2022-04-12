@@ -66,6 +66,12 @@ std::string SMSControl::m_beamlineLongName;
 std::string SMSControl::m_geometryPath;
 std::string SMSControl::m_pixelMapPath;
 
+uint32_t SMSControl::m_instanceId;
+
+std::string SMSControl::m_pvPrefix;
+
+std::string SMSControl::m_altPrimaryPVPrefix;
+
 uint32_t SMSControl::m_noEoPPulseBufferSize;
 uint32_t SMSControl::m_maxPulseBufferSize;
 
@@ -181,6 +187,34 @@ public:
 	}
 };
 
+// Read-Only String PV for SMS Version...
+class VersionPV : public smsStringPV {
+public:
+	VersionPV(const std::string &name) :
+		smsStringPV(name) {}
+
+	// No External Writes Allowed...!
+	bool allowUpdate(const gdd &)
+	{
+		return false;
+	}
+};
+
+// Read-Only Integer PV for "ParADARA" SMS Instance ID...
+class InstanceIdPV : public smsUint32PV {
+public:
+	InstanceIdPV(const std::string &name,
+			uint32_t min = 0, uint32_t max = INT32_MAX,
+			bool auto_save = false) :
+		smsUint32PV(name, min, max, auto_save) {}
+
+	// No External Writes Allowed...!
+	bool allowUpdate(const gdd &)
+	{
+		return false;
+	}
+};
+
 class CleanShutdownPV : public smsTriggerPV {
 public:
 	CleanShutdownPV(const std::string &name) :
@@ -226,6 +260,17 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 			conf.get<std::string>("sms.beamline_shortname", "");
 	m_beamlineLongName =
 			conf.get<std::string>("sms.beamline_longname", "");
+
+	// "ParADARA" SMS Instance Id...
+	m_instanceId = conf.get<uint32_t>("sms.instance_id", 0);
+	INFO("SMS Instance ID = " << m_instanceId
+		<< ( ( m_instanceId == 0 ) ? " (PRIMARY)" : " (SECONDARY)" ) );
+
+	// "ParADARA" Alternate Primary SMS PV Prefix...
+	m_altPrimaryPVPrefix =
+		conf.get<std::string>("sms.alt_primary_pv_prefix", "(unset)");
+	INFO("SMS Alternate Primary PV Prefix = "
+		<< "[" << m_altPrimaryPVPrefix << "]");
 
 	/* Addendum 7/2014: for some legacy dcomserver implementations,
 	 * the neutron events and meta-data events can interleave and/or
@@ -570,6 +615,22 @@ void SMSControl::addSource(const std::string &name,
 	/* TODO check against the max number of sources? */
 }
 
+void ca_exception_handler( struct exception_handler_args args )
+{
+	const char *pName = ( args.chid ) ? ca_name( args.chid ) : "(Unknown)";
+
+	ERROR("ca_exception_handler():"
+		<< " Caught EPICS Exception!"
+		<< " Context=[" << args.ctx << "]"
+		<< " - with Request"
+		<< " ChannelId=[" << pName << "]"
+		<< " Stat=[" << args.stat << "]"
+		<< " Operation=[" << args.op << "]"
+		<< " DataType=[" << dbr_type_to_text( args.type ) << "]"
+		<< " Count=[" << args.count << "]"
+		<< ", Continuing...!");
+}
+
 SMSControl::SMSControl() :
 	m_currentRunNumber(0), m_recording(false),
 	m_nextSrcId(1), // Note: Must Start From 1, SMS Internal Uses 0...!
@@ -581,104 +642,120 @@ SMSControl::SMSControl() :
 	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta))
 {
 	// Initialize Control PVs...
-	std::string prefix(m_beamlineId);
-	prefix += ":SMS";
+	m_pvPrefix = m_beamlineId;
+	m_pvPrefix += ":SMS";
 
-	m_pvVersion = boost::shared_ptr<smsStringPV>(new
-						smsStringPV(prefix + ":Version"));
+	// *** ParADARA ***
+	// Include Any *Secondary* SMS Instance Id in EPICS PV Prefix...!
+	// (Omit Instance Id for *Primary* SMS Instance...)
+	if ( m_instanceId != 0 ) {
+		std::stringstream ss;
+		ss << ":" << m_instanceId;
+		m_pvPrefix += ss.str();
+	}
+
+	m_pvVersion = boost::shared_ptr<VersionPV>(new
+						VersionPV(m_pvPrefix + ":Version"));
 
 	m_pvLogLevel = boost::shared_ptr<LogLevelPV>(new
-						LogLevelPV(prefix + ":LogLevel"));
+						LogLevelPV(m_pvPrefix + ":LogLevel"));
 
 	m_pvRecording = boost::shared_ptr<smsRecordingPV>(new
-						smsRecordingPV(prefix, this));
+						smsRecordingPV(m_pvPrefix, this));
 	m_pvRunNumber = boost::shared_ptr<smsRunNumberPV>(new
-						smsRunNumberPV(prefix));
+						smsRunNumberPV(m_pvPrefix));
 
 	m_markers = boost::shared_ptr<Markers>(new
 						Markers(this, m_notesCommentAutoReset));
 
 	m_pvSummary = boost::shared_ptr<smsErrorPV>(new
-						smsErrorPV(prefix + ":Summary"));
+						smsErrorPV(m_pvPrefix + ":Summary"));
 
 	m_pvSummaryReason = boost::shared_ptr<smsStringPV>(new
-						smsStringPV(prefix + ":SummaryReason"));
+						smsStringPV(m_pvPrefix + ":SummaryReason"));
+
+	m_pvInstanceId = boost::shared_ptr<InstanceIdPV>(new
+						InstanceIdPV(m_pvPrefix + ":InstanceId"));
+
+	m_pvAltPrimaryPVPrefix = boost::shared_ptr<smsStringPV>(new
+						smsStringPV(m_pvPrefix + ":AltPrimaryPVPrefix",
+						/* AutoSave */ true));
 
 	m_pvNoEoPPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
-						smsUint32PV(prefix + ":Control:"
+						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "NoEoPPulseBufferSize", 0, INT32_MAX,
 						/* AutoSave */ true));
 
 	m_pvMaxPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
-						smsUint32PV(prefix + ":Control:"
+						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "MaxPulseBufferSize", 0, INT32_MAX,
 						/* AutoSave */ true));
 
 	m_pvPopPulseBuffer = boost::shared_ptr<PopPulseBufferPV>(new
-						PopPulseBufferPV(prefix + ":Control:"
+						PopPulseBufferPV(m_pvPrefix + ":Control:"
 							+ "PopPulseBuffer"));
 
 	m_pvNoRTDLPulses = boost::shared_ptr<smsBooleanPV>(new
-						smsBooleanPV(prefix + ":Control:"
+						smsBooleanPV(m_pvPrefix + ":Control:"
 							+ "NoRTDLPulses",
 						/* AutoSave */ true));
 
 	m_pvDoPulsePchgCorrect = boost::shared_ptr<smsBooleanPV>(new
-						smsBooleanPV(prefix + ":Control:"
+						smsBooleanPV(m_pvPrefix + ":Control:"
 							+ "DoPulsePchgCorrect",
 						/* AutoSave */ true));
 
 	m_pvDoPulseVetoCorrect = boost::shared_ptr<smsBooleanPV>(new
-						smsBooleanPV(prefix + ":Control:"
+						smsBooleanPV(m_pvPrefix + ":Control:"
 							+ "DoPulseVetoCorrect",
 						/* AutoSave */ true));
 
 	m_pvIntermittentDataThreshold = boost::shared_ptr<smsUint32PV>(new
-						smsUint32PV(prefix + ":Control:"
+						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "IntermittentDataThreshold", 0, INT32_MAX,
 						/* AutoSave */ true));
 
 	m_pvNeutronEventStateBits = boost::shared_ptr<smsUint32PV>(new
-						smsUint32PV(prefix + ":Control:"
+						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "NeutronEventStateBits", 0, INT32_MAX,
 						/* AutoSave */ true));
 
 	m_pvNeutronEventSortByState = boost::shared_ptr<smsBooleanPV>(new
-						smsBooleanPV(prefix + ":Control:"
+						smsBooleanPV(m_pvPrefix + ":Control:"
 							+ "NeutronEventSortByState",
 						/* AutoSave */ true));
 
 	m_pvIgnoreInterleavedSawtooth = boost::shared_ptr<smsBooleanPV>(new
-						smsBooleanPV(prefix + ":Control:"
+						smsBooleanPV(m_pvPrefix + ":Control:"
 							+ "IgnoreInterleavedGlobalSAWTOOTH",
 						/* AutoSave */ true));
 
 	m_pvMonitorTOFBits = boost::shared_ptr<smsUint32PV>(new
-						smsUint32PV(prefix + ":Control:"
+						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "BeamMonitorTOFBits", 0, INT32_MAX,
 						/* AutoSave */ true));
 
 	m_pvChopperTOFBits = boost::shared_ptr<smsUint32PV>(new
-						smsUint32PV(prefix + ":Control:"
+						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "ChopperTOFBits", 0, INT32_MAX,
 						/* AutoSave */ true));
 
 	m_pvVerbose = boost::shared_ptr<smsUint32PV>(new
-						smsUint32PV(prefix + ":Control:"
+						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "Verbose", 0, INT32_MAX,
 						/* AutoSave */ true));
 
 	m_pvNumDataSources = boost::shared_ptr<smsUint32PV>(new
-						smsUint32PV(prefix + ":Control:"
+						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "NumDataSources"));
 
 	m_pvNumLiveClients = boost::shared_ptr<smsUint32PV>(new
-						smsUint32PV(prefix + ":Control:"
+						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "NumLiveClients"));
 
 	// The Kill Switch. ["NEVER USE THIS!" Lol... (Except for Valgrind) :-]
 	m_pvCleanShutdown = boost::shared_ptr<CleanShutdownPV>(new
-						CleanShutdownPV(prefix + ":CleanShutdown"));
+						CleanShutdownPV(m_pvPrefix + ":CleanShutdown"));
 
 	addPV(m_pvVersion);
 	addPV(m_pvLogLevel);
@@ -686,6 +763,8 @@ SMSControl::SMSControl() :
 	addPV(m_pvRunNumber);
 	addPV(m_pvSummary);
 	addPV(m_pvSummaryReason);
+	addPV(m_pvInstanceId);
+	addPV(m_pvAltPrimaryPVPrefix);
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvMaxPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
@@ -734,6 +813,12 @@ SMSControl::SMSControl() :
 	// - "true": Do Log Status as Error
 	// - "true": Major Error
 	setSummaryReason( false, true, true );
+
+	// Set the "ParADARA" SMS Instance Id PV...
+	m_pvInstanceId->update(m_instanceId, &now);
+
+	// Set the "ParADARA" Alternate Primary SMS PV Prefix String...
+	m_pvAltPrimaryPVPrefix->update(m_altPrimaryPVPrefix, &now);
 
 	// Initialize "Oldest" DataSource Max Time
 	m_oldestMaxDataSourceTime.tv_sec = 0; // EPICS Time...!
@@ -804,8 +889,15 @@ SMSControl::SMSControl() :
 	// Restore Any PVs to AutoSaved Config Values...
 
 	struct timespec ts;
+	std::string value;
 	uint32_t uvalue;
 	bool bvalue;
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvAltPrimaryPVPrefix->getName(), value, ts ) ) {
+		m_altPrimaryPVPrefix = value;
+		m_pvAltPrimaryPVPrefix->update(value, &ts);
+	}
 
 	if ( StorageManager::getAutoSavePV(
 			m_pvNoEoPPulseBufferSize->getName(), uvalue, ts ) ) {
@@ -917,10 +1009,12 @@ SMSControl::SMSControl() :
 	m_numStatesLast = 1;
 	m_numStatesResetCount = 10;
 
-	// Notify the IPTS-ITEMS IOC that "We're Alive" and request that it
-	// Re-Send the IPTS Proposal and ITEMS Sample Information PVs...
+	// Create EPICS Channel Access Context and Exception Handler
+	// - Both for the IPTS-ITEMS Resend ca_put(), as well as
+	// Any Primary SMS Servers to Monitor for Recording/Run Numbers...
 
 	int ca_status;
+
 	if ( !( (ca_status =
 			ca_context_create( ca_disable_preemptive_callback ))
 				& CA_M_SUCCESS ) )
@@ -934,6 +1028,26 @@ SMSControl::SMSControl() :
 	// Log as "Error" so we'll get notified if this is working... ;-D
 	ERROR("IPTS-ITEMS Resend - "
 		<< "Channel Access Context Successfully Created");
+	m_epics_context = ca_current_context();
+
+	// Install Non-Default (And Non-Terminating!) Channel Access
+	// Exception Handler for the SMSD...! ;-D
+	if ( !( (ca_status =
+			ca_add_exception_event( ca_exception_handler , 0 ))
+				& CA_M_SUCCESS ) )
+	{
+		ERROR("IPTS-ITEMS Resend - "
+			<< "Channel Access Error in "
+			<< "ca_add_exception_event( ca_exception_handler, 0 ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("IPTS-ITEMS Resend - "
+		<< "Channel Access Exception Handler Installed");
+
+	// Notify the IPTS-ITEMS IOC that "We're Alive" and request that it
+	// Re-Send the IPTS Proposal and ITEMS Sample Information PVs...
 
 	std::string resendPVName = m_beamlineId + ":CS:IPTS_ITEMS:SMS:Resend";
 	chid resend_chid;
@@ -991,6 +1105,19 @@ SMSControl::SMSControl() :
 	// Log as "Error" so we'll get notified if this is working... ;-D
 	ERROR("IPTS-ITEMS Resend - "
 		<< "Channel Access Pending I/O Successful, Resend Request Sent!");
+
+	// *** ParADARA ***
+	// For *Secondary* SMS Instances, Create Channel Access Subscriptions
+	// To SMS Primary "Recording", "RunNumber" and "Paused" PVs... ;-D
+	if ( m_instanceId != 0 ) {
+		DEBUG("Secondary SMS Instance Id " << m_instanceId
+			<< " - Subscribe to Primary SMS PVs...");
+		if ( m_altPrimaryPVPrefix.size()
+				&& m_altPrimaryPVPrefix.compare( "(unset)" ) ) {
+			DEBUG("Using Alternate Primary SMS PV Prefix String = "
+				<< "[" << m_altPrimaryPVPrefix << "]");
+		}
+	}
 }
 
 SMSControl::~SMSControl()
@@ -2404,8 +2531,7 @@ int32_t SMSControl::registerLiveClient(std::string clientName,
 		// Allocate Next Index of PVs...
 		if ( (uint32_t) clientId >= m_pvLiveClientNames.size() ) {
 
-			std::string prefix(m_beamlineId);
-			prefix += ":SMS";
+			std::string prefix(m_pvPrefix);
 			prefix += ":LiveClient:";
 
 			std::stringstream ss;

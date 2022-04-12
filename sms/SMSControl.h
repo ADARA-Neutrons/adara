@@ -26,6 +26,8 @@ class smsUint32PV;
 class smsConnectedPV;
 class PopPulseBufferPV;
 class LogLevelPV;
+class VersionPV;
+class InstanceIdPV;
 class CleanShutdownPV;
 class RunInfo;
 class Geometry;
@@ -59,6 +61,8 @@ public:
 	std::string getFacility(void) { return m_facility; }
 
 	std::string getBeamlineId(void) { return m_beamlineId; }
+
+	std::string getPVPrefix(void) { return m_pvPrefix; }
 
 	void sourceUp(uint32_t srcId);
 	void sourceDown(uint32_t srcId, bool stateChanged);
@@ -246,8 +250,13 @@ private:
 	bool m_recording;
 	uint32_t m_nextSrcId;
 
-	boost::shared_ptr<smsStringPV> m_pvVersion;
 	boost::shared_ptr<LogLevelPV> m_pvLogLevel;
+
+	boost::shared_ptr<VersionPV> m_pvVersion;
+
+	boost::shared_ptr<InstanceIdPV> m_pvInstanceId;
+
+	boost::shared_ptr<smsStringPV> m_pvAltPrimaryPVPrefix;
 
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
@@ -328,6 +337,12 @@ private:
 	static std::string m_geometryPath;
 	static std::string m_pixelMapPath;
 
+	static uint32_t m_instanceId;
+
+	static std::string m_pvPrefix;
+
+	static std::string m_altPrimaryPVPrefix;
+
 	boost::shared_ptr<smsUint32PV> m_pvNoEoPPulseBufferSize;
 	static uint32_t m_noEoPPulseBufferSize;
 
@@ -393,6 +408,8 @@ private:
 	std::vector< boost::shared_ptr<smsUint32PV> > m_pvLiveClientStartTimes;
 	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientFilePaths;
 	std::vector< boost::shared_ptr<smsConnectedPV> > m_pvLiveClientStatuses;
+
+	struct ca_client_context *m_epics_context;
 
 	static SMSControl *m_singleton;
 
