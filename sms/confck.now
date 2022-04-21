@@ -596,7 +596,7 @@ PVSD_CONFCK()
 			echo -n "Create PVSD Local Run Level? [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
-			if [[ "$ckUpdate} == "y" || "$ckUpdate" == "yes" ]]; then
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 				sudo chkconfig --add pvsd
 				chkconfig --list pvsd
 				sudo chkconfig pvsd on
