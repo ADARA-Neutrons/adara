@@ -633,6 +633,7 @@ if [[ $UPDATE == 1 ]]; then
 	# Check/Create ADARA/SMSD User Local Bin Soft Links...
 	for i in adara_add_run_end adaracat adara_data_find adara-dump \
 			adara_fix_ipts adara-gen adara-munge adara-parser adara-pvgen \
+			adara_latest_data adara_retranslate_manual \
 			liveconf smsd ; do
 
 		echo "Checking ADARA/SMSD User Local Bin Soft Links for: [$i]"
