@@ -877,7 +877,7 @@ PARSE_LOG()
 		# "Comment Annotation SAWTOOTH" Log
 		elif [[ "$log" =~ Comment${S}Annotation${S}SAWTOOTH ]]; then
 			#echo "Comment Annotation SAWTOOTH..."
-			nHostSTCommentAnnotSAWTOOTH[$host]=$(( \
+			nHostSTCCommentAnnotSAWTOOTH[$host]=$(( \
 				nHostSTCCommentAnnotSAWTOOTH[$host] + 1 ))
 
 		# "Note Pause Annotation" Log
