@@ -516,7 +516,7 @@ PVSD_CONFCK()
 		./pvsd/usr.local.bin.pvsd /usr/local/bin/pvsd
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -525,7 +525,7 @@ PVSD_CONFCK()
 		./pvsd/pvsd.initscript /etc/init.d/pvsd
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -534,7 +534,7 @@ PVSD_CONFCK()
 		./pvsd/rsyslog.conf /etc/rsyslog.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -543,7 +543,7 @@ PVSD_CONFCK()
 		./pvsd/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -552,7 +552,7 @@ PVSD_CONFCK()
 		./pvsd/pvsd_syslog.conf /etc/rsyslog.d/pvsd_syslog.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -561,7 +561,7 @@ PVSD_CONFCK()
 		./pvsd/etc.logrotate.d.pvsd_log /etc/logrotate.d/pvsd_log
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -575,14 +575,14 @@ PVSD_CONFCK()
 	if [ $? != 0 ]; then
 		echo "Failure Retrieving System ChkConfig for PVSD...!"
 		_check_update=1
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "diff ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
 		diff ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
 		if [ $? != 0 ]; then
 			echo "System ChkConfig for PVSD Differed...!"
 			_check_update=1
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "System ChkConfig for PVSD is the Same."
 		fi
@@ -590,7 +590,7 @@ PVSD_CONFCK()
 	/bin/rm -f /tmp/chkconfig.pvsd.$$
 	if [ $? != 0 ]; then
 		echo "Failure Deleting Temporary System ChkConfig File for PVSD...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	fi
 	# Create PVSD Local Run Level...
 	if [[ ${_check_update} == 1 ]]; then
@@ -613,14 +613,14 @@ PVSD_CONFCK()
 	fi
 
 	echo
-	if [ $nerrors -gt 0 ]; then
-		echo "$nerrors Errors/Files Differed!"
+	if [ $_nerrors -gt 0 ]; then
+		echo "$_nerrors Errors/Files Differed!"
 	else
 		echo "All Files/Configs are the Same."
 	fi
 	echo
 
-	return $nerrors
+	return $_nerrors
 }
 
 if [[ $UPDATE == 1 ]]; then
@@ -796,13 +796,13 @@ fi
 
 DASMON_CONFCK()
 {
-	nerrors=0
+	local _nerrors=0
 
 	DIFF_FILE "Dasmon Daemon Config File" "Deployed" \
 		dasmond/dasmond.cfg /home/dasmon/dasmond.cfg
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -814,7 +814,7 @@ DASMON_CONFCK()
 			dasmond/dasmond_def.cfg /home/dasmon/dasmond_def.cfg
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -828,7 +828,7 @@ DASMON_CONFCK()
 			dasmond/init.dasmond.conf /etc/init/dasmond.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -841,7 +841,7 @@ DASMON_CONFCK()
 			/etc/systemd/system/dasmond.service
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -851,7 +851,7 @@ DASMON_CONFCK()
 		dasmond/usr.local.bin.dasmond /usr/local/bin/dasmond
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -860,7 +860,7 @@ DASMON_CONFCK()
 		dasmond/rsyslog.conf /etc/rsyslog.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -870,7 +870,7 @@ DASMON_CONFCK()
 			dasmond/dasmon_syslog.conf /etc/rsyslog.d/dasmon.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -880,7 +880,7 @@ DASMON_CONFCK()
 		dasmond/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -889,7 +889,7 @@ DASMON_CONFCK()
 		dasmond/etc.logrotate.d.dasmon_log /etc/logrotate.d/dasmon_log
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -898,7 +898,7 @@ DASMON_CONFCK()
 		dasmon/xinitrc.dasmon /etc/X11/xinit/xinitrc.dasmon
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -909,7 +909,7 @@ DASMON_CONFCK()
 			dasmon/init.dasmongui.conf /etc/init/dasmongui.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -922,21 +922,21 @@ DASMON_CONFCK()
 			/etc/systemd/system/dasmongui.service
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
 	fi
 
 	echo
-	if [ $nerrors -gt 0 ]; then
-		echo "$nerrors Files Differed!"
+	if [ $_nerrors -gt 0 ]; then
+		echo "$_nerrors Files Differed!"
 	else
 		echo "All Files are the Same."
 	fi
 	echo
 
-	return $nerrors
+	return $_nerrors
 }
 
 if [[ $DO_DASMON_CONFCK == 1 ]]; then
