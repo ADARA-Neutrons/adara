@@ -57,6 +57,8 @@ PVSD_BINARY="/home/controls/config-now1/deploy/pvsd"
 PVSD_LINK="/usr/sbin/pvsd"
 STC_BINARIES="/home/controls/config-now1/deploy"
 STC_LINKS="/usr/sbin"
+DASMON_BINARIES="/home/controls/config-now1/deploy"
+DASMON_LINKS="/usr/sbin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
 
@@ -1329,6 +1331,30 @@ if [[ $UPDATE == 1 ]]; then
 		echo
 	
 	done
+
+	# Check/Create DASMON User Local Bin Soft Links...
+	if [[ $DO_DASMON_CONFCK == 1 ]]; then
+
+		for i in dasmon dasmond ; do
+
+			echo "Checking DASMON User Local Bin Soft Links for: [$i]"
+
+			/bin/ls -l "${DASMON_LINKS}/$i"
+			if [[ ! -x "${DASMON_LINKS}/$i" ]]; then
+				echo -n "Create DASMON User Local Bin Soft Link for [$i]?"
+				echo -n " [yes|No] "
+				read ckUpdate
+				ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+				if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+					sudo ln -s "${DASMON_BINARIES}/$i" "${DASMON_LINKS}/$i"
+					/bin/ls -l "${DASMON_LINKS}/$i"
+				fi
+			fi
+			echo
+	
+		done
+
+	fi
 
 	# Also Check/Create ADARA/SMSD-MON User Local Bin Soft Link... ;-D
 	if [[ -n ${ALT} ]]; then
