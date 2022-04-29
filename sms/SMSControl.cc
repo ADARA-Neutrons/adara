@@ -1112,11 +1112,14 @@ SMSControl::SMSControl() :
 	if ( m_instanceId != 0 ) {
 		DEBUG("Secondary SMS Instance Id " << m_instanceId
 			<< " - Subscribe to Primary SMS PVs...");
+		std::string PrimaryPVPrefix = m_beamlineId + ":SMS";
 		if ( m_altPrimaryPVPrefix.size()
 				&& m_altPrimaryPVPrefix.compare( "(unset)" ) ) {
 			DEBUG("Using Alternate Primary SMS PV Prefix String = "
 				<< "[" << m_altPrimaryPVPrefix << "]");
+			PrimaryPVPrefix = m_altPrimaryPVPrefix;
 		}
+		subscribeToPrimaryPVs( PrimaryPVPrefix );
 	}
 }
 
@@ -1172,6 +1175,745 @@ pvAttachReturn SMSControl::pvAttach(const casCtx &UNUSED(ctx),
 		return pverDoesNotExistHere;
 
 	return *(iter->second);
+}
+
+void SMSControl::subscribeToPrimaryPVs( std::string PrimaryPVPrefix )
+{
+	DEBUG("subscribeToPrimaryPVs(): Subscribing to External Primary PVs"
+		<< " with PrimaryPVPrefix = [" << PrimaryPVPrefix << "]");
+
+	boost::unique_lock<boost::mutex> lock(m_mutex);
+
+	// Subscribe to the Primary "Recording" PV...
+	m_extRecordingPV = ExternalPVPtr(new ExternalPV("Recording",
+		PrimaryPVPrefix + ":Recording", PV_ENUM));
+	subscribePV( m_extRecordingPV );
+
+	// Subscribe to the Primary "RunNumber" PV...
+	m_extRunNumberPV = ExternalPVPtr(new ExternalPV("RunNumber",
+		PrimaryPVPrefix + ":RunNumber", PV_UINT));
+	subscribePV( m_extRunNumberPV );
+
+	// Subscribe to the Primary "Paused" PV...
+	m_extPausedPV = ExternalPVPtr(new ExternalPV("Paused",
+		PrimaryPVPrefix + ":Paused", PV_ENUM));
+	subscribePV( m_extPausedPV );
+
+	// Flush EPICS I/O...
+	ca_flush_io();
+}
+
+void SMSControl::unsubscribePrimaryPVs(void)
+{
+	DEBUG("unsubscribeToPrimaryPVs():"
+		<< " Unsubscribing from External Primary PVs");
+
+	boost::unique_lock<boost::mutex> lock(m_mutex);
+
+	// Unsubscribe from the Primary "Recording" PV...
+	unsubscribePV( m_extRecordingPV, lock );
+
+	// Unsubscribe from the Primary "RunNumber" PV...
+	unsubscribePV( m_extRunNumberPV, lock );
+
+	// Unsubscribe from the Primary "Paused" PV...
+	unsubscribePV( m_extPausedPV, lock );
+
+	// Flush EPICS I/O...
+	ca_flush_io();
+}
+
+void SMSControl::subscribePV( ExternalPVPtr pv )
+{
+	DEBUG("subscribePV(): Subscribing to External Primary "
+		<< pv->m_name << " PV with Connection String "
+		<< pv->m_connection);
+
+	ChanInfo info;
+	info.m_pv = pv;
+
+	// Create a CA channel
+	if ( ca_create_channel( pv->m_connection.c_str(),
+				&SMSControl::epicsConnectionHandler,
+				0 /* void *PUSER */, 0 /* priority */,
+				&info.m_chid )
+			== ECA_NORMAL )
+	{
+		// Note: don't flush I/O here
+		// - subscribeToPrimaryPVs() method will call it
+
+		// Update channel info and PV name index structures
+		m_chan_info[info.m_chid] = info;
+		m_pv_index[pv->m_connection] = info.m_chid;
+
+		DEBUG("subscribePV(): Connected chid: " << info.m_chid
+			<< " for External Primary " << pv->m_name
+			<< " PV " << pv->m_connection);
+	}
+	else
+	{
+		ERROR("subscribePV(): Failed to create channel"
+			<< " for External Primary " << pv->m_name
+			<< " PV " << pv->m_connection);
+	}
+}
+
+void SMSControl::unsubscribePV( ExternalPVPtr pv,
+		boost::unique_lock<boost::mutex> & lock )
+{
+	DEBUG("unsubscribePV(): Unsubscribing from External Primary "
+		<< pv->m_name << " PV with Connection String "
+		<< pv->m_connection);
+
+	std::map<std::string,chid>::iterator ipv =
+		m_pv_index.find( pv->m_connection );
+
+	if ( ipv != m_pv_index.end() )
+	{
+		DEBUG("unsubscribePV(): Disconnecting channel"
+			<< " for External Primary " << pv->m_name
+			<< " PV " << pv->m_connection);
+
+		std::map<chid,ChanInfo>::iterator ich =
+			m_chan_info.find( ipv->second );
+
+		if ( ich != m_chan_info.end() )
+		{
+			DEBUG("unsubscribePV(): Found Existing Channel"
+				<< " for External Primary " << pv->m_name
+				<< " PV " << pv->m_connection);
+
+			if ( ich->second.m_subscribed )
+			{
+				DEBUG("unsubscribePV(): Clearing Subscription"
+					<< " for External Primary " << pv->m_name
+					<< " PV " << pv->m_connection);
+				
+				// *** Prevent Deadlock with New EPICS Callback Guard...!!
+				lock.unlock();
+				ca_clear_subscription( ich->second.m_evid );
+				lock.lock();
+			}
+
+			DEBUG("unsubscribePV(): Clearing Channel"
+				<< " for External Primary " << pv->m_name
+				<< " PV " << pv->m_connection);
+			
+			// *** Prevent Deadlock with New EPICS Callback Guard...!!
+			lock.unlock();
+			ca_clear_channel( ich->second.m_chid );
+			lock.lock();
+
+			// Update channel info index structures
+
+			DEBUG("unsubscribePV(): Erasing Channel Info"
+				<< " for External Primary " << pv->m_name
+				<< " PV " << pv->m_connection);
+
+			m_chan_info.erase( ich );
+
+			DEBUG("unsubscribePV(): Disconnecting Channel Info"
+				<< " for External Primary " << pv->m_name
+				<< " PV " << pv->m_connection);
+
+			// Don't flush I/O here
+			// - unsubscribePrimaryPVs() method will call it
+		}
+		else
+		{
+			DEBUG("unsubscribePV(): Warning: No Channel Info Found"
+				<< " for External Primary " << pv->m_name
+				<< " PV " << pv->m_connection);
+		}
+
+		// Update name index structures
+		m_pv_index.erase( ipv );
+	}
+
+	else
+	{
+		ERROR("unsubscribePV(): Failed to disconnect channel"
+			<< " for External Primary " << pv->m_name
+			<< " PV " << pv->m_connection
+			<< " - Not Found");
+	}
+}
+
+/**
+ * @brief Converts EPICS DB record type to EPICS time record type
+ * @param a_rec_type - Input value to convert
+ * @return EPICS time type if value is valid; throws otherwise
+ */
+int32_t
+SMSControl::epicsToTimeRecordType( uint32_t a_rec_type )
+{
+    switch ( a_rec_type )
+    {
+    case DBR_STRING:    return DBR_TIME_STRING;
+    case DBR_SHORT:     return DBR_TIME_SHORT;
+    case DBR_FLOAT:     return DBR_TIME_FLOAT;
+    case DBR_ENUM:      return DBR_TIME_ENUM;
+    case DBR_CHAR:      return DBR_TIME_CHAR;
+    case DBR_LONG:      return DBR_TIME_LONG;
+    case DBR_DOUBLE:    return DBR_TIME_DOUBLE;
+    default:
+		ERROR("epicsToTimeRecordType():"
+			<< " Invalid EPICS DB record type: " << a_rec_type
+			<< " - Defaulting to DBR_TIME_STRING...");
+		return DBR_TIME_STRING;
+    }
+}
+
+/**
+ * @brief Checks if argument is a valid EPICS time record
+ * @param a_rec_type - Input value to check
+ * @return True if value is valid; false otherwise
+ */
+bool
+SMSControl::epicsIsTimeRecordType( uint32_t a_rec_type )
+{
+    if ( a_rec_type >= DBR_TIME_STRING && a_rec_type <= DBR_TIME_DOUBLE )
+        return true;
+    else
+        return false;
+}
+
+/**
+ * @brief Checks if argument is a valid EPICS control record
+ * @param a_rec_type - Input value to check
+ * @return True if value is valid; false otherwise
+ */
+bool
+SMSControl::epicsIsCtrlRecordType( uint32_t a_rec_type )
+{
+    if ( a_rec_type >= DBR_CTRL_STRING && a_rec_type <= DBR_CTRL_DOUBLE )
+        return true;
+    else
+        return false;
+}
+
+/**
+ * @brief Handles EPICS connection status callbacks
+ * @param a_args - EPICS callback arguments
+ *
+ * This method handles EPICS channel connection Up/Down events. When a
+ * connection is established, a subscription is created for time-value
+ * events, and the state machine is triggered to ask for channel metadata
+ * (INFO_NEEDED). When a connection is lost, the event subscription is
+ * dropped and a PV disconnect packet is emitted.
+ */
+void
+SMSControl::epicsConnectionHandler( struct connection_handler_args a_args )
+{
+	DEBUG("epicsConnectionHandler()"
+		<< " a_args.op=" << a_args.op
+		<< " a_args.chid=" << a_args.chid);
+
+	SMSControl *ctrl = SMSControl::m_singleton;
+
+	try
+	{
+		// Connection established?
+		if ( a_args.op == CA_OP_CONN_UP )
+		{
+			DEBUG("epicsConnectionHandler(): Connection Up!");
+
+			boost::lock_guard<boost::mutex> lock(ctrl->m_mutex);
+
+			std::map<chid,ChanInfo>::iterator ich =
+				ctrl->m_chan_info.find( a_args.chid );
+
+			if ( ich != ctrl->m_chan_info.end() )
+			{
+				DEBUG("epicsConnectionHandler(): Channel Connected"
+					<< " for External Primary " << ich->second.m_pv->m_name
+					<< " PV " << ich->second.m_pv->m_connection);
+
+				ich->second.m_connected = true;
+
+				chtype type = ca_field_type( a_args.chid );
+				unsigned long elem_count = ca_element_count( a_args.chid );
+				if ( VALID_DB_FIELD( type ) )
+				{
+					// Save native type
+					ich->second.m_ca_type = type;
+					ich->second.m_ca_elem_count = elem_count;
+					//cout <<  "chan: " << ich->first
+						// << " ca_type = " << type << " for PV: "
+						// << ich->second.m_pv->m_connection << endl;
+
+					std::string pvStr = "";
+					if ( ich->second.m_pv != NULL )
+					{
+						pvStr = " for External Primary "
+							+ ich->second.m_pv->m_name
+							+ " PV " + ich->second.m_pv->m_connection;
+					}
+
+					if ( ca_create_subscription(
+							epicsToTimeRecordType( type ), 0,
+							ich->second.m_chid,
+							DBE_VALUE | DBE_ALARM | DBE_PROPERTY,
+							&epicsEventHandler, 0 /* void *USERARG */,
+							&ich->second.m_evid ) == ECA_NORMAL )
+					{
+						ERROR("epicsConnectionHandler():"
+							<< " Subscription created" << pvStr);
+
+						ich->second.m_subscribed = true;
+					}
+					else
+					{
+						ERROR("epicsConnectionHandler():"
+							<< " Failed to create subscription" << pvStr);
+					}
+
+					ca_flush_io();
+
+					// Note: there is no way to know if the metadata
+					// on this channel has or hasn't changed,
+					// so assume it has changed
+
+					// There is NO ctrl record for EPICS string types
+					if ( ich->second.m_pv->m_type == PV_STR )
+					{
+						ERROR("epicsConnectionHandler():"
+							<< " String PV, Info Available...");
+						ich->second.m_chan_state = INFO_AVAILABLE;
+					}
+					else
+					{
+						ERROR("epicsConnectionHandler():"
+							<< " Not A String PV, Info Needed...");
+						ich->second.m_chan_state = INFO_NEEDED;
+					}
+
+					// Wake state machine
+					// XXX m_state_changed = true;
+					// XXX m_state_cond.notify_one();
+					// ==> Call PV Handler Directly...?
+					// (a la DeviceAgent::controlThread()...)
+					DEBUG("epicsConnectionHandler(): DO SOMETHING HERE");
+				}
+			}
+
+			else
+			{
+				DEBUG("epicsConnectionHandler():"
+					<< " Warning: chid=" << a_args.chid
+					<< " Not Found...!");
+			}
+		}
+
+		// Connection lost?
+		else if ( a_args.op == CA_OP_CONN_DOWN )
+		{
+			DEBUG("epicsConnectionHandler(): Connection Down...");
+
+			boost::unique_lock<boost::mutex> lock(ctrl->m_mutex);
+
+			std::map<chid,ChanInfo>::iterator ich =
+				ctrl->m_chan_info.find( a_args.chid );
+
+			if ( ich != ctrl->m_chan_info.end() )
+			{
+				DEBUG("epicsConnectionHandler(): Channel Disconnected"
+					<< " for External Primary " << ich->second.m_pv->m_name
+					<< " PV " << ich->second.m_pv->m_connection);
+
+				ich->second.m_connected = false;
+
+				std::string pvStr = "";
+				if ( ich->second.m_pv != NULL )
+				{
+					pvStr = " for External Primary "
+						+ ich->second.m_pv->m_name
+						+ " PV " + ich->second.m_pv->m_connection;
+				}
+
+				if ( ich->second.m_subscribed )
+				{
+					ERROR("epicsConnectionHandler():"
+						<< " Clearing subscription (Down?)" << pvStr);
+
+					// *** Prevent Deadlock with New EPICS Callback Guard!
+					lock.unlock();
+					ca_clear_subscription( ich->second.m_evid );
+					lock.lock();
+
+					ich->second.m_subscribed = false;
+				}
+
+				// Set var state to disconnected
+				ich->second.m_pv_state.m_status = epicsAlarmComm;
+				ich->second.m_pv_state.m_severity = epicsSevMajor;
+			}
+
+			else
+			{
+				DEBUG("epicsConnectionHandler():"
+					<< " Warning: chid=" << a_args.chid
+					<< " Not Found...!");
+			}
+		}
+	}
+	catch( std::exception &e )
+	{
+		ERROR("epicsConnectionHandler():" << " Exception!" << e.what());
+	}
+	catch(...)
+	{
+		ERROR("epicsConnectionHandler():" << " Unknown Exception!");
+	}
+}
+
+template<typename T>
+void
+SMSControl::updateState( const void *a_src, PVState &a_state )
+{
+	DEBUG("updateState():"
+		<< " a_src=0x" << std::hex << (long) a_src << std::dec
+		<< " a_src->stamp.secPastEpoch="
+			<< ((T*)a_src)->stamp.secPastEpoch
+		<< " a_src->stamp.nsec=" << ((T*)a_src)->stamp.nsec
+		<< " a_src->status=" << ((T*)a_src)->status
+		<< " a_src->severity=" << ((T*)a_src)->severity);
+
+    if ( ((T*)a_src)->stamp.secPastEpoch == 0 )
+    {
+        // Use a local timestamp if a valid timestamp has
+        // not yet been received
+        if ( a_state.m_time.sec == 0 )
+        {
+            a_state.m_time.sec = (uint32_t)time(0)
+				- ADARA::EPICS_EPOCH_OFFSET;
+            a_state.m_time.nsec = 0;
+        }
+    }
+    else
+    {
+        // It's *OK*" if the timestamp goes backwards, Let It Be! ;-D
+        // (always just pass the data through; maybe something else
+        // later on can sort it out... ;-)
+        a_state.m_time.sec = ((T*)a_src)->stamp.secPastEpoch;
+        a_state.m_time.nsec = ((T*)a_src)->stamp.nsec;
+    }
+
+    a_state.m_status = ((T*)a_src)->status;
+    a_state.m_severity = ((T*)a_src)->severity;
+}
+
+/**
+ * @brief Handles EPICS channel events
+ * @param a_args - EPICS callback arguments
+ *
+ * This method handles EPICS data and metadata channel events.
+ */
+void
+SMSControl::epicsEventHandler( struct event_handler_args a_args )
+{
+	DEBUG("epicsEventHandler():"
+		<< " a_args.type=" << a_args.type
+		<< " a_args.chid=" << a_args.chid
+		<< " a_args.status=" << a_args.status);
+
+	SMSControl *ctrl = SMSControl::m_singleton;
+
+	try
+	{
+		// Valid status / db record?
+		if ( a_args.status != ECA_NORMAL || a_args.dbr == 0 )
+			return;
+
+		// Data event?
+		if ( epicsIsTimeRecordType( a_args.type ) )
+		{
+			DEBUG("epicsEventHandler(): Data Event");
+
+			boost::lock_guard<boost::mutex> lock(ctrl->m_mutex);
+
+			// Valid EPICS channel?
+			std::map<chid,ChanInfo>::iterator ich =
+				ctrl->m_chan_info.find( a_args.chid );
+
+			if ( ich != ctrl->m_chan_info.end() )
+			{
+				DEBUG("epicsConnectionHandler(): Value Update"
+					<< " for External Primary " << ich->second.m_pv->m_name
+					<< " PV " << ich->second.m_pv->m_connection);
+
+				// Extract PV state from type-specific data structure
+				PVState &state = ich->second.m_pv_state;
+
+				std::string ckPvStr = "";
+				if ( ich->second.m_pv != NULL )
+				{
+					ckPvStr = " for External Primary "
+						+ ich->second.m_pv->m_name
+						+ " PV " + ich->second.m_pv->m_connection;
+				}
+
+				switch ( a_args.type )
+				{
+				case DBR_TIME_STRING:
+					state.m_str_val =
+						((struct dbr_time_string *)a_args.dbr)->value;
+					state.m_elem_count = a_args.count; // Always 1 String?
+					ctrl->updateState<struct dbr_time_string>(
+						a_args.dbr, state );
+					DEBUG("epicsEventHandler():"
+						<< " Got String PV Value Update" << ckPvStr
+						<< " state.m_str_val=[" << state.m_str_val << "]"
+						<< " state.m_elem_count=" << state.m_elem_count
+						<< " state.m_str_val.size()="
+							<< state.m_str_val.size());
+					break;
+				case DBR_TIME_SHORT:
+					// Could be Scalar Numerical Value
+					// -OR- Variable Length Numerical Array...!
+					//	-> Therefore, Set *Both* Value Fields...! ;-D
+					state.m_int_val = (int32_t)
+						((struct dbr_time_short *)a_args.dbr)->value;
+					state.m_elem_count = a_args.count;
+					if ( a_args.count > 1 ) // Minimum Array Size is 2...
+					{
+						state.m_short_array = new int16_t[a_args.count];
+						int16_t *values = (int16_t *)
+							&((struct dbr_time_short *)a_args.dbr)->value;
+						for ( uint32_t i=0 ; i < a_args.count ; i++ )
+						{
+							state.m_short_array[i] = values[i];
+						}
+					}
+					ctrl->updateState<struct dbr_time_short>(
+						a_args.dbr, state );
+					DEBUG("epicsEventHandler():"
+						<< " Got Short PV Value Update" << ckPvStr);
+					break;
+				case DBR_TIME_FLOAT:
+					// Could be Scalar Numerical Value
+					// -OR- Variable Length Numerical Array...!
+					//	-> Therefore, Set *Both* Value Fields...! ;-D
+					state.m_double_val = (double)
+						((struct dbr_time_float *)a_args.dbr)->value;
+					state.m_elem_count = a_args.count;
+					if ( a_args.count > 1 ) // Minimum Array Size is 2...
+					{
+						state.m_float_array = new float[a_args.count];
+						float *values = (float *)
+							&((struct dbr_time_float *)a_args.dbr)->value;
+						for ( uint32_t i=0 ; i < a_args.count ; i++ )
+						{
+							state.m_float_array[i] = values[i];
+						}
+					}
+					ctrl->updateState<struct dbr_time_float>(
+						a_args.dbr, state );
+					DEBUG("epicsEventHandler():"
+						<< " Got Float PV Value Update" << ckPvStr);
+					break;
+				case DBR_TIME_ENUM:
+					state.m_uint_val = (uint32_t)
+						((struct dbr_time_enum *)a_args.dbr)->value;
+					state.m_elem_count = a_args.count;
+					ctrl->updateState<struct dbr_time_enum>(
+						a_args.dbr, state );
+					DEBUG("epicsEventHandler():"
+						<< " Got Enum PV Value Update" << ckPvStr);
+					break;
+				case DBR_TIME_CHAR:
+					// Could be (Scalar Numerical) Character
+					// -OR- Variable Length Character String...!
+					//	-> Therefore, Set *Both* Value Fields...! ;-D
+					state.m_uint_val = (uint32_t)
+						((struct dbr_time_char *)a_args.dbr)->value;
+					state.m_str_val = (char *)
+						&((struct dbr_time_char *)a_args.dbr)->value;
+					state.m_elem_count = a_args.count;
+					ctrl->updateState<struct dbr_time_char>(
+						a_args.dbr, state );
+					// *** Trim String Value to Specified Length!!
+					if ( state.m_elem_count < state.m_str_val.size() )
+					{
+						DEBUG("epicsEventHandler():"
+							<< " Got Char PV Value Update TRIMMING LENGTH"
+							<< ckPvStr << " ORIG "
+							<< " state.m_str_val=["
+								<< state.m_str_val << "]"
+							<< " state.m_elem_count=" << state.m_elem_count
+							<< " state.m_str_val.size()="
+								<< state.m_str_val.size());
+						state.m_str_val.erase( state.m_elem_count );
+					}
+					DEBUG("epicsEventHandler():"
+						<< " Got Char PV Value Update" << ckPvStr
+						<< " state.m_str_val=["
+							<< state.m_str_val << "]"
+						<< " state.m_elem_count=" << state.m_elem_count
+						<< " state.m_str_val.size()="
+							<< state.m_str_val.size());
+					break;
+				case DBR_TIME_LONG:
+					// Could be Scalar Numerical Value
+					// -OR- Variable Length Numerical Array...!
+					//	-> Therefore, Set *Both* Value Fields...! ;-D
+					state.m_int_val = (int32_t)
+						((struct dbr_time_long *)a_args.dbr)->value;
+					state.m_elem_count = a_args.count;
+					if ( a_args.count > 1 ) // Minimum Array Size is 2...
+					{
+						state.m_long_array = new int32_t[a_args.count];
+						int32_t *values = (int32_t *)
+							&((struct dbr_time_long *)a_args.dbr)->value;
+						for ( uint32_t i=0 ; i < a_args.count ; i++ )
+						{
+							state.m_long_array[i] = values[i];
+						}
+					}
+					ctrl->updateState<struct dbr_time_long>(
+						a_args.dbr, state );
+					DEBUG("epicsEventHandler():"
+						<< " Got Long PV Value Update" << ckPvStr);
+					break;
+				case DBR_TIME_DOUBLE:
+					// Could be Scalar Numerical Value
+					// -OR- Variable Length Numerical Array...!
+					//	-> Therefore, Set *Both* Value Fields...! ;-D
+					state.m_double_val = (double)
+						((struct dbr_time_double *)a_args.dbr)->value;
+					state.m_elem_count = a_args.count;
+					if ( a_args.count > 1 ) // Minimum Array Size is 2...
+					{
+						state.m_double_array = new double[a_args.count];
+						double *values = (double *)
+							&((struct dbr_time_double *)a_args.dbr)->value;
+						for ( uint32_t i=0 ; i < a_args.count ; i++ )
+						{
+							state.m_double_array[i] = values[i];
+						}
+					}
+					ctrl->updateState<struct dbr_time_double>(
+						a_args.dbr, state );
+					DEBUG("epicsEventHandler():"
+						<< " Got Double PV Value Update" << ckPvStr);
+					break;
+				default:
+					break;
+				}
+			}
+
+			// Invalid EPICS Channel/Not Found...!
+			else
+			{
+				DEBUG("epicsEventHandler():"
+					<< " Error Looking Up EPICS Data Event,"
+					<< " Unknown Channel Id chid=" << a_args.chid);
+			}
+		}
+
+		// Metadata event?
+		else if ( epicsIsCtrlRecordType( a_args.type ) )
+		{
+			DEBUG("epicsEventHandler(): Meta-Data Event");
+
+			boost::lock_guard<boost::mutex> lock(ctrl->m_mutex);
+
+			// Valid EPICS channel?
+			std::map<chid,ChanInfo>::iterator ich =
+				ctrl->m_chan_info.find( a_args.chid );
+
+			if ( ich != ctrl->m_chan_info.end() )
+			{
+				DEBUG("epicsConnectionHandler(): Meta-Data Update"
+					<< " for External Primary " << ich->second.m_pv->m_name
+					<< " PV " << ich->second.m_pv->m_connection);
+
+				// Note EPICS does not define ctrl structs (or units)
+				// for string types...
+				// Extract units and/or enumeration values
+				switch ( a_args.type )
+				{
+				case DBR_CTRL_SHORT:
+					ich->second.m_ca_units =
+						((struct dbr_ctrl_short *)a_args.dbr)->units;
+					DEBUG("epicsEventHandler(): Short Units = "
+						<< ich->second.m_ca_units);
+					break;
+				case DBR_CTRL_FLOAT:
+					ich->second.m_ca_units =
+						((struct dbr_ctrl_float *)a_args.dbr)->units;
+					DEBUG("epicsEventHandler(): Float Units = "
+						<< ich->second.m_ca_units);
+					break;
+				case DBR_CTRL_CHAR:
+					ich->second.m_ca_units =
+						((struct dbr_ctrl_char *)a_args.dbr)->units;
+					DEBUG("epicsEventHandler(): Ctrl Units = "
+						<< ich->second.m_ca_units);
+					break;
+				case DBR_CTRL_LONG:
+					ich->second.m_ca_units =
+						((struct dbr_ctrl_long *)a_args.dbr)->units;
+					DEBUG("epicsEventHandler(): Long Units = "
+						<< ich->second.m_ca_units);
+					break;
+				case DBR_CTRL_DOUBLE:
+					ich->second.m_ca_units =
+						((struct dbr_ctrl_double *)a_args.dbr)->units;
+					DEBUG("epicsEventHandler(): Double Units = "
+						<< ich->second.m_ca_units);
+					break;
+				case DBR_CTRL_ENUM:
+					{
+					ich->second.m_ca_enum_vals.clear();
+					for ( int i = 0;
+							i < ((struct dbr_ctrl_enum *)a_args.dbr)
+								->no_str;
+							++i )
+						{
+						ich->second.m_ca_enum_vals[i] =
+							((struct dbr_ctrl_enum *)a_args.dbr)->strs[i];
+						DEBUG("epicsEventHandler(): Enum Val #" << i
+							<< " = " << ich->second.m_ca_enum_vals[i]);
+						}
+					break;
+					}
+				default:
+					DEBUG("epicsEventHandler(): Unknown Case - Ignored");
+					break;
+				}
+
+				// Bump state to INFO_AVAILABLE if it was pending
+				if ( ich->second.m_chan_state == INFO_PENDING )
+				{
+					ich->second.m_chan_state = INFO_AVAILABLE;
+
+					// Wake state machine
+					// XXX m_state_changed = true;
+					// XXX m_state_cond.notify_one();
+					// ==> Call PV Handler Directly...?
+					// (a la DeviceAgent::controlThread()...)
+					DEBUG("epicsEventHandler(): DO SOMETHING HERE");
+				}
+			}
+
+			// Invalid EPICS Channel/Not Found...!
+			else
+			{
+				DEBUG("epicsEventHandler():"
+					<< " Error Looking Up EPICS Metadata Event,"
+					<< " Unknown Channel Id chid=" << a_args.chid);
+			}
+		}
+	}
+	catch( std::exception &e )
+	{
+		ERROR("epicsConnectionHandler():" << " Exception!" << e.what());
+	}
+	catch(...)
+	{
+		ERROR("epicsConnectionHandler():" << " Unknown Exception!");
+	}
 }
 
 void SMSControl::addPV(PVSharedPtr pv)
@@ -3629,7 +4371,12 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 			//       -> so this should only check the PV once per hour...
 			//    - Otherwise, on SNS, this is like "once per minute"...
 			if ( !(++cnt % 3600) ) {
-				m_noRTDLPulses = m_pvNoRTDLPulses->value();
+				bool tmp = m_pvNoRTDLPulses->value();
+				if ( tmp != m_noRTDLPulses ) {
+					m_noRTDLPulses = tmp;
+					DEBUG("recordPulse(): Setting NoRTDLPulses to "
+						<< m_noRTDLPulses);
+				}
 			}
 
 			// Skip Error Logging if We Don't Expect Any RTDLs Anyway...

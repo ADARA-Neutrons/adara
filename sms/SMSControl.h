@@ -3,6 +3,9 @@
 
 #include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
+#include <boost/thread/mutex.hpp>
+#include <boost/thread/condition_variable.hpp>
+
 #include <stdint.h>
 #include <string>
 #include <map>
@@ -11,6 +14,7 @@
 #include <set>
 
 #include <casdef.h>
+#include <cadef.h>
 
 #include "ADARA.h"
 #include "ADARAUtils.h"
@@ -54,6 +58,274 @@ public:
 	pvExistReturn pvExistTest(const casCtx &, const caNetAddr &,
 				  const char *pv_name);
 	pvAttachReturn pvAttach(const casCtx &ctx, const char *pv_name);
+
+	// Borrowed from PVStreamer/common/CoreDefs.h for now...
+
+	enum PVType
+	{
+		PV_INT,
+		PV_UINT,
+		PV_REAL,
+		PV_ENUM,
+		PV_STR,
+		PV_INT_ARRAY,
+		PV_REAL_ARRAY
+	};
+
+	enum
+	{
+		EC_INVALID_OPERATION = 1,
+		EC_INVALID_PARAM,
+		EC_INVALID_CONFIG_DATA,
+		EC_SOCKET_ERROR,
+		EC_UNKOWN_ERROR,
+		EC_EPICS_API,
+		EC_WINDOWS_ERROR = 0x1000
+	};
+
+	// Borrowed from PVStreamer/common/Streamservice.h for now...
+
+	/// Timestamp associated with device activity and variable values
+	struct Timestamp
+	{
+		Timestamp() : sec(0), nsec(0) {}
+
+		uint32_t sec;
+		uint32_t nsec;
+	};
+
+	/// Holds last-known value and alarm state/severity
+	/// for a process variable
+	struct PVState
+	{
+		PVState()
+			: m_uint_val(0),
+			m_short_array(NULL), m_long_array(NULL),
+			m_float_array(NULL), m_double_array(NULL),
+			m_elem_count(0),
+			m_status(0), m_severity(0)
+		{}
+
+		PVState( int16_t a_status, int16_t a_severity )
+			: m_uint_val(0),
+			m_short_array(NULL), m_long_array(NULL),
+			m_float_array(NULL), m_double_array(NULL),
+			m_elem_count(0),
+			m_status(a_status), m_severity(a_severity)
+		{}
+
+		PVState( const PVState & a_state )
+			// Copy *Double*, Covers Union...
+			: m_double_val(a_state.m_double_val),
+			m_str_val(a_state.m_str_val),
+			m_short_array(NULL), m_long_array(NULL),
+			m_float_array(NULL), m_double_array(NULL),
+			m_elem_count(a_state.m_elem_count), m_time(a_state.m_time),
+			m_status(a_state.m_status), m_severity(a_state.m_severity)
+		{
+			// Don't Allocate Anything if there are No Elements...
+			// (Minimum Array Size is 2! :-)
+			if ( m_elem_count > 1 )
+			{
+				if ( a_state.m_short_array != NULL )
+				{
+					m_short_array = new int16_t[m_elem_count];
+					memcpy( m_short_array,
+						a_state.m_short_array,
+						m_elem_count * sizeof(int16_t) );
+				}
+				if ( a_state.m_long_array != NULL )
+				{
+					m_long_array = new int32_t[m_elem_count];
+					memcpy( m_long_array,
+						a_state.m_long_array,
+						m_elem_count * sizeof(int32_t) );
+				}
+				if ( a_state.m_float_array != NULL )
+				{
+					m_float_array = new float[m_elem_count];
+					memcpy( m_float_array,
+						a_state.m_float_array,
+						m_elem_count * sizeof(float) );
+				}
+				if ( a_state.m_double_array != NULL )
+				{
+					m_double_array = new double[m_elem_count];
+					memcpy( m_double_array,
+						a_state.m_double_array,
+						m_elem_count * sizeof(double) );
+				}
+			}
+		}
+
+		~PVState()
+		{
+			delete[] m_short_array;
+			delete[] m_long_array;
+			delete[] m_float_array;
+			delete[] m_double_array;
+		}
+
+    	PVState& operator=( const PVState & a_state )
+    	{
+        	// Free & Null Out Any Existing Numerical Arrays...
+        	delete[] m_short_array;
+        	m_short_array = (int16_t *) NULL;
+        	delete[] m_long_array;
+        	m_long_array = (int32_t *) NULL;
+        	delete[] m_float_array;
+        	m_float_array = (float *) NULL;
+        	delete[] m_double_array;
+        	m_double_array = (double *) NULL;
+
+        	// Copy Scalar Fields...
+			// (Copy *Double*, Covers Union!)
+        	m_double_val = a_state.m_double_val;
+        	m_str_val = a_state.m_str_val;
+        	m_elem_count = a_state.m_elem_count;
+        	m_time = a_state.m_time;
+        	m_status = a_state.m_status;
+        	m_severity = a_state.m_severity;
+
+        	// Don't Allocate Anything if there are No Elements...
+        	// (Minimum Array Size is 2! :-)
+        	if ( m_elem_count > 1 )
+        	{
+            	if ( a_state.m_short_array != NULL )
+            	{
+                	m_short_array = new int16_t[m_elem_count];
+                	memcpy( m_short_array,
+                    	a_state.m_short_array,
+						m_elem_count * sizeof(int16_t) );
+            	}
+            	if ( a_state.m_long_array != NULL )
+            	{
+                	m_long_array = new int32_t[m_elem_count];
+                	memcpy( m_long_array,
+                    	a_state.m_long_array,
+						m_elem_count * sizeof(int32_t) );
+            	}
+            	if ( a_state.m_float_array != NULL )
+            	{
+                	m_float_array = new float[m_elem_count];
+                	memcpy( m_float_array,
+                    	a_state.m_float_array,
+						m_elem_count * sizeof(float) );
+            	}
+            	if ( a_state.m_double_array != NULL )
+            	{
+                	m_double_array = new double[m_elem_count];
+                	memcpy( m_double_array,
+                    	a_state.m_double_array,
+						m_elem_count * sizeof(double) );
+            	}
+        	}
+        	return *this;
+    	}
+
+    	union
+    	{
+        	uint32_t m_uint_val;   ///< Used for both uint and enum types
+        	int32_t m_int_val;
+        	double m_double_val;
+    	};
+    	std::string m_str_val;
+
+    	int16_t *m_short_array;
+    	int32_t *m_long_array;
+    	float *m_float_array;
+    	double *m_double_array;
+
+    	uint32_t m_elem_count;
+    	Timestamp m_time;
+    	int16_t m_status;       ///< EPICS alarm code
+    	int16_t m_severity;     ///< EPICS severity code
+	};
+
+	// SMSControl-specific External EPICS PV Types...
+
+	struct ExternalPV {
+		ExternalPV(std::string name, std::string connection, PVType type)
+			: m_name(name), m_connection(connection), m_type(type),
+			m_elem_count(0)
+		{ }
+
+		std::string m_name;
+		std::string m_connection;
+		PVType m_type;
+		uint32_t m_elem_count;
+		std::string m_units;
+	};
+
+	typedef boost::shared_ptr<ExternalPV> ExternalPVPtr;
+
+	ExternalPVPtr m_extRecordingPV;
+	ExternalPVPtr m_extRunNumberPV;
+	ExternalPVPtr m_extPausedPV;
+
+	// Borrowed from PVStreamer/epics/EPICS_DeviceAgent.h for now...
+
+	enum ChanState
+	{
+		UNINITIALIZED = 0,
+		INFO_NEEDED,
+		INFO_PENDING,
+		INFO_AVAILABLE,
+		READY
+	};
+
+	struct ChanInfo
+	{
+		ChanInfo()
+			: m_chid(0), m_evid(0),
+			m_chan_state(UNINITIALIZED), m_connected(false),
+			m_subscribed(false)
+		{}
+
+		ExternalPVPtr m_pv;
+		chid m_chid;
+		evid m_evid;
+		ChanState m_chan_state;
+		PVState m_pv_state;
+		bool m_connected;
+		bool m_subscribed;
+		unsigned long m_ca_type;
+		unsigned long m_ca_elem_count;
+		std::string m_ca_units;
+		std::map<int32_t,std::string> m_ca_enum_vals;
+	};
+
+	boost::mutex m_mutex; // Mutex for EPICS Thread Locking...
+
+	static int32_t epicsToTimeRecordType( uint32_t a_rec_type );
+
+	static bool epicsIsTimeRecordType( uint32_t a_rec_type );
+	static bool epicsIsCtrlRecordType( uint32_t a_rec_type );
+
+	// PV channel ID to channel info map
+	std::map<chid,ChanInfo> m_chan_info;
+
+	// PV connection to channel id map
+	std::map<std::string,chid> m_pv_index;
+
+	// External EPICS PV Subscription Methods
+
+	void subscribePV( ExternalPVPtr pv );
+	void unsubscribePV( ExternalPVPtr pv,
+		boost::unique_lock<boost::mutex> & lock );
+
+	void subscribeToPrimaryPVs( std::string PrimaryPVPrefix );
+	void unsubscribePrimaryPVs(void);
+
+	static void epicsConnectionHandler(
+		struct connection_handler_args a_args );
+
+	template<typename T>
+	void updateState( const void *a_src, PVState &a_state );
+
+	static void epicsEventHandler( struct event_handler_args a_args );
+
+	// SMSControl Internal PVs...
 	void addPV(PVSharedPtr pv);
 
 	static SMSControl *getInstance(void) { return m_singleton; }
