@@ -212,6 +212,15 @@ option_label[$num_options]="[Save Input Stream]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
+option_name[$num_options]="alt_primary_pv_prefix"
+option_pv[$num_options]="AltPrimaryPVPrefix"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(Alternate Primary SMS PV Prefix.)"
+option_default[$num_options]="(unset)"
+option_label[$num_options]="[Alternate Primary PV Prefix]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
 option_name[$num_options]="no_eop_pulse_buffer_size"
 option_pv[$num_options]="Control:NoEoPPulseBufferSize"
 option_value_type[$num_options]="UINT32_VALUE(pulses)"
@@ -1436,6 +1445,12 @@ if [[ "$command" == "status" \
 		caget -a -S $WAIT ${PRE}:${SMS}:Version \
 			| sed -e "s/ 2/   2/" -e "s/SMSD/ SMSD/" -e "s/ (/\n   (/" \
 				-e "s/[[:space:]]*$//"
+
+		echo
+
+		caget $WAIT ${PRE}:${SMS}:InstanceId
+
+		caget -a -S $WAIT ${PRE}:${SMS}:AltPrimaryPVPrefix
 
 		echo
 
