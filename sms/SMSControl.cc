@@ -1361,8 +1361,11 @@ void SMSControl::unsubscribePV( ExternalPVPtr pv,
 		<< pv->m_name << " PV with Connection String "
 		<< pv->m_connection);
 
-	// TODO: Unregister Any Ready Adapter for PV Channel...???
+	// Unregister Any Ready Adapter for PV Channel...???
 	// Only if No Open EPICS PV Channels Yet Exist...??? ;-D
+	// Nope, as it happens, ca_add_fd_registration() only ever
+	// returns *1* Pseudo Channel Access File Descriptor (After R3.14),
+	// so we *Don't* need to Unregister/Reregister a ReadyAdapter. ;-D
 
 	// Unsubscribe from PV Channel...
 
