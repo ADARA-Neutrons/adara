@@ -1820,6 +1820,224 @@ SMSControl::updateState( const void *a_src, PVState &a_state )
     a_state.m_severity = ((T*)a_src)->severity;
 }
 
+uint32_t
+SMSControl::uint32ValueOf( PVType a_type, PVState &a_state )
+{
+	uint32_t uint_val = 0;
+
+    switch ( a_type )
+    {
+    case PV_ENUM:
+    case PV_UINT:
+		return a_state.m_uint_val;
+        break;
+
+    case PV_INT:
+		return (uint32_t) a_state.m_int_val;
+        break;
+
+    case PV_REAL:
+		return (uint32_t) a_state.m_double_val;
+        break;
+
+    case PV_STR:
+		// Just Try to Lexical Cast the String into an Unsigned Int... ;-b
+		uint_val =
+			boost::lexical_cast<uint32_t>( a_state.m_str_val.c_str() );
+		ERROR("uint32ValueOf(): Warning: Converted String PV to UInt32"
+			<< " [" << a_state.m_str_val << "] -> [" << uint_val << "]");
+		return uint_val;
+		break;
+
+    case PV_INT_ARRAY:
+		// Meh, Just Return First Array Element (If Any)... ;-b
+		if ( a_state.m_elem_count > 0 )
+		{
+        	if ( a_state.m_short_array != NULL )
+			{
+				uint_val = (uint32_t) a_state.m_short_array[0];
+				ERROR("uint32ValueOf(): Warning:"
+					<< " Using First Value of Short Integer Array PV: "
+					<< "[" << uint_val << "]");
+			}
+			else if ( a_state.m_long_array != NULL )
+			{
+				uint_val = (uint32_t) a_state.m_long_array[0];
+				ERROR("uint32ValueOf(): Warning:"
+					<< " Using First Value of Long Integer Array PV: "
+					<< "[" << uint_val << "]");
+			}
+			else
+			{
+				uint_val = 0;
+				ERROR("uint32ValueOf():"
+					<< " Missing Integer Array Data for PV!"
+					<< " Returning 0.");
+			}
+		}
+		else
+		{
+			uint_val = 0;
+			ERROR("uint32ValueOf():"
+				<< " No Integer Array Data Elements for PV!"
+				<< " Returning 0.");
+		}
+		return uint_val;
+		break;
+
+    case PV_REAL_ARRAY:
+		// Meh, Just Return First Array Element (If Any)... ;-b
+		if ( a_state.m_elem_count > 0 )
+		{
+        	if ( a_state.m_float_array != NULL )
+			{
+				uint_val = (uint32_t) a_state.m_float_array[0];
+				ERROR("uint32ValueOf(): Warning:"
+					<< " Using First Value of Float Array PV: "
+					<< "[" << uint_val << "]");
+			}
+			else if ( a_state.m_double_array != NULL )
+			{
+				uint_val = (uint32_t) a_state.m_double_array[0];
+				ERROR("uint32ValueOf(): Warning:"
+					<< " Using First Value of Double Array PV: "
+					<< "[" << uint_val << "]");
+			}
+			else
+			{
+				uint_val = 0;
+				ERROR("uint32ValueOf():"
+					<< " Missing Real Array Data for PV!"
+					<< " Returning 0.");
+			}
+		}
+		else
+		{
+			uint_val = 0;
+			ERROR("uint32ValueOf():"
+				<< " No Real Array Data Elements for PV!"
+				<< " Returning 0.");
+		}
+		return uint_val;
+		break;
+    }
+
+	// Never Use This... ;-D
+	return uint_val;
+}
+
+bool
+SMSControl::boolValueOf( PVType a_type, PVState &a_state )
+{
+	bool bool_val = false;
+
+    switch ( a_type )
+    {
+    case PV_ENUM:
+    case PV_UINT:
+		return( a_state.m_uint_val != 0 );
+        break;
+
+    case PV_INT:
+		return( a_state.m_int_val != 0 );
+        break;
+
+    case PV_REAL:
+		return( approximatelyEqual( a_state.m_double_val, 0.0, 0.0001 ) );
+        break;
+
+    case PV_STR:
+		// Just Try to Lexical Cast the String into an Unsigned Int... ;-b
+		bool_val =
+			boost::lexical_cast<bool>( a_state.m_str_val.c_str() );
+		ERROR("boolValueOf(): Warning: Converted String PV to Bool"
+			<< " [" << a_state.m_str_val << "] -> [" << bool_val << "]");
+		return bool_val;
+		break;
+
+    case PV_INT_ARRAY:
+		// Meh, Just Return First Array Element (If Any)... ;-b
+		if ( a_state.m_elem_count > 0 )
+		{
+        	if ( a_state.m_short_array != NULL )
+			{
+				bool_val = (bool) a_state.m_short_array[0];
+				ERROR("boolValueOf(): Warning:"
+					<< " Using First Value of Short Integer Array PV:"
+					<< " [" << a_state.m_short_array[0] << "] ->"
+					<< " [" << bool_val << "]");
+			}
+			else if ( a_state.m_long_array != NULL )
+			{
+				bool_val = (bool) a_state.m_long_array[0];
+				ERROR("boolValueOf(): Warning:"
+					<< " Using First Value of Long Integer Array PV:"
+					<< " [" << a_state.m_long_array[0] << "] ->"
+					<< " [" << bool_val << "]");
+			}
+			else
+			{
+				bool_val = false;
+				ERROR("boolValueOf():"
+					<< " Missing Integer Array Data for PV!"
+					<< " Returning False.");
+			}
+		}
+		else
+		{
+			bool_val = false;
+			ERROR("boolValueOf():"
+				<< " No Integer Array Data Elements for PV!"
+				<< " Returning False.");
+		}
+		return bool_val;
+		break;
+
+    case PV_REAL_ARRAY:
+		// Meh, Just Return First Array Element (If Any)... ;-b
+		if ( a_state.m_elem_count > 0 )
+		{
+        	if ( a_state.m_float_array != NULL )
+			{
+				bool_val = approximatelyEqual( a_state.m_float_array[0],
+					0.0, 0.0001 );
+				ERROR("boolValueOf(): Warning:"
+					<< " Using First Value of Float Array PV:"
+					<< " [" << a_state.m_float_array[0] << "] ->"
+					<< " [" << bool_val << "]");
+			}
+			else if ( a_state.m_double_array != NULL )
+			{
+				bool_val = approximatelyEqual( a_state.m_double_array[0],
+					0.0, 0.0001 );
+				ERROR("boolValueOf(): Warning:"
+					<< " Using First Value of Double Array PV:"
+					<< " [" << a_state.m_double_array[0] << "] ->"
+					<< " [" << bool_val << "]");
+			}
+			else
+			{
+				bool_val = false;
+				ERROR("boolValueOf():"
+					<< " Missing Real Array Data for PV!"
+					<< " Returning False.");
+			}
+		}
+		else
+		{
+			bool_val = false;
+			ERROR("boolValueOf():"
+				<< " No Real Array Data Elements for PV!"
+				<< " Returning False.");
+		}
+		return bool_val;
+		break;
+    }
+
+	// Never Use This... ;-D
+	return bool_val;
+}
+
 /**
  * @brief Handles EPICS channel events
  * @param a_args - EPICS callback arguments
@@ -2045,35 +2263,126 @@ SMSControl::epicsEventHandler( struct event_handler_args a_args )
 				{
 					DEBUG("epicsEventHandler():"
 						<< " State Changed" << ckPvStr);
-					
+
+					// Wallclock Time...!
+					struct timespec ts;
+
+					ts.tv_sec = state.m_time.sec
+						+ ADARA::EPICS_EPOCH_OFFSET;
+					ts.tv_nsec = state.m_time.nsec;
+
 					// Recording PV
 					if ( !std::string("Recording").compare(
 							ich->second.m_pv->m_name ) )
 					{
 						DEBUG("epicsEventHandler():"
 							<< " RECORDING PV CHANGED");
+
+						bool recording = ctrl->boolValueOf(
+							ich->second.m_pv->m_type, state );
+
+						DEBUG("epicsEventHandler():"
+							<< "External PV Setting Recording to "
+							<< recording << " at "
+							<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
+							<< "." << std::setfill('0') << std::setw(9)
+							<< ts.tv_nsec);
+
+						bool status;
+
+						if ( recording )
+						{
+							// Do We Need to "Force" Here...???
+							status = ctrl->setRecording( true, &ts );
+								// Wallclock Time...!
+
+							if ( !status )
+							{
+								ERROR(
+									( ctrl->m_recording
+										? "[RECORDING] " : "" )
+									<< "epicsEventHandler():"
+									<< " External PV \"Run Start\""
+									<< " Command Failed!");
+							}
+						}
+
+						else
+						{
+							// Do We Need to "Force" Here...???
+							status = ctrl->setRecording( false, &ts );
+								// Wallclock Time...!
+
+							if ( !status )
+							{
+								ERROR(
+									( ctrl->m_recording
+										? "[RECORDING] " : "" )
+									<< "epicsEventHandler():"
+									<< " External PV \"Run Stop\""
+									<< " Command Failed!");
+							}
+						}
 					}
+
 					// RunNumber PV
 					else if ( !std::string("RunNumber").compare(
 							ich->second.m_pv->m_name ) )
 					{
 						DEBUG("epicsEventHandler():"
 							<< " RUNNUMBER PV CHANGED");
+
+						// This One's Easy, Just Sneak External RunNumber
+						// Value into SMSControl's "Next Run Number"...!
+						ctrl->m_nextRunNumber = ctrl->uint32ValueOf(
+							ich->second.m_pv->m_type, state );
+
+						DEBUG("epicsEventHandler():"
+							<< "External PV Setting RunNumber to "
+							<< ctrl->m_nextRunNumber << " at "
+							<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
+							<< "." << std::setfill('0') << std::setw(9)
+							<< ts.tv_nsec);
 					}
-					// Recording PV
+
+					// Paused PV
 					else if ( !std::string("Paused").compare(
 							ich->second.m_pv->m_name ) )
 					{
 						DEBUG("epicsEventHandler():"
 							<< " PAUSED PV CHANGED");
+
+						bool paused = ctrl->boolValueOf(
+							ich->second.m_pv->m_type, state );
+
+						DEBUG("epicsEventHandler():"
+							<< "External PV Setting Paused Mode to "
+							<< paused << " at "
+							<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
+							<< "." << std::setfill('0') << std::setw(9)
+							<< ts.tv_nsec);
+
+						if ( paused )
+						{
+							ctrl->pauseRecording( &ts ); // Wallclock Time
+						}
+						else
+						{
+							ctrl->resumeRecording( &ts ); // Wallclock Time
+						}
 					}
+
 					// Unknown PV Name...
 					else
 					{
 						DEBUG("epicsEventHandler():"
 							<< " UNKNOWN ["
 							<< ich->second.m_pv->m_name
-							<< "] PV CHANGED - Ignoring...");
+							<< "] PV CHANGED at "
+							<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
+							<< "." << std::setfill('0') << std::setw(9)
+							<< ts.tv_nsec
+							<< " - Ignoring...");
 					}
 				}
 			}
@@ -2579,7 +2888,7 @@ void SMSControl::externalRunControl( struct timespec *ts,
 			<< " External RunControl \"Run Start\" Command Received,"
 			<< ss.str() );
 
-		status = setRecording( true, ts );
+		status = setRecording( true, ts ); // Wallclock Time...!
 
 		if ( !status )
 		{
@@ -2598,7 +2907,7 @@ void SMSControl::externalRunControl( struct timespec *ts,
 			<< " External RunControl \"Run Stop\" Command Received,"
 			<< ss.str() );
 
-		status = setRecording( false, ts );
+		status = setRecording( false, ts ); // Wallclock Time...!
 
 		if ( !status )
 		{

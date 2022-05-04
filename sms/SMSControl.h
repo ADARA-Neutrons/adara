@@ -330,6 +330,9 @@ public:
 	template<typename T>
 	void updateState( const void *a_src, PVState &a_state );
 
+	uint32_t uint32ValueOf( PVType a_type, PVState &a_state );
+	bool boolValueOf( PVType a_type, PVState &a_state );
+
 	static void epicsEventHandler( struct event_handler_args a_args );
 
 	// SMSControl Internal PVs...
@@ -697,7 +700,7 @@ private:
 	void addSources(const boost::property_tree::ptree &conf);
 	void addSource(const std::string &name,
 				const boost::property_tree::ptree &info, bool enabled);
-	bool setRecording(bool val, struct timespec *ts);
+	bool setRecording(bool val, struct timespec *ts); // Wallclock Time...!
 
 	PulseMap::iterator getPulse(uint64_t id, uint32_t dup);
 	void correctPChargeVeto(PulsePtr &pulse, PulsePtr &next_pulse);
