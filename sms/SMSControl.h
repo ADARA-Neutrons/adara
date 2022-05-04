@@ -19,6 +19,7 @@
 #include "ADARA.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
+#include "ReadyAdapter.h"
 #include "Storage.h"
 
 class smsStringPV;
@@ -263,6 +264,8 @@ public:
 	ExternalPVPtr m_extRunNumberPV;
 	ExternalPVPtr m_extPausedPV;
 
+	static ReadyAdapter *m_fdregChannelAccess;
+
 	// Borrowed from PVStreamer/epics/EPICS_DeviceAgent.h for now...
 
 	enum ChanState
@@ -298,9 +301,13 @@ public:
 	boost::mutex m_mutex; // Mutex for EPICS Thread Locking...
 
 	static int32_t epicsToTimeRecordType( uint32_t a_rec_type );
+	static int32_t epicsToCtrlRecordType( uint32_t a_rec_type );
 
 	static bool epicsIsTimeRecordType( uint32_t a_rec_type );
 	static bool epicsIsCtrlRecordType( uint32_t a_rec_type );
+
+	static PVType epicsToPVType(
+		uint32_t a_rec_type, uint32_t a_elem_count );
 
 	// PV channel ID to channel info map
 	std::map<chid,ChanInfo> m_chan_info;
