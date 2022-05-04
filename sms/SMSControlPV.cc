@@ -504,7 +504,7 @@ caStatus smsRecordingPV::write(const casCtx &UNUSED(ctx), const gdd &val)
 		return S_casApp_noSupport;
 	}
 
-	if (m_ctrl->setRecording(v, &ts)) {
+	if (m_ctrl->setRecording(v, &ts)) {  // Wallclock Time...!
 		// Note: SMSControl::setRecording() calls
 		// smsRecordingPV::update() on success,
 		// which handles the notify() and changed()... :-D
