@@ -1638,7 +1638,7 @@ SMSControl::epicsEventHandler( struct event_handler_args a_args )
 
 			if ( ich != ctrl->m_chan_info.end() )
 			{
-				DEBUG("epicsConnectionHandler(): Value Update"
+				DEBUG("epicsEventHandler(): Value Update"
 					<< " for External Primary " << ich->second.m_pv->m_name
 					<< " PV " << ich->second.m_pv->m_connection);
 
@@ -1824,7 +1824,7 @@ SMSControl::epicsEventHandler( struct event_handler_args a_args )
 
 			if ( ich != ctrl->m_chan_info.end() )
 			{
-				DEBUG("epicsConnectionHandler(): Meta-Data Update"
+				DEBUG("epicsEventHandler(): Meta-Data Update"
 					<< " for External Primary " << ich->second.m_pv->m_name
 					<< " PV " << ich->second.m_pv->m_connection);
 
@@ -1908,11 +1908,11 @@ SMSControl::epicsEventHandler( struct event_handler_args a_args )
 	}
 	catch( std::exception &e )
 	{
-		ERROR("epicsConnectionHandler():" << " Exception!" << e.what());
+		ERROR("epicsEventHandler():" << " Exception!" << e.what());
 	}
 	catch(...)
 	{
-		ERROR("epicsConnectionHandler():" << " Unknown Exception!");
+		ERROR("epicsEventHandler():" << " Unknown Exception!");
 	}
 }
 
