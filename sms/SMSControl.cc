@@ -2338,7 +2338,7 @@ SMSControl::epicsEventHandler( struct event_handler_args a_args )
 							ich->second.m_pv->m_type, state );
 
 						DEBUG("epicsEventHandler():"
-							<< "External PV Setting RunNumber to "
+							<< "External PV Setting NEXT RunNumber to "
 							<< ctrl->m_nextRunNumber << " at "
 							<< ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET
 							<< "." << std::setfill('0') << std::setw(9)
@@ -2362,14 +2362,23 @@ SMSControl::epicsEventHandler( struct event_handler_args a_args )
 							<< "." << std::setfill('0') << std::setw(9)
 							<< ts.tv_nsec);
 
+						boost::shared_ptr<Markers> markers =
+							ctrl->getMarkers();
+
 						if ( paused )
 						{
-							ctrl->pauseRecording( &ts ); // Wallclock Time
+							markers->pause( &ts ); // Wallclock Time
 						}
 						else
 						{
-							ctrl->resumeRecording( &ts ); // Wallclock Time
+							markers->resume( &ts ); // Wallclock Time
 						}
+
+						// Also Update Regular SMS Paused PV State...
+						// Note: MarkerPausedPV Update Doesn't Call
+						// the "changed()" method... ;-D
+						markers->updatePausedPV( paused, &ts );
+							// Wallclock Time...!
 					}
 
 					// Unknown PV Name...
