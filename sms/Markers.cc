@@ -482,6 +482,12 @@ void Markers::resume( struct timespec *ts, // Wallclock Time...!
 	}
 }
 
+// Public Method for Setting Local MarkerPausePV Class Instance... ;-D
+void Markers::updatePausedPV( bool paused, struct timespec *ts )
+{
+	m_pausedPV->update( paused, ts ); // Wallclock Time...!
+}
+
 void Markers::startScan( struct timespec *ts, // Wallclock Time...!
 		PassThru passthru, uint32_t pt_scanIndex, std::string pt_comment )
 {

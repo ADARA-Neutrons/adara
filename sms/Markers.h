@@ -64,6 +64,8 @@ public:
 		uint32_t pt_scanIndex = -1, std::string pt_comment = "" );
 		// DEPRECATED
 
+	void updatePausedPV( bool paused, struct timespec *ts );
+
 private:
 	boost::shared_ptr<MarkerPausedPV> m_pausedPV;
 	boost::shared_ptr<smsStringPV> m_commentPV;
