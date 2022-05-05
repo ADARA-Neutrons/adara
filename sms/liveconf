@@ -943,36 +943,46 @@ if [ ${SMS_ID} == "[NotSet]" ]; then
 
 	iid_ck=`grep "instance_id" $SMSD_CONFIG | grep -v ';' \
 		| wc | awk '{print $1}'`
-	if [[ "#$iid_ck#" != '#1#' ]]; then
-		echo -e -n "$introOutput"
-		echo -e "Error: Invalid SMS Instance Id in SMSD Config File!\n"
-		ls -l $SMSD_CONFIG
-		echo
-		grep -e "instance_id" $SMSD_CONFIG | grep -v ';'
-		exit -94
+
+	# If Instance Id is _Not_ Specified, Assume "Primary" SMS...
+	if [[ "#$iid_ck#" == '#0#' ]]; then
+
+		SMS_ID="0"
+
+		addToIntroOutput \
+			"Assuming Primary SMS Instance, No Id in SMSD Config File:\n" \
+			"   $SMSD_CONFIG\n" \
+			"      -> No \"instance_id\" Key.\n" \
+			"         => [${SMS_ID}].\n" \
+			"\n"
+	
+	# Extract SMS Instance Id from SMSD Config File...
+	else
+
+		iid_clean=`grep "instance_id" $SMSD_CONFIG | grep -v ';' \
+			| awk '{print $1$2$3}'`
+
+		iid_key=`echo "$iid_clean" | awk -F '=' '{print $1}'`
+		iid_value=`echo "$iid_clean" | awk -F '=' '{print $2}'`
+
+		if [[ "#$iid_key#" != '#instance_id#' ]]; then
+			echo -e -n "$introOutput"
+			echo -e "Error Parsing SMS Instance Id in SMSD Config File!\n"
+			ls -l $SMSD_CONFIG
+			echo -e "\n   $iid_clean\n"
+			exit -95
+		fi
+
+		SMS_ID="$iid_value"
+
+		addToIntroOutput \
+			"Setting SMS Instance Id from SMSD Config File:\n" \
+			"   $SMSD_CONFIG\n" \
+			"      -> $iid_key = $iid_value\n" \
+			"         => [${SMS_ID}].\n" \
+			"\n"
+
 	fi
-
-	iid_clean=`grep "instance_id" $SMSD_CONFIG | grep -v ';' \
-		| awk '{print $1$2$3}'`
-
-	iid_key=`echo "$iid_clean" | awk -F '=' '{print $1}'`
-	iid_value=`echo "$iid_clean" | awk -F '=' '{print $2}'`
-
-	if [[ "#$iid_key#" != '#instance_id#' ]]; then
-		echo -e -n "$introOutput"
-		echo -e "Error Parsing SMS Instance Id in SMSD Config File!\n"
-		ls -l $SMSD_CONFIG
-		echo -e "\n   $iid_clean\n"
-		exit -95
-	fi
-
-	SMS_ID="$iid_value"
-
-	addToIntroOutput "Setting SMS Instance Id from SMSD Config File:\n" \
-		"   $SMSD_CONFIG\n" \
-		"      -> $iid_key = $iid_value\n" \
-		"         => [${SMS_ID}].\n" \
-		"\n"
 
 fi
 
