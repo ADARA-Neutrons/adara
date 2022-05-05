@@ -22,7 +22,8 @@ STC2_OLD="sns-stc2.sns.gov"
 
 STC_OLD="${STC1_OLD} ${STC2_OLD}"
 
-STC_ALL="${STC_NEW} ${STC_OLD}"
+STC_ALL="${STC_NEW}"
+# Removed ${STC_OLD}, They're Gone... 5/5/2022
 
 STCVIEW="/SNS/users/y8y/stuff/exec/stcview"
 
@@ -122,9 +123,9 @@ for arg in "$@" ; do
 		echo -e "\nAdding Old STC2 Host to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc-old#' ]]; then
 		STC_HOSTS="${STC_HOSTS} ${STC_OLD}"
-		echo -e "\nAdding OLD STCs to Hosts List:\n\n[${STC_HOSTS} ]"
+		echo -e "\nAdding All Old STCs to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc-all#' ]]; then
-		STC_HOSTS="${STC_HOSTS} ${STC_NEW} ${STC_OLD}"
+		STC_HOSTS="${STC_HOSTS} ${STC_ALL}"
 		echo -e "\nAdding All STCs to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--all#' ]]; then
 		DO_ALL_LOGS=1
@@ -164,7 +165,7 @@ for arg in "$@" ; do
 done
 
 if [[ -z ${STC_HOSTS} ]]; then
-	STC_HOSTS="${STC_HOSTS} ${STC_NEW} ${STC_OLD}"
+	STC_HOSTS="${STC_HOSTS} ${STC_ALL}"
 	echo -e "\nDefaulting to All STCs in Hosts List:\n\n[${STC_HOSTS} ]"
 fi
 
