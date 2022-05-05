@@ -33,6 +33,7 @@ class PopPulseBufferPV;
 class LogLevelPV;
 class VersionPV;
 class InstanceIdPV;
+class PVPrefixPV;
 class CleanShutdownPV;
 class RunInfo;
 class Geometry;
@@ -246,6 +247,7 @@ public:
 	// SMSControl-specific External EPICS PV Types...
 
 	struct ExternalPV {
+
 		ExternalPV(std::string name, std::string connection, PVType type)
 			: m_name(name), m_connection(connection), m_type(type),
 			m_elem_count(0)
@@ -344,7 +346,13 @@ public:
 
 	std::string getBeamlineId(void) { return m_beamlineId; }
 
+	uint32_t getInstanceId(void) { return m_instanceId; }
+
 	std::string getPVPrefix(void) { return m_pvPrefix; }
+
+	std::string getPrimaryPVPrefix(void) { return m_primaryPVPrefix; }
+	void setPrimaryPVPrefix( std::string PrimaryPVPrefix )
+		{ m_primaryPVPrefix = PrimaryPVPrefix; }
 
 	void sourceUp(uint32_t srcId);
 	void sourceDown(uint32_t srcId, bool stateChanged);
@@ -538,7 +546,7 @@ private:
 
 	boost::shared_ptr<InstanceIdPV> m_pvInstanceId;
 
-	boost::shared_ptr<smsStringPV> m_pvAltPrimaryPVPrefix;
+	boost::shared_ptr<PVPrefixPV> m_pvAltPrimaryPVPrefix;
 
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
@@ -622,6 +630,8 @@ private:
 	static uint32_t m_instanceId;
 
 	static std::string m_pvPrefix;
+
+	static std::string m_primaryPVPrefix;
 
 	static std::string m_altPrimaryPVPrefix;
 

@@ -72,6 +72,8 @@ uint32_t SMSControl::m_instanceId;
 
 std::string SMSControl::m_pvPrefix;
 
+std::string SMSControl::m_primaryPVPrefix;
+
 std::string SMSControl::m_altPrimaryPVPrefix;
 
 uint32_t SMSControl::m_noEoPPulseBufferSize;
@@ -215,6 +217,102 @@ public:
 	{
 		return false;
 	}
+};
+
+// "PV Prefix" PV Class for "ParADARA", Trigger Re-Subscribe on Change
+class PVPrefixPV : public smsStringPV {
+public:
+	PVPrefixPV(const std::string &name, bool auto_save = false) :
+		smsStringPV(name, auto_save), m_auto_save(auto_save) {}
+
+	void changed(void)
+	{
+		std::string new_pv_prefix = value();
+
+		INFO("PVPrefixPV: PV " << m_pv_name
+			<< " set to " << new_pv_prefix);
+
+		if ( m_auto_save && !m_first_set )
+		{
+			// AutoSave PV Value Change...
+			struct timespec ts;
+			m_value->getTimeStamp(&ts);
+			StorageManager::autoSavePV( m_pv_name, new_pv_prefix, &ts );
+		}
+
+		SMSControl *ctrl = SMSControl::getInstance();
+
+		// *** ParADARA ***
+		// For *Secondary* SMS Instances,
+		// Create Channel Access Subscriptions
+		// To SMS Primary "Recording", "RunNumber" and "Paused" PVs... ;-D
+
+		if ( ctrl->getInstanceId() != 0 )
+		{
+			DEBUG("PVPrefixPV:"
+				<< " Secondary SMS Instance, Id " << ctrl->getInstanceId()
+				<< " - Construct Primary SMS PV Prefix String...");
+
+			std::string PrimaryPVPrefix = ctrl->getBeamlineId() + ":SMS";
+
+			if ( new_pv_prefix.size()
+					&& new_pv_prefix.compare( "(unset)" ) )
+			{
+				DEBUG("PVPrefixPV:"
+					<< " Using Alternate Primary SMS PV Prefix String"
+					<< " [" << new_pv_prefix << "]");
+				PrimaryPVPrefix = new_pv_prefix;
+			}
+
+			// SMSControl() ctor hasn't fully executed yet.. Wait...! ;-D
+			if ( !std::string("NotYetInitialized").compare(
+					ctrl->getPrimaryPVPrefix() ) )
+			{
+				DEBUG("PVPrefixPV:"
+					<< " SMSControl Instance Not Yet Fully Initialized..."
+					<< " Ignore Primary SMS PV Prefix"
+					<< " [" << PrimaryPVPrefix << "]"
+					<< " For Now...");
+			}
+
+			// Did the Resulting Primary SMS PV Prefix Actually Change...?
+			else if ( PrimaryPVPrefix.compare(
+					ctrl->getPrimaryPVPrefix() ) )
+			{
+				DEBUG("PVPrefixPV: Re-Subscribe to Primary SMS PVs"
+					<< " Using New Primary SMS PV Prefix"
+					<< " [" << PrimaryPVPrefix << "]");
+
+				ctrl->setPrimaryPVPrefix( PrimaryPVPrefix );
+
+				// Unsubscribe from Any Current External Run Control PVs...
+				ctrl->unsubscribePrimaryPVs();
+
+				// Re-Subscribe to External Run Control PVs
+				// with New Prefix...
+				ctrl->subscribeToPrimaryPVs( PrimaryPVPrefix );
+			}
+
+			// No Change to Primary SMS PV Prefix...
+			else
+			{
+				DEBUG("PVPrefixPV: No Change to Primary SMS PV Prefix"
+					<< " [" << PrimaryPVPrefix << "]"
+					<< " Ignore...");
+			}
+		}
+
+		// Not a Secondary SMS Instance...
+		else
+		{
+			DEBUG("PVPrefixPV:"
+				<< " Primary SMS Instance, No Need for Subscribing"
+				<< " to External Run Control PVs. Ignore...");
+		}
+	}
+
+private:
+	bool m_auto_save;
 };
 
 class CleanShutdownPV : public smsTriggerPV {
@@ -723,6 +821,11 @@ SMSControl::SMSControl() :
 	m_chopperReserve(128), m_fastMetaReserve(16),
 	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta))
 {
+	// Initialize the Primary SMS PV Prefix to "Not Ready"... ;-b
+	// (For the PVPrefixPV::changed() method,
+	// which gets called prematurely... ;-b)
+	m_primaryPVPrefix = "NotYetInitialized";
+
 	// Initialize Control PVs...
 	m_pvPrefix = m_beamlineId;
 	m_pvPrefix += ":SMS";
@@ -759,8 +862,8 @@ SMSControl::SMSControl() :
 	m_pvInstanceId = boost::shared_ptr<InstanceIdPV>(new
 						InstanceIdPV(m_pvPrefix + ":InstanceId"));
 
-	m_pvAltPrimaryPVPrefix = boost::shared_ptr<smsStringPV>(new
-						smsStringPV(m_pvPrefix + ":AltPrimaryPVPrefix",
+	m_pvAltPrimaryPVPrefix = boost::shared_ptr<PVPrefixPV>(new
+						PVPrefixPV(m_pvPrefix + ":AltPrimaryPVPrefix",
 						/* AutoSave */ true));
 
 	m_pvNoEoPPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
@@ -1202,16 +1305,30 @@ SMSControl::SMSControl() :
 	// For *Secondary* SMS Instances, Create Channel Access Subscriptions
 	// To SMS Primary "Recording", "RunNumber" and "Paused" PVs... ;-D
 	if ( m_instanceId != 0 ) {
+
 		DEBUG("Secondary SMS Instance Id " << m_instanceId
-			<< " - Subscribe to Primary SMS PVs...");
+			<< " - Construct Primary SMS PV Prefix String...");
+
 		std::string PrimaryPVPrefix = m_beamlineId + ":SMS";
+
 		if ( m_altPrimaryPVPrefix.size()
-				&& m_altPrimaryPVPrefix.compare( "(unset)" ) ) {
+				&& m_altPrimaryPVPrefix.compare( "(unset)" ) )
+		{
 			DEBUG("Using Alternate Primary SMS PV Prefix String = "
 				<< "[" << m_altPrimaryPVPrefix << "]");
 			PrimaryPVPrefix = m_altPrimaryPVPrefix;
 		}
-		subscribeToPrimaryPVs( PrimaryPVPrefix );
+
+		if ( PrimaryPVPrefix.compare( m_primaryPVPrefix ) )
+		{
+			DEBUG("Subscribe to Primary SMS PVs"
+				<< " Using Primary SMS PV Prefix"
+				<< " [" << PrimaryPVPrefix << "]");
+
+			m_primaryPVPrefix = PrimaryPVPrefix;
+
+			subscribeToPrimaryPVs( PrimaryPVPrefix );
+		}
 	}
 }
 
@@ -1301,7 +1418,7 @@ void SMSControl::subscribeToPrimaryPVs( std::string PrimaryPVPrefix )
 
 void SMSControl::unsubscribePrimaryPVs(void)
 {
-	DEBUG("unsubscribeToPrimaryPVs():"
+	DEBUG("unsubscribePrimaryPVs():"
 		<< " Unsubscribing from External Primary PVs");
 
 	boost::unique_lock<boost::mutex> lock(m_mutex);
