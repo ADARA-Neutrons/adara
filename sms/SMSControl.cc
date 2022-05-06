@@ -2642,6 +2642,7 @@ void SMSControl::addPV(PVSharedPtr pv)
 }
 
 bool SMSControl::setRecording( bool v, struct timespec *ts )
+		// Wallclock Time...!
 {
 	/* We return true if we accepted the setting, and false if not.
 	 * It is not an error for a caller to try to stop recording if
@@ -2719,9 +2720,15 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 		// We've Updated the Run Number on disk,
 		// so if we Fail Now, we need to Fail Big...
 		m_currentRunNumber = m_nextRunNumber++;
-		INFO("Starting Run " << m_currentRunNumber);
+
+		INFO("Starting Run " << m_currentRunNumber
+			<< " at ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
+
 		// No More RunInfo Locking, Allow Changes Mid-Run...! ;-D
 		// m_runInfo->lock();
+
 		m_runInfo->setRunNumber( m_currentRunNumber );
 
 		// Reset the Overall Monitor bookkeeping...
@@ -2841,10 +2848,15 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 
 		// Stopping Run, Clear Run Number
 		// and "Unlock" RunInfo for PV Updates...
-		INFO("Stopping Run " << m_currentRunNumber);
+		INFO("Stopping Run " << m_currentRunNumber
+			<< " at ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
+			<< "." << std::setfill('0') << std::setw(9)
+			<< ts->tv_nsec);
+
 		uint32_t save_current_run_number = m_currentRunNumber;
 		m_currentRunNumber = 0;
 		m_runInfo->setRunNumber(0);
+
 		// No More RunInfo Locking, Allow Changes Mid-Run...! ;-D
 		// m_runInfo->unlock();
 
