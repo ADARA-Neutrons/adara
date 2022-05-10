@@ -198,9 +198,9 @@ public:
 	static bool sanitizeString( std::string & a_str,
 			bool a_preserve_uri, bool a_preserve_whitespace = false )
 	{
-		std::string all_bad = " \t\'\",.;:<>[]{}()|/\\?~!@#$%^&*+=";
-		std::string uri_bad = " \t\'\";<>[]{}|\\~!@#$%^*+";
-		std::string all_values = "\'\";<>|?~!#$&*";
+		std::string all_bad = " \t\'\"`,.;:<>[]{}()|/\\?~!@#$%^&*+=";
+		std::string uri_bad = " \t\'\"`;<>[]{}|\\~!@#$%^*+";
+		std::string all_values = "\'\"`;<>|?~!#$&*";
 
 		std::string bad = ( a_preserve_uri ) ? uri_bad :
 			( ( a_preserve_whitespace ) ? all_values : all_bad );
