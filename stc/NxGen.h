@@ -2524,11 +2524,30 @@ private:
                                     this->m_last_value ).c_str() );
                             give_syslog_a_chance;
 
+                            std::string arg_value = this->valueToString(
+                                    this->m_last_value );
+
+                            if ( Utils::sanitizeString( arg_value,
+                                false /* a_preserve_uri */,
+                                true /* a_preserve_whitespace */ ) )
+                            {
+                                syslog( LOG_INFO,
+                                "[%i] %s: %s %s %s %s %s: %s = %s -> %s",
+                                    g_pid,
+                                "appendSTCConfigCommandMatchingElements()",
+                                    "Sanitizing PV",
+                                    pv_value_path.c_str(),
+                                    "Value for Command Line Parameter",
+                                    "for Command", CMD->name.c_str(),
+                                    E->name.c_str(),
+                                    this->valueToString(
+                                        this->m_last_value ).c_str(),
+                                    arg_value.c_str() );
+                                give_syslog_a_chance;
+                            }
+
                             CMD->args += " " + E->name
-                                + "=" + "\""
-                                + this->valueToString(
-                                    this->m_last_value )
-                                + "\"";
+                                + "=" + "\"" + arg_value + "\"";
                         }
 
                         else
