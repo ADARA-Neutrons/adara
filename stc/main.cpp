@@ -666,7 +666,17 @@ int main( int argc, char** argv )
         else
             sms_code = STC::TS_PERM_ERROR;
 
-        sms_reason = e.toString( true, true );
+        if ( nxgen != 0 )
+        {
+            sms_reason = nxgen->getFacilityName()
+                + " " + nxgen->getBeamLongName()
+                + " (" + nxgen->getBeamShortName() + ")"
+                + " Run "
+                    + boost::lexical_cast<string>(nxgen->getRunNumber())
+                + " " + nxgen->getProposalID() + " - ";
+        }
+
+        sms_reason += e.toString( true, true );
 
         long_syslog( "STC failed:", sms_reason );
     }
@@ -674,7 +684,18 @@ int main( int argc, char** argv )
     {
         // Unexpected exception
         sms_code = STC::TS_PERM_ERROR;
-        sms_reason = e.what();
+
+        if ( nxgen != 0 )
+        {
+            sms_reason = nxgen->getFacilityName()
+                + " " + nxgen->getBeamLongName()
+                + " (" + nxgen->getBeamShortName() + ")"
+                + " Run "
+                    + boost::lexical_cast<string>(nxgen->getRunNumber())
+                + " " + nxgen->getProposalID() + " - ";
+        }
+
+        sms_reason += e.what();
 
         long_syslog( "STC failed: Exception:", sms_reason );
     }
@@ -682,7 +703,18 @@ int main( int argc, char** argv )
     {
         // Really unexpected exception
         sms_code = STC::TS_PERM_ERROR;
-        sms_reason = "Unhandled exception";
+
+        if ( nxgen != 0 )
+        {
+            sms_reason = nxgen->getFacilityName()
+                + " " + nxgen->getBeamLongName()
+                + " (" + nxgen->getBeamShortName() + ")"
+                + " Run "
+                    + boost::lexical_cast<string>(nxgen->getRunNumber())
+                + " " + nxgen->getProposalID() + " - ";
+        }
+
+        sms_reason += "Unhandled exception";
 
         syslog( LOG_INFO, "[%i] STC failed: Unknown exception.", g_pid );
     }
