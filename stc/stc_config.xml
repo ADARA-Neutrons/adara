@@ -604,11 +604,11 @@
 	<command>
 		<name>DummyCommand</name>
 		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_dummy.bash</path>
-		<condition>
+		<!-- condition>
 			<name>Never Use This</name>
 			<pattern>:This:PV:Does:Not:Exist$</pattern>
 			<value>1</value>
-		</condition>
+		</condition -->
 		<element_last_value>
 			<pattern>SMS:RunInfo:Sample:Id$</pattern>
 			<pattern>CS:ITEMS$</pattern>
