@@ -7,7 +7,7 @@
 #    - on stc3.ornl.gov
 #
 
-STC_DIR="/SNS/users/y8y"
+STC_DIR="/SNS/users/$USER"
 
 STC_SSH="ssh -AY stc1.ornl.gov"
 #STC_SSH="ssh -AY stc2.ornl.gov"

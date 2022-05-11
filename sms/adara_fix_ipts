@@ -12,48 +12,48 @@
 # "Fix IPTS" Test Commands:
 #
 # ./sms/adara_fix_ipts --inst=PG3 --stc_host=localhost --stc_port=31420 \
-#    --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --sms_data=/SNS/users/$USER --no-send-paused-data \
 #    --archive_path=/TESTING --run=38524-38527 --ipts=IPTS-2767
 #
 # ./sms/adara_fix_ipts --inst=VULCAN --stc_host=localhost \
-#    --stc_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --stc_port=31420 --sms_data=/SNS/users/$USER --no-send-paused-data \
 #    --archive_path=/TESTING --run=156458 --ipts=IPTS-18677
 #
 # ./sms/adara_fix_ipts --inst=EQSANS --stc_host=localhost \
-#    --stc_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --stc_port=31420 --sms_data=/SNS/users/$USER --no-send-paused-data \
 #    --archive_path=/TESTING --run=98446-98448 --ipts=IPTS-21608
 #
 # ./sms/adara_fix_ipts --inst=ARCS --facility=SNS --stc_host=localhost \
-#    --stc_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --stc_port=31420 --sms_data=/SNS/users/$USER --no-send-paused-data \
 #    --archive_path=/TESTING --run=125356-125363 --ipts=IPTS-20849
 
 # With "Fix IPTS" Test Data in:
 #
-#    /SNS/users/y8y/20170830/20170830-013325.796536119-run-38523/
-#    /SNS/users/y8y/20170830/20170830-034457.473266516-run-38524/
-#    /SNS/users/y8y/20170830/20170830-055215.443177248-run-38525/
-#    /SNS/users/y8y/20170830/20170830-075802.792935897-run-38526/
-#    /SNS/users/y8y/20170830/20170830-085315.302591461-run-38527/
-#    /SNS/users/y8y/20170830/20170830-094851.304674233-run-38528/
-#    (/SNS/users/y8y/20170830/cleanup)
+#    /SNS/users/$USER/20170830/20170830-013325.796536119-run-38523/
+#    /SNS/users/$USER/20170830/20170830-034457.473266516-run-38524/
+#    /SNS/users/$USER/20170830/20170830-055215.443177248-run-38525/
+#    /SNS/users/$USER/20170830/20170830-075802.792935897-run-38526/
+#    /SNS/users/$USER/20170830/20170830-085315.302591461-run-38527/
+#    /SNS/users/$USER/20170830/20170830-094851.304674233-run-38528/
+#    (/SNS/users/$USER/20170830/cleanup)
 #
-#    /SNS/users/y8y/20170925/20170925-223300.550696919-run-156458/
-#    (/SNS/users/y8y/20170925/cleanup)
+#    /SNS/users/$USER/20170925/20170925-223300.550696919-run-156458/
+#    (/SNS/users/$USER/20170925/cleanup)
 #
-#    /SNS/users/y8y/20180920/20180920-133950.705888442-run-98446/
-#    /SNS/users/y8y/20180920/20180920-154457.198797185-run-98447/
-#    /SNS/users/y8y/20180920/20180920-154729.955497035-run-98448/
-#    (/SNS/users/y8y/20180920/cleanup)
+#    /SNS/users/$USER/20180920/20180920-133950.705888442-run-98446/
+#    /SNS/users/$USER/20180920/20180920-154457.198797185-run-98447/
+#    /SNS/users/$USER/20180920/20180920-154729.955497035-run-98448/
+#    (/SNS/users/$USER/20180920/cleanup)
 #
-#    /SNS/users/y8y/20190311/20190311-000350.433146816-run-125356/
-#    /SNS/users/y8y/20190311/20190311-032720.588704159-run-125357/
-#    /SNS/users/y8y/20190311/20190311-061229.415149226-run-125358/
-#    /SNS/users/y8y/20190311/20190311-070418.791527987-run-125359/
-#    /SNS/users/y8y/20190311/20190311-090706.409446369-run-125360/
-#    /SNS/users/y8y/20190311/20190311-094042.223450763-run-125361/
-#    /SNS/users/y8y/20190311/20190311-112034.429064109-run-125362/
-#    /SNS/users/y8y/20190311/20190311-114014.684490977-run-125363/
-#    (/SNS/users/y8y/20190311/cleanup)
+#    /SNS/users/$USER/20190311/20190311-000350.433146816-run-125356/
+#    /SNS/users/$USER/20190311/20190311-032720.588704159-run-125357/
+#    /SNS/users/$USER/20190311/20190311-061229.415149226-run-125358/
+#    /SNS/users/$USER/20190311/20190311-070418.791527987-run-125359/
+#    /SNS/users/$USER/20190311/20190311-090706.409446369-run-125360/
+#    /SNS/users/$USER/20190311/20190311-094042.223450763-run-125361/
+#    /SNS/users/$USER/20190311/20190311-112034.429064109-run-125362/
+#    /SNS/users/$USER/20190311/20190311-114014.684490977-run-125363/
+#    (/SNS/users/$USER/20190311/cleanup)
 #
 
 #

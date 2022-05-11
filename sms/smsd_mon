@@ -16,7 +16,7 @@ fi
 # Default Settings
 #
 
-#LOG_HOME="/SNS/users/y8y"
+#LOG_HOME="/SNS/users/$USER"
 LOG_HOME="$HOME"
 
 SMS_HOME="/SNSlocal"
@@ -79,7 +79,7 @@ for arg in "$@" ; do
 		SMS="sms${ALT}"
 		SMSD_LOG="/var/log/${SMSD}.log"
 	elif [ "#$key#" == '#--help#' ]; then
-		echo -n "usage:  ${PROG} [--no_notify] [--smsd_user=y8y]"
+		echo -n "usage:  ${PROG} [--no_notify] [--smsd_user=$USER]"
 		echo " [--alt=\"-mon\"]"
 		exit 0
 	fi
@@ -200,7 +200,8 @@ CHECK_ERROR_REPORTING()
 # Get SMS Daemon process status...
 #
 
-status=`ps augxww | grep $SMSD | grep -v -e $PROG -e $TIME -e grep | grep $SMSD_USER`
+status=`ps augxww | grep $SMSD | grep -v -e $PROG -e $TIME -e grep \
+	| grep $SMSD_USER`
 #echo "status=$status"
 
 if [ "#$status#" == '##' ]; then

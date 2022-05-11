@@ -236,13 +236,13 @@ CONFCK()
 	echo "Comparing Saved ADARA Admin Crontab to System:"
 	echo
 
-	crontab -l > /tmp/y8y.crontab.$$ 2>&1
-	if [[ $? != 0 || ! -s /tmp/y8y.crontab.$$ ]]; then
+	crontab -l > /tmp/$USER.crontab.$$ 2>&1
+	if [[ $? != 0 || ! -s /tmp/$USER.crontab.$$ ]]; then
 		echo "Failure Retrieving ADARA Admin Crontab for DASMOND!"
 		(( nerrors++ ))
 	else
-		echo "diff ./dasmond/y8y.crontab /tmp/y8y.crontab.$$"
-		diff ./dasmond/y8y.crontab /tmp/y8y.crontab.$$
+		echo "diff ./dasmond/$USER.crontab /tmp/$USER.crontab.$$"
+		diff ./dasmond/$USER.crontab /tmp/$USER.crontab.$$
 		if [ $? != 0 ]; then
 			echo "ADARA Admin Crontab for DASMOND Differed...!"
 			(( nerrors++ ))
@@ -250,7 +250,7 @@ CONFCK()
 			echo "ADARA Admin Crontab for DASMOND is the Same."
 		fi
 	fi
-	/bin/rm -f /tmp/y8y.crontab.$$
+	/bin/rm -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
 		echo "Failure Deleting Temporary Admin Crontab File for DASMOND...!"
 		(( nerrors++ ))

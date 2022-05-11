@@ -38,7 +38,7 @@ int main()
 	// Set Up LDAP Search Filters...
 	filter[0] = "uid=FENG_BNL";
 	filter[1] = "uid=WANGDAWEI";
-	filter[2] = "uid=y8y";
+	filter[2] = "uid=xyz";
 
 	// Choose Desired Attribute(s)...
 	attrs[0] = "cn";

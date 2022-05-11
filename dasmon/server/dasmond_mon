@@ -7,7 +7,7 @@
 #
 
 # Set Shared/External Mount Directory for Logging
-#LOG_HOME="/SNS/users/y8y"
+#LOG_HOME="/SNS/users/$USER"
 LOG_HOME="$HOME"
 
 host=`hostname`
@@ -51,7 +51,7 @@ for arg in "$@" ; do
 	elif [ "#$key#" == '#--dasmond_user#' ]; then
 		DASMOND_USER="$value"
 	elif [ "#$key#" == '#--help#' ]; then
-		echo "usage:  ${PROG} [--no_notify] [--dasmond_user=y8y]"
+		echo "usage:  ${PROG} [--no_notify] [--dasmond_user=$USER]"
 		exit 0
 	fi
 

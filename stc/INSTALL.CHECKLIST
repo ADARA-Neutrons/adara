@@ -112,7 +112,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# Get/Copy/Create a "confck" Script...
 
-	cp /SNS/users/y8y/confck.stc confck
+	cp /SNS/users/$USER/confck.stc confck
 	git add confck
 	git commit -m "Install ConfCk Script." confck
 
@@ -460,9 +460,9 @@ please set your shell "umask" as follows before proceeding! ;-D
 	ls -l /home/controls/Accelerator/
 
 		total 388
-		-rw-rw-r-- 1 y8y slowcontrols_developers  18277 Mar 31  2016
+		-rw-rw-r-- 1 USER slowcontrols_developers  18277 Mar 31  2016
 			snsTiming.h
-		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
+		-rw-rw-r-- 1 USER slowcontrols_developers 373279 Mar 31  2016
 			SNS.Timing.Master.Functional.System.Description.pdf
 
 9. Deploy STC Daemon:
@@ -471,7 +471,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	(ls -l /home/controls/config/deploy/stc)
 
-		lrwxrwxrwx 1 y8y slowcontrols_developers 47 Jul 18 13:28
+		lrwxrwxrwx 1 USER slowcontrols_developers 47 Jul 18 13:28
 			/home/controls/config/deploy/stc ->
 				/home/controls/prod/ADARA/20170717/v1.6.19/stc*
 

@@ -21,13 +21,13 @@ namedPipeFile="/etc/rsyslog.pipes/criticalMessages"
 
 localCacheDir="/SNSlocal/rsyslog.cache"
 
-archiveDir="/SNS/users/y8y/RSyslogErrors"
+archiveDir="/SNS/users/$USER/RSyslogErrors"
 
-altArchiveDir="/home/y8y/RSyslogErrors"
+altArchiveDir="/home/$USER/RSyslogErrors"
 
 fileGroup="adara"
 
-alertRecipient="y8y@ornl.gov"      # the mail recipient for alerts
+alertRecipient="$USER@ornl.gov"      # the mail recipient for alerts
 
 hostName=`hostname`                # the host are we logging from
 

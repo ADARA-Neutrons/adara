@@ -117,7 +117,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# Get/Copy/Create a "confck" Script...
 
-	cp /SNS/users/y8y/confck.pvsd confck
+	cp /SNS/users/$USER/confck.pvsd confck
 	git add confck
 	git commit -m "Install ConfCk Script." confck
 
@@ -148,7 +148,8 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# ADARA Mailer Config
 
-	sudo cp /SNS/users/y8y/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+	sudo cp /SNS/users/$USER/adaraMailer.conf \
+		/etc/rsyslog.d/adaraMailer.conf
 
 	cp /etc/rsyslog.d/adaraMailer.conf pvsd/adaraMailer.conf
 
@@ -315,7 +316,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 		MAILTO=idac_adara_notify@email.ornl.gov
 		PATH=/home/controls/epics/base/master/bin/linux-x86_64:/home/controls/epics/basev4/master/pvAccessCPP/bin/linux-x86_64/:/home/controls/epics/extensions/master/bin/linux-x86_64:/home/controls/epics/extensions/master/bin:/usr/local/SNS/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/sbin:/usr/sbin
-		0-59/10 * * * * /SNS/users/y8y/stuff/exec/pvsd_mon.sh
+		0-59/10 * * * * /SNS/users/$USER/stuff/exec/pvsd_mon.sh
 		0 8,17 * * * /home/controls/config-dassrv1/confck --quiet
 		0 8,17 * * * /home/controls/share/master/scripts/check_beamline_xml --quiet /home/controls/blXXX/beamline.xml
 		MAILTO=idac_support@email.ornl.gov
@@ -450,9 +451,9 @@ please set your shell "umask" as follows before proceeding! ;-D
 	ls -l /home/controls/Accelerator/
 
 		total 388
-		-rw-rw-r-- 1 y8y slowcontrols_developers  18277 Mar 31  2016
+		-rw-rw-r-- 1 USER slowcontrols_developers  18277 Mar 31  2016
 			snsTiming.h
-		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
+		-rw-rw-r-- 1 USER slowcontrols_developers 373279 Mar 31  2016
 			SNS.Timing.Master.Functional.System.Description.pdf
 
 10. Deploy PVSD Daemon:
@@ -461,7 +462,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	(ls -l /home/controls/config-dassrv1/deploy/pvsd)
 
-		lrwxrwxrwx 1 y8y slowcontrols_developers 47 Jul 18 13:28
+		lrwxrwxrwx 1 USER slowcontrols_developers 47 Jul 18 13:28
 			/home/controls/config-dassrv1/deploy/pvsd ->
 				/home/controls/prod/ADARA/20170717/v1.6.19/pvsd*
 

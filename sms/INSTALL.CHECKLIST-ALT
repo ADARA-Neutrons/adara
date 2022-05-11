@@ -127,7 +127,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# Get/Copy/Create a "confck" Script...
 
-	cp /SNS/users/y8y/confck.smsd-mon confck
+	cp /SNS/users/$USER/confck.smsd-mon confck
 	git add confck
 	git commit -m "Install ConfCk Script." confck
 
@@ -149,7 +149,8 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# ADARA Mailer Config
 
-	sudo cp /SNS/users/y8y/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+	sudo cp /SNS/users/$USER/adaraMailer.conf \
+		/etc/rsyslog.d/adaraMailer.conf
 
 	cp /etc/rsyslog.d/adaraMailer.conf sms-mon/adaraMailer.conf
 
@@ -319,11 +320,11 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 		[Add to Existing Crontab...]
 		MAILTO=kohlja@ornl.gov
-		0-59/10 * * * * /SNS/users/y8y/stuff/exec/smsd_mon --alt="-mon"
+		0-59/10 * * * * /SNS/users/$USER/stuff/exec/smsd_mon --alt="-mon"
 		0 8,17 * * * /home/controls/config-daq1-mon/confck --quiet
 		0 8,17 * * * /usr/local/bin/liveconf \
 			--config=/SNSlocal/sms-mon/conf/smsd.conf --terse --quiet confck
-		0 0 * * * /SNS/users/y8y/stuff/exec/bump_mon_run \
+		0 0 * * * /SNS/users/$USER/stuff/exec/bump_mon_run \
 			--config="/SNSlocal/sms-mon/conf/smsd.conf"
 
 	crontab -l

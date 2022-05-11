@@ -33,7 +33,7 @@ ALT=""
 # ADARA Git Repo
 if [[ -z "$ADARA_DIR" ]]; then
 	ADARA_DIR="/usr/local/src/ADARA"
-	#ADARA_DIR="/SNS/users/y8y/gitsrc/ADARA"
+	#ADARA_DIR="/SNS/users/$USER/gitsrc/ADARA"
 elif [[ $QUIET == 0 ]]; then
 	echo "Inheriting ADARA_DIR Value from User Environment:"
 	echo -e "\t[${ADARA_DIR}]"
@@ -449,14 +449,14 @@ SMS_CONFCK()
 	echo
 
 	_check_update=0
-	crontab -l > /tmp/y8y.crontab.$$ 2>&1
-	if [[ $? != 0 || ! -s /tmp/y8y.crontab.$$ ]]; then
+	crontab -l > /tmp/$USER.crontab.$$ 2>&1
+	if [[ $? != 0 || ! -s /tmp/$USER.crontab.$$ ]]; then
 		echo "Failure Retrieving ADARA Admin Crontab for SMSD${ALT}...!"
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo "diff ./sms${ALT}/y8y.crontab /tmp/y8y.crontab.$$"
-		diff ./sms${ALT}/y8y.crontab /tmp/y8y.crontab.$$
+		echo "diff ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$"
+		diff ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$
 		if [ $? != 0 ]; then
 			echo "ADARA Admin Crontab for SMSD${ALT} Differed...!"
 			_check_update=1
@@ -470,7 +470,7 @@ SMS_CONFCK()
 		echo "Defer Fixing of SMSD${ALT} Admin Crontab..."
 		echo "(See Admin Crontab Create Below, or Fix Manually.)"
 	fi
-	/bin/rm -f /tmp/y8y.crontab.$$
+	/bin/rm -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
 		echo \
 		 "Failure Deleting Temporary Admin Crontab File for SMSD${ALT}...!"
@@ -1139,7 +1139,7 @@ if [[ $UPDATE == 1 ]]; then
 			echo -e "\nLOCAL_DATA=/SNSlocal" >> $cron_file
 
 			echo -e "\n# SMS" >> $cron_file
-			echo "0-59/10 * * * * /SNS/users/y8y/stuff/exec/smsd_mon" \
+			echo "0-59/10 * * * * /SNS/users/$USER/stuff/exec/smsd_mon" \
 				>> $cron_file
 			echo "0 8,17 * * * /home/controls/config-now1/confck --quiet" \
 				>> $cron_file
@@ -1149,7 +1149,8 @@ if [[ $UPDATE == 1 ]]; then
 			if [[ -n ${ALT} ]]; then
 				echo -e "\n# SMS-MON" >> $cron_file
 				echo -n "0-59/10 * * * *" >> $cron_file
-				echo -n " /SNS/users/y8y/stuff/exec/smsd_mon" >> $cron_file
+				echo -n " /SNS/users/$USER/stuff/exec/smsd_mon" \
+					>> $cron_file
 				echo " --alt=\"-mon\"" >> $cron_file
 				echo -n "0 8,17 * * *" >> $cron_file
 				echo " /home/controls/config-now1-mon/confck --quiet" \
@@ -1159,7 +1160,8 @@ if [[ $UPDATE == 1 ]]; then
 				echo -n " --config=/SNSlocal/sms-mon/conf/smsd.conf" \
 					>> $cron_file
 				echo " --terse --quiet confck" >> $cron_file
-				echo -n "1 0 * * * /SNS/users/y8y/stuff/exec/bump_mon_run" \
+				echo -n "1 0 * * *" >> $cron_file
+				echo -n " /SNS/users/$USER/stuff/exec/bump_mon_run" \
 					>> $cron_file
 				echo " --config=\"/SNSlocal/sms-mon/conf/smsd.conf\"" \
 					>> $cron_file
@@ -1179,7 +1181,8 @@ if [[ $UPDATE == 1 ]]; then
 			echo -n "/usr/local/SNS/bin:/usr/local/bin:" >> $cron_file
 			echo "/usr/bin:/bin:/usr/local/sbin:/sbin:/usr/sbin" \
 				>> $cron_file
-			echo "0-59/10 * * * * /SNS/users/y8y/stuff/exec/pvsd_mon.sh" \
+			echo -n "0-59/10 * * * *" >> $cron_file
+			echo " /SNS/users/$USER/stuff/exec/pvsd_mon.sh" \
 				>> $cron_file
 			echo -n "#0 8,17 * * * /home/controls/config-dassrv1/confck" \
 				>> $cron_file
@@ -1223,7 +1226,8 @@ if [[ $UPDATE == 1 ]]; then
 				>> $cron_file
 
 			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
-			echo -n "0 8 * * * /SNS/users/y8y/gitsrc/ADARA/adara_monitor" \
+			echo -n "0 8 * * *" >> $cron_file
+			echo -n " /SNS/users/$USER/gitsrc/ADARA/adara_monitor" \
 				>> $cron_file
 			echo " --oneshot" >> $cron_file
 			echo >> $cron_file
@@ -1233,18 +1237,20 @@ if [[ $UPDATE == 1 ]]; then
 
 			echo -e "\n# DASMON" >> $cron_file
 			echo -n "0-59/10 * * * *" >> $cron_file
-			echo " /SNS/users/y8y/stuff/exec/dasmond_mon" >> $cron_file
+			echo " /SNS/users/$USER/stuff/exec/dasmond_mon" >> $cron_file
 			echo -n "#0 8,17 * * *" >> $cron_file
 			echo " /home/controls/config-dasmon/confck --quiet" \
 				>> $cron_file
 
 			echo -e "\n# For Long Running NOWN Runs..." >> $cron_file
 			echo -n "###0 0 * * *" >> $cron_file
-			echo -n " /SNS/users/y8y/stuff/exec/bump_mon_run" >> $cron_file
+			echo -n " /SNS/users/$USER/stuff/exec/bump_mon_run" \
+				>> $cron_file
 			echo " --beamline=\"BL0X\"" >> $cron_file
 
 			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
-			echo -n "0 8 * * * /SNS/users/y8y/gitsrc/ADARA/adara_monitor" \
+			echo -n "0 8 * * *" >> $cron_file
+			echo -n " /SNS/users/$USER/gitsrc/ADARA/adara_monitor" \
 				>> $cron_file
 			echo " --oneshot" >> $cron_file
 			echo >> $cron_file

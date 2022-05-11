@@ -21,7 +21,7 @@ ADARA_MONITOR_PVS="${BL}:CS:Adara:PVStreamer \
 	${BL}:CS:Adara:Reduction \
 	${BL}:CS:Adara:Stat"
 
-LOG_HOME="/SNS/users/y8y"
+LOG_HOME="/SNS/users/$USER"
 #LOG_HOME="$HOME"
 
 host=`hostname`
@@ -73,7 +73,8 @@ for arg in "$@" ; do
 	elif [ "#$key#" == '#--pvsd_user#' ]; then
 		PVSD_USER="$value"
 	elif [ "#$key#" == '#--help#' ]; then
-		echo "usage:  ${PROG} [--no_notify] [--skip_pvs] [--pvsd_user=y8y]"
+		echo "usage:  ${PROG} [--no_notify] [--skip_pvs] \\"
+		echo "             [--pvsd_user=$USER]"
 		exit 0
 	fi
 
@@ -193,7 +194,8 @@ CHECK_ERROR_REPORTING()
 # Get PVSD process status...
 #
 
-status=`ps augxww | grep $PVSD | grep -v -e $PROG -e $TIME -e grep | grep $PVSD_USER`
+status=`ps augxww | grep $PVSD | grep -v -e $PROG -e $TIME -e grep \
+	| grep $PVSD_USER`
 #echo "status=$status"
 
 if [ "#$status#" == '##' ]; then

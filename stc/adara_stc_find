@@ -25,9 +25,9 @@ STC_OLD="${STC1_OLD} ${STC2_OLD}"
 STC_ALL="${STC_NEW}"
 # Removed ${STC_OLD}, They're Gone... 5/5/2022
 
-STCVIEW="/SNS/users/y8y/stuff/exec/stcview"
+STCVIEW="/SNS/users/$USER/stuff/exec/stcview"
 
-STCRUN="/SNS/users/y8y/stuff/exec/stcrun"
+STCRUN="/SNS/users/$USER/stuff/exec/stcrun"
 
 SORT="/usr/bin/sort"
 TAIL="/usr/bin/tail"
