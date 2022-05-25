@@ -38,6 +38,11 @@ static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 
 namespace fs = boost::filesystem;
 
+RateLimitedLogging::History RLLHistory_StorageManager;
+
+// Rate-Limited Logging IDs...
+#define RLL_CONTAINER_SAWTOOTH        0
+
 class PoolsizePV : public smsStringPV {
 public:
 	PoolsizePV(const std::string &name, uint32_t block_size,
@@ -2436,22 +2441,32 @@ StorageManager::findContainerByTime(
 					// Bogus TimeStamps... ;-Q
 					it = m_containerStack.begin();
 
-					// XXX TODO Add Rate-Limited Logging Here...!! ;-D
-					ERROR("findContainerByTime(): " << label
-						<< " Container SAWTOOTH for ts="
-						<< ts.tv_sec << "."
-						<< std::setfill('0') << std::setw(9) << ts.tv_nsec
-						<< " -> Using Current Container "
-						<< (*it)->name()
-						<< " in [" << (*it)->minTime().tv_sec << "."
-						<< std::setfill('0') << std::setw(9)
-						<< (*it)->minTime().tv_nsec << std::setw(0)
-						<< ", " << (*it)->maxTime().tv_sec << "."
-						<< std::setfill('0') << std::setw(9)
-						<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
-						<< " check_old_containers=" << check_old_containers
-						<< " - Btw, the Container Stack has "
-						<< m_containerStack.size() << " elements");
+					// Rate-Limited Logging Container SAWTOOTH...
+					std::string log_info;
+					if ( RateLimitedLogging::checkLog(
+							RLLHistory_StorageManager,
+							RLL_CONTAINER_SAWTOOTH, "none",
+							2, 10, 1000, log_info ) ) {
+						ERROR(log_info
+							<< "findContainerByTime(): " << label
+							<< " Container SAWTOOTH for ts="
+							<< ts.tv_sec << "."
+							<< std::setfill('0') << std::setw(9)
+								<< ts.tv_nsec
+							<< " -> Using Current Container "
+							<< (*it)->name()
+							<< " in [" << (*it)->minTime().tv_sec << "."
+							<< std::setfill('0') << std::setw(9)
+							<< (*it)->minTime().tv_nsec << std::setw(0)
+							<< ", " << (*it)->maxTime().tv_sec << "."
+							<< std::setfill('0') << std::setw(9)
+								<< (*it)->maxTime().tv_nsec
+								<< std::setw(0) << "]"
+							<< " check_old_containers="
+								<< check_old_containers
+							<< " - Btw, the Container Stack has "
+							<< m_containerStack.size() << " elements");
+					}
 
 					// Cache This Bogus Time Stamp Lookup Result
 					// for Next Time...! ;-Q
