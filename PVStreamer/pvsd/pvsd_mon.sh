@@ -21,8 +21,8 @@ ADARA_MONITOR_PVS="${BL}:CS:Adara:PVStreamer \
 	${BL}:CS:Adara:Reduction \
 	${BL}:CS:Adara:Stat"
 
-LOG_HOME="/SNS/users/$USER"
-#LOG_HOME="$HOME"
+#LOG_HOME="/SNS/users/$USER"
+LOG_HOME="$HOME"
 
 host=`hostname`
 #echo "host=$host"
