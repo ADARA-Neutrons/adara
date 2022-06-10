@@ -6,7 +6,8 @@
 # in the specified ITEMS Sample Meta-Data, and Dump Any Inconsistencies
 #
 
-NXLS="/SNS/users/y8y/stuff/exec/nxls"
+#NXLS="/SNS/users/$USER/stuff/exec/nxls"
+NXLS="$HOME/bin/nxls"
 
 CHECK_PROCEED()
 {
