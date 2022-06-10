@@ -1,0 +1,46 @@
+#!/bin/bash
+#
+# STC Run Script
+#
+# Search STC Log Entries to Track the Progress of a Specific Run Number
+#
+
+num_files=5
+
+getpid=0
+
+if [[ "$1" == "--pid" ]]; then
+	getpid=1
+	shift
+fi
+
+if [[ $# < 1 ]]; then
+	echo "usage: stcrun [--pid] <runNumber>"
+	exit -1
+fi
+
+runNumber="$1"
+
+EXTRACT_PID()
+{
+	if [[ $getpid == 1 ]]; then
+		awk '{print $6}' | sed 's/[][]//g'
+	else
+		awk '{print}'
+	fi
+}
+
+files=`/bin/ls -t -r /var/log/stc.log* | tail -${num_files}`
+
+for log in $files ; do
+
+	gzck=`echo $log | grep '.gz$' | wc | awk '{print $1}'`
+
+	if [[ $gzck == 1 ]]; then
+		zcat "$log" | grep "Run: ${runNumber}" | EXTRACT_PID
+	else
+		grep "Run: ${runNumber}" "$log" | EXTRACT_PID
+	fi
+
+done
+

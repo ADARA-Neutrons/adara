@@ -1,0 +1,21 @@
+#!/bin/bash
+#
+# STC Process Check Script (Cron Job :-)
+#
+
+STC_HOSTS="stc1.ornl.gov stc2.ornl.gov stc3.ornl.gov"
+#STC_HOSTS="sns-stc1.sns.gov sns-stc2.sns.gov"
+#STC_HOSTS="sns-stc1.sns.gov sns-stc2.sns.gov labanalysis.sns.gov"
+
+echo
+
+for h in $STC_HOSTS ; do
+
+	echo "STC Processes on ${h}:"
+
+	ssh -AY ${USER}@${h} ps augxww | grep "/usr/sbin/stc"
+
+	echo
+
+done
+
