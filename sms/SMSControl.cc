@@ -3574,8 +3574,12 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 	// Ignore-Interleaved-Global-SAWTOOTH Flag...
 	// (Once Per Minute...)
 	if ( !(++cnt % 3600) ) {
-		m_ignoreInterleavedSawtooth =
-			m_pvIgnoreInterleavedSawtooth->value();
+		bool tmp = m_pvIgnoreInterleavedSawtooth->value();
+		if ( tmp != m_ignoreInterleavedSawtooth ) {
+			m_ignoreInterleavedSawtooth = tmp;
+			DEBUG("getPulse(): Setting IgnoreInterleavedSawtooth to "
+				<< m_ignoreInterleavedSawtooth);
+		}
 	}
 
 	// New Pulse...! If Any Pulses in list, Check for SAWTOOTH...
@@ -3675,7 +3679,12 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		// (Once Per Minute...)
 		// ("cnt" already incremented above... :-)
 		if ( !(cnt % 3600) ) {
-			m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
+			uint32_t tmp = m_pvMaxPulseBufferSize->value();
+			if ( tmp != m_maxPulseBufferSize ) {
+				m_maxPulseBufferSize = tmp;
+				DEBUG("getPulse(): Setting MaxPulseBufferSize to "
+					<< m_maxPulseBufferSize);
+			}
 		}
 
 		// Now, *Before* Inserting New Pulse, Check Max Pulse Buffer Size!
@@ -4686,8 +4695,12 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Infrequently Check Live Control PV for Intermittent Data Threshold
 	// (Once Per Minute...)
 	if ( !(++cnt % 3600) ) {
-		m_intermittentDataThreshold =
-			m_pvIntermittentDataThreshold->value();
+		uint32_t tmp = m_pvIntermittentDataThreshold->value();
+		if ( tmp != m_intermittentDataThreshold ) {
+			m_intermittentDataThreshold = tmp;
+			DEBUG("markComplete(): Setting IntermittentDataThreshold to "
+				<< m_intermittentDataThreshold);
+		}
 	}
 
 	// *Before* We Mark This Pulse Complete,
@@ -4909,8 +4922,18 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	//    "No End-of-Pulse Buffer Size"...)
 	// ("cnt" already incremented above... :-)
 	if ( !(cnt % freq) ) {
-		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
-		m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
+		bool tmp = m_pvDoPulsePchgCorrect->value();
+		if ( tmp != m_doPulsePchgCorrect ) {
+			m_doPulsePchgCorrect = tmp;
+			DEBUG("markComplete(): Setting DoPulsePchgCorrect to "
+				<< m_doPulsePchgCorrect);
+		}
+		tmp = m_pvDoPulseVetoCorrect->value();
+		if ( tmp != m_doPulseVetoCorrect ) {
+			m_doPulseVetoCorrect = tmp;
+			DEBUG("markComplete(): Setting DoPulseVetoCorrect to "
+				<< m_doPulseVetoCorrect);
+		}
 	}
 
 	for ( it = m_pulses.begin(); it != last_minus_buffer; it++ ) {
