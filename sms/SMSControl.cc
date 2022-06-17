@@ -4848,7 +4848,12 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 
 	// ("cnt" already incremented above... :-)
 	if ( !(cnt % freq) ) {
-		m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
+		uint32_t tmp = m_pvNoEoPPulseBufferSize->value();
+		if ( tmp != m_noEoPPulseBufferSize ) {
+			m_noEoPPulseBufferSize = tmp;
+			DEBUG("markComplete(): Setting NoEoPPulseBufferSize to "
+				<< m_noEoPPulseBufferSize);
+		}
 	}
 
 	last_minus_buffer = last;
