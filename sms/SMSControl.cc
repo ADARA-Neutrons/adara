@@ -3673,7 +3673,8 @@ SMSControl::PulseMap::iterator SMSControl::getPulse(
 		// Infrequently Check Live Control PV for
 		// Max Pulse Buffer Size...
 		// (Once Per Minute...)
-		if ( !(++cnt % 3600) ) {
+		// ("cnt" already incremented above... :-)
+		if ( !(cnt % 3600) ) {
 			m_maxPulseBufferSize = m_pvMaxPulseBufferSize->value();
 		}
 
@@ -4845,6 +4846,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Once Every 10 Seconds...
 	uint32_t freq = 600;
 
+	// ("cnt" already incremented above... :-)
 	if ( !(cnt % freq) ) {
 		m_noEoPPulseBufferSize = m_pvNoEoPPulseBufferSize->value();
 	}
@@ -4900,6 +4902,7 @@ void SMSControl::markComplete(uint64_t pulseId, uint32_t dup,
 	// Settings from PVs...
 	// (Note: count already incremented above for
 	//    "No End-of-Pulse Buffer Size"...)
+	// ("cnt" already incremented above... :-)
 	if ( !(cnt % freq) ) {
 		m_doPulsePchgCorrect = m_pvDoPulsePchgCorrect->value();
 		m_doPulseVetoCorrect = m_pvDoPulseVetoCorrect->value();
