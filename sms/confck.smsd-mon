@@ -18,7 +18,7 @@ umask 0002
 # (Only output on errors...)
 UPDATE=0
 QUIET=0
-if [ "$1" == "--quiet" ]; then
+if [[ "$1" == "--quiet" ]]; then
 	QUIET=1
 elif [[ "$1" == "--update" ]]; then
 	UPDATE=1
