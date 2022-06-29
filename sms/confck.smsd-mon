@@ -49,7 +49,7 @@ MKNOD="/usr/bin/mknod"
 CRITICAL_MSGS="criticalMessages"
 SNSLOCAL="/SNSlocal"
 RSYSLOG_CACHE="${SNSLOCAL}/rsyslog.cache"
-ADARA_BINARIES="/home/controls/config-daq1/deploy"
+ADARA_BINARIES="/home/controls/config-daq1${ALT}/deploy"
 ADARA_LINKS="/usr/local/bin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
@@ -684,13 +684,14 @@ if [[ $UPDATE == 1 ]]; then
 			echo "MAILTO=idac_adara_notify@email.ornl.gov" >> $cron_file
 			echo "0-59/10 * * * * /SNS/users/$USER/stuff/exec/smsd_mon" \
 				>> $cron_file
-			echo "0 8,17 * * * /home/controls/config-daq1/confck --quiet" \
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-daq1${ALT}/confck --quiet" \
 				>> $cron_file
 			echo -n "0 8,17 * * * /usr/local/bin/liveconf" >> $cron_file
 			echo " --terse --quiet confck" >> $cron_file
 
 			if [[ -n ${ALT} ]]; then
-				echo "# SMS-MON" >> $cron_file
+				echo -e "\n# SMS-MON" >> $cron_file
 				echo -n "0-59/10 * * * *" >> $cron_file
 				echo -n " /SNS/users/$USER/stuff/exec/smsd_mon" \
 					>> $cron_file
@@ -698,7 +699,8 @@ if [[ $UPDATE == 1 ]]; then
 				echo -n "0 8,17 * * *" >> $cron_file
 				echo " /home/controls/config-daq1${ALT}/confck --quiet" \
 					>> $cron_file
-				echo -n "0 8,17 * * * /usr/local/bin/liveconf" >> $cron_file
+				echo -n "0 8,17 * * * /usr/local/bin/liveconf" \
+					>> $cron_file
 				echo -n " --config=" >> $cron_file
 				echo -n "\"${SNSLOCAL}/sms${ALT}/conf/smsd.conf\"" \
 					>> $cron_file
