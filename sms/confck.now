@@ -51,19 +51,19 @@ MKNOD="/usr/bin/mknod"
 CRITICAL_MSGS="criticalMessages"
 SNSLOCAL="/SNSlocal"
 RSYSLOG_CACHE="${SNSLOCAL}/rsyslog.cache"
-ADARA_BINARIES="/home/controls/config-now1/deploy"
+ADARA_BINARIES="/home/controls/config-now1${ALT}/deploy"
 ADARA_LINKS="/usr/local/bin"
-PVSD_BINARY="/home/controls/config-now1/deploy/pvsd"
+PVSD_BINARY="/home/controls/config-now1${ALT}/deploy/pvsd"
 PVSD_LINK="/usr/sbin/pvsd"
-STC_BINARIES="/home/controls/config-now1/deploy"
+STC_BINARIES="/home/controls/config-now1${ALT}/deploy"
 STC_LINKS="/usr/sbin"
-DASMON_BINARIES="/home/controls/config-now1/deploy"
+DASMON_BINARIES="/home/controls/config-now1${ALT}/deploy"
 DASMON_LINKS="/usr/sbin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
-cd /home/controls/config-now1/
+cd /home/controls/config-now1${ALT}/
 
 # Do We Have A DASMON Daemon Setup on This Host...?
 DO_DASMON_CONFCK=1
@@ -320,6 +320,113 @@ DIFF_DIR()
 	return ${_status}
 }
 
+CK_SNS_LOCAL_DIRS()
+{
+	# Only Check/Create the /SNSlocal/ SMS Directories in Update Mode!
+	if [[ $UPDATE == 1 ]]; then
+
+		# Check/Create Top Level /SNSlocal/ Directory for ADARA...
+		if [[ ! -d "${SNSLOCAL}" ]]; then
+			echo -e "\n*** ADARA SNS LOCAL Directory is Missing:"
+			echo -e "\n   ${SNSLOCAL}"
+			echo
+			/bin/ls -ld "${SNSLOCAL}"
+			echo -e -n "\nCreate the ADARA SNS LOCAL Directory? [yes|No] "
+			read ckSNSLocal
+			ckSNSLocal=`echo "$ckSNSLocal" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckSNSLocal" == "y" || "$ckSNSLocal" == "yes" ]]; then
+				sudo mkdir "${SNSLOCAL}"
+				sudo chmod +rx "${SNSLOCAL}"
+				echo
+				/bin/ls -ld "${SNSLOCAL}"
+			fi
+		fi
+
+		# Check/Create ADARA/SMS Daemon Directory...
+		local _smsdir="${SNSLOCAL}/sms${ALT}"
+		if [[ ! -d "${_smsdir}" ]]; then
+			echo -e "\n*** ADARA/SMS Daemon Directory is Missing:"
+			echo -e "\n   ${_smsdir}"
+			echo
+			/bin/ls -ld "${_smsdir}"
+			echo -e -n "\nCreate ADARA/SMS Daemon Directory? [yes|No] "
+			read ckSMSDir
+			ckSMSDir=`echo "$ckSMSDir" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckSMSDir" == "y" || "$ckSMSDir" == "yes" ]]; then
+				sudo mkdir "${_smsdir}"
+				sudo chown snsdata "${_smsdir}"
+				sudo chgrp adara "${_smsdir}"
+				sudo chmod g+ws "${_smsdir}"
+				echo
+				/bin/ls -ld "${_smsdir}"
+			fi
+		fi
+
+		# Check/Create ADARA/SMS Config Directory...
+		local _smsconf="${_smsdir}/conf"
+		if [[ ! -d "${_smsconf}" ]]; then
+			echo -e "\n*** ADARA/SMS Config Directory is Missing:"
+			echo -e "\n   ${_smsconf}"
+			echo
+			/bin/ls -ld "${_smsconf}"
+			echo -e -n "\nCreate ADARA/SMS Config Directory? [yes|No] "
+			read ckSMSConf
+			ckSMSConf=`echo "$ckSMSConf" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckSMSConf" == "y" || "$ckSMSConf" == "yes" ]]; then
+				sudo mkdir "${_smsconf}"
+				sudo chown snsdata "${_smsconf}"
+				sudo chgrp adara "${_smsconf}"
+				sudo chmod g+ws "${_smsconf}"
+				echo
+				/bin/ls -ld "${_smsconf}"
+			fi
+		fi
+
+		# Check/Create ADARA/SMS Data Directory...
+		local _smsdata="${_smsdir}/data"
+		if [[ ! -d "${_smsdata}" ]]; then
+			echo -e "\n*** ADARA/SMS Data Directory is Missing:"
+			echo -e "\n   ${_smsdata}"
+			echo
+			/bin/ls -ld "${_smsdata}"
+			echo -e -n "\nCreate ADARA/SMS Data Directory? [yes|No] "
+			read ckSMSData
+			ckSMSData=`echo "$ckSMSData" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckSMSData" == "y" || "$ckSMSData" == "yes" ]]; then
+				sudo mkdir "${_smsdata}"
+				sudo chown snsdata "${_smsdata}"
+				sudo chgrp adara "${_smsdata}"
+				sudo chmod g+ws "${_smsdata}"
+				echo
+				/bin/ls -ld "${_smsdata}"
+			fi
+		fi
+
+		# Check/Create ADARA/SMS "Next Run" File...
+		local _sms_next_run="${_smsdata}/next_run"
+		if [[ ! -f "${_sms_next_run}" ]]; then
+			echo -e "\n*** ADARA/SMS \"Next Run\" File is Missing:"
+			echo -e "\n   ${_sms_next_run}"
+			echo
+			/bin/ls -ld "${_sms_next_run}"
+			echo -e -n "\nCreate ADARA/SMS \"Next Run\" File? [yes|No] "
+			read ckSMSNextRun
+			ckSMSNextRun=`echo "$ckSMSNextRun" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckSMSNextRun" == "y"
+					|| "$ckSMSNextRun" == "yes" ]]; then
+				sudo vi "${_sms_next_run}"
+				sudo chown snsdata "${_sms_next_run}"
+				sudo chgrp adara "${_sms_next_run}"
+				sudo chmod g+w "${_sms_next_run}"
+				echo
+				/bin/ls -ld "${_sms_next_run}"
+				echo -e "\nNew ADARA/SMS \"Next Run\" File Contents:\n"
+				/bin/cat "${_sms_next_run}"
+			fi
+		fi
+	fi
+}
+
 # SMS Config Check
 SMS_CONFCK()
 {
@@ -331,7 +438,7 @@ SMS_CONFCK()
 	echo "Comparing Git Repo to Deployed:"
 
 	DIFF_DIR "SMSD${ALT} Config Files" "Deployed" \
-		./sms${ALT}/conf/ /SNSlocal/sms${ALT}/conf/
+		./sms${ALT}/conf/ ${SNSLOCAL}/sms${ALT}/conf/
 	if [ $? != 0 ]; then
 		echo "Directories/Files Differed...!"
 		(( _nerrors++ ))
@@ -473,7 +580,7 @@ SMS_CONFCK()
 	/bin/rm -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
 		echo \
-		 "Failure Deleting Temporary Admin Crontab File for SMSD${ALT}...!"
+		  "Failure Deleting Temporary Admin Crontab File for SMSD${ALT}...!"
 		(( _nerrors++ ))
 	fi
 
@@ -488,6 +595,7 @@ SMS_CONFCK()
 }
 
 if [[ $UPDATE == 1 ]]; then
+	CK_SNS_LOCAL_DIRS
 	SMS_CONFCK
 	_ckSMSconfck=$?
 else
@@ -1110,8 +1218,10 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			# Note: Now Already Handled in CK_SNS_LOCAL_DIRS()...
 			if [[ ! -d "${SNSLOCAL}" ]]; then
 				sudo mkdir "${SNSLOCAL}"
+				sudo chmod +rx "${SNSLOCAL}"
 			fi
 			sudo mkdir "${RSYSLOG_CACHE}"
 			sudo chown snsdata "${RSYSLOG_CACHE}"
@@ -1141,7 +1251,8 @@ if [[ $UPDATE == 1 ]]; then
 			echo -e "\n# SMS" >> $cron_file
 			echo "0-59/10 * * * * /SNS/users/$USER/stuff/exec/smsd_mon" \
 				>> $cron_file
-			echo "0 8,17 * * * /home/controls/config-now1/confck --quiet" \
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-now1${ALT}/confck --quiet" \
 				>> $cron_file
 			echo -n "0 8,17 * * * /usr/local/bin/liveconf" >> $cron_file
 			echo " --terse --quiet confck" >> $cron_file
@@ -1151,19 +1262,20 @@ if [[ $UPDATE == 1 ]]; then
 				echo -n "0-59/10 * * * *" >> $cron_file
 				echo -n " /SNS/users/$USER/stuff/exec/smsd_mon" \
 					>> $cron_file
-				echo " --alt=\"-mon\"" >> $cron_file
+				echo " --alt=\"${ALT}\"" >> $cron_file
 				echo -n "0 8,17 * * *" >> $cron_file
-				echo " /home/controls/config-now1-mon/confck --quiet" \
+				echo " /home/controls/config-now1${ALT}/confck --quiet" \
 					>> $cron_file
 				echo -n "0 8,17 * * * /usr/local/bin/liveconf" \
 					>> $cron_file
-				echo -n " --config=/SNSlocal/sms-mon/conf/smsd.conf" \
+				echo -n " --config=" >> $cron_file
+				echo -n "\"${SNSLOCAL}/sms${ALT}/conf/smsd.conf\"" \
 					>> $cron_file
 				echo " --terse --quiet confck" >> $cron_file
 				echo -n "1 0 * * *" >> $cron_file
 				echo -n " /SNS/users/$USER/stuff/exec/bump_mon_run" \
 					>> $cron_file
-				echo " --config=\"/SNSlocal/sms-mon/conf/smsd.conf\"" \
+				echo " --config=\"${SNSLOCAL}/sms${ALT}/conf/smsd.conf\"" \
 					>> $cron_file
 			fi
 
