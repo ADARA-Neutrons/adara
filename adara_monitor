@@ -257,17 +257,18 @@ CLEAR_PREVIOUS_CACHE()
 	if [[ ! -f "${CACHE_DIR}/${PREVIOUS}" ]]; then
 		echo -e "\nNo Previous ADARA Summary Marker File Found..."
 		echo "Ignoring Command."
-		return
+	else
+
+		echo -e -n "\nRemoving Any Previously Processed Local Cache Files "
+		echo -e "or Leftover Summaries:\n"
+
+		# Remove Any Older Files than the Previous ADARA Summary Marker File
+		find "${CACHE_DIR}/" \
+			-mindepth 1 -not -cnewer "${CACHE_DIR}/${PREVIOUS}" \
+			-and -not -path "${CACHE_DIR}/${PREVIOUS}" \
+			-print -exec /bin/rm -f {} \;
+
 	fi
-
-	echo -e -n "\nRemoving Any Previously Processed Local Cache Files "
-	echo -e "or Leftover Summaries:\n"
-
-	# Remove Any Older Files than the Previous ADARA Summary Marker File...
-	find "${CACHE_DIR}/" \
-		-mindepth 1 -not -cnewer "${CACHE_DIR}/${PREVIOUS}" \
-		-and -not -path "${CACHE_DIR}/${PREVIOUS}" \
-		-print -exec /bin/rm -f {} \;
 
 	# Generate a New ADARA Summary Now...
 	echo -e "\nRefreshing ADARA Summary..."
