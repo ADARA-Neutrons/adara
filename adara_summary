@@ -101,6 +101,7 @@ declare -A nHostUnknownLogs
 declare -A nHostAltLogs
 
 declare -A nHostSTCLDAPLookupUserName
+declare -A nHostSTCLDAPLookupUserNameUIDs
 declare -A nHostSTCLDAPSearchFailed
 declare -A nHostSTCMoreThanOnePVValue
 declare -A nHostSTCMoreThanOnePVValuePIDs
@@ -340,6 +341,7 @@ PARSE_LOG()
 		nHostAltLogs[$host]=0
 
 		nHostSTCLDAPLookupUserName[$host]=0
+		nHostSTCLDAPLookupUserNameUIDs[$host]=""
 		nHostSTCLDAPSearchFailed[$host]=0
 		nHostSTCMoreThanOnePVValue[$host]=0
 		nHostSTCMoreThanOnePVValuePIDs[$host]=""
@@ -575,11 +577,15 @@ PARSE_LOG()
 			awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		fi
 
-		# "stcLDAPLookupUserName()" Log
-		if [[ "$log" =~ stcLDAPLookupUserName ]]; then
-			#echo "LDAP Lookup User Name..."
+		# "stcLdapLookupUserName(): LDAP User Name Not Found" Log
+		if [[ "$log" =~ LDAP${S}User${S}Name${S}Not${S}Found ]]; then
+			#echo "LDAP User Name Not Found..."
 			nHostSTCLDAPLookupUserName[$host]=$(( \
 				nHostSTCLDAPLookupUserName[$host] + 1 ))
+			uidarg=`echo "$log" | awk '{print $8}'`
+			uid=`echo "${uidarg%?}" | awk -F = '{print $2}'`
+			nHostSTCLDAPLookupUserNameUIDs[$host]="\
+				${nHostSTCLDAPLookupUserNameUIDs[$host]}${uid}\n"
 
 		# "stcLdapConnect(): LDAP Search Failed" Log
 		elif [[ "$log" =~ \
@@ -2279,7 +2285,10 @@ for h in ${HostList} ; do
 	fi
 	if [[ ${nHostSTCLDAPLookupUserName[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTCLDAPLookupUserName[$h]} "
-		echo "STC \"LDAP Lookup User Name\" Logs"
+		echo "STC \"LDAP User Name Not Found\" Logs"
+		uidlist=`echo -e "${nHostSTCLDAPLookupUserNameUIDs[$h]//	/}" \
+			| sed -e '/^$/d' -e 's/[][]//g' | sort -u`
+		echo "        UIDs: "${uidlist}
 	fi
 	if [[ ${nHostSTCComBusConnTimeout[$h]} -gt 0 ]]; then
 		echo -n "   ${nHostSTCComBusConnTimeout[$h]} "
