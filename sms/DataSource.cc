@@ -2250,6 +2250,15 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 			 * we need to Unregister Any DataSource that sends us one...!
 			 * (or else we'll buffer everything else, swell up & pop! ;-)
 			 */
+			// Also, If the DataSource has Gone Event-Idle (Heartbeat)
+			// Then We Need to "Count" the Heartbeat Packet Timestamp
+			// As the Possible Max DataSource Time (for Container Cleanup)
+			if ( compareTimeStamps( // Wallclock Time...!
+					pkt.timestamp(), m_maxTime ) > 0 ) {
+				m_maxTime = pkt.timestamp(); // Wallclock Time...!
+				m_ctrl->updateMaxDataSourceTime( m_smsSourceId,
+					&m_maxTime ); // Wallclock Time...!
+			}
 			return Parser::rxPacket(pkt);
 
 		case ADARA::PacketType::SYNC_TYPE:
@@ -2341,8 +2350,8 @@ bool DataSource::rxOversizePkt( const ADARA::PacketHeader *hdr,
 			ERROR(log_info
 				<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 				<< "Oversized packet"
-				<< " at " << hdr->timestamp().tv_sec
-					- ADARA::EPICS_EPOCH_OFFSET
+				<< " at " << hdr->timestamp().tv_sec // Wallclock Time...!
+					- ADARA::EPICS_EPOCH_OFFSET // EPICS Time...!
 				<< "." << std::setfill('0') << std::setw(9)
 				<< hdr->timestamp().tv_nsec << std::setw(0)
 				<< " of type 0x" << std::hex << hdr->type() << std::dec
@@ -3633,8 +3642,8 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 			<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
 			<< "External Annotation Packet Received from " << m_name
 			<< ss.str()
-			<< " at " << pkt.timestamp().tv_sec
-				- ADARA::EPICS_EPOCH_OFFSET
+			<< " at " << pkt.timestamp().tv_sec // Wallclock Time...!
+				- ADARA::EPICS_EPOCH_OFFSET // EPICS Time...!
 			<< "." << std::setfill('0') << std::setw(9)
 			<< pkt.timestamp().tv_nsec);
 	}
@@ -3710,8 +3719,8 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 					<< " - Execute:"
 					<< " Command=[" << pkt.comment() << "]"
 					<< " scanIndex=" << pkt.scanIndex()
-					<< " at " << pkt.timestamp().tv_sec
-						- ADARA::EPICS_EPOCH_OFFSET
+					<< " at " << pkt.timestamp().tv_sec // Wallclock Time!
+						- ADARA::EPICS_EPOCH_OFFSET // EPICS Time...!
 					<< "." << std::setfill('0') << std::setw(9)
 					<< pkt.timestamp().tv_nsec );
 				m_ctrl->externalRunControl( &ts, // Wallclock Time...!
@@ -3723,7 +3732,7 @@ bool DataSource::rxPacket(const ADARA::AnnotationPkt &pkt)
 	return false;
 }
 
-bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
+bool DataSource::rxPacket(const ADARA::HeartbeatPkt &pkt)
 {
 	/* Rate-limited logging of heartbeat packets */
 	std::string log_info;
@@ -3743,6 +3752,12 @@ bool DataSource::rxPacket(const ADARA::HeartbeatPkt &UNUSED(pkt))
 	updateBandwidthSecond( now, do_log );
 	updateBandwidthMinute( now, do_log );
 	updateBandwidthTenMin( now, do_log );
+
+	// Check to Make Sure Whether We Should Expire Any
+	// Containers (or Embedded PauseModes...)
+	struct timespec ts = pkt.timestamp(); // Wallclock Time...!
+	ts.tv_sec -= ADARA::EPICS_EPOCH_OFFSET; // EPICS Time...!
+	StorageManager::checkContainerTimeout( "HeartbeatPkt", ts );
 
 	// In case this DataSource was formerly registered and sending events,
 	// we need to *Unregister All Registered SourceIds* when we receive a
@@ -3776,7 +3791,7 @@ void DataSource::onSavePrologue( bool UNUSED(capture_last) )
 	pkt[1] = ADARA_PKT_TYPE(
 		ADARA::PacketType::STREAM_ANNOTATION_TYPE,
 		ADARA::PacketType::STREAM_ANNOTATION_VERSION );
-	pkt[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
+	pkt[2] = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET; // EPICS Time...!
 	pkt[3] = now.tv_nsec;
 
 	pkt[4] = (uint32_t) ADARA::MarkerType::SYSTEM << 16;
