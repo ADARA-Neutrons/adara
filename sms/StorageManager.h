@@ -78,6 +78,9 @@ public:
 		savePacket(iovec, dataSourceId, pkt_base_type);
 	}
 
+	static void checkContainerTimeout( std::string label,
+			struct timespec &ts ); // EPICS Time...!
+
 	static void notify(void);
 
 	static void addPrologue(IoVector &iovec);
