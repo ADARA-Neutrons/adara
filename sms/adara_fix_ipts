@@ -64,6 +64,10 @@ PROD_BASE_URL="https://snsapp1.sns.ornl.gov/xprod_ro/proposal_production"
 
 GET_PROPOSAL_BY_ID="express/getIPTSByPrpsl"
 
+ONCAT_AUTH="/SNS/users/${USER}/ONCat.Authentication.Certificate.txt"
+
+ONCAT_URL="https://oncat.ornl.gov/api/datafiles"
+
 #NOTIFY_EMAIL_LIST="parkerpg@ornl.gov rens@ornl.gov kohlja@ornl.gov"
 NOTIFY_EMAIL_LIST="kohlja@ornl.gov"
 
@@ -775,16 +779,88 @@ RESUBMIT_RUN()
 		echo
 
 		${FINDNEXUS} -i ${INST} ${run}
-		ckfindnexus=$?
+		local _ckfindnexus=$?
 
-		if [[ ${ckfindnexus} != 0 ]]; then
-			echo -e -n "\nERROR Checking FindNeXus to Verify "
-			echo "the Proposal Move for Run ${run}!"
+		if [[ ${_ckfindnexus} != 0 ]]; then
+			echo -e -n "\nERROR Checking FindNeXus to Verify"
+			echo " the Proposal Move for Run ${run}!"
 			echo -e "\n\t${FINDNEXUS} -i ${INST} ${run}"
 			CHECK_PROCEED
 			echo -e "\nContinuing..."
 			# No Need to Give Up/Return Here, Just FindNeXus Check...
 		fi
+
+	fi
+
+	#
+	# Now Update the Catalog to Remove the Original Run Data File Location
+	#
+
+	# Prompt User for Old Catalog Remove Check...
+	local _ckrmoldcat
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED \
+			"Update the Catalog to Remove the Original Data File Location"
+		_ckrmoldcat=$?
+	else
+		_ckrmoldcat=1		# Default to *Updating* the Catalog...
+	fi
+
+	# Did We Already Update the Catalog to Remove the Original Data File?
+	local _didweupdatethecatalog="Did Not"
+
+	if [[ ${_ckrmoldcat} == 0 ]]; then
+
+		echo -e -n "\nUpdating the Catalog to Remove"
+		echo -e " the Original Data File Location."
+
+		# Base ONCat Curl Command...
+		local _catcmd="curl -X DELETE"
+
+		# Get Special ONCat Authentication Certificate from User Area
+		local _catauth=`/bin/cat ${ONCAT_AUTH}`
+		_catcmd="${_catcmd} -H 'Authorization: Bearer ${_catauth}'"
+
+		# Construct Run NeXus Data File URL Location Reference
+		local _nxsurl="${ONCAT_URL}/${FACILITY}/${INST}/${IPTS_OLD}/nexus"
+		_nxsurl="${_nxsurl}/${INST}_${run}.nxs.h5"
+
+		local _catopt="?facility=${FACILITY}"
+		_catopt="${_catopt}&instrument=${INST}"
+
+		# Assemble Full ONCat Catalog Remove Command
+		_catcmd="${_catcmd} \"${_nxsurl}${_catopt}\""
+
+		echo -e "\nExecuting ONCat Catalog Remove Command:"
+		echo -e "\n   ${_catcmd}"
+
+		${_catcmd}
+		local _ckcatcmd=$?
+
+		if [[ ${_ckcatcmd} != 0 ]]; then
+			echo -e -n "\nERROR Updating the Catalog to Remove"
+			echo " the Original Data File Location for Run ${run}!"
+			CHECK_PROCEED
+			echo -e "\nContinuing..."
+			# No Need to Give Up/Return Here, Just Move On...
+		else
+			_didweupdatethecatalog="Did"
+		fi
+
+		# Just In Case, Spew Forth the Command to Undo What We Just Did!
+
+		# Base ONCat Curl Command...
+		local _undocatcmd="curl -X POST"
+
+		# Special ONCat Authentication Certificate (from User Area)
+		_undocatcmd="${_undocatcmd} -H 'Authorization: Bearer ${_catauth}'"
+
+		# Assemble Full ONCat Catalog Remove Command
+		_undocatcmd="${_undocatcmd} \"${_nxsurl}/ingest\""
+
+		echo -e "\nBtw, If This ONCat Catalog Removal Was In Error,"
+		echo -e "Then This is the Magic \"Undo\" Command:"
+		echo -e "\n   ${_undocatcmd}"
 
 	fi
 
@@ -827,8 +903,12 @@ to the New Proposal:
 
 	${IPTS_NEW} (${TITLE_NEW})
 
+We ***${_didweupdatethecatalog}*** Already Update the Catalog Database
+to Remove the Reference to the Original NeXus Data File.
+
 Please Verify This Update to the ${FACILITY} Catalog Database,
-and Remove Any Duplicate Records referring to the Old Proposal.
+and Remove Any Duplicate Records referring to the Old Proposal
+(as needed).
 
 Thank You! :-D
 
@@ -836,11 +916,11 @@ Thank You! :-D
 
 NotifyEmailContent
 
-		ckmail=$?
+		local _ckmail=$?
 
-		if [[ ${ckmail} != 0 ]]; then
-			echo -e -n "\nERROR Sending Email Notification "
-			echo "to Catalog Admins for Run ${run}!"
+		if [[ ${_ckmail} != 0 ]]; then
+			echo -e -n "\nERROR Sending Email Notification"
+			echo " to Catalog Admins for Run ${run}!"
 			echo -e "\n\tTo: ${NOTIFY_EMAIL_LIST}"
 			echo -e "\n\tSubject: ${_subject}"
 			CHECK_PROCEED
@@ -2660,7 +2740,7 @@ for run in ${RUN_NUMBERS} ; do
 	fi
 
 	#
-	# Now That We're Done Substituting,
+	# Now That We Are Done Substituting,
 	# See If We Still Need to Absorb Yet More White Space... ;-o
 	#
 
