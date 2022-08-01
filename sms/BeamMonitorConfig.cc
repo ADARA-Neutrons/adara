@@ -388,8 +388,7 @@ public:
 
 		SMSControl *ctrl = SMSControl::getInstance();
 
-		std::string prefix(ctrl->getBeamlineId());
-		prefix += ":SMS";
+		std::string prefix(ctrl->getPVPrefix());
 		prefix += ":BeamMonitor:";
 
 		std::stringstream ss;
@@ -606,8 +605,7 @@ BeamMonitorConfig::BeamMonitorConfig(
 
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	std::string prefix(ctrl->getBeamlineId());
-	prefix += ":SMS";
+	std::string prefix(ctrl->getPVPrefix());
 
 	m_pvNumBeamMonitors = boost::shared_ptr<smsUint32PV>( new
 						smsUint32PV(prefix + ":Control:NumBeamMonitors") );

@@ -30,7 +30,7 @@ fi
 # ADARA Git Repo
 if [ -z "$ADARA_DIR" ]; then
 	ADARA_DIR="/usr/local/src/ADARA"
-	#ADARA_DIR="/SNS/users/y8y/gitsrc/ADARA"
+	#ADARA_DIR="/SNS/users/$USER/gitsrc/ADARA"
 elif [[ $QUIET == 0 ]]; then
 	echo "Inheriting ADARA_DIR Value from User Environment:"
 	echo -e "\t[${ADARA_DIR}]"
@@ -292,14 +292,14 @@ CONFCK()
 	echo
 
 	_check_update=0
-	crontab -l > /tmp/y8y.crontab.$$ 2>&1
-	if [[ $? != 0 || ! -s /tmp/y8y.crontab.$$ ]]; then
+	crontab -l > /tmp/$USER.crontab.$$ 2>&1
+	if [[ $? != 0 || ! -s /tmp/$USER.crontab.$$ ]]; then
 		echo "Failure Retrieving ADARA Admin Crontab for PVSD...!"
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo "diff ./pvsd/y8y.crontab /tmp/y8y.crontab.$$"
-		diff ./pvsd/y8y.crontab /tmp/y8y.crontab.$$
+		echo "diff ./pvsd/$USER.crontab /tmp/$USER.crontab.$$"
+		diff ./pvsd/$USER.crontab /tmp/$USER.crontab.$$
 		if [ $? != 0 ]; then
 			echo "ADARA Admin Crontab for PVSD Differed...!"
 			_check_update=1
@@ -313,7 +313,7 @@ CONFCK()
 		echo "Defer Fixing of PVSD Admin Crontab..."
 		echo "(See Admin Crontab Create Below, or Fix Manually.)"
 	fi
-	/bin/rm -f /tmp/y8y.crontab.$$
+	/bin/rm -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
 		echo "Failure Deleting Temporary Admin Crontab File for PVSD...!"
 		(( _nerrors++ ))
@@ -467,9 +467,11 @@ if [[ $UPDATE == 1 ]]; then
 			echo "0 * * * * /usr/local/bin/beamline_xml_mon.sh --quiet" \
 				>> $cron_file
 			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
-			echo "0 8 * * * /SNS/users/y8y/gitsrc/ADARA/adara_monitor --oneshot" \
+			echo -n "0 8 * * *" >> $cron_file
+			echo " /SNS/users/$USER/gitsrc/ADARA/adara_monitor --oneshot" \
 				>> $cron_file
-			echo -e "\n*/10 * * * * /usr/local/bin/rsyslogMailer > /dev/null 2>&1" \
+			echo -e -n "\n*/10 * * * *" >> $cron_file
+			echo " /usr/local/bin/rsyslogMailer > /dev/null 2>&1" \
 				>> $cron_file
 			# Install Administrator Crontab
 			crontab $cron_file

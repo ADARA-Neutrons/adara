@@ -101,56 +101,55 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	m_useFirstNotesComment(false),
 	m_runNumber(0), m_lastRunNumber(0), m_scanIndex(0), m_lastScanIndex(0)
 {
-	std::string prefix(ctrl->getBeamlineId());
-	prefix += ":SMS:";
+	std::string prefix(ctrl->getPVPrefix());
 
-	m_pausedPV.reset( new MarkerPausedPV( prefix + "Paused", this ) );
+	m_pausedPV.reset( new MarkerPausedPV( prefix + ":Paused", this ) );
 	ctrl->addPV(m_pausedPV);
 
-	prefix += "Marker:";
+	prefix += ":Marker";
 
-	m_commentPV.reset( new smsStringPV( prefix + "Comment" ) );
+	m_commentPV.reset( new smsStringPV( prefix + ":Comment" ) );
 	ctrl->addPV(m_commentPV);
 
-	m_indexPV.reset( new smsUint32PV( prefix + "ScanIndex" ) );
+	m_indexPV.reset( new smsUint32PV( prefix + ":ScanIndex" ) );
 	ctrl->addPV(m_indexPV);
 
-	m_scanStartPV.reset( new MarkerTriggerPV( prefix + "StartScan",
+	m_scanStartPV.reset( new MarkerTriggerPV( prefix + ":StartScan",
 			boost::bind( &Markers::startScan,
 				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_scanStartPV);
 
-	m_scanStopPV.reset( new MarkerTriggerPV( prefix + "StopScan",
+	m_scanStopPV.reset( new MarkerTriggerPV( prefix + ":StopScan",
 			boost::bind( &Markers::stopScan,
 				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_scanStopPV);
 
-	m_annotatePV.reset( new MarkerTriggerPV( prefix + "Annotate",
+	m_annotatePV.reset( new MarkerTriggerPV( prefix + ":Annotate",
 			boost::bind( &Markers::annotate,
 				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_annotatePV);
 
-	m_runCommentPV.reset( new MarkerTriggerPV( prefix + "RunComment",
+	m_runCommentPV.reset( new MarkerTriggerPV( prefix + ":RunComment",
 			boost::bind( &Markers::addRunComment,
 				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_runCommentPV);
 
-	m_scanCommentPV.reset( new MarkerCommentPV( prefix + "ScanComment",
+	m_scanCommentPV.reset( new MarkerCommentPV( prefix + ":ScanComment",
 			boost::bind( &Markers::addScanComment,
 				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_scanCommentPV);
 
-	m_notesCommentPV.reset( new MarkerCommentPV( prefix + "NotesComment",
+	m_notesCommentPV.reset( new MarkerCommentPV( prefix + ":NotesComment",
 			boost::bind( &Markers::addNotesComment,
 				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_notesCommentPV);
 
 	m_notesCommentAutoResetPV.reset( new smsBooleanPV(
-			prefix + "NotesCommentAutoReset", /* AutoSave */ true ) );
+			prefix + ":NotesCommentAutoReset", /* AutoSave */ true ) );
 	ctrl->addPV(m_notesCommentAutoResetPV);
 
 	m_annotationCommentPV.reset(
-		new MarkerCommentPV( prefix + "AnnotationComment",
+		new MarkerCommentPV( prefix + ":AnnotationComment",
 			boost::bind( &Markers::addAnnotationComment,
 				this, _1, _2, _3, _4 ) ) );
 	ctrl->addPV(m_annotationCommentPV);
@@ -481,6 +480,12 @@ void Markers::resume( struct timespec *ts, // Wallclock Time...!
 			std::pair<struct timespec, std::string>( *ts,
 				"[PRE-RUN] " + ss.str() + comment ) );
 	}
+}
+
+// Public Method for Setting Local MarkerPausePV Class Instance... ;-D
+void Markers::updatePausedPV( bool paused, struct timespec *ts )
+{
+	m_pausedPV->update( paused, ts ); // Wallclock Time...!
 }
 
 void Markers::startScan( struct timespec *ts, // Wallclock Time...!

@@ -67,6 +67,8 @@ public:
 
     std::string getBeamShortName() const
         { return m_beamline_info.instr_shortname; }
+    std::string getBeamLongName() const
+        { return m_beamline_info.instr_longname; }
     std::string getFacilityName() const
         { return m_run_info.facility_name; }
     std::string getProposalID() const

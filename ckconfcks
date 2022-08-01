@@ -3,7 +3,7 @@
 # Check ConfCk Templates Script... ;-D
 #
 
-TARGET_DIR=/SNS/users/y8y
+TARGET_DIR=/SNS/users/$USER
 
 CONFCKS="./dasmon/server/confck.dasmon \
 	./stc/confck.stc \

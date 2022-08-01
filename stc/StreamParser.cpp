@@ -337,21 +337,30 @@ StreamParser::processStream()
             {
                 if ( m_processing_state != DONE_PROCESSING )
                 {
+                    stringstream ss;
+                    ss << m_run_info.facility_name
+                        << " " << m_beamline_info.instr_longname
+                        << " (" << m_beamline_info.instr_shortname << ")"
+                        << " Run " << m_run_info.run_number
+                        << " " << m_run_info.proposal_id;
+
                     syslog( LOG_ERR,
-                    "[%i] STC failed %s: %s, %s (%s = %s)! [%s]",
+                    "[%i] STC failed %s: %s, %s (%s = %s)! %s [%s]",
                         g_pid, "processStream()", "Connection Failed",
                         "Not Done Processing", "Processing State",
                         getProcessingStateString().c_str(),
+                        ss.str().c_str(),
                         log_info.c_str() );
 
                     if ( m_processing_state == PROCESSING_EVENTS )
                     {
                         syslog( LOG_ERR,
-                            "[%i] %s %s: %s, %s (%s = %s)!",
+                            "[%i] %s %s: %s, %s (%s = %s)! %s",
                             g_pid, "STC Error:", "processStream()",
                             "Connection Failed", "Still Processing Events",
                             "Processing State",
-                            getProcessingStateString().c_str() );
+                            getProcessingStateString().c_str(),
+                            ss.str().c_str() );
 
                         // On fatal error, flush buffers to Nexus
                         // before terminating
@@ -3510,10 +3519,18 @@ StreamParser::rxPacket
 
     else if ( m_processing_state != DONE_PROCESSING )
     {
+        stringstream ss;
+        ss << m_run_info.facility_name
+            << " " << m_beamline_info.instr_longname
+            << " (" << m_beamline_info.instr_shortname << ")"
+            << " Run " << m_run_info.run_number
+            << " " << m_run_info.proposal_id;
+
         syslog( LOG_INFO,
-            "[%i] STC failed: Data Done Received, %s (%s = %s)!",
+            "[%i] STC failed: Data Done Received, %s (%s = %s)! %s",
             g_pid, "Not Done Processing", "Processing State",
-            getProcessingStateString().c_str() );
+            getProcessingStateString().c_str(),
+            ss.str().c_str() );
         give_syslog_a_chance;
 
         if ( m_processing_state == PROCESSING_EVENTS )

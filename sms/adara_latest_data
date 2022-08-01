@@ -40,6 +40,8 @@ USAGE()
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
 	echo "    [--extra_parser_args=\"--events\"]  \\"
 	echo "    [--search=\" [56]00[0-5]\"]  \\"
+	echo "    [--extra_search_args=\"-B 1 -A 3\"]  \\"
+	echo "    [--extra_tail_args=\"-20\"]  \\"
 	echo "    [--help|-h]"
 	echo
 }
@@ -88,6 +90,10 @@ TIMEOUT=1
 EXTRA_PARSER_ARGS=""
 
 SEARCH=""
+
+EXTRA_SEARCH_ARGS=""
+
+EXTRA_TAIL_ARGS=""
 
 for arg in "$@" ; do
 
@@ -145,6 +151,14 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--search#' ]]; then
 		SEARCH="${SEARCH} -e \"${value}\""
 		echo -e "\nSetting Parser Search Pattern(s) to:\n\t[${SEARCH}]"
+	elif [[ "#$key#" == '#--extra_search_args#' ]]; then
+		EXTRA_SEARCH_ARGS="${value}"
+		echo -e "\nSetting Extra Search Args to:"
+		echo -e "\n\t[${EXTRA_SEARCH_ARGS}]"
+	elif [[ "#$key#" == '#--extra_tail_args#' ]]; then
+		EXTRA_TAIL_ARGS="${value}"
+		echo -e "\nSetting Extra Tail Args to:"
+		echo -e "\n\t[${EXTRA_TAIL_ARGS}]"
 	elif [[ "#$key#" == '#--help#' || "#$key#" == '#-h#' ]]; then
 		USAGE
 		exit 0
@@ -163,8 +177,11 @@ CMD_USAGE()
 	echo -e "  P or p     = Parse Latest Raw Data File (Thru Less)\n"
 	echo -e "  G or g     = Grep Latest Raw Data File for Search Pattern\n"
 	echo -e "  T or t     = Tail Latest Raw Data File, Search for Pattern\n"
+	echo -e "  R or r     = Set Extra Parser Args (e.g. \"--events\")\n"
 	echo -e "  S or s     = Set Search Pattern\n"
+	echo -e "  C or c     = Set Extra "Search" Args (e.g. \"-B 1 -A 3\")\n"
 	echo -e "  A or a     = Append to Search Pattern\n"
+	echo -e "  L or l     = Set Extra Tail Args (e.g. \"-20\")\n"
 	echo -e "H or h or ?  = Display this Interactive Command Usage\n"
 }
 
@@ -191,7 +208,7 @@ DO_CMD()
 			echo -e "   for Search Pattern [${SEARCH}]"
 			${ADARA_PARSER} ${EXTRA_PARSER_ARGS} \
 				"${fullrawdir}/${datafile}" \
-					| eval "${GREP} ${SEARCH}" \
+					| eval "${GREP} ${EXTRA_SEARCH_ARGS} ${SEARCH}" \
 					| ${Less}
 		fi
 	elif [[ "${_cmd}" == "T" || "${_cmd}" == "t" ]]; then
@@ -202,22 +219,41 @@ DO_CMD()
 		else
 			echo -e "\nTail Latest Raw Data File [${datafile}]"
 			echo -e "   Searching for Pattern [${SEARCH}]"
+			echo -e "---------"
 			${ADARA_PARSER} ${EXTRA_PARSER_ARGS} \
 				"${fullrawdir}/${datafile}" \
-					| eval "${GREP} ${SEARCH}" \
-					| ${TAIL}
+					| eval "${GREP} ${EXTRA_SEARCH_ARGS} ${SEARCH}" \
+					| ${TAIL} ${EXTRA_TAIL_ARGS}
 			CHECK_PROCEED
 		fi
+	elif [[ "${_cmd}" == "R" || "${_cmd}" == "r" ]]; then
+		echo -e -n "\nPlease Enter New Extra ADARA Parser Args: "
+		IFS="" read pattern
+		EXTRA_PARSER_ARGS="${pattern}"
+		echo -e "\nNew Extra ADARA Parser Args Set to:"
+		echo -e "\n\t[${EXTRA_PARSER_ARGS}]"
 	elif [[ "${_cmd}" == "S" || "${_cmd}" == "s" ]]; then
 		echo -e -n "\nPlease Enter New Search Pattern: "
 		IFS="" read pattern
 		SEARCH="-e \"${pattern}\""
 		echo -e "\nNew Search Pattern Set to: [${SEARCH}]"
+	elif [[ "${_cmd}" == "C" || "${_cmd}" == "c" ]]; then
+		echo -e -n "\nPlease Enter New Extra Search Args: "
+		IFS="" read pattern
+		EXTRA_SEARCH_ARGS="${pattern}"
+		echo -e "\nNew Extra Search Args Set to:"
+		echo -e "\n\t[${EXTRA_SEARCH_ARGS}]"
 	elif [[ "${_cmd}" == "A" || "${_cmd}" == "a" ]]; then
 		echo -e -n "\nPlease Enter Search Pattern to Append: "
 		read pattern
 		SEARCH="${SEARCH} -e \"${pattern}\""
 		echo -e "\nSearch Pattern Appended to: [${SEARCH}]"
+	elif [[ "${_cmd}" == "L" || "${_cmd}" == "l" ]]; then
+		echo -e -n "\nPlease Enter New Extra Tail Args: "
+		IFS="" read pattern
+		EXTRA_TAIL_ARGS="${pattern}"
+		echo -e "\nNew Extra Tail Args Set to:"
+		echo -e "\n\t[${EXTRA_TAIL_ARGS}]"
 	elif [[ "${_cmd}" == "H" || "${_cmd}" == "h" \
 			|| "${_cmd}" == "?" ]]; then
 		CMD_USAGE

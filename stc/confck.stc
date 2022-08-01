@@ -29,7 +29,7 @@ fi
 # ADARA Git Repo
 if [[ -z "$ADARA_DIR" ]]; then
 	ADARA_DIR="/usr/local/src/ADARA"
-	#ADARA_DIR="/SNS/users/y8y/gitsrc/ADARA"
+	#ADARA_DIR="/SNS/users/$USER/gitsrc/ADARA"
 elif [[ $QUIET == 0 ]]; then
 	echo "Inheriting ADARA_DIR Value from User Environment:"
 	echo -e "\t[${ADARA_DIR}]"
@@ -126,8 +126,8 @@ CONFIG_DIFF_DIR()
 			echo -e "Ignoring stc.deployment.history.txt.\n"
 		elif [ "${_file}" == "stat_list" ]; then
 			echo -e "Ignoring Stat List File: stat_list.\n"
-		elif [ "${_file}" == "y8y.crontab" ]; then
-			echo -e "Ignoring ADARA Admin Crontab File: y8y.crontab\n"
+		elif [ "${_file}" == "$USER.crontab" ]; then
+			echo -e "Ignoring ADARA Admin Crontab File: $USER.crontab\n"
 		else
 
 			# File Diff
@@ -206,14 +206,14 @@ CONFCK()
 	echo
 
 	local _check_update=0
-	crontab -l > /tmp/y8y.crontab.$$ 2>&1
-	if [[ $? != 0 || ! -s /tmp/y8y.crontab.$$ ]]; then
+	crontab -l > /tmp/$USER.crontab.$$ 2>&1
+	if [[ $? != 0 || ! -s /tmp/$USER.crontab.$$ ]]; then
 		echo "Failure Retrieving ADARA Admin Crontab for STC...!"
 		_check_update=1
 		diff_cnt=$(( $diff_cnt + 1 ))
 	else
-		echo "diff ./y8y.crontab /tmp/y8y.crontab.$$"
-		diff ./y8y.crontab /tmp/y8y.crontab.$$
+		echo "diff ./$USER.crontab /tmp/$USER.crontab.$$"
+		diff ./$USER.crontab /tmp/$USER.crontab.$$
 		if [ $? != 0 ]; then
 			echo "ADARA Admin Crontab for STC Differed...!"
 			_check_update=1
@@ -227,7 +227,7 @@ CONFCK()
 		echo "Defer Fixing of STC Admin Crontab..."
 		echo "(See Admin Crontab Create Below, or Fix Manually.)"
 	fi
-	/bin/rm -f /tmp/y8y.crontab.$$
+	/bin/rm -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
 		echo "Failure Deleting Temporary Admin Crontab File for STC...!"
 		diff_cnt=$(( $diff_cnt + 1 ))
@@ -358,7 +358,8 @@ if [[ $UPDATE == 1 ]]; then
 			echo " /home/controls/config-stc-config-dummy/confck --quiet" \
 				>> $cron_file
 			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
-			echo -n "0 8 * * * /SNS/users/y8y/gitsrc/ADARA/adara_monitor" \
+			echo -n "0 8 * * *" >> $cron_file
+			echo -n " /SNS/users/$USER/gitsrc/ADARA/adara_monitor" \
 				>> $cron_file
 			echo " --oneshot" >> $cron_file
 			echo >> $cron_file

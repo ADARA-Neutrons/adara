@@ -1,4 +1,0 @@
-MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
-0-59/5 * * * * /SNS/users/y8y/stuff/exec/smsd_mon
-0 8,17 * * * /home/controls/config-daq1/confck --quiet
-0 8,17 * * * /usr/local/bin/liveconf --terse --quiet confck

@@ -1,0 +1,33 @@
+#!/bin/bash
+#
+# Check for Choppers in SMS Logs
+#
+
+num_files=8
+
+CHOP="New Chopper"
+
+SEARCH_SMS_LOGS()
+{
+	files=`/bin/ls -t -r /var/log/smsd.log* | tail -${num_files}`
+
+	for log in $files ; do
+
+		gzck=`echo $log | grep '.gz$' | wc | awk '{print $1}'`
+
+		if [[ $gzck == 1 ]]; then
+			zcat "$log" | grep "${CHOP}"
+		else
+			grep "${CHOP}" "$log"
+		fi
+
+	done
+}
+
+# Search Log Files
+log_lines=`SEARCH_SMS_LOGS`
+
+sorted=`echo "$log_lines" | sort -u --key=10`
+
+echo "${sorted}"
+

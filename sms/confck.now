@@ -10,18 +10,60 @@ if [ -e $HOME/.bash_profile ] ; then
 	source $HOME/.bash_profile
 fi
 
+# Note: to ensure proper file permissions for captured system files,
+# please set your shell "umask" as follows before proceeding! ;-D
+umask 0002
+
 # Handle "Quiet" Operation Option for Cron Usage...
 # (Only output on errors...)
+UPDATE=0
 QUIET=0
-if [ "$1" == "--quiet" ]; then
+if [[ "$1" == "--quiet" ]]; then
 	QUIET=1
+elif [[ "$1" == "--update" ]]; then
+	UPDATE=1
+elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
+	echo -e "\nusage: confck [--quiet|--update]\n"
+	exit 0
 fi
 
 # For "Alternate" or Secondary SMS Deployments...
 ALT=""
 
+# ADARA Git Repo
+if [[ -z "$ADARA_DIR" ]]; then
+	ADARA_DIR="/usr/local/src/ADARA"
+	#ADARA_DIR="/SNS/users/$USER/gitsrc/ADARA"
+elif [[ $QUIET == 0 ]]; then
+	echo "Inheriting ADARA_DIR Value from User Environment:"
+	echo -e "\t[${ADARA_DIR}]"
+fi
+
+# Default Update/Installation Target Definitions
+SYSTEMCTL="/usr/bin/systemctl"
+SMSD_LOG="/var/log/smsd${ALT}.log"
+PVSD_LOG="/var/log/pvsd.log"
+STC_LOG="/var/log/stc.log"
+DASMOND_LOG="/var/log/dasmond.log"
+MESSAGES_LOG="/var/log/messages"
+RSYSLOG_PIPES="/etc/rsyslog.pipes"
+MKNOD="/usr/bin/mknod"
+CRITICAL_MSGS="criticalMessages"
+SNSLOCAL="/SNSlocal"
+RSYSLOG_CACHE="${SNSLOCAL}/rsyslog.cache"
+ADARA_BINARIES="/home/controls/config-now1${ALT}/deploy"
+ADARA_LINKS="/usr/local/bin"
+PVSD_BINARY="/home/controls/config-now1${ALT}/deploy/pvsd"
+PVSD_LINK="/usr/sbin/pvsd"
+STC_BINARIES="/home/controls/config-now1${ALT}/deploy"
+STC_LINKS="/usr/sbin"
+DASMON_BINARIES="/home/controls/config-now1${ALT}/deploy"
+DASMON_LINKS="/usr/sbin"
+ACCEL_TIMING="/home/controls/Accelerator"
+ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
+
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
-cd /home/controls/config-now1/
+cd /home/controls/config-now1${ALT}/
 
 # Do We Have A DASMON Daemon Setup on This Host...?
 DO_DASMON_CONFCK=1
@@ -77,9 +119,11 @@ DIFF_FILE()
 	local _label2="$1"
 	shift
 
+	# Git Repo Version of File
 	local _file1="$1"
 	shift
 
+	# System Deployed Version of File
 	local _file2="$1"
 	shift
 
@@ -90,9 +134,33 @@ DIFF_FILE()
 
 	echo "diff ${_file1} ${_file2}"
 	diff "${_file1}" "${_file2}"
-	_ckdiff=$?
+	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
+		# Update the Deployed System File or Git Repo File Version...
+		if [[ $UPDATE == 1 ]]; then
+			echo -e "\nPush/Deploy the System File (\"sys\"),"
+			echo -e "   or Pull/Update the Git Repo File (\"repo\"),"
+			echo -n "   or Do Nothing (\"nothing\")? [sys|repo|Nothing]: "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			# Push Latest Git Repo Version to System
+			if [[ "$ckUpdate" == "s" || "$ckUpdate" == "sys" ]]; then
+				echo "Deploying Latest Repo File to System:"
+				sudo /bin/cp -i "${_file1}" "${_file2}"
+			# Pull Latest System Version into Git Repo
+			elif [[ "$ckUpdate" == "r" || "$ckUpdate" == "repo" ]]; then
+				echo "Updating Repo with Latest Deployed System File:"
+				/bin/cp -i "${_file2}" "${_file1}"
+				git add "${_file1}"
+				git commit \
+					-m "Update Config Repo with Latest System File" \
+					"${_file1}"
+			# Do Nothing.
+			else
+				echo "Doing Nothing, as Requested."
+			fi
+		fi
 	fi
 
 	DIFF_STAT "${_label2}" "${_file2}" "${STAT_LIST}"
@@ -252,122 +320,290 @@ DIFF_DIR()
 	return ${_status}
 }
 
+CK_SNS_LOCAL_DIRS()
+{
+	# Only Check/Create the /SNSlocal/ SMS Directories in Update Mode!
+	if [[ $UPDATE == 1 ]]; then
+
+		# Check/Create Top Level /SNSlocal/ Directory for ADARA...
+		if [[ ! -d "${SNSLOCAL}" ]]; then
+			echo -e "\n*** ADARA SNS LOCAL Directory is Missing:"
+			echo -e "\n   ${SNSLOCAL}"
+			echo
+			/bin/ls -ld "${SNSLOCAL}"
+			echo -e -n "\nCreate the ADARA SNS LOCAL Directory? [yes|No] "
+			read ckSNSLocal
+			ckSNSLocal=`echo "$ckSNSLocal" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckSNSLocal" == "y" || "$ckSNSLocal" == "yes" ]]; then
+				sudo mkdir "${SNSLOCAL}"
+				sudo chmod +rx "${SNSLOCAL}"
+				echo
+				/bin/ls -ld "${SNSLOCAL}"
+			fi
+		fi
+
+		# Check/Create ADARA/SMS Daemon Directory...
+		local _smsdir="${SNSLOCAL}/sms${ALT}"
+		if [[ ! -d "${_smsdir}" ]]; then
+			echo -e "\n*** ADARA/SMS Daemon Directory is Missing:"
+			echo -e "\n   ${_smsdir}"
+			echo
+			/bin/ls -ld "${_smsdir}"
+			echo -e -n "\nCreate ADARA/SMS Daemon Directory? [yes|No] "
+			read ckSMSDir
+			ckSMSDir=`echo "$ckSMSDir" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckSMSDir" == "y" || "$ckSMSDir" == "yes" ]]; then
+				sudo mkdir "${_smsdir}"
+				sudo chown snsdata "${_smsdir}"
+				sudo chgrp adara "${_smsdir}"
+				sudo chmod g+ws "${_smsdir}"
+				echo
+				/bin/ls -ld "${_smsdir}"
+			fi
+		fi
+
+		# Check/Create ADARA/SMS Config Directory...
+		local _smsconf="${_smsdir}/conf"
+		if [[ ! -d "${_smsconf}" ]]; then
+			echo -e "\n*** ADARA/SMS Config Directory is Missing:"
+			echo -e "\n   ${_smsconf}"
+			echo
+			/bin/ls -ld "${_smsconf}"
+			echo -e -n "\nCreate ADARA/SMS Config Directory? [yes|No] "
+			read ckSMSConf
+			ckSMSConf=`echo "$ckSMSConf" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckSMSConf" == "y" || "$ckSMSConf" == "yes" ]]; then
+				sudo mkdir "${_smsconf}"
+				sudo chown snsdata "${_smsconf}"
+				sudo chgrp adara "${_smsconf}"
+				sudo chmod g+ws "${_smsconf}"
+				echo
+				/bin/ls -ld "${_smsconf}"
+			fi
+		fi
+
+		# Check/Create ADARA/SMS Data Directory...
+		local _smsdata="${_smsdir}/data"
+		if [[ ! -d "${_smsdata}" ]]; then
+			echo -e "\n*** ADARA/SMS Data Directory is Missing:"
+			echo -e "\n   ${_smsdata}"
+			echo
+			/bin/ls -ld "${_smsdata}"
+			echo -e -n "\nCreate ADARA/SMS Data Directory? [yes|No] "
+			read ckSMSData
+			ckSMSData=`echo "$ckSMSData" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckSMSData" == "y" || "$ckSMSData" == "yes" ]]; then
+				sudo mkdir "${_smsdata}"
+				sudo chown snsdata "${_smsdata}"
+				sudo chgrp adara "${_smsdata}"
+				sudo chmod g+ws "${_smsdata}"
+				echo
+				/bin/ls -ld "${_smsdata}"
+			fi
+		fi
+
+		# Check/Create ADARA/SMS "Next Run" File...
+		local _sms_next_run="${_smsdata}/next_run"
+		if [[ ! -f "${_sms_next_run}" ]]; then
+			echo -e "\n*** ADARA/SMS \"Next Run\" File is Missing:"
+			echo -e "\n   ${_sms_next_run}"
+			echo
+			/bin/ls -ld "${_sms_next_run}"
+			echo -e -n "\nCreate ADARA/SMS \"Next Run\" File? [yes|No] "
+			read ckSMSNextRun
+			ckSMSNextRun=`echo "$ckSMSNextRun" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckSMSNextRun" == "y"
+					|| "$ckSMSNextRun" == "yes" ]]; then
+				sudo vi "${_sms_next_run}"
+				sudo chown snsdata "${_sms_next_run}"
+				sudo chgrp adara "${_sms_next_run}"
+				sudo chmod g+w "${_sms_next_run}"
+				echo
+				/bin/ls -ld "${_sms_next_run}"
+				echo -e "\nNew ADARA/SMS \"Next Run\" File Contents:\n"
+				/bin/cat "${_sms_next_run}"
+			fi
+		fi
+	fi
+}
+
 # SMS Config Check
 SMS_CONFCK()
 {
-	local _status=0
+	local _nerrors=0
 
 	echo -e "\nSMS Config Check"
 
 	echo
 	echo "Comparing Git Repo to Deployed:"
-	echo
 
-	DIFF_DIR "SMSD Config Files" "Deployed" \
-		./sms${ALT}/conf/ /SNSlocal/sms${ALT}/conf/
-	local _ckdiff=$?
-	if [ ${_ckdiff} != 0 ]; then
-		_status=${_ckdiff}
+	DIFF_DIR "SMSD${ALT} Config Files" "Deployed" \
+		./sms${ALT}/conf/ ${SNSLOCAL}/sms${ALT}/conf/
+	if [ $? != 0 ]; then
+		echo "Directories/Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Directories/Files are the Same."
 	fi
 
-	DIFF_FILE "SMSD Init Script" "Deployed" \
+	DIFF_FILE "SMSD${ALT} Init Script" "Deployed" \
 		./sms${ALT}/smsd${ALT}.initscript /etc/init.d/smsd${ALT}
-	_ckdiff=$?
-	if [ ${_ckdiff} != 0 ]; then
-		_status=${_ckdiff}
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
 	fi
 
 	DIFF_FILE "Saved RSyslog ADARA Config" "System" \
 		./sms${ALT}/rsyslog.conf /etc/rsyslog.conf
-	_ckdiff=$?
-	if [ ${_ckdiff} != 0 ]; then
-		_status=${_ckdiff}
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
 		./sms${ALT}/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
-	_ckdiff=$?
-	if [ ${_ckdiff} != 0 ]; then
-		_status=${_ckdiff}
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
 	fi
 
-	DIFF_FILE "RSyslog SMSD Config" "Deployed" \
+	DIFF_FILE "RSyslog SMSD${ALT} Config" "Deployed" \
 		./sms${ALT}/smsd${ALT}_syslog.conf \
 			/etc/rsyslog.d/smsd${ALT}_syslog.conf
-	_ckdiff=$?
-	if [ ${_ckdiff} != 0 ]; then
-		_status=${_ckdiff}
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Script" "Deployed" \
 		./sms${ALT}/rsyslogMailer /usr/local/bin/rsyslogMailer
-	_ckdiff=$?
-	if [ ${_ckdiff} != 0 ]; then
-		_status=${_ckdiff}
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
 	fi
 
 	ALT_LOG="${ALT/-/_}"
-	DIFF_FILE "Saved SMSD Logrotate Config" "System" \
+	DIFF_FILE "Saved SMSD${ALT} Logrotate Config" "System" \
 		./sms${ALT}/etc.logrotate.d.smsd${ALT_LOG}_log \
 		/etc/logrotate.d/smsd${ALT_LOG}_log
-	_ckdiff=$?
-	if [ ${_ckdiff} != 0 ]; then
-		_status=${_ckdiff}
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
 	fi
 
 	echo
-	echo "Comparing Saved ChkConfig SMSD ADARA Config to System:"
+	echo "Comparing Saved ChkConfig SMSD${ALT} ADARA Config to System:"
 	echo
 
+	local _check_update=0
 	chkconfig --list smsd${ALT} > /tmp/chkconfig.smsd${ALT}.$$ 2>&1
-	_ckchkconf=$?
-	if [ ${_ckchkconf} != 0 ]; then
-		_status=${_ckchkconf}
+	if [ $? != 0 ]; then
+		echo "Failure Retrieving System ChkConfig for SMSD${ALT}...!"
+		_check_update=1
+		(( _nerrors++ ))
 	else
 		echo "diff ./sms${ALT}/chkconfig.smsd${ALT} /tmp/chkconfig.smsd${ALT}.$$"
 		diff ./sms${ALT}/chkconfig.smsd${ALT} /tmp/chkconfig.smsd${ALT}.$$
-		_ckdiff=$?
-		if [ ${_ckdiff} != 0 ]; then
-			_status=${_ckdiff}
+		if [ $? != 0 ]; then
+			echo "System ChkConfig for SMSD${ALT} Differed...!"
+			_check_update=1
+			(( _nerrors++ ))
+		else
+			echo "System ChkConfig for SMSD${ALT} is the Same."
 		fi
 	fi
 	/bin/rm -f /tmp/chkconfig.smsd${ALT}.$$
-	_ckrmchkconf=$?
-	if [ ${_ckrmchkconf} != 0 ]; then
-		_status=${_ckrmchkconf}
+	if [ $? != 0 ]; then
+		echo \
+	   "Failure Deleting Temporary System ChkConfig File for SMSD${ALT}...!"
+		(( _nerrors++ ))
+	fi
+	# Create SMSD Local Run Level...
+	if [[ ${_check_update} == 1 ]]; then
+		if [[ $UPDATE == 1 ]]; then
+			echo -n "Create SMSD${ALT} Local Run Level? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo chkconfig --add smsd${ALT}
+				chkconfig --list smsd${ALT}
+				sudo chkconfig smsd${ALT} on
+				chkconfig --list smsd${ALT}
+				/bin/rm -i ./sms${ALT}/chkconfig.smsd${ALT}
+				chkconfig --list smsd${ALT} \
+					> ./sms${ALT}/chkconfig.smsd${ALT} 2>&1
+			fi
+		else
+			echo -n "*** SMSD${ALT} Must Be Added to the"
+			echo " System ChkConfig Run Level!"
+		fi
 	fi
 
 	echo
 	echo "Comparing Saved ADARA Admin Crontab to System:"
 	echo
 
-	crontab -l > /tmp/y8y.crontab.$$ 2>&1
-	_ckcrontab=$?
-	if [ ${_ckcrontab} != 0 ]; then
-		_status=${_ckcrontab}
+	_check_update=0
+	crontab -l > /tmp/$USER.crontab.$$ 2>&1
+	if [[ $? != 0 || ! -s /tmp/$USER.crontab.$$ ]]; then
+		echo "Failure Retrieving ADARA Admin Crontab for SMSD${ALT}...!"
+		_check_update=1
+		(( _nerrors++ ))
 	else
-		echo "diff ./sms${ALT}/y8y.crontab /tmp/y8y.crontab.$$"
-		diff ./sms${ALT}/y8y.crontab /tmp/y8y.crontab.$$
-		_ckdiff=$?
-		if [ ${_ckdiff} != 0 ]; then
-			_status=${_ckdiff}
+		echo "diff ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$"
+		diff ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$
+		if [ $? != 0 ]; then
+			echo "ADARA Admin Crontab for SMSD${ALT} Differed...!"
+			_check_update=1
+			(( _nerrors++ ))
+		else
+			echo "ADARA Admin Crontab for SMSD${ALT} is the Same."
 		fi
 	fi
-	/bin/rm -f /tmp/y8y.crontab.$$
-	_ckrmcrontab=$?
-	if [ ${_ckrmcrontab} != 0 ]; then
-		_status=${_ckrmcrontab}
+	# Defer SMSD Admin Crontab to Below...
+	if [[ ${_check_update} == 1 ]]; then
+		echo "Defer Fixing of SMSD${ALT} Admin Crontab..."
+		echo "(See Admin Crontab Create Below, or Fix Manually.)"
+	fi
+	/bin/rm -f /tmp/$USER.crontab.$$
+	if [ $? != 0 ]; then
+		echo \
+		  "Failure Deleting Temporary Admin Crontab File for SMSD${ALT}...!"
+		(( _nerrors++ ))
 	fi
 
 	echo
+	if [ ${_nerrors} -gt 0 ]; then
+		echo "${_nerrors} Errors/Files Differed!"
+	else
+		echo "All Files/Configs are the Same."
+	fi
 
-	return ${_status}
+	return ${_nerrors}
 }
 
-doSMSConfCk=`SMS_CONFCK 2>&1`
-_ckSMSconfck=$?
-if [[ ${_ckSMSconfck} != 0 || $QUIET == 0 ]]; then
-	echo -e "$doSMSConfCk\n"
+if [[ $UPDATE == 1 ]]; then
+	CK_SNS_LOCAL_DIRS
+	SMS_CONFCK
+	_ckSMSconfck=$?
+else
+	doSMSConfCk=`SMS_CONFCK 2>&1`
+	_ckSMSconfck=$?
+	if [[ ${_ckSMSconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doSMSConfCk\n"
+	fi
 fi
 
 if [[ ${_ckSMSconfck} != 0 ]]; then
@@ -380,76 +616,81 @@ fi
 
 PVSD_CONFCK()
 {
-	nerrors=0
+	local _nerrors=0
 
 	echo -e "\nPVSD Config Check"
 
 	DIFF_FILE "PVSD Wrapper Script" "Deployed" \
-		pvsd/usr.local.bin.pvsd /usr/local/bin/pvsd
+		./pvsd/usr.local.bin.pvsd /usr/local/bin/pvsd
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
 
 	DIFF_FILE "PVSD Init Script" "Deployed" \
-		pvsd/pvsd.initscript /etc/init.d/pvsd
+		./pvsd/pvsd.initscript /etc/init.d/pvsd
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
 
 	DIFF_FILE "Saved RSyslog ADARA Config" "System" \
-		pvsd/rsyslog.conf /etc/rsyslog.conf
+		./pvsd/rsyslog.conf /etc/rsyslog.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
-		pvsd/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+		./pvsd/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
 
 	DIFF_FILE "RSyslog PVSD Config" "Deployed" \
-		pvsd/pvsd_syslog.conf /etc/rsyslog.d/pvsd_syslog.conf
+		./pvsd/pvsd_syslog.conf /etc/rsyslog.d/pvsd_syslog.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
 
 	DIFF_FILE "Saved Etc Logrotate PVSD Config" "System" \
-		pvsd/etc.logrotate.d.pvsd_log /etc/logrotate.d/pvsd_log
+		./pvsd/etc.logrotate.d.pvsd_log /etc/logrotate.d/pvsd_log
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
 
 	echo
 	echo "Comparing Saved ChkConfig PVSD ADARA Config to System:"
+	echo
+
+	local _check_update=0
 	chkconfig --list pvsd > /tmp/chkconfig.pvsd.$$ 2>&1
 	if [ $? != 0 ]; then
 		echo "Failure Retrieving System ChkConfig for PVSD...!"
-		(( nerrors++ ))
+		_check_update=1
+		(( _nerrors++ ))
 	else
-		echo "diff pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
-		diff pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
+		echo "diff ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
+		diff ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
 		if [ $? != 0 ]; then
 			echo "System ChkConfig for PVSD Differed...!"
-			(( nerrors++ ))
+			_check_update=1
+			(( _nerrors++ ))
 		else
 			echo "System ChkConfig for PVSD is the Same."
 		fi
@@ -457,24 +698,48 @@ PVSD_CONFCK()
 	/bin/rm -f /tmp/chkconfig.pvsd.$$
 	if [ $? != 0 ]; then
 		echo "Failure Deleting Temporary System ChkConfig File for PVSD...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
+	fi
+	# Create PVSD Local Run Level...
+	if [[ ${_check_update} == 1 ]]; then
+		if [[ $UPDATE == 1 ]]; then
+			echo -n "Create PVSD Local Run Level? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo chkconfig --add pvsd
+				chkconfig --list pvsd
+				sudo chkconfig pvsd on
+				chkconfig --list pvsd
+				/bin/rm -i ./pvsd/chkconfig.pvsd
+				chkconfig --list pvsd > ./pvsd/chkconfig.pvsd 2>&1
+			fi
+		else
+			echo -n "*** PVSD Must Be Added to the"
+			echo " System ChkConfig Run Level!"
+		fi
 	fi
 
 	echo
-	if [ $nerrors -gt 0 ]; then
-		echo "$nerrors Errors/Files Differed!"
+	if [ $_nerrors -gt 0 ]; then
+		echo "$_nerrors Errors/Files Differed!"
 	else
 		echo "All Files/Configs are the Same."
 	fi
 	echo
 
-	return $nerrors
+	return $_nerrors
 }
 
-doPVSDConfCk=`PVSD_CONFCK 2>&1`
-_ckPVSDconfck=$?
-if [[ ${_ckPVSDconfck} != 0 || $QUIET == 0 ]]; then
-	echo -e "$doPVSDConfCk\n"
+if [[ $UPDATE == 1 ]]; then
+	PVSD_CONFCK
+	_ckPVSDconfck=$?
+else
+	doPVSDConfCk=`PVSD_CONFCK 2>&1`
+	_ckPVSDconfck=$?
+	if [[ ${_ckPVSDconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doPVSDConfCk\n"
+	fi
 fi
 
 if [[ ${_ckPVSDconfck} != 0 ]]; then
@@ -493,25 +758,25 @@ diff_cnt=0
 
 CONFIG_DIFF_DIR()
 {
-	file="$1"
+	local _file="$1"
 
-	if [[ -d $file ]]; then
+	if [[ -d ${_file} ]]; then
 
-		echo "[$file]:"
+		echo "[${_file}]:"
 
-		if [ "$file" == "deploy" ]; then
+		if [ "${_file}" == "deploy" ]; then
 			echo -e "Ignoring 'deploy' directory.\n"
-		elif [ "$file" == "dasmon" ]; then
+		elif [ "${_file}" == "dasmon" ]; then
 			echo -e "Ignoring 'dasmon' directory.\n"
-		elif [ "$file" == "dasmond" ]; then
+		elif [ "${_file}" == "dasmond" ]; then
 			echo -e "Ignoring 'dasmond' directory.\n"
-		elif [ "$file" == "pvsd" ]; then
+		elif [ "${_file}" == "pvsd" ]; then
 			echo -e "Ignoring 'pvsd' directory.\n"
-		elif [ "$file" == "sms" ]; then
+		elif [ "${_file}" == "sms" ]; then
 			echo -e "Ignoring 'sms' directory.\n"
 		else
 
-			for f in $file/* ; do
+			for f in ${_file}/* ; do
 
 				CONFIG_DIFF_DIR $f
 
@@ -519,34 +784,64 @@ CONFIG_DIFF_DIR()
 
 		fi
 
-	elif [[ -e $file ]]; then
+	elif [[ -e ${_file} ]]; then
 
-		if [ "$file" == "README" ]; then
+		if [ "${_file}" == "README" ]; then
 			echo -e "Ignoring README.\n"
-		elif [ "$file" == "confck" ]; then
+		elif [ "${_file}" == "confck" ]; then
 			echo -e "Ignoring confck.\n"
-		elif [ "$file" == "pvsd.deployment.history.txt" ]; then
+		elif [ "${_file}" == "pvsd.deployment.history.txt" ]; then
 			echo -e "Ignoring pvsd.deployment.history.txt.\n"
-		elif [ "$file" == "stc.deployment.history.txt" ]; then
+		elif [ "${_file}" == "stc.deployment.history.txt" ]; then
 			echo -e "Ignoring stc.deployment.history.txt.\n"
-		elif [ "$file" == "dasmon.deployment.history.txt" ]; then
+		elif [ "${_file}" == "dasmon.deployment.history.txt" ]; then
 			echo -e "Ignoring dasmon.deployment.history.txt.\n"
-		elif [ "$file" == "stat_list" ]; then
+		elif [ "${_file}" == "stat_list" ]; then
 			echo -e "Ignoring Stat List File: stat_list.\n"
 		else
 
 			# File Diff
 
-			echo "diff /$file $file"
-			diff "/$file" "$file"
+			echo "diff ${_file} /${_file}"
+			diff "${_file}" "/${_file}"
+
 
 			if [ $? != 0 ] ; then
 				diff_cnt=$(( $diff_cnt + 1 ))
+				# Update the Deployed System File or Git Repo File Version
+				if [[ $UPDATE == 1 ]]; then
+					echo -e "\nPush/Deploy the System File (\"sys\"),"
+					echo -e \
+						"   or Pull/Update the Git Repo File (\"repo\"),"
+					echo -n "   or Do Nothing (\"nothing\")?"
+					echo -n " [sys|repo|Nothing]: "
+					read ckUpdate
+					ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+					# Push Latest Git Repo Version to System
+					if [[ "$ckUpdate" == "s" \
+							|| "$ckUpdate" == "sys" ]]; then
+						echo "Deploying Latest Repo File to System:"
+						sudo /bin/cp -i "${_file}" "/${_file}"
+					# Pull Latest System Version into Git Repo
+					elif [[ "$ckUpdate" == "r" \
+							|| "$ckUpdate" == "repo" ]]; then
+						echo \
+						   "Updating Repo with Latest Deployed System File:"
+						/bin/cp -i "/${_file}" "${_file}"
+						git add "${_file}"
+						git commit \
+						   -m "Update Config Repo with Latest System File" \
+							"${_file}"
+					# Do Nothing.
+					else
+						echo "Doing Nothing, as Requested."
+					fi
+				fi
 			fi
 
 			# File Stat Diff
 
-			DIFF_STAT "CONFIG_DIFF_DIR File" "/$file" "${STAT_LIST}"
+			DIFF_STAT "CONFIG_DIFF_DIR File" "/${_file}" "${STAT_LIST}"
 
 			if [ $? != 0 ] ; then
 				diff_cnt=$(( $diff_cnt + 1 ))
@@ -588,10 +883,15 @@ STC_CONFCK()
 	return $diff_cnt
 }
 
-doSTCConfCk=`STC_CONFCK 2>&1`
-_ckSTCconfck=$?
-if [[ ${_ckSTCconfck} != 0 || $QUIET == 0 ]]; then
-	echo -e "$doSTCConfCk\n"
+if [[ $UPDATE == 1 ]]; then
+	STC_CONFCK
+	_ckSTCconfck=$?
+else
+	doSTCConfCk=`STC_CONFCK 2>&1`
+	_ckSTCconfck=$?
+	if [[ ${_ckSTCconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doSTCConfCk\n"
+	fi
 fi
 
 if [[ ${_ckSTCconfck} != 0 ]]; then
@@ -604,13 +904,13 @@ fi
 
 DASMON_CONFCK()
 {
-	nerrors=0
+	local _nerrors=0
 
 	DIFF_FILE "Dasmon Daemon Config File" "Deployed" \
 		dasmond/dasmond.cfg /home/dasmon/dasmond.cfg
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -622,7 +922,7 @@ DASMON_CONFCK()
 			dasmond/dasmond_def.cfg /home/dasmon/dasmond_def.cfg
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -636,7 +936,7 @@ DASMON_CONFCK()
 			dasmond/init.dasmond.conf /etc/init/dasmond.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -649,7 +949,7 @@ DASMON_CONFCK()
 			/etc/systemd/system/dasmond.service
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -659,7 +959,7 @@ DASMON_CONFCK()
 		dasmond/usr.local.bin.dasmond /usr/local/bin/dasmond
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -668,7 +968,7 @@ DASMON_CONFCK()
 		dasmond/rsyslog.conf /etc/rsyslog.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -678,7 +978,7 @@ DASMON_CONFCK()
 			dasmond/dasmon_syslog.conf /etc/rsyslog.d/dasmon.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -688,7 +988,7 @@ DASMON_CONFCK()
 		dasmond/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -697,7 +997,7 @@ DASMON_CONFCK()
 		dasmond/etc.logrotate.d.dasmon_log /etc/logrotate.d/dasmon_log
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -706,7 +1006,7 @@ DASMON_CONFCK()
 		dasmon/xinitrc.dasmon /etc/X11/xinit/xinitrc.dasmon
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -717,7 +1017,7 @@ DASMON_CONFCK()
 			dasmon/init.dasmongui.conf /etc/init/dasmongui.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -730,28 +1030,33 @@ DASMON_CONFCK()
 			/etc/systemd/system/dasmongui.service
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
 	fi
 
 	echo
-	if [ $nerrors -gt 0 ]; then
-		echo "$nerrors Files Differed!"
+	if [ $_nerrors -gt 0 ]; then
+		echo "$_nerrors Files Differed!"
 	else
 		echo "All Files are the Same."
 	fi
 	echo
 
-	return $nerrors
+	return $_nerrors
 }
 
 if [[ $DO_DASMON_CONFCK == 1 ]]; then
-	doDASMONConfCk=`DASMON_CONFCK 2>&1`
-	_ckDASMONconfck=$?
-	if [[ ${_ckDASMONconfck} != 0 || $QUIET == 0 ]]; then
-		echo -e "$doDASMONConfCk\n"
+	if [[ $UPDATE == 1 ]]; then
+		DASMON_CONFCK
+		_ckDASMONconfck=$?
+	else
+		doDASMONConfCk=`DASMON_CONFCK 2>&1`
+		_ckDASMONconfck=$?
+		if [[ ${_ckDASMONconfck} != 0 || $QUIET == 0 ]]; then
+			echo -e "$doDASMONConfCk\n"
+		fi
 	fi
 	if [[ ${_ckDASMONconfck} != 0 ]]; then
 		echo -e "*** DASMON ConfCk FAILED...!\n"
@@ -764,6 +1069,447 @@ else
 	if [[ $QUIET == 0 ]]; then
 		echo -e "DASMON ConfCk Skipped.\n\n---------"
 	fi
+fi
+
+# In Update Mode, Perform Other Assorted Install Operations, As Needed...
+if [[ $UPDATE == 1 ]]; then
+
+	echo -e "Checking Other Assorted Install Operations, As Needed...\n"
+
+	# Check/Create SMSD RSyslog Log File...
+	/bin/ls -l "${SMSD_LOG}"
+	log_perms=`/bin/ls -l "${SMSD_LOG}" | awk '{print $1}'`
+	log_group=`/bin/ls -l "${SMSD_LOG}" | awk '{print $4}'`
+	if [[ ! -f "${SMSD_LOG}"
+			|| "$log_perms" != "-rw-rw----"
+			|| "$log_group" != "users" ]]; then
+		echo -n "Create/Setup SMSD${ALT} RSyslog Log File? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			sudo touch "${SMSD_LOG}"
+			sudo chgrp users "${SMSD_LOG}"
+			sudo chmod g+rw "${SMSD_LOG}"
+			/bin/ls -l "${SMSD_LOG}"
+			# Restart RSyslog Service...?
+			sudo ${SYSTEMCTL} status rsyslog
+			echo -n "Restart RSyslog Service? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo ${SYSTEMCTL} restart rsyslog
+				sudo tail "${MESSAGES_LOG}"
+			fi
+		fi
+	fi
+	echo
+
+	# Check/Create PVSD RSyslog Log File...
+	/bin/ls -l "${PVSD_LOG}"
+	log_perms=`/bin/ls -l "${PVSD_LOG}" | awk '{print $1}'`
+	log_group=`/bin/ls -l "${PVSD_LOG}" | awk '{print $4}'`
+	if [[ ! -f "${PVSD_LOG}"
+			|| "$log_perms" != "-rw-rw----"
+			|| "$log_group" != "users" ]]; then
+		echo -n "Create/Setup PVSD RSyslog Log File? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			sudo touch "${PVSD_LOG}"
+			sudo chgrp users "${PVSD_LOG}"
+			sudo chmod g+rw "${PVSD_LOG}"
+			/bin/ls -l "${PVSD_LOG}"
+			# Restart RSyslog Service...?
+			sudo ${SYSTEMCTL} status rsyslog
+			echo -n "Restart RSyslog Service? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo ${SYSTEMCTL} restart rsyslog
+				sudo tail "${MESSAGES_LOG}"
+			fi
+		fi
+	fi
+	echo
+
+	# Check/Create STC RSyslog Log File...
+	/bin/ls -l "${STC_LOG}"
+	log_perms=`/bin/ls -l "${STC_LOG}" | awk '{print $1}'`
+	log_group=`/bin/ls -l "${STC_LOG}" | awk '{print $4}'`
+	if [[ ! -f "${STC_LOG}"
+			|| "$log_perms" != "-rw-rw----"
+			|| "$log_group" != "users" ]]; then
+		echo -n "Create/Setup STC RSyslog Log File? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			sudo touch "${STC_LOG}"
+			sudo chgrp users "${STC_LOG}"
+			sudo chmod g+rw "${STC_LOG}"
+			/bin/ls -l "${STC_LOG}"
+			# Restart RSyslog Service...?
+			sudo ${SYSTEMCTL} status rsyslog
+			echo -n "Restart RSyslog Service? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo ${SYSTEMCTL} restart rsyslog
+				sudo tail "${MESSAGES_LOG}"
+			fi
+		fi
+	fi
+	echo
+
+	# Check/Create DASMON RSyslog Log File...
+	if [[ $DO_DASMON_CONFCK == 1 ]]; then
+		/bin/ls -l "${DASMOND_LOG}"
+		log_perms=`/bin/ls -l "${DASMOND_LOG}" | awk '{print $1}'`
+		log_group=`/bin/ls -l "${DASMOND_LOG}" | awk '{print $4}'`
+		if [[ ! -f "${DASMOND_LOG}"
+				|| "$log_perms" != "-rw-rw----"
+				|| "$log_group" != "users" ]]; then
+			echo -n "Create/Setup DASMOND RSyslog Log File? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo touch "${DASMOND_LOG}"
+				sudo chgrp users "${DASMOND_LOG}"
+				sudo chmod g+rw "${DASMOND_LOG}"
+				/bin/ls -l "${DASMOND_LOG}"
+				# Restart RSyslog Service...?
+				sudo ${SYSTEMCTL} status rsyslog
+				echo -n "Restart RSyslog Service? [yes|No] "
+				read ckUpdate
+				ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+				if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+					sudo ${SYSTEMCTL} restart rsyslog
+					sudo tail "${MESSAGES_LOG}"
+				fi
+			fi
+		fi
+		echo
+	fi
+
+	# Check/Create RSyslog Pipes...
+	/bin/ls -l "${RSYSLOG_PIPES}"
+	if [[ ! -d "${RSYSLOG_PIPES}" ]]; then
+		echo -n "Create RSyslog Pipes? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			sudo mkdir "${RSYSLOG_PIPES}"
+			sudo "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
+			sudo chgrp snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
+			sudo chmod 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
+			/bin/ls -l "${RSYSLOG_PIPES}"
+			# Set Big Error Pipe...
+			echo "Set Big Error Pipe..."
+			/bin/cp ${ADARA_DIR}/big_err_pipe.c /tmp
+			cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+			/tmp/big_err_pipe
+		fi
+	fi
+	echo
+
+	# Check/Create RSyslog Cache...
+	/bin/ls -ld "${RSYSLOG_CACHE}"
+	if [[ ! -d "${RSYSLOG_CACHE}" ]]; then
+		echo -n "Create RSyslog Cache? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			# Note: Now Already Handled in CK_SNS_LOCAL_DIRS()...
+			if [[ ! -d "${SNSLOCAL}" ]]; then
+				sudo mkdir "${SNSLOCAL}"
+				sudo chmod +rx "${SNSLOCAL}"
+			fi
+			sudo mkdir "${RSYSLOG_CACHE}"
+			sudo chown snsdata "${RSYSLOG_CACHE}"
+			sudo chgrp adara "${RSYSLOG_CACHE}"
+			sudo chmod g+ws "${RSYSLOG_CACHE}"
+			/bin/ls -ld "${RSYSLOG_CACHE}"
+		fi
+	fi
+	echo
+
+	# Check/Create ADARA Administrator Crontab...
+	crontab -l
+	crontab_check=`crontab -l |& awk '{ print $1 " " $2 }'`
+	if [[ "$crontab_check" == "no crontab" ]]; then
+		echo -n "Create ADARA Administrator Crontab? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			cron_file=`mktemp ./.confck.adara.crontab.edit.file.XXXXXX`
+
+			echo "MAILTO=idac_adara_notify@email.ornl.gov" >> $cron_file
+
+			echo -e -n "\n# Handle \"Local\" STS Deployments" >> $cronfile
+			echo " (and STS Config ConfCk... :-)" >> $cron_file
+			echo -e "\nLOCAL_DATA=/SNSlocal" >> $cron_file
+
+			echo -e "\n# SMS" >> $cron_file
+			echo "0-59/10 * * * * /SNS/users/$USER/stuff/exec/smsd_mon" \
+				>> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-now1${ALT}/confck --quiet" \
+				>> $cron_file
+			echo -n "0 8,17 * * * /usr/local/bin/liveconf" >> $cron_file
+			echo " --terse --quiet confck" >> $cron_file
+
+			if [[ -n ${ALT} ]]; then
+				echo -e "\n# SMS-MON" >> $cron_file
+				echo -n "0-59/10 * * * *" >> $cron_file
+				echo -n " /SNS/users/$USER/stuff/exec/smsd_mon" \
+					>> $cron_file
+				echo " --alt=\"${ALT}\"" >> $cron_file
+				echo -n "0 8,17 * * *" >> $cron_file
+				echo " /home/controls/config-now1${ALT}/confck --quiet" \
+					>> $cron_file
+				echo -n "0 8,17 * * * /usr/local/bin/liveconf" \
+					>> $cron_file
+				echo -n " --config=" >> $cron_file
+				echo -n "\"${SNSLOCAL}/sms${ALT}/conf/smsd.conf\"" \
+					>> $cron_file
+				echo " --terse --quiet confck" >> $cron_file
+				echo -n "1 0 * * *" >> $cron_file
+				echo -n " /SNS/users/$USER/stuff/exec/bump_mon_run" \
+					>> $cron_file
+				echo " --config=\"${SNSLOCAL}/sms${ALT}/conf/smsd.conf\"" \
+					>> $cron_file
+			fi
+
+			echo -e "\n# PVSD" >> $cron_file
+			echo -n "PATH=" >> $cron_file
+			echo -n "/home/controls/epics/base/master/bin/linux-x86_64:" \
+				>> $cron_file
+			echo -n "/home/controls/epics/basev4/master/pvAccessCPP/" \
+				>> $cron_file
+			echo -n "bin/linux-x86_64/:" >> $cron_file
+			echo -n "/home/controls/epics/extensions/master/" >> $cron_file
+			echo -n "bin/linux-x86_64:" >> $cron_file
+			echo -n "/home/controls/epics/extensions/master/bin:" \
+				>> $cron_file
+			echo -n "/usr/local/SNS/bin:/usr/local/bin:" >> $cron_file
+			echo "/usr/bin:/bin:/usr/local/sbin:/sbin:/usr/sbin" \
+				>> $cron_file
+			echo -n "0-59/10 * * * *" >> $cron_file
+			echo " /SNS/users/$USER/stuff/exec/pvsd_mon.sh" \
+				>> $cron_file
+			echo -n "#0 8,17 * * * /home/controls/config-dassrv1/confck" \
+				>> $cron_file
+			echo " --quiet" >> $cron_file
+			echo "### For Accelerator PVs in beamline.xml... ;-D" \
+				>> $cron_file
+			echo "#EPICS_CA_ADDR_LIST=\"10.111.14.255 160.91.228.17\"" \
+				>> $cron_file
+			echo "#EPICS_CA_AUTO_ADDR_LIST=NO" >> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo -n " /home/controls/share/master/scripts/" >> $cron_file
+			echo -n "check_beamline_xml --quiet --noprompt" >> $cron_file
+			if [[ -n "$BEAMLINE" ]]; then
+				echo " /home/controls/$BEAMLINE/beamline.xml" >> $cron_file
+			else
+				echo " /home/controls/blXXX/beamline.xml" >> $cron_file
+				echo -e -n "\nWarning: \$BEAMLINE Environment Variable"
+				echo " Not Yet Set."
+				echo -e "\nPlease Replace "blXXX" with Beamline Number!\n"
+				echo -n "Continue? "
+				read foo
+				manual_edit=1
+			fi
+
+			echo -e "\n# STS" >> $cron_file
+			echo -n "0 8,17 * * * /home/controls/config-stc-config/confck" \
+				>> $cron_file
+			echo " --quiet" >> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-stc-config-test/confck --quiet" \
+				>> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-stc-config-hfir/confck --quiet" \
+				>> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo -n " /home/controls/config-stc-config-hfir-test/confck" \
+				>> $cron_file
+			echo " --quiet" >> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-stc-config-dummy/confck --quiet" \
+				>> $cron_file
+
+			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
+			echo -n "0 8 * * *" >> $cron_file
+			echo -n " /SNS/users/$USER/gitsrc/ADARA/adara_monitor" \
+				>> $cron_file
+			echo " --oneshot" >> $cron_file
+			echo >> $cron_file
+			echo -n "*/10 * * * * /usr/local/bin/rsyslogMailer" \
+				>> $cron_file
+			echo " > /dev/null 2>&1" >> $cron_file
+
+			echo -e "\n# DASMON" >> $cron_file
+			echo -n "0-59/10 * * * *" >> $cron_file
+			echo " /SNS/users/$USER/stuff/exec/dasmond_mon" >> $cron_file
+			echo -n "#0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-dasmon/confck --quiet" \
+				>> $cron_file
+
+			echo -e "\n# For Long Running NOWN Runs..." >> $cron_file
+			echo -n "###0 0 * * *" >> $cron_file
+			echo -n " /SNS/users/$USER/stuff/exec/bump_mon_run" \
+				>> $cron_file
+			echo " --beamline=\"BL0X\"" >> $cron_file
+
+			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
+			echo -n "0 8 * * *" >> $cron_file
+			echo -n " /SNS/users/$USER/gitsrc/ADARA/adara_monitor" \
+				>> $cron_file
+			echo " --oneshot" >> $cron_file
+			echo >> $cron_file
+			echo -n "*/10 * * * * /usr/local/bin/rsyslogMailer" \
+				>> $cron_file
+			echo " > /dev/null 2>&1" >> $cron_file
+
+			# Install Administrator Crontab
+			crontab $cron_file
+			if [[ $? != 0 ]]; then
+				echo -e \
+					"\nError Creating ADARA Administrator Crontab:\n"
+				/bin/cat $cron_file
+			fi
+
+			# Clean Up Temp Crontab File
+			/bin/rm $cron_file
+
+			# Check for Manual Crontab Edit
+			crontab -l
+			echo -e -n "\nDo you need to Manually Edit the Crontab?"
+			echo -n " [yes|No] "
+			read ck_edit
+			ck_edit=`echo "$ck_edit" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ck_edit" == "y" || "$ck_edit" == "yes" ]]; then
+				crontab -e
+			fi
+		fi
+	fi
+	echo
+
+	# Check/Create ADARA/SMSD User Local Bin Soft Links...
+	for i in adara_add_run_end adaracat adara_data_find adara-dump \
+			adara_fix_ipts adara-gen adara-munge adara-parser adara-pvgen \
+			adara_latest_data adara_retranslate_manual \
+			liveconf smsd ; do
+
+		echo "Checking ADARA/SMSD User Local Bin Soft Links for: [$i]"
+
+		/bin/ls -l "${ADARA_LINKS}/$i"
+		if [[ ! -x "${ADARA_LINKS}/$i" ]]; then
+			echo -n "Create ADARA User Local Bin Soft Link for [$i]?"
+			echo -n " [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo ln -s "${ADARA_BINARIES}/$i" "${ADARA_LINKS}/$i"
+				/bin/ls -l "${ADARA_LINKS}/$i"
+			fi
+		fi
+		echo
+	
+	done
+
+	# Check/Create PVSD User Local Bin Soft Link...
+	/bin/ls -l "${PVSD_LINK}"
+	if [[ ! -x "${PVSD_LINK}" ]]; then
+		echo -n "Create PVSD User Local Bin Soft Link? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			sudo ln -s "${PVSD_BINARY}" "${PVSD_LINK}"
+			/bin/ls -l "${PVSD_LINK}"
+		fi
+	fi
+	echo
+
+	# Check/Create STC User System Bin Soft Links...
+	for i in stc stc_test stc_dummy stc_hfir stc_hfir_test ; do
+
+		echo "Checking ADARA/STC User System Bin Soft Links for: [$i]"
+
+		/bin/ls -l "${STC_LINKS}/$i"
+		if [[ ! -x "${STC_LINKS}/$i" ]]; then
+			echo -n "Create ADARA/STC User System Bin Soft Link for [$i]?"
+			echo -n " [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo ln -s "${STC_BINARIES}/$i" "${STC_LINKS}/$i"
+				/bin/ls -l "${STC_LINKS}/$i"
+			fi
+		fi
+		echo
+	
+	done
+
+	# Check/Create DASMON User Local Bin Soft Links...
+	if [[ $DO_DASMON_CONFCK == 1 ]]; then
+
+		for i in dasmon dasmond ; do
+
+			echo "Checking DASMON User Local Bin Soft Links for: [$i]"
+
+			/bin/ls -l "${DASMON_LINKS}/$i"
+			if [[ ! -x "${DASMON_LINKS}/$i" ]]; then
+				echo -n "Create DASMON User Local Bin Soft Link for [$i]?"
+				echo -n " [yes|No] "
+				read ckUpdate
+				ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+				if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+					sudo ln -s "${DASMON_BINARIES}/$i" "${DASMON_LINKS}/$i"
+					/bin/ls -l "${DASMON_LINKS}/$i"
+				fi
+			fi
+			echo
+	
+		done
+
+	fi
+
+	# Also Check/Create ADARA/SMSD-MON User Local Bin Soft Link... ;-D
+	if [[ -n ${ALT} ]]; then
+
+		i="smsd"
+
+		echo -n "Checking ADARA/SMSD-${ALT} User Local Bin Soft Links for:"
+		echo " [$i${ALT}]"
+
+		/bin/ls -l "${ADARA_LINKS}/$i${ALT}"
+		if [[ ! -x "${ADARA_LINKS}/$i${ALT}" ]]; then
+			echo -n "Create ADARA User Local Bin Soft Link for [$i${ALT}]?"
+			echo -n " [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo ln -s "${ADARA_BINARIES}/$i" "${ADARA_LINKS}/$i${ALT}"
+				/bin/ls -l "${ADARA_LINKS}/$i${ALT}"
+			fi
+		fi
+		echo
+	
+	fi
+
+	# Check/Create Clone of SNS Accelerator Timing Git Repo...
+	/bin/ls -ld "${ACCEL_TIMING}"
+	if [[ ! -d "${ACCEL_TIMING}" ]]; then
+		echo -n "Create Clone of SNS Accelerator Timing Git Repo? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			git clone "${ACCEL_TIMING_REPO}" "${ACCEL_TIMING}"
+			/bin/ls -l "${ACCEL_TIMING}"
+		fi
+	fi
+	echo
+
 fi
 
 # Repeat Log Messages to Indicate Components Failing...!

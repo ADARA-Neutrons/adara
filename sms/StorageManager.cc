@@ -38,6 +38,11 @@ static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
 
 namespace fs = boost::filesystem;
 
+RateLimitedLogging::History RLLHistory_StorageManager;
+
+// Rate-Limited Logging IDs...
+#define RLL_CONTAINER_SAWTOOTH        0
+
 class PoolsizePV : public smsStringPV {
 public:
 	PoolsizePV(const std::string &name, uint32_t block_size,
@@ -728,8 +733,7 @@ void StorageManager::lateInit(void)
 			"uninitialized SMSControl obj for StorageManager!");
 	}
 
-	std::string prefix(ctrl->getBeamlineId());
-	prefix += ":SMS";
+	std::string prefix(ctrl->getPVPrefix());
 	prefix += ":StorageManager";
 
 	m_pvPoolsize = boost::shared_ptr<PoolsizePV>(new
@@ -2066,6 +2070,46 @@ void StorageManager::savePacket( IoVector &iovec, uint32_t dataSourceId,
 	}
 }
 
+void StorageManager::checkContainerTimeout( std::string label,
+		struct timespec &ts ) // EPICS Time...!
+{
+	DEBUG("checkContainerTimeout():"
+		<< " label=" << label
+		<< " ts=" << ts.tv_sec << "."
+		<< std::setfill('0') << std::setw(9)
+		<< ts.tv_nsec << std::setw(0)
+		<< " - Btw, the Container Stack has "
+		<< m_containerStack.size() << " elements");
+
+	// Obviously, or we wouldn't be here... ;-D
+	bool ignore_pkt_timestamp = false;
+	bool check_old_containers = true;
+
+	std::list<StorageContainer::SharedPtr>::iterator it;
+
+	// Find Container for This TimeStamp...
+	// (and Check Old Containers for Expiration in the Process...! ;-D)
+	it = findContainerByTime( "checkContainerTimeout()",
+		ignore_pkt_timestamp, ts, check_old_containers );
+
+	if ( it == m_containerStack.end() || !(*it) ) {
+		ERROR("checkContainerTimeout(): No Container Found"
+			<< " for ts=" << ts.tv_sec << "."
+			<< std::setfill('0') << std::setw(9)
+			<< ts.tv_nsec << std::setw(0)
+			<< " label=" << label
+			<< " - Btw, the Container Stack has "
+			<< m_containerStack.size() << " elements");
+		// *Don't* Throw an Exception Here, an Error Log is Enough... ;-D
+	}
+
+	// Get Proper PauseMode Off of Stack for This Packet/Time...
+	// (and Check Old PauseModes for Expiration in the Process...! ;-D)
+	std::list<struct StorageContainer::PauseMode>::iterator pm_it;
+	(*it)->getPauseModeByTime( pm_it, ignore_pkt_timestamp,
+		ts, check_old_containers );
+}
+
 void StorageManager::addPrologue(IoVector &iovec)
 {
 	/* We're writing a prologue before putting event data or slow control
@@ -2164,6 +2208,8 @@ StorageManager::findContainerByTime(
 {
 	static uint32_t cnt = 0;
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// *** Quick Cached Time Stamp Lookup Shortcut:
 	// If *Everything* is the "Same" for This Time Stamp Lookup,
 	// Then We Can Simply Return the Same "Last Iterator"...!
@@ -2173,30 +2219,30 @@ StorageManager::findContainerByTime(
 			&& ts.tv_sec == m_last_ts.tv_sec // EPICS Time...!
 			&& ts.tv_nsec == m_last_ts.tv_nsec )
 	{
-		// REMOVEME...
-		// DEBUG("findContainerByTime(): " << label
-			// << " *** CACHE HIT! SAME Packet TimeStamp,"
-			// << " Re-Use Last Container "
-			// << (*m_last_found_it)->name()
-			// << " for ts=" << ts.tv_sec << "."
-			// << std::setfill('0') << std::setw(9)
-			// << ts.tv_nsec << std::setw(0)
-			// << " in [" << (*m_last_found_it)->minTime().tv_sec << "."
-			// << std::setfill('0') << std::setw(9)
-			// << (*m_last_found_it)->minTime().tv_nsec << std::setw(0)
-			// << ", " << (*m_last_found_it)->maxTime().tv_sec << "."
-			// << std::setfill('0') << std::setw(9)
-			// << (*m_last_found_it)->maxTime().tv_nsec
-			// << std::setw(0) << "]"
-			// << " ignore_pkt_timestamp=" << ignore_pkt_timestamp
-			// << " check_old_containers=" << check_old_containers
-			// << " - Btw, the Container Stack has "
-			// << m_containerStack.size() << " elements");
+		if ( ctrl->verbose() > 2 )
+		{
+			DEBUG("findContainerByTime(): " << label
+				<< " *** CACHE HIT! SAME Packet TimeStamp,"
+				<< " Re-Use Last Container "
+				<< (*m_last_found_it)->name()
+				<< " for ts=" << ts.tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< ts.tv_nsec << std::setw(0)
+				<< " in [" << (*m_last_found_it)->minTime().tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< (*m_last_found_it)->minTime().tv_nsec << std::setw(0)
+				<< ", " << (*m_last_found_it)->maxTime().tv_sec << "."
+				<< std::setfill('0') << std::setw(9)
+				<< (*m_last_found_it)->maxTime().tv_nsec
+				<< std::setw(0) << "]"
+				<< " ignore_pkt_timestamp=" << ignore_pkt_timestamp
+				<< " check_old_containers=" << check_old_containers
+				<< " - Btw, the Container Stack has "
+				<< m_containerStack.size() << " elements");
+		}
 
 		return( m_last_found_it );
 	}
-
-	SMSControl *ctrl = SMSControl::getInstance();
 
 	// Update Storage Container Cleanup Timeout PV...
 	// (Infrequently, maybe once per minute...?)
@@ -2437,22 +2483,32 @@ StorageManager::findContainerByTime(
 					// Bogus TimeStamps... ;-Q
 					it = m_containerStack.begin();
 
-					// XXX TODO Add Rate-Limited Logging Here...!! ;-D
-					ERROR("findContainerByTime(): " << label
-						<< " Container SAWTOOTH for ts="
-						<< ts.tv_sec << "."
-						<< std::setfill('0') << std::setw(9) << ts.tv_nsec
-						<< " -> Using Current Container "
-						<< (*it)->name()
-						<< " in [" << (*it)->minTime().tv_sec << "."
-						<< std::setfill('0') << std::setw(9)
-						<< (*it)->minTime().tv_nsec << std::setw(0)
-						<< ", " << (*it)->maxTime().tv_sec << "."
-						<< std::setfill('0') << std::setw(9)
-						<< (*it)->maxTime().tv_nsec << std::setw(0) << "]"
-						<< " check_old_containers=" << check_old_containers
-						<< " - Btw, the Container Stack has "
-						<< m_containerStack.size() << " elements");
+					// Rate-Limited Logging Container SAWTOOTH...
+					std::string log_info;
+					if ( RateLimitedLogging::checkLog(
+							RLLHistory_StorageManager,
+							RLL_CONTAINER_SAWTOOTH, "none",
+							2, 10, 1000, log_info ) ) {
+						ERROR(log_info
+							<< "findContainerByTime(): " << label
+							<< " Container SAWTOOTH for ts="
+							<< ts.tv_sec << "."
+							<< std::setfill('0') << std::setw(9)
+								<< ts.tv_nsec
+							<< " -> Using Current Container "
+							<< (*it)->name()
+							<< " in [" << (*it)->minTime().tv_sec << "."
+							<< std::setfill('0') << std::setw(9)
+							<< (*it)->minTime().tv_nsec << std::setw(0)
+							<< ", " << (*it)->maxTime().tv_sec << "."
+							<< std::setfill('0') << std::setw(9)
+								<< (*it)->maxTime().tv_nsec
+								<< std::setw(0) << "]"
+							<< " check_old_containers="
+								<< check_old_containers
+							<< " - Btw, the Container Stack has "
+							<< m_containerStack.size() << " elements");
+					}
 
 					// Cache This Bogus Time Stamp Lookup Result
 					// for Next Time...! ;-Q

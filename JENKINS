@@ -95,7 +95,7 @@ Jenkins Build Node Configuration:
 
       Host: adara-tester.sns.gov
 
-      Username: y8y
+      Username: $USER
 
       Password: XXXXXXXX  (probably need to set up an SSH key, ahem... :)
 
@@ -152,7 +152,7 @@ Jenkins Project Information:
       X Trigger only if build succeeds
 
       Editable Email Notification
-         Project Recipient List: y8y@ornl.gov
+         Project Recipient List: $USER@ornl.gov
          Content Type: "Default Content Type"
          Default Subject: $DEFAULT_SUBJECT
          Default Content: $DEFAULT_CONTENT

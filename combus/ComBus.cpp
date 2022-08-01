@@ -404,7 +404,7 @@ std::string&
 Connection::checkBrokerURI( std::string &a_broker_uri )
 {
     // Better Sanitize the Input String, So ComBus/ActiveMQ Doesn't Crash!
-    Utils::sanitizeString( a_broker_uri, true );
+    Utils::sanitizeString( a_broker_uri, true /* a_preserve_uri */ );
 
     // Apply default protocol if not set
     if ( a_broker_uri.find("://") == string::npos )

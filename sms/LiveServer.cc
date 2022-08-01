@@ -98,8 +98,7 @@ LiveServer::LiveServer() :
 			"uninitialized SMSControl obj for LiveServer!");
 	}
 
-	std::string prefix(ctrl->getBeamlineId());
-	prefix += ":SMS";
+	std::string prefix(ctrl->getPVPrefix());
 	prefix += ":LiveServer";
 
 	m_pvListenStatus = boost::shared_ptr<smsErrorPV>(new

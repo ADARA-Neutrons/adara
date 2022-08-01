@@ -12,6 +12,8 @@ tools/adara-pvgen
 tools/adara-parser
 tools/adara-dump
 
+parser/adara-parser
+
 sms/smsd
 sms/testfs
 sms/test/storage-test

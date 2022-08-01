@@ -128,8 +128,7 @@ STCClientMgr::STCClientMgr() :
 			"uninitialized SMSControl obj for STCClientMgr!");
 	}
 
-	std::string prefix(ctrl->getBeamlineId());
-	prefix += ":SMS";
+	std::string prefix(ctrl->getPVPrefix());
 	prefix += ":STCClient";
 
 	m_pvConnectTimeout = boost::shared_ptr<smsFloat64PV>(new
@@ -312,8 +311,11 @@ void STCClientMgr::queueRun(StorageContainer::SharedPtr &c)
 	std::pair<RunMap::iterator, bool> ret;
 
 	ret = m_pendingRuns.insert(std::make_pair(c->runNumber(), c));
-	if (!ret.second)
-		throw std::logic_error("Duplicate Run Numbers");
+	if (!ret.second) {
+		ERROR("queueRun(): Duplicate Run Number " << c->runNumber()
+			<< ", Already in Pending Run Queue! Ignoring...");
+		return;
+	}
 
 	if (c->active())
 		m_currentRun = c->runNumber();
@@ -334,7 +336,7 @@ StorageContainer::SharedPtr &STCClientMgr::nextRun(void)
 	QueueMode next;
 
 	if (m_pendingRuns.empty())
-		throw std::logic_error("Trying to dequeue when empty");
+		throw std::logic_error("Trying to Dequeue When Pending Runs Empty");
 
 	if (m_currentRun) {
 		/* Always send the run we're currently recording if it
@@ -696,11 +698,11 @@ void STCClientMgr::connectComplete(void)
 
 		m_connect_timer->cancel();
 
-		StorageContainer::SharedPtr &run = nextRun();
-
 		// Update Send Paused Data Option from PV...
 		// (STCClient reads _Once_ on init...)
 		m_send_paused_data = m_pvSendPausedData->value();
+
+		StorageContainer::SharedPtr &run = nextRun();
 
 		try {
 			new STCClient(m_fd, run, *this);

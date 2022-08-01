@@ -5,7 +5,7 @@ ADARA_PREFIX="adara_"
 ADARA_MONITOR="${ADARA_PREFIX}monitor"
 ADARA_SUMMARY="${ADARA_PREFIX}summary"
 
-USERS="/SNS/users/y8y"
+USERS="/SNS/users/$USER"
 
 ADARA="gitsrc/ADARA"
 
@@ -35,7 +35,8 @@ if [[ $? != 0 ]]; then
 	/bin/cp -i ${ADARA_SUMMARY} ${USERS}/${ADARA}/
 fi
 
-nED_ON_WHEELS="bl0-now02.sns.gov bl0-now04.sns.gov"
+nED_ON_WHEELS="bl0b-now1.sns.gov bl0d-now1.sns.gov"
+	# Note: bl0g-now1 and bl0n-now1 mount /SNS/users/$USER/... ;-D
 
 for i in ${nED_ON_WHEELS} ; do
 

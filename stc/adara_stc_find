@@ -22,11 +22,12 @@ STC2_OLD="sns-stc2.sns.gov"
 
 STC_OLD="${STC1_OLD} ${STC2_OLD}"
 
-STC_ALL="${STC_NEW} ${STC_OLD}"
+STC_ALL="${STC_NEW}"
+# Removed ${STC_OLD}, They're Gone... 5/5/2022
 
-STCVIEW="/SNS/users/y8y/stuff/exec/stcview"
+STCVIEW="/SNS/users/$USER/stuff/exec/stcview"
 
-STCRUN="/SNS/users/y8y/stuff/exec/stcrun"
+STCRUN="/SNS/users/$USER/stuff/exec/stcrun"
 
 SORT="/usr/bin/sort"
 TAIL="/usr/bin/tail"
@@ -43,7 +44,7 @@ USAGE()
 	echo "    [--stc1-old|--stc2-old|--stc-old] \\"
 	echo "    [--stc-all (default)] \\"
 	echo "    [--all][--last (default)] \\"
-	echo "    [--start][--status (default)][--end] \\"
+	echo "    [--start][--status (default)][--end][--any] \\"
 	echo "    [--terse] \\"
 	echo "    [--help|-h]"
 	echo
@@ -103,28 +104,28 @@ for arg in "$@" ; do
 	value=`echo "$arg" | ${AWK} -F = '{print $2}'`
 
 	if [[ "#$key#" == '#--stc1#' ]]; then
-		STC_HOSTS="${STC_HOST} ${STC1}"
+		STC_HOSTS="${STC_HOSTS} ${STC1}"
 		echo -e "\nAdding STC1 Host to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc2#' ]]; then
-		STC_HOSTS="${STC_HOST} ${STC2}"
+		STC_HOSTS="${STC_HOSTS} ${STC2}"
 		echo -e "\nAdding STC2 Host to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc3#' ]]; then
-		STC_HOSTS="${STC_HOST} ${STC3}"
+		STC_HOSTS="${STC_HOSTS} ${STC3}"
 		echo -e "\nAdding STC3 Host to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc#' ]]; then
-		STC_HOSTS="${STC_HOST} ${STC_NEW}"
+		STC_HOSTS="${STC_HOSTS} ${STC_NEW}"
 		echo -e "\nAdding STC VMs to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc1-old#' ]]; then
-		STC_HOSTS="${STC_HOST} ${STC1_OLD}"
+		STC_HOSTS="${STC_HOSTS} ${STC1_OLD}"
 		echo -e "\nAdding Old STC1 Host to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc2-old#' ]]; then
-		STC_HOSTS="${STC_HOST} ${STC2_OLD}"
+		STC_HOSTS="${STC_HOSTS} ${STC2_OLD}"
 		echo -e "\nAdding Old STC2 Host to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc-old#' ]]; then
-		STC_HOSTS="${STC_HOST} ${STC_OLD}"
-		echo -e "\nAdding OLD STCs to Hosts List:\n\n[${STC_HOSTS} ]"
+		STC_HOSTS="${STC_HOSTS} ${STC_OLD}"
+		echo -e "\nAdding All Old STCs to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc-all#' ]]; then
-		STC_HOSTS="${STC_HOST} ${STC_NEW} ${STC_OLD}"
+		STC_HOSTS="${STC_HOSTS} ${STC_ALL}"
 		echo -e "\nAdding All STCs to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--all#' ]]; then
 		DO_ALL_LOGS=1
@@ -141,6 +142,11 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--end#' ]]; then
 		DO_END=1
 		echo -e "\nCapturing STC \"End\" Logs."
+	elif [[ "#$key#" == '#--any#' ]]; then
+		DO_START=1
+		DO_STATUS=1
+		DO_END=1
+		echo -e "\nCapturing Any STC Log: \"Start\", \"Status\" or \"End\"."
 	elif [[ "#$key#" == '#--terse#' ]]; then
 		TERSE=1
 		# Don't Log that Terse Mode Requested - It's Terse Mode! :-D
@@ -159,7 +165,7 @@ for arg in "$@" ; do
 done
 
 if [[ -z ${STC_HOSTS} ]]; then
-	STC_HOSTS="${STC_HOST} ${STC_NEW} ${STC_OLD}"
+	STC_HOSTS="${STC_HOSTS} ${STC_ALL}"
 	echo -e "\nDefaulting to All STCs in Hosts List:\n\n[${STC_HOSTS} ]"
 fi
 

@@ -32,7 +32,7 @@ SOURCES += main.cpp \
     MainWindow.cpp
 
 HEADERS  += \
-    ../../combus/STSMessages.h \
+    ../../combus/STCMessages.h \
     ../../combus/ComBusMessages.h \
     ../../combus/ComBusAppender.h \
     ../../combus/ComBus.h \

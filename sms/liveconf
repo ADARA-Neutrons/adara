@@ -39,7 +39,7 @@ index_pv["marker"]=""
 idName["marker"]="Marker"
 
 is_indexed["source"]=1
-index_pv["source"]="SMS:Control:NumDataSources"
+index_pv["source"]="Control:NumDataSources"
 idName["source"]="Source"
 
 is_indexed["ctrl"]=0
@@ -47,11 +47,11 @@ index_pv["ctrl"]=""
 idName["ctrl"]="Control"
 
 is_indexed["monitor"]=1
-index_pv["monitor"]="SMS:Control:NumBeamMonitors"
+index_pv["monitor"]="Control:NumBeamMonitors"
 idName["monitor"]="BeamMonitor"
 
 is_indexed["bankset"]=1
-index_pv["bankset"]="SMS:Control:NumDetBankSets"
+index_pv["bankset"]="Control:NumDetBankSets"
 idName["bankset"]="DetectorBankSet"
 
 is_indexed["combus"]=0
@@ -77,7 +77,7 @@ num_options=0
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="uri"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:DataURI"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:DataURI"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="IP_ADDR:IP_PORT(data)"
 option_label[$num_options]="[Data Source URI]"
@@ -85,14 +85,14 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="enabled"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:Enabled"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:Enabled"
 option_value_type[$num_options]="BOOL_VALUE(Enabled/Disabled)"
 option_label[$num_options]="[Enable/Disable Data Source]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="required"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:Required"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:Required"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[Data Source is Required for Data Collection]"
@@ -100,7 +100,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="connect_timeout"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:ConnectTimeout"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:ConnectTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="5"
 option_label[$num_options]="[Data Source Connection Timeout]"
@@ -108,7 +108,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="connect_retry"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:ConnectRetryTimeout"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:ConnectRetryTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="15"
 option_label[$num_options]="[Data Source Disconnect Retry Timeout]"
@@ -116,7 +116,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="data_timeout"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:DataTimeout"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:DataTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="3"
 option_label[$num_options]="[Data Source Data Delivery Timeout]"
@@ -124,7 +124,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="data_timeout_retry"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:DataTimeoutRetry"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:DataTimeoutRetry"
 option_value_type[$num_options]="UINT32_VALUE(nretries)"
 option_default[$num_options]="3"
 option_label[$num_options]="[Data Source Data Delivery Timeout Retries]"
@@ -132,7 +132,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="ignore_eop"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:IgnoreEoP"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:IgnoreEoP"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[Ignore End-of-Pulse]"
@@ -140,7 +140,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="ignore_local_sawtooth"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:IgnoreLocalSAWTOOTH"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:IgnoreLocalSAWTOOTH"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[Ignore Local SAWTOOTH Times]"
@@ -148,7 +148,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="ignore_annotation_pkts"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:IgnoreAnnotationPkts"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:IgnoreAnnotationPkts"
 option_value_type[$num_options]="ENUM(Ignore=0|PassThru=1|Execute=2)"
 option_default[$num_options]="Ignore"
 option_label[$num_options]="[Ignore External/Replay ADARA Markers/Annotns]"
@@ -156,7 +156,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="mixed_data_packets"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MixedDataPackets"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:MixedDataPackets"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[Mixed Data Packets (Neutron and Meta-Data)]"
@@ -164,7 +164,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="check_source_sequence"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:CheckSourceSequence"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:CheckSourceSequence"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="true"
 option_label[$num_options]="[Check Pkt Source Sequence Numbers (No Reset)]"
@@ -172,7 +172,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="check_pulse_sequence"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:CheckPulseSequence"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:CheckPulseSequence"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="true"
 option_label[$num_options]="[Check Pkt Pulse Sequence Numbers (Resets)]"
@@ -180,7 +180,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="max_pulse_seq_list"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MaxPulseSeqList"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:MaxPulseSeqList"
 option_value_type[$num_options]="UINT32_VALUE(buffer_size)"
 option_default[$num_options]="32"
 option_label[$num_options]="[Max Pulse Sequence List (Buffer) Size]"
@@ -188,7 +188,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="readsize"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:MaxReadChunk"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:MaxReadChunk"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="UINT32_VALUE+[M|K](bytes)"
 option_default[$num_options]="4194304"   # "4M" = 4 * 1024 * 1024
@@ -197,7 +197,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="rtdl_no_data_thresh"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:RTDLNoDataThresh"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:RTDLNoDataThresh"
 option_value_type[$num_options]="UINT32_VALUE(packets)"
 option_default[$num_options]="100"
 option_label[$num_options]="[RTDL No Data Threshold]"
@@ -205,15 +205,24 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="source"
 option_name[$num_options]="save_input_stream"
-option_pv[$num_options]="SMS:DataSource:XXX_INDEX_XXX:SaveInputStream"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:SaveInputStream"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[Save Input Stream]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
+option_name[$num_options]="alt_primary_pv_prefix"
+option_pv[$num_options]="AltPrimaryPVPrefix"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(Alternate Primary SMS PV Prefix.)"
+option_default[$num_options]="(unset)"
+option_label[$num_options]="[Alternate Primary PV Prefix]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
 option_name[$num_options]="no_eop_pulse_buffer_size"
-option_pv[$num_options]="SMS:Control:NoEoPPulseBufferSize"
+option_pv[$num_options]="Control:NoEoPPulseBufferSize"
 option_value_type[$num_options]="UINT32_VALUE(pulses)"
 option_default[$num_options]="0"
 option_label[$num_options]="[No EoP Pulse Buffer Size]"
@@ -221,7 +230,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="max_pulse_buffer_size"
-option_pv[$num_options]="SMS:Control:MaxPulseBufferSize"
+option_pv[$num_options]="Control:MaxPulseBufferSize"
 option_value_type[$num_options]="UINT32_VALUE(max_pulses)"
 option_default[$num_options]="1000"
 option_label[$num_options]="[Max Pulse Buffer Size]"
@@ -230,14 +239,14 @@ num_options=$(( num_options + 1 ))
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="pop_pulse_buffer"
 option_no_config[$num_options]=1
-option_pv[$num_options]="SMS:Control:PopPulseBuffer"
+option_pv[$num_options]="Control:PopPulseBuffer"
 option_value_type[$num_options]="INT32_VALUE(pulse_index)"
 option_label[$num_options]="[Pop (Erase) Pulse from Buffer By Index (+/-)]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="no_rtdl_pulses"
-option_pv[$num_options]="SMS:Control:NoRTDLPulses"
+option_pv[$num_options]="Control:NoRTDLPulses"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[No RTDL Pulses on This Beamline]"
@@ -245,7 +254,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="do_pulse_pcharge_correction"
-option_pv[$num_options]="SMS:Control:DoPulsePchgCorrect"
+option_pv[$num_options]="Control:DoPulsePchgCorrect"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="true"
 option_label[$num_options]="[Do Pulse Proton Charge Correction]"
@@ -253,7 +262,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="do_pulse_veto_correction"
-option_pv[$num_options]="SMS:Control:DoPulseVetoCorrect"
+option_pv[$num_options]="Control:DoPulseVetoCorrect"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="true"
 option_label[$num_options]="[Do Pulse Veto Flags Correction]"
@@ -261,7 +270,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="send_sample_in_run_info"
-option_pv[$num_options]="SMS:RunInfo:SendSampleInRunInfo"
+option_pv[$num_options]="RunInfo:SendSampleInRunInfo"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[Send Sample In Run Info]"
@@ -269,7 +278,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="run_notes_auto_reset"
-option_pv[$num_options]="SMS:Marker:NotesCommentAutoReset"
+option_pv[$num_options]="Marker:NotesCommentAutoReset"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="true"
 option_label[$num_options]="[Auto-Reset the Run Notes Between Runs]"
@@ -277,7 +286,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="intermittent_data_threshold"
-option_pv[$num_options]="SMS:Control:IntermittentDataThreshold"
+option_pv[$num_options]="Control:IntermittentDataThreshold"
 option_value_type[$num_options]="UINT32_VALUE(number_of_missing_pulses)"
 option_default[$num_options]="9"
 option_label[$num_options]="[Intermittent Data Source Threshold]"
@@ -285,7 +294,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="neutron_event_state_bits"
-option_pv[$num_options]="SMS:Control:NeutronEventStateBits"
+option_pv[$num_options]="Control:NeutronEventStateBits"
 option_value_type[$num_options]="UINT32_VALUE(number_of_state_bits)"
 option_default[$num_options]="0"
 option_label[$num_options]="[Number of Neutron Event State Bits]"
@@ -293,7 +302,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="neutron_event_sort_by_state"
-option_pv[$num_options]="SMS:Control:NeutronEventSortByState"
+option_pv[$num_options]="Control:NeutronEventSortByState"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[Whether to Sort Neutron Events By State]"
@@ -301,7 +310,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="ignore_interleaved_sawtooth"
-option_pv[$num_options]="SMS:Control:IgnoreInterleavedGlobalSAWTOOTH"
+option_pv[$num_options]="Control:IgnoreInterleavedGlobalSAWTOOTH"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="true"
 option_label[$num_options]="[Ignore Interleaved Global SAWTOOTH Times]"
@@ -309,7 +318,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="beam_monitor_tof_bits"
-option_pv[$num_options]="SMS:Control:BeamMonitorTOFBits"
+option_pv[$num_options]="Control:BeamMonitorTOFBits"
 option_value_type[$num_options]="UINT32_VALUE(number_of_tof_bits)"
 option_default[$num_options]="21"
 option_label[$num_options]="[Number of Beam Monitor TOF Bits]"
@@ -317,7 +326,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="chopper_tof_bits"
-option_pv[$num_options]="SMS:Control:ChopperTOFBits"
+option_pv[$num_options]="Control:ChopperTOFBits"
 option_value_type[$num_options]="UINT32_VALUE(number_of_tof_bits)"
 option_default[$num_options]="21"
 option_label[$num_options]="[Number of Chopper TOF Bits]"
@@ -325,7 +334,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="verbose"
-option_pv[$num_options]="SMS:Control:Verbose"
+option_pv[$num_options]="Control:Verbose"
 option_value_type[$num_options]="UINT32_VALUE(verbose_logging_level)"
 option_default[$num_options]="0"
 option_label[$num_options]="[SMS Verbose Logging Level Value]"
@@ -333,7 +342,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
 option_name[$num_options]="always_send_bmon_config"
-option_pv[$num_options]="SMS:Control:AlwaysSendBMConfig"
+option_pv[$num_options]="Control:AlwaysSendBMConfig"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="true"
 option_label[$num_options]="[Always Send Beam Monitor Config Packets]"
@@ -341,14 +350,14 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="id"
-option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Id"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:Id"
 option_value_type[$num_options]="UINT32_VALUE(Never Use This :-)"
 option_label[$num_options]="[Manually Override Beam Monitor Id in Config]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="format"
-option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Format"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:Format"
 option_value_type[$num_options]="BOOL_VALUE(event/histo)"
 option_default[$num_options]="event"
 option_label[$num_options]="[Switch Beam Monitor Output Formatting]"
@@ -356,7 +365,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="offset"
-option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:TofOffset"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:TofOffset"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
 option_default[$num_options]="0"
 option_label[$num_options]="[TOF Offset for Beam Monitor Histogram]"
@@ -364,7 +373,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="max"
-option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:MaxTof"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:MaxTof"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
 option_default[$num_options]="4294967295"   # ((uint32_t) -1)
 option_label[$num_options]="[Max TOF for Beam Monitor Histogram]"
@@ -372,7 +381,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="bin"
-option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:TofBin"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:TofBin"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
 option_default[$num_options]="1"
 option_label[$num_options]="[Linear TOF Bin Size for Beam Mon Histogram]"
@@ -380,7 +389,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="monitor"
 option_name[$num_options]="distance"
-option_pv[$num_options]="SMS:BeamMonitor:XXX_INDEX_XXX:Distance"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:Distance"
 option_value_type[$num_options]="FLOAT64_VALUE(meters)"
 option_default[$num_options]="0"
 option_label[$num_options]="[Beam Monitor Distance from Sample]"
@@ -388,7 +397,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="bankset"
 option_name[$num_options]="name"
-option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Name"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:Name"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="STRING16(human-readable description)"
 option_default[$num_options]="NoName"   # Never happens... :-D
@@ -397,7 +406,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="bankset"
 option_name[$num_options]="banklist"
-option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Banklist"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:Banklist"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="[UINT32_VALUE, ...](detector bank ids)"
 option_default[$num_options]="[]"
@@ -406,7 +415,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="bankset"
 option_name[$num_options]="format"
-option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Format"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:Format"
 option_value_type[$num_options]="ENUM_VALUE(event/histo/both)"
 option_default[$num_options]="event"
 option_label[$num_options]="[Set Detector Bank Set Output Formatting]"
@@ -414,7 +423,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="bankset"
 option_name[$num_options]="offset"
-option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:TofOffset"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:TofOffset"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
 option_default[$num_options]="0"
 option_label[$num_options]="[TOF Offset for Neutron Detector Histogram]"
@@ -422,7 +431,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="bankset"
 option_name[$num_options]="max"
-option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:MaxTof"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:MaxTof"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
 option_default[$num_options]="4294967295"   # ((uint32_t) -1)
 option_label[$num_options]="[Max TOF for Neutron Detector Histogram]"
@@ -430,7 +439,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="bankset"
 option_name[$num_options]="bin"
-option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:TofBin"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:TofBin"
 option_value_type[$num_options]="UINT32_VALUE(microseconds)"
 option_default[$num_options]="1"
 option_label[$num_options]="[Linear TOF Bin Size for Detector Histogram]"
@@ -438,7 +447,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="bankset"
 option_name[$num_options]="throttle"
-option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Throttle"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:Throttle"
 option_value_type[$num_options]="FLOAT64_VALUE(Hz)"
 option_default[$num_options]="0"
 option_label[$num_options]="[Detector Set Throttled Event Sampling Rate]"
@@ -446,7 +455,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="bankset"
 option_name[$num_options]="suffix"
-option_pv[$num_options]="SMS:DetectorBankSet:XXX_INDEX_XXX:Suffix"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:Suffix"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="STRING16(throttled toplevel name suffix)"
 option_default[$num_options]="throttled"
@@ -456,14 +465,14 @@ num_options=$(( num_options + 1 ))
 option_id_type[$num_options]="combus"
 option_name[$num_options]="restart"
 option_no_config[$num_options]=1
-option_pv[$num_options]="SMS:Combus:Restart"
+option_pv[$num_options]="Combus:Restart"
 option_value_type[$num_options]="BOOL_VALUE(Trigger ComBus Restart)"
 option_label[$num_options]="[Trigger ComBus Restart & Reconnect]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="combus"
 option_name[$num_options]="domain"
-option_pv[$num_options]="SMS:Combus:Domain"
+option_pv[$num_options]="Combus:Domain"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="STRING(ComBus Domain Name.)"
 option_default[$num_options]="SNS.TEST."
@@ -473,7 +482,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="combus"
 option_name[$num_options]="broker_uri"
-option_pv[$num_options]="SMS:Combus:BrokerURI"
+option_pv[$num_options]="Combus:BrokerURI"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="STRING(ComBus Broker URI tcp://host:port)"
 option_default[$num_options]="localhost"
@@ -483,7 +492,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="combus"
 option_name[$num_options]="broker_user"
-option_pv[$num_options]="SMS:Combus:BrokerUser"
+option_pv[$num_options]="Combus:BrokerUser"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="STRING(ComBus Broker User)"
 option_default[$num_options]="DAS"
@@ -492,7 +501,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="combus"
 option_name[$num_options]="broker_pass"
-option_pv[$num_options]="SMS:Combus:BrokerPass"
+option_pv[$num_options]="Combus:BrokerPass"
 option_value_type[$num_options]="STRING(ComBus Broker Password)"
 option_default[$num_options]="fish"   # Lol...! ;-D
 option_pv_opt[$num_options]="-S"
@@ -501,7 +510,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="storage"
 option_name[$num_options]="poolsize"
-option_pv[$num_options]="SMS:StorageManager:Poolsize"
+option_pv[$num_options]="StorageManager:Poolsize"
 option_pv_opt[$num_options]="-S"
 option_config_supercede[$num_options]="max_blocks_allowed"
 option_value_type[$num_options]="UINT32_VALUE+[G|M]"
@@ -510,7 +519,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="storage"
 option_name[$num_options]="percent"
-option_pv[$num_options]="SMS:StorageManager:Percent"
+option_pv[$num_options]="StorageManager:Percent"
 option_config_supercede[$num_options]="poolsize max_blocks_allowed"
 option_value_type[$num_options]="UINT32_VALUE(percent)"
 option_default[$num_options]="80"
@@ -519,7 +528,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="storage"
 option_name[$num_options]="max_blocks_allowed"
-option_pv[$num_options]="SMS:StorageManager:MaxBlocksAllowed"
+option_pv[$num_options]="StorageManager:MaxBlocksAllowed"
 option_value_type[$num_options]="UINT32_VALUE(blocks)"
 option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
 option_label[$num_options]=\
@@ -529,7 +538,7 @@ num_options=$(( num_options + 1 ))
 option_id_type[$num_options]="storage"
 option_name[$num_options]="max_blocks_allowed_multiplier"
 option_no_config[$num_options]=1
-option_pv[$num_options]="SMS:StorageManager:MaxBlocksAllowedMultiplier"
+option_pv[$num_options]="StorageManager:MaxBlocksAllowedMultiplier"
 option_value_type[$num_options]="UINT32_VALUE(blocks)"
 option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
 option_label[$num_options]=\
@@ -539,7 +548,7 @@ num_options=$(( num_options + 1 ))
 option_id_type[$num_options]="storage"
 option_name[$num_options]="block_size"
 option_no_config[$num_options]=1
-option_pv[$num_options]="SMS:StorageManager:BlockSize"
+option_pv[$num_options]="StorageManager:BlockSize"
 option_value_type[$num_options]="UINT32_VALUE(blocksize)"
 option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
 option_label[$num_options]="[Storage Block Size (Read-Only!)]"
@@ -548,14 +557,14 @@ num_options=$(( num_options + 1 ))
 option_id_type[$num_options]="storage"
 option_name[$num_options]="rescan_run_dir"
 option_no_config[$num_options]=1
-option_pv[$num_options]="SMS:StorageManager:RescanRunDir"
+option_pv[$num_options]="StorageManager:RescanRunDir"
 option_value_type[$num_options]="STRING(Full Path to Run Directory)"
 option_label[$num_options]="[Rescan Given Run Directory for Processing]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="storage"
 option_name[$num_options]="combus_verbose"
-option_pv[$num_options]="SMS:StorageManager:ComBusVerbose"
+option_pv[$num_options]="StorageManager:ComBusVerbose"
 option_value_type[$num_options]="BOOL_VALUE(ComBus is Verbose)"
 option_default[$num_options]="true"
 option_label[$num_options]="[ComBus Verbosity (for Run Pause/Resume)]"
@@ -563,7 +572,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="storage"
 option_name[$num_options]="container_cleanup_timeout"
-option_pv[$num_options]="SMS:StorageManager:ContainerCleanupTimeout"
+option_pv[$num_options]="StorageManager:ContainerCleanupTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="1"
 option_label[$num_options]="[Storage Container Cleanup Timeout]"
@@ -571,7 +580,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="stc"
 option_name[$num_options]="connect_timeout"
-option_pv[$num_options]="SMS:STCClient:ConnectTimeout"
+option_pv[$num_options]="STCClient:ConnectTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="15"
 option_label[$num_options]="[STC Client Connection Timeout]"
@@ -579,7 +588,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="stc"
 option_name[$num_options]="connect_retry"
-option_pv[$num_options]="SMS:STCClient:ConnectRetryTimeout"
+option_pv[$num_options]="STCClient:ConnectRetryTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="15"
 option_label[$num_options]="[STC Client Timeout for Re-Connection Attempt]"
@@ -587,7 +596,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="stc"
 option_name[$num_options]="transient_timeout"
-option_pv[$num_options]="SMS:STCClient:TransientTimeout"
+option_pv[$num_options]="STCClient:TransientTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="60"
 option_label[$num_options]="[STC Client Transient Error Retry Timeout]"
@@ -595,7 +604,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="stc"
 option_name[$num_options]="max_connections"
-option_pv[$num_options]="SMS:STCClient:MaxConnections"
+option_pv[$num_options]="STCClient:MaxConnections"
 option_value_type[$num_options]="UINT32_VALUE(connections)"
 option_default[$num_options]="3"
 option_label[$num_options]="[Max Simultaneous STC Client Connections]"
@@ -603,7 +612,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="stc"
 option_name[$num_options]="max_requeue_count"
-option_pv[$num_options]="SMS:STCClient:MaxRequeueCount"
+option_pv[$num_options]="STCClient:MaxRequeueCount"
 option_value_type[$num_options]="UINT32_VALUE(requeues)"
 option_default[$num_options]="5"
 option_label[$num_options]="[Max STC Client Error Re-Queue Attempts]"
@@ -611,7 +620,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="stc"
 option_name[$num_options]="send_paused_data"
-option_pv[$num_options]="SMS:STCClient:SendPausedData"
+option_pv[$num_options]="STCClient:SendPausedData"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[Send STC Client Paused Mode Data (Or Not)]"
@@ -619,7 +628,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="stc"
 option_name[$num_options]="uri"
-option_pv[$num_options]="SMS:STCClient:ServiceURI"
+option_pv[$num_options]="STCClient:ServiceURI"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="IP_ADDR:IP_PORT(service)"
 option_default[$num_options]="localhost"
@@ -628,7 +637,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="livestream"
 option_name[$num_options]="listen_retry"
-option_pv[$num_options]="SMS:LiveServer:ListenRetryTimeout"
+option_pv[$num_options]="LiveServer:ListenRetryTimeout"
 option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
 option_default[$num_options]="5"
 option_label[$num_options]="[Live Server Listener Retry Timeout]"
@@ -636,7 +645,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="livestream"
 option_name[$num_options]="uri"
-option_pv[$num_options]="SMS:LiveServer:ListenerURI"
+option_pv[$num_options]="LiveServer:ListenerURI"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="IP_ADDR(ip_addr or ANY)"
 option_default[$num_options]="ANY"
@@ -645,7 +654,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="livestream"
 option_name[$num_options]="service"
-option_pv[$num_options]="SMS:LiveServer:ListenerService"
+option_pv[$num_options]="LiveServer:ListenerService"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="IP_PORT(service)"
 option_default[$num_options]="31415"
@@ -654,7 +663,7 @@ num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="livestream"
 option_name[$num_options]="send_paused_data"
-option_pv[$num_options]="SMS:LiveServer:SendPausedData"
+option_pv[$num_options]="LiveServer:SendPausedData"
 option_value_type[$num_options]="BOOL_VALUE(true/false)"
 option_default[$num_options]="false"
 option_label[$num_options]="[Send Live Client Paused Mode Data (Or Not)]"
@@ -667,7 +676,8 @@ num_options=$(( num_options + 1 ))
 USAGE()
 {
 	echo "usage:  liveconf \\"
-	echo "            [--beamline=BL14B] [--config=./smsd.conf] \\"
+	echo "            [--beamline=BL14B] [--instance_id=0123] \\"
+	echo "            [--config=./smsd.conf] \\"
 	echo "            [--repo=/home/controls/config] [--alt=\"-mon\"] \\"
 	echo "            [status] [run_status] [sample_status] \\"
 	echo "            [data_status] [sys_status] \\"
@@ -682,6 +692,7 @@ USAGE()
 	echo
 
 	echo "   --beamline=BL14B      = explicitly set Beamline PV Prefix"
+	echo "   --instance_id=0123    = explicitly set SMS Instance Id"
 	echo "   --config=./smsd.conf  = specify custom SMSD Config file"
 	echo "   --repo=.../config...  = specify custom Git Config Repo dir"
 	echo "   --skiplive            = *don't* set live config option"
@@ -762,6 +773,8 @@ testonly=0
 terse=0
 quiet=0
 PRE="[NotSet]"
+SMS_ID="[NotSet]"
+SMS="SMS"
 ALT="" # for Alternate/Secondary SMS Deployments... ;-D
 for arg in "$@" ; do
 	# echo "arg=$arg"
@@ -772,6 +785,9 @@ for arg in "$@" ; do
 	if [[ "#$key#" == '#--beamline#' ]]; then
 		PRE="$value"
 		addToIntroOutput "Setting EPICS PV Prefix to: $PRE\n\n"
+	elif [[ "#$key#" == '#--instance_id#' ]]; then
+		SMS_ID="$value"
+		addToIntroOutput "Setting SMS Instance Id to: $SMS_ID\n\n"
 	elif [[ "#$key#" == '#--config#' ]]; then
 		SMSD_CONFIG="$value"
 		addToIntroOutput "Using SMS Daemon Config File in:\n" \
@@ -915,6 +931,68 @@ if [ ${PRE} == "[NotSet]" ]; then
 
 fi
 
+# Check for "ParADARA" SMS Instance Id in SMSD Config File...
+if [ ${SMS_ID} == "[NotSet]" ]; then
+
+	if [ ! -f $SMSD_CONFIG ]; then
+		echo -e -n "$introOutput"
+		echo -e "Error: Invalid SMSD Config File Does Not Exist!\n"
+		echo -e "   $SMSD_CONFIG\n"
+		exit -93
+	fi
+
+	iid_ck=`grep "instance_id" $SMSD_CONFIG | grep -v ';' \
+		| wc | awk '{print $1}'`
+
+	# If Instance Id is _Not_ Specified, Assume "Primary" SMS...
+	if [[ "#$iid_ck#" == '#0#' ]]; then
+
+		SMS_ID="0"
+
+		addToIntroOutput \
+			"Assuming Primary SMS Instance, No Id in SMSD Config File:\n" \
+			"   $SMSD_CONFIG\n" \
+			"      -> No \"instance_id\" Key.\n" \
+			"         => [${SMS_ID}].\n" \
+			"\n"
+	
+	# Extract SMS Instance Id from SMSD Config File...
+	else
+
+		iid_clean=`grep "instance_id" $SMSD_CONFIG | grep -v ';' \
+			| awk '{print $1$2$3}'`
+
+		iid_key=`echo "$iid_clean" | awk -F '=' '{print $1}'`
+		iid_value=`echo "$iid_clean" | awk -F '=' '{print $2}'`
+
+		if [[ "#$iid_key#" != '#instance_id#' ]]; then
+			echo -e -n "$introOutput"
+			echo -e "Error Parsing SMS Instance Id in SMSD Config File!\n"
+			ls -l $SMSD_CONFIG
+			echo -e "\n   $iid_clean\n"
+			exit -95
+		fi
+
+		SMS_ID="$iid_value"
+
+		addToIntroOutput \
+			"Setting SMS Instance Id from SMSD Config File:\n" \
+			"   $SMSD_CONFIG\n" \
+			"      -> $iid_key = $iid_value\n" \
+			"         => [${SMS_ID}].\n" \
+			"\n"
+
+	fi
+
+fi
+
+# Set the "SMS" Portion of the PV Prefix Based on the SMS Instance Id...
+# Note: SMS Instance Id = 0 for *Primary*, Non-Zero for *Secondary*...
+if [[ ${SMS_ID} != "[NotSet]" && ${SMS_ID} != 0 ]]; then
+	SMS="${SMS}:${SMS_ID}"
+	addToIntroOutput "Setting SMS PV Prefix from Instance Id: ${SMS}\n\n"
+fi
+
 daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
 now_ck=`echo "$config_host" | grep "now" | wc | awk '{print $1}'`
 if [ "#$daq_ck#" == '#1#' ]; then
@@ -975,7 +1053,7 @@ Dump_Non_Zero_PV()
 #
 # Uses:
 #    $optId $opt_label
-#    $PRE $PV $opt_pv_opt
+#    $PRE $SMS $PV $opt_pv_opt
 #
 # Sets:
 #    $live_value
@@ -990,15 +1068,16 @@ GET_LIVE_SETTING()
 	if [[ $terse == 0 ]]; then
 		echo "Getting Current Live SMS Daemon Setting (PV) for:"
 		echo "   ${optId}:${opt_label}"
-		echo "   ${PRE}:${PV}"
+		echo "   ${PRE}:${SMS}:${PV}"
 		if [[ "${_truncPrec}" != "" ]]; then
 			echo "   [Truncating Precision]"
 		fi
 		echo
 	fi
 	local _live_current=""
+	local _live_pv="${PRE}:${SMS}:${PV}"
 	local _live_ok=""
-	_live_current=`caget $opt_pv_opt $WAIT $_truncPrec ${PRE}:${PV} 2>&1`
+	_live_current=`caget $opt_pv_opt $WAIT $_truncPrec ${_live_pv} 2>&1`
 	_live_ok=$?
 	if [ ${_live_ok} != 0 ]; then
 		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
@@ -1362,10 +1441,10 @@ if [[ "$command" == "status" \
 
 	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
 	# (Give SMS plenty of time to reply, since it's Not multi-threaded.)
-	caget $WAIT ${PRE}:SMS:Recording > /dev/null 2>&1
+	caget $WAIT ${PRE}:${SMS}:Recording > /dev/null 2>&1
 	if [ $? != 0 ]; then
-		echo \
-		"Error: $PRE SMS EPICS PVs Not Initialized... Is 'smsd' running?"
+		echo -n "Error: $PRE ${SMS} EPICS PVs Not Initialized..."
+		echo " Is 'smsd' running?"
 		exit -2
 	fi
 
@@ -1373,9 +1452,15 @@ if [[ "$command" == "status" \
 			|| "$command" == "run_status" \
 			|| "$command" == "sys_status" ]]; then
 
-		caget -a -S $WAIT ${PRE}:SMS:Version \
+		caget -a -S $WAIT ${PRE}:${SMS}:Version \
 			| sed -e "s/ 2/   2/" -e "s/SMSD/ SMSD/" -e "s/ (/\n   (/" \
 				-e "s/[[:space:]]*$//"
+
+		echo
+
+		caget $WAIT ${PRE}:${SMS}:InstanceId
+
+		caget -a -S $WAIT ${PRE}:${SMS}:AltPrimaryPVPrefix
 
 		echo
 
@@ -1384,20 +1469,20 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "run_status" ]]; then
 
-		caget $WAIT -a ${PRE}:SMS:Recording
+		caget $WAIT -a ${PRE}:${SMS}:Recording
 
-		caget $WAIT ${PRE}:SMS:RunNumber
+		caget $WAIT ${PRE}:${SMS}:RunNumber
 
-		caget $WAIT ${PRE}:SMS:Summary
-		sr="${PRE}:SMS:SummaryReason"
+		caget $WAIT ${PRE}:${SMS}:Summary
+		sr="${PRE}:${SMS}:SummaryReason"
 		caget $WAIT -S $sr | grep $sr | awk "$awkLineBreak"
 
 		echo
 
-		caget $WAIT -S ${PRE}:SMS:RunInfo:ProposalId
-		pt="${PRE}:SMS:RunInfo:ProposalTitle"
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:ProposalId
+		pt="${PRE}:${SMS}:RunInfo:ProposalTitle"
 		caget $WAIT -S $pt | grep $pt | awk "$awkLineBreak"
-		rt="${PRE}:SMS:RunInfo:RunTitle"
+		rt="${PRE}:${SMS}:RunInfo:RunTitle"
 		caget $WAIT -S $rt | grep $rt | awk "$awkLineBreak"
 
 		echo
@@ -1408,7 +1493,7 @@ if [[ "$command" == "status" \
 			|| "$command" == "run_status"
 			|| "$command" == "sample_status" ]]; then
 
-		ssiri="${PRE}:SMS:RunInfo:SendSampleInRunInfo"
+		ssiri="${PRE}:${SMS}:RunInfo:SendSampleInRunInfo"
 		sendSampleInRunInfoOut=`caget $WAIT $ssiri`
 		echo "$sendSampleInRunInfoOut"
 
@@ -1419,25 +1504,25 @@ if [[ "$command" == "status" \
 		if [[ "$command" != "run_status"
 				|| "$sendSampleInRunInfo" != "false" ]]; then
 
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Id
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Name
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Nature
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Formula
-			caget $WAIT ${PRE}:SMS:RunInfo:Sample:Mass
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassString
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:MassUnits
-			caget $WAIT ${PRE}:SMS:RunInfo:Sample:Density
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityString
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:DensityUnits
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerId
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:ContainerName
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Component
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanIndicator
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanBarcode
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanName
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:CanMaterials
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Description
-			caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:Comments
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Id
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Name
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Nature
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Formula
+			caget $WAIT ${PRE}:${SMS}:RunInfo:Sample:Mass
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:MassString
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:MassUnits
+			caget $WAIT ${PRE}:${SMS}:RunInfo:Sample:Density
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:DensityString
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:DensityUnits
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:ContainerId
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:ContainerName
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Component
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:CanIndicator
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:CanBarcode
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:CanName
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:CanMaterials
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Description
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Comments
 
 			echo
 
@@ -1448,45 +1533,45 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "sample_status" ]]; then
 
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:HeightInContainer
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:HeightInContainerString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:HeightInContainerUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:HeightInContainer
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:HeightInContainerString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:HeightInContainerUnits
 
 		echo
 
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorDiameter
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorDiameterString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorDiameterUnits
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorHeight
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorHeightString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorHeightUnits
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorWidth
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorWidthString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorWidthUnits
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorDepth
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorDepthString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:InteriorDepthUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDiameter
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDiameterString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDiameterUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorHeight
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorHeightString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorHeightUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorWidth
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorWidthString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorWidthUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDepth
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDepthString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDepthUnits
 
 		echo
 
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterDiameter
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterDiameterString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterDiameterUnits
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterHeight
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterHeightString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterHeightUnits
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterWidth
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterWidthString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterWidthUnits
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterDepth
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterDepthString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:OuterDepthUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDiameter
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDiameterString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDiameterUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterHeight
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterHeightString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterHeightUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterWidth
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterWidthString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterWidthUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDepth
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDepthString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDepthUnits
 
 		echo
 
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:VolumeCubic
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:VolumeCubicString
-		caget $WAIT -S ${PRE}:SMS:RunInfo:Sample:VolumeCubicUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:VolumeCubic
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:VolumeCubicString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:VolumeCubicUnits
 
 		echo
 
@@ -1495,29 +1580,29 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "run_status" ]]; then
 
-		ui="${PRE}:SMS:RunInfo:UserInfo"
+		ui="${PRE}:${SMS}:RunInfo:UserInfo"
 		caget $WAIT -S $ui | grep $ui | awk "$awkLineBreak"
 
 		echo
 
-		caget $WAIT ${PRE}:SMS:Marker:ScanIndex
-		caget $WAIT ${PRE}:SMS:Marker:StartScan
-		caget $WAIT ${PRE}:SMS:Marker:StopScan
-		caget $WAIT -S ${PRE}:SMS:Marker:Comment
-		caget $WAIT ${PRE}:SMS:Marker:Annotate
-		caget $WAIT ${PRE}:SMS:Marker:RunComment
-		caget $WAIT -S ${PRE}:SMS:Marker:ScanComment
-		caget $WAIT -S ${PRE}:SMS:Marker:NotesComment
-		caget $WAIT ${PRE}:SMS:Marker:NotesCommentAutoReset
-		caget $WAIT -S ${PRE}:SMS:Marker:AnnotationComment
+		caget $WAIT ${PRE}:${SMS}:Marker:ScanIndex
+		caget $WAIT ${PRE}:${SMS}:Marker:StartScan
+		caget $WAIT ${PRE}:${SMS}:Marker:StopScan
+		caget $WAIT -S ${PRE}:${SMS}:Marker:Comment
+		caget $WAIT ${PRE}:${SMS}:Marker:Annotate
+		caget $WAIT ${PRE}:${SMS}:Marker:RunComment
+		caget $WAIT -S ${PRE}:${SMS}:Marker:ScanComment
+		caget $WAIT -S ${PRE}:${SMS}:Marker:NotesComment
+		caget $WAIT ${PRE}:${SMS}:Marker:NotesCommentAutoReset
+		caget $WAIT -S ${PRE}:${SMS}:Marker:AnnotationComment
 
 		echo
 
-		caget $WAIT ${PRE}:SMS:Paused
+		caget $WAIT ${PRE}:${SMS}:Paused
 
 		echo
 
-		caget $WAIT -S ${PRE}:SMS:LogLevel
+		caget $WAIT -S ${PRE}:${SMS}:LogLevel
 
 		echo
 
@@ -1527,7 +1612,7 @@ if [[ "$command" == "status" \
 			|| "$command" == "data_status" \
 			|| "$command" == "bandwidth" ]]; then
 
-		ndsvar="${PRE}:SMS:Control:NumDataSources"
+		ndsvar="${PRE}:${SMS}:Control:NumDataSources"
 
 		caget $WAIT $ndsvar
 
@@ -1543,7 +1628,7 @@ if [[ "$command" == "status" \
 
 				echo "Data Source id=${ds}:"
 
-				dsprefix="${PRE}:SMS:DataSource:${ds}"
+				dsprefix="${PRE}:${SMS}:DataSource:${ds}"
 
 				caget $WAIT -S ${dsprefix}:Name
 				caget $WAIT -S ${dsprefix}:BaseName
@@ -1596,7 +1681,7 @@ if [[ "$command" == "status" \
 
 				echo "---"
 
-				nhwsvar="${PRE}:SMS:DataSource:${ds}:NumHWSources"
+				nhwsvar="${PRE}:${SMS}:DataSource:${ds}:NumHWSources"
 
 				caget $WAIT $nhwsvar
 
@@ -1618,7 +1703,7 @@ if [[ "$command" == "status" \
 
 					echo "HW Source index=${hws}:"
 
-					hwsprefix="${PRE}:SMS:DataSource:${ds}:HWSource:${hws}"
+					hwsprefix="${PRE}:${SMS}:DataSource:${ds}:HWSource:${hws}"
 
 					caget $WAIT ${hwsprefix}:HwId
 					caget $WAIT ${hwsprefix}:SmsId
@@ -1650,44 +1735,44 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "sys_status" ]]; then
 
-		caget $WAIT ${PRE}:SMS:Control:NoEoPPulseBufferSize
-		caget $WAIT ${PRE}:SMS:Control:MaxPulseBufferSize
-		caget $WAIT ${PRE}:SMS:Control:NoRTDLPulses
-		caget $WAIT ${PRE}:SMS:Control:DoPulsePchgCorrect
-		caget $WAIT ${PRE}:SMS:Control:DoPulseVetoCorrect
-		caget $WAIT ${PRE}:SMS:Control:IntermittentDataThreshold
-		caget $WAIT ${PRE}:SMS:Control:NeutronEventStateBits
-		caget $WAIT ${PRE}:SMS:Control:NeutronEventSortByState
-		caget $WAIT ${PRE}:SMS:Control:IgnoreInterleavedGlobalSAWTOOTH
-		caget $WAIT ${PRE}:SMS:Control:BeamMonitorTOFBits
-		caget $WAIT ${PRE}:SMS:Control:ChopperTOFBits
-		caget $WAIT ${PRE}:SMS:Control:AlwaysSendBMConfig
-		caget $WAIT ${PRE}:SMS:Control:Verbose
+		caget $WAIT ${PRE}:${SMS}:Control:NoEoPPulseBufferSize
+		caget $WAIT ${PRE}:${SMS}:Control:MaxPulseBufferSize
+		caget $WAIT ${PRE}:${SMS}:Control:NoRTDLPulses
+		caget $WAIT ${PRE}:${SMS}:Control:DoPulsePchgCorrect
+		caget $WAIT ${PRE}:${SMS}:Control:DoPulseVetoCorrect
+		caget $WAIT ${PRE}:${SMS}:Control:IntermittentDataThreshold
+		caget $WAIT ${PRE}:${SMS}:Control:NeutronEventStateBits
+		caget $WAIT ${PRE}:${SMS}:Control:NeutronEventSortByState
+		caget $WAIT ${PRE}:${SMS}:Control:IgnoreInterleavedGlobalSAWTOOTH
+		caget $WAIT ${PRE}:${SMS}:Control:BeamMonitorTOFBits
+		caget $WAIT ${PRE}:${SMS}:Control:ChopperTOFBits
+		caget $WAIT ${PRE}:${SMS}:Control:AlwaysSendBMConfig
+		caget $WAIT ${PRE}:${SMS}:Control:Verbose
 
 		echo
 
-		caget $WAIT ${PRE}:SMS:Control:PopPulseBuffer
+		caget $WAIT ${PRE}:${SMS}:Control:PopPulseBuffer
 
 		echo
 
-		caget $WAIT -S ${PRE}:SMS:StorageManager:Poolsize
-		caget $WAIT ${PRE}:SMS:StorageManager:Percent
-		caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowed
-		caget $WAIT ${PRE}:SMS:StorageManager:MaxBlocksAllowedMultiplier
-		caget $WAIT ${PRE}:SMS:StorageManager:BlockSize
-		caget $WAIT -S ${PRE}:SMS:StorageManager:RescanRunDir
-		caget $WAIT ${PRE}:SMS:StorageManager:ComBusVerbose
-		caget $WAIT ${PRE}:SMS:StorageManager:ContainerCleanupTimeout
+		caget $WAIT -S ${PRE}:${SMS}:StorageManager:Poolsize
+		caget $WAIT ${PRE}:${SMS}:StorageManager:Percent
+		caget $WAIT ${PRE}:${SMS}:StorageManager:MaxBlocksAllowed
+		caget $WAIT ${PRE}:${SMS}:StorageManager:MaxBlocksAllowedMultiplier
+		caget $WAIT ${PRE}:${SMS}:StorageManager:BlockSize
+		caget $WAIT -S ${PRE}:${SMS}:StorageManager:RescanRunDir
+		caget $WAIT ${PRE}:${SMS}:StorageManager:ComBusVerbose
+		caget $WAIT ${PRE}:${SMS}:StorageManager:ContainerCleanupTimeout
 
 		echo
 
-		caget $WAIT ${PRE}:SMS:STCClient:ConnectTimeout
-		caget $WAIT ${PRE}:SMS:STCClient:ConnectRetryTimeout
-		caget $WAIT ${PRE}:SMS:STCClient:TransientTimeout
-		caget $WAIT ${PRE}:SMS:STCClient:MaxConnections
-		caget $WAIT ${PRE}:SMS:STCClient:MaxRequeueCount
-		caget $WAIT ${PRE}:SMS:STCClient:SendPausedData
-		caget $WAIT -S ${PRE}:SMS:STCClient:ServiceURI
+		caget $WAIT ${PRE}:${SMS}:STCClient:ConnectTimeout
+		caget $WAIT ${PRE}:${SMS}:STCClient:ConnectRetryTimeout
+		caget $WAIT ${PRE}:${SMS}:STCClient:TransientTimeout
+		caget $WAIT ${PRE}:${SMS}:STCClient:MaxConnections
+		caget $WAIT ${PRE}:${SMS}:STCClient:MaxRequeueCount
+		caget $WAIT ${PRE}:${SMS}:STCClient:SendPausedData
+		caget $WAIT -S ${PRE}:${SMS}:STCClient:ServiceURI
 
 		echo
 
@@ -1696,7 +1781,7 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "bmon_status" ]]; then
 
-		nbmvar="${PRE}:SMS:Control:NumBeamMonitors"
+		nbmvar="${PRE}:${SMS}:Control:NumBeamMonitors"
 		caget $WAIT $nbmvar
 		if [ $? == 0 ]; then
 			echo
@@ -1705,12 +1790,12 @@ if [[ "$command" == "status" \
 			# Count from 1...!
 			for (( bm=1 ; bm <= numBeamMonitors ; bm++ )); do
 				echo "Beam Monitor index=${bm}:"
-				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:Id
-				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:Format
-				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:TofOffset
-				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:MaxTof
-				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:TofBin
-				caget $WAIT ${PRE}:SMS:BeamMonitor:${bm}:Distance
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:Id
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:Format
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:TofOffset
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:MaxTof
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:TofBin
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:Distance
 				echo
 			done
 		fi
@@ -1719,7 +1804,7 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "detset_status" ]]; then
 
-		ndbsvar="${PRE}:SMS:Control:NumDetBankSets"
+		ndbsvar="${PRE}:${SMS}:Control:NumDetBankSets"
 		caget $WAIT $ndbsvar
 		if [ $? == 0 ]; then
 			echo
@@ -1728,15 +1813,15 @@ if [[ "$command" == "status" \
 			# Count from 1...!
 			for (( dbs=1 ; dbs <= numDetBankSets ; dbs++ )); do
 				echo "Detector Bank Set index=${dbs}:"
-				caget $WAIT -S ${PRE}:SMS:DetectorBankSet:${dbs}:Name
-				bl="${PRE}:SMS:DetectorBankSet:${dbs}:Banklist"
+				caget $WAIT -S ${PRE}:${SMS}:DetectorBankSet:${dbs}:Name
+				bl="${PRE}:${SMS}:DetectorBankSet:${dbs}:Banklist"
 				caget $WAIT -S $bl | grep $bl | awk "$awkLineBreak"
-				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:Format
-				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:TofOffset
-				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:MaxTof
-				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:TofBin
-				caget $WAIT ${PRE}:SMS:DetectorBankSet:${dbs}:Throttle
-				caget $WAIT -S ${PRE}:SMS:DetectorBankSet:${dbs}:Suffix
+				caget $WAIT ${PRE}:${SMS}:DetectorBankSet:${dbs}:Format
+				caget $WAIT ${PRE}:${SMS}:DetectorBankSet:${dbs}:TofOffset
+				caget $WAIT ${PRE}:${SMS}:DetectorBankSet:${dbs}:MaxTof
+				caget $WAIT ${PRE}:${SMS}:DetectorBankSet:${dbs}:TofBin
+				caget $WAIT ${PRE}:${SMS}:DetectorBankSet:${dbs}:Throttle
+				caget $WAIT -S ${PRE}:${SMS}:DetectorBankSet:${dbs}:Suffix
 				echo
 			done
 		fi
@@ -1745,14 +1830,14 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "combus_status" ]]; then
 
-		caget $WAIT -S ${PRE}:SMS:Combus:Restart
+		caget $WAIT -S ${PRE}:${SMS}:Combus:Restart
 
 		echo
 
-		caget $WAIT -S ${PRE}:SMS:Combus:Domain
-		caget $WAIT -S ${PRE}:SMS:Combus:BrokerURI
-		caget $WAIT -S ${PRE}:SMS:Combus:BrokerUser
-		caget $WAIT -S ${PRE}:SMS:Combus:BrokerPass
+		caget $WAIT -S ${PRE}:${SMS}:Combus:Domain
+		caget $WAIT -S ${PRE}:${SMS}:Combus:BrokerURI
+		caget $WAIT -S ${PRE}:${SMS}:Combus:BrokerUser
+		caget $WAIT -S ${PRE}:${SMS}:Combus:BrokerPass
 
 		echo
 
@@ -1761,15 +1846,15 @@ if [[ "$command" == "status" \
 	if [[ "$command" == "status" \
 			|| "$command" == "live_status" ]]; then
 
-		caget $WAIT -a ${PRE}:SMS:LiveServer:ListenStatus
-		caget $WAIT ${PRE}:SMS:LiveServer:ListenRetryTimeout
-		caget $WAIT ${PRE}:SMS:LiveServer:SendPausedData
-		caget $WAIT -S ${PRE}:SMS:LiveServer:ListenerURI
-		caget $WAIT -S ${PRE}:SMS:LiveServer:ListenerService
+		caget $WAIT -a ${PRE}:${SMS}:LiveServer:ListenStatus
+		caget $WAIT ${PRE}:${SMS}:LiveServer:ListenRetryTimeout
+		caget $WAIT ${PRE}:${SMS}:LiveServer:SendPausedData
+		caget $WAIT -S ${PRE}:${SMS}:LiveServer:ListenerURI
+		caget $WAIT -S ${PRE}:${SMS}:LiveServer:ListenerService
 
 		echo
 
-		nlcvar="${PRE}:SMS:Control:NumLiveClients"
+		nlcvar="${PRE}:${SMS}:Control:NumLiveClients"
 		caget $WAIT -S $nlcvar
 		if [ $? == 0 ]; then
 			echo
@@ -1778,11 +1863,12 @@ if [[ "$command" == "status" \
 			# Count from 1...!
 			for (( lc=1 ; lc <= numLiveClients ; lc++ )); do
 				echo "Live Client id=${lc}:"
-				caget $WAIT -S ${PRE}:SMS:LiveClient:${lc}:Name
-				caget $WAIT ${PRE}:SMS:LiveClient:${lc}:RequestedStartTime
-				cfp="${PRE}:SMS:LiveClient:${lc}:CurrentFilePath"
+				caget $WAIT -S ${PRE}:${SMS}:LiveClient:${lc}:Name
+				caget $WAIT \
+					${PRE}:${SMS}:LiveClient:${lc}:RequestedStartTime
+				cfp="${PRE}:${SMS}:LiveClient:${lc}:CurrentFilePath"
 				caget $WAIT -S $cfp | grep $cfp | awk "$awkLineBreak"
-				caget $WAIT -a ${PRE}:SMS:LiveClient:${lc}:Status
+				caget $WAIT -a ${PRE}:${SMS}:LiveClient:${lc}:Status
 				echo
 			done
 		fi
@@ -2051,9 +2137,10 @@ GET_OPTION_INFO()
 		fi
 		echo "      ${id_name_indent}to ${opt_value}."
 		if [ $testonly == 1 ]; then
-			echo "[TESTONLY] caput $opt_pv_opt ${PRE}:${PV} $opt_value"
+			echo -n "[TESTONLY] caput $opt_pv_opt"
+			echo " ${PRE}:${SMS}:${PV} $opt_value"
 		else
-			caput $opt_pv_opt ${PRE}:${PV} "$opt_value"
+			caput $opt_pv_opt ${PRE}:${SMS}:${PV} "$opt_value"
 		fi
 		if [ $? != 0 ]; then
 			echo "Error Setting Live SMS Daemon Option:"
@@ -2710,7 +2797,7 @@ CONFCK()
 		# Get Number of Instances for Indexed Option
 		if [ ${is_indexed[$opt_id_type]} == 1 ]; then
 			echo "   Indexed Option."
-			numVarsPV="${PRE}:${index_pv[$opt_id_type]}"
+			numVarsPV="${PRE}:${SMS}:${index_pv[$opt_id_type]}"
 			numIndexedVars=`caget $WAIT $numVarsPV | grep $numVarsPV | awk '{print $2}'`
 			# Make Sure We Got Something...
 			if [[ $numIndexedVars == "" ]]; then

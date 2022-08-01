@@ -406,8 +406,8 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 	m_runNumber(0), m_lastRunNumber(0),
 	m_packetValid(false), m_packet(NULL), m_packetSize(0)
 {
-	std::string prefix(beamline);
-	prefix += ":SMS:RunInfo:";
+	std::string prefix(m_ctrl->getPVPrefix());
+	prefix += ":RunInfo:";
 
 	m_resetPV.reset(new RunInfoResetPV(prefix, this));
 	m_ctrl->addPV(m_resetPV);

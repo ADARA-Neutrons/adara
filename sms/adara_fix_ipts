@@ -12,48 +12,48 @@
 # "Fix IPTS" Test Commands:
 #
 # ./sms/adara_fix_ipts --inst=PG3 --stc_host=localhost --stc_port=31420 \
-#    --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --sms_data=/SNS/users/$USER --no-send-paused-data \
 #    --archive_path=/TESTING --run=38524-38527 --ipts=IPTS-2767
 #
 # ./sms/adara_fix_ipts --inst=VULCAN --stc_host=localhost \
-#    --stc_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --stc_port=31420 --sms_data=/SNS/users/$USER --no-send-paused-data \
 #    --archive_path=/TESTING --run=156458 --ipts=IPTS-18677
 #
 # ./sms/adara_fix_ipts --inst=EQSANS --stc_host=localhost \
-#    --stc_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --stc_port=31420 --sms_data=/SNS/users/$USER --no-send-paused-data \
 #    --archive_path=/TESTING --run=98446-98448 --ipts=IPTS-21608
 #
 # ./sms/adara_fix_ipts --inst=ARCS --facility=SNS --stc_host=localhost \
-#    --stc_port=31420 --sms_data=/SNS/users/y8y --no-send-paused-data \
+#    --stc_port=31420 --sms_data=/SNS/users/$USER --no-send-paused-data \
 #    --archive_path=/TESTING --run=125356-125363 --ipts=IPTS-20849
 
 # With "Fix IPTS" Test Data in:
 #
-#    /SNS/users/y8y/20170830/20170830-013325.796536119-run-38523/
-#    /SNS/users/y8y/20170830/20170830-034457.473266516-run-38524/
-#    /SNS/users/y8y/20170830/20170830-055215.443177248-run-38525/
-#    /SNS/users/y8y/20170830/20170830-075802.792935897-run-38526/
-#    /SNS/users/y8y/20170830/20170830-085315.302591461-run-38527/
-#    /SNS/users/y8y/20170830/20170830-094851.304674233-run-38528/
-#    (/SNS/users/y8y/20170830/cleanup)
+#    /SNS/users/$USER/20170830/20170830-013325.796536119-run-38523/
+#    /SNS/users/$USER/20170830/20170830-034457.473266516-run-38524/
+#    /SNS/users/$USER/20170830/20170830-055215.443177248-run-38525/
+#    /SNS/users/$USER/20170830/20170830-075802.792935897-run-38526/
+#    /SNS/users/$USER/20170830/20170830-085315.302591461-run-38527/
+#    /SNS/users/$USER/20170830/20170830-094851.304674233-run-38528/
+#    (/SNS/users/$USER/20170830/cleanup)
 #
-#    /SNS/users/y8y/20170925/20170925-223300.550696919-run-156458/
-#    (/SNS/users/y8y/20170925/cleanup)
+#    /SNS/users/$USER/20170925/20170925-223300.550696919-run-156458/
+#    (/SNS/users/$USER/20170925/cleanup)
 #
-#    /SNS/users/y8y/20180920/20180920-133950.705888442-run-98446/
-#    /SNS/users/y8y/20180920/20180920-154457.198797185-run-98447/
-#    /SNS/users/y8y/20180920/20180920-154729.955497035-run-98448/
-#    (/SNS/users/y8y/20180920/cleanup)
+#    /SNS/users/$USER/20180920/20180920-133950.705888442-run-98446/
+#    /SNS/users/$USER/20180920/20180920-154457.198797185-run-98447/
+#    /SNS/users/$USER/20180920/20180920-154729.955497035-run-98448/
+#    (/SNS/users/$USER/20180920/cleanup)
 #
-#    /SNS/users/y8y/20190311/20190311-000350.433146816-run-125356/
-#    /SNS/users/y8y/20190311/20190311-032720.588704159-run-125357/
-#    /SNS/users/y8y/20190311/20190311-061229.415149226-run-125358/
-#    /SNS/users/y8y/20190311/20190311-070418.791527987-run-125359/
-#    /SNS/users/y8y/20190311/20190311-090706.409446369-run-125360/
-#    /SNS/users/y8y/20190311/20190311-094042.223450763-run-125361/
-#    /SNS/users/y8y/20190311/20190311-112034.429064109-run-125362/
-#    /SNS/users/y8y/20190311/20190311-114014.684490977-run-125363/
-#    (/SNS/users/y8y/20190311/cleanup)
+#    /SNS/users/$USER/20190311/20190311-000350.433146816-run-125356/
+#    /SNS/users/$USER/20190311/20190311-032720.588704159-run-125357/
+#    /SNS/users/$USER/20190311/20190311-061229.415149226-run-125358/
+#    /SNS/users/$USER/20190311/20190311-070418.791527987-run-125359/
+#    /SNS/users/$USER/20190311/20190311-090706.409446369-run-125360/
+#    /SNS/users/$USER/20190311/20190311-094042.223450763-run-125361/
+#    /SNS/users/$USER/20190311/20190311-112034.429064109-run-125362/
+#    /SNS/users/$USER/20190311/20190311-114014.684490977-run-125363/
+#    (/SNS/users/$USER/20190311/cleanup)
 #
 
 #
@@ -63,6 +63,10 @@
 PROD_BASE_URL="https://snsapp1.sns.ornl.gov/xprod_ro/proposal_production"
 
 GET_PROPOSAL_BY_ID="express/getIPTSByPrpsl"
+
+ONCAT_AUTH="/SNS/users/${USER}/ONCat.Authentication.Certificate.txt"
+
+ONCAT_URL="https://oncat.ornl.gov/api/datafiles"
 
 NOTIFY_EMAIL_LIST="parkerpg@ornl.gov rens@ornl.gov kohlja@ornl.gov"
 
@@ -84,8 +88,9 @@ XINETD_DIR="/etc/xinetd.d"
 
 ARCHIVE_PATH="/"
 
-STC1="sns-stc1.sns.gov"
-STC2="sns-stc2.sns.gov"
+STC1="stc1.ornl.gov"
+STC2="stc2.ornl.gov"
+STC3="stc3.ornl.gov"
 
 TRUNCATE="/usr/bin/truncate"
 Editor="/usr/bin/vim"
@@ -120,7 +125,7 @@ USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
 	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
-	echo "    [--stc1|--stc2|--stc_host=<STC_HOST>] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc_host=<STC_HOST>] \\"
 	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
 	echo "    [--stc_port=<STCPort>] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
@@ -274,6 +279,9 @@ for arg in "$@" ; do
 		echo -e "\nSetting STC Host to: ${STC_HOST}"
 	elif [[ "#$key#" == '#--stc2#' ]]; then
 		STC_HOST="${STC2}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc3#' ]]; then
+		STC_HOST="${STC3}"
 		echo -e "\nSetting STC Host to: ${STC_HOST}"
 	elif [[ "#$key#" == '#--stc_host#' ]]; then
 		STC_HOST="${value}"
@@ -770,16 +778,88 @@ RESUBMIT_RUN()
 		echo
 
 		${FINDNEXUS} -i ${INST} ${run}
-		ckfindnexus=$?
+		local _ckfindnexus=$?
 
-		if [[ ${ckfindnexus} != 0 ]]; then
-			echo -e -n "\nERROR Checking FindNeXus to Verify "
-			echo "the Proposal Move for Run ${run}!"
+		if [[ ${_ckfindnexus} != 0 ]]; then
+			echo -e -n "\nERROR Checking FindNeXus to Verify"
+			echo " the Proposal Move for Run ${run}!"
 			echo -e "\n\t${FINDNEXUS} -i ${INST} ${run}"
 			CHECK_PROCEED
 			echo -e "\nContinuing..."
 			# No Need to Give Up/Return Here, Just FindNeXus Check...
 		fi
+
+	fi
+
+	#
+	# Now Update the Catalog to Remove the Original Run Data File Location
+	#
+
+	# Prompt User for Old Catalog Remove Check...
+	local _ckrmoldcat
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+		CHECK_PROCEED \
+			"Update the Catalog to Remove the Original Data File Location"
+		_ckrmoldcat=$?
+	else
+		_ckrmoldcat=1		# Default to *Updating* the Catalog...
+	fi
+
+	# Did We Already Update the Catalog to Remove the Original Data File?
+	local _didweupdatethecatalog="Did Not"
+
+	if [[ ${_ckrmoldcat} == 0 ]]; then
+
+		echo -e -n "\nUpdating the Catalog to Remove"
+		echo -e " the Original Data File Location."
+
+		# Base ONCat Curl Command...
+		local _catcmd="curl -X DELETE"
+
+		# Get Special ONCat Authentication Certificate from User Area
+		local _catauth=`/bin/cat ${ONCAT_AUTH}`
+		_catcmd="${_catcmd} -H 'Authorization: Bearer ${_catauth}'"
+
+		# Construct Run NeXus Data File URL Location Reference
+		local _nxsurl="${ONCAT_URL}/${FACILITY}/${INST}/${IPTS_OLD}/nexus"
+		_nxsurl="${_nxsurl}/${INST}_${run}.nxs.h5"
+
+		local _catopt="?facility=${FACILITY}"
+		_catopt="${_catopt}&instrument=${INST}"
+
+		# Assemble Full ONCat Catalog Remove Command
+		_catcmd="${_catcmd} \"${_nxsurl}${_catopt}\""
+
+		echo -e "\nExecuting ONCat Catalog Remove Command:"
+		echo -e "\n   ${_catcmd}"
+
+		${_catcmd}
+		local _ckcatcmd=$?
+
+		if [[ ${_ckcatcmd} != 0 ]]; then
+			echo -e -n "\nERROR Updating the Catalog to Remove"
+			echo " the Original Data File Location for Run ${run}!"
+			CHECK_PROCEED
+			echo -e "\nContinuing..."
+			# No Need to Give Up/Return Here, Just Move On...
+		else
+			_didweupdatethecatalog="Did"
+		fi
+
+		# Just In Case, Spew Forth the Command to Undo What We Just Did!
+
+		# Base ONCat Curl Command...
+		local _undocatcmd="curl -X POST"
+
+		# Special ONCat Authentication Certificate (from User Area)
+		_undocatcmd="${_undocatcmd} -H 'Authorization: Bearer ${_catauth}'"
+
+		# Assemble Full ONCat Catalog Remove Command
+		_undocatcmd="${_undocatcmd} \"${_nxsurl}/ingest\""
+
+		echo -e "\nBtw, If This ONCat Catalog Removal Was In Error,"
+		echo -e "Then This is the Magic \"Undo\" Command:"
+		echo -e "\n   ${_undocatcmd}"
 
 	fi
 
@@ -822,8 +902,12 @@ to the New Proposal:
 
 	${IPTS_NEW} (${TITLE_NEW})
 
+We ***${_didweupdatethecatalog}*** Already Update the Catalog Database
+to Remove the Reference to the Original NeXus Data File.
+
 Please Verify This Update to the ${FACILITY} Catalog Database,
-and Remove Any Duplicate Records referring to the Old Proposal.
+and Remove Any Duplicate Records referring to the Old Proposal
+(as needed).
 
 Thank You! :-D
 
@@ -831,11 +915,11 @@ Thank You! :-D
 
 NotifyEmailContent
 
-		ckmail=$?
+		local _ckmail=$?
 
-		if [[ ${ckmail} != 0 ]]; then
-			echo -e -n "\nERROR Sending Email Notification "
-			echo "to Catalog Admins for Run ${run}!"
+		if [[ ${_ckmail} != 0 ]]; then
+			echo -e -n "\nERROR Sending Email Notification"
+			echo " to Catalog Admins for Run ${run}!"
 			echo -e "\n\tTo: ${NOTIFY_EMAIL_LIST}"
 			echo -e "\n\tSubject: ${_subject}"
 			CHECK_PROCEED
@@ -2655,7 +2739,7 @@ for run in ${RUN_NUMBERS} ; do
 	fi
 
 	#
-	# Now That We're Done Substituting,
+	# Now That We Are Done Substituting,
 	# See If We Still Need to Absorb Yet More White Space... ;-o
 	#
 

@@ -119,7 +119,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# Get/Copy/Create a "confck" Script...
 
-	cp /SNS/users/y8y/confck.dasmon confck
+	cp /SNS/users/$USER/confck.dasmon confck
 	git add confck
 	git commit -m "Install ConfCk Script." confck
 
@@ -171,7 +171,8 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	ls -l /etc/rsyslog.d/adaraMailer.conf
 
-	sudo cp /SNS/users/y8y/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+	sudo cp /SNS/users/$USER/adaraMailer.conf \
+		/etc/rsyslog.d/adaraMailer.conf
 
 	ls -l /etc/rsyslog.d/adaraMailer.conf
 
@@ -452,7 +453,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 	crontab -e
 
 		MAILTO=idac_adara_notify@email.ornl.gov
-		0-59/10 * * * * /SNS/users/y8y/stuff/exec/dasmond_mon
+		0-59/10 * * * * /SNS/users/$USER/stuff/exec/dasmond_mon
 		0 8,17 * * * /home/controls/config-dasmon/confck --quiet
 
 	crontab -l
@@ -557,9 +558,9 @@ please set your shell "umask" as follows before proceeding! ;-D
 	ls -l /home/controls/Accelerator/
 
 		total 388
-		-rw-rw-r-- 1 y8y slowcontrols_developers  18277 Mar 31  2016
+		-rw-rw-r-- 1 USER slowcontrols_developers  18277 Mar 31  2016
 			snsTiming.h
-		-rw-rw-r-- 1 y8y slowcontrols_developers 373279 Mar 31  2016
+		-rw-rw-r-- 1 USER slowcontrols_developers 373279 Mar 31  2016
 			SNS.Timing.Master.Functional.System.Description.pdf
 
 8. Deploy DASMOND Daemon:
@@ -568,7 +569,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	(ls -l /home/controls/config-dasmon/deploy/dasmond)
 
-		lrwxrwxrwx 1 y8y slowcontrols_developers 47 Jul 18 13:28
+		lrwxrwxrwx 1 USER slowcontrols_developers 47 Jul 18 13:28
 			/home/controls/config-dasmon/deploy/dasmond ->
 				/home/controls/prod/ADARA/20170717/v1.6.19/dasmond*
 

@@ -27,6 +27,11 @@ static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
 
 namespace fs = boost::filesystem;
 
+RateLimitedLogging::History RLLHistory_StorageContainer;
+
+// Rate-Limited Logging IDs...
+#define RLL_PAUSEMODE_SAWTOOTH        0
+
 #define CONTAINER_MODE	(S_IRUSR|S_IWUSR|S_IXUSR|S_IRGRP|S_IWGRP|S_IXGRP)
 #define MARKER_MODE	(S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP)
 
@@ -938,30 +943,40 @@ void StorageContainer::getPauseModeByTime(
 					// Bogus TimeStamps... ;-Q
 					it = m_pauseModeStack.begin();
 
-					// XXX TODO Add Rate-Limited Logging Here...!! ;-D
-					ERROR("getPauseModeByTime():"
-						<< " PauseMode SAWTOOTH for ts="
-						<< ts.tv_sec << "."
-						<< std::setfill('0') << std::setw(9) << ts.tv_nsec
-						<< " -> Using Current PauseMode " << it->m_numModes
-						<< " in [" << it->m_minTime.tv_sec << "."
-						<< std::setfill('0') << std::setw(9)
-						<< it->m_minTime.tv_nsec << std::setw(0)
-						<< ", " << it->m_maxTime.tv_sec << "."
-						<< std::setfill('0') << std::setw(9)
-						<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
-						<< " check_old_pausemodes=" << check_old_pausemodes
-						<< " m_paused=" << it->m_paused
-						<< " m_numModes=" << it->m_numModes
-						<< " m_numFiles=" << it->m_numFiles
-						<< " m_numPauseFiles=" << it->m_numPauseFiles
-						<< " m_pendingFiles.size()="
-							<< it->m_pendingFiles.size()
-						<< " m_lastPrologueFile="
-						<< ( ( it->m_lastPrologueFile ) ?
-							it->m_lastPrologueFile->path() : "(null)" )
-						<< " - Btw, the PauseMode Stack has "
-						<< m_pauseModeStack.size() << " elements");
+					// Rate-Limited Logging PauseMode SAWTOOTH...
+					std::string log_info;
+					if ( RateLimitedLogging::checkLog(
+							RLLHistory_StorageContainer,
+							RLL_PAUSEMODE_SAWTOOTH, "none",
+							2, 10, 1000, log_info ) ) {
+						ERROR(log_info
+							<< "getPauseModeByTime():"
+							<< " PauseMode SAWTOOTH for ts="
+							<< ts.tv_sec << "."
+							<< std::setfill('0') << std::setw(9)
+								<< ts.tv_nsec
+							<< " -> Using Current PauseMode "
+								<< it->m_numModes
+							<< " in [" << it->m_minTime.tv_sec << "."
+							<< std::setfill('0') << std::setw(9)
+							<< it->m_minTime.tv_nsec << std::setw(0)
+							<< ", " << it->m_maxTime.tv_sec << "."
+							<< std::setfill('0') << std::setw(9)
+							<< it->m_maxTime.tv_nsec << std::setw(0) << "]"
+							<< " check_old_pausemodes="
+								<< check_old_pausemodes
+							<< " m_paused=" << it->m_paused
+							<< " m_numModes=" << it->m_numModes
+							<< " m_numFiles=" << it->m_numFiles
+							<< " m_numPauseFiles=" << it->m_numPauseFiles
+							<< " m_pendingFiles.size()="
+								<< it->m_pendingFiles.size()
+							<< " m_lastPrologueFile="
+							<< ( ( it->m_lastPrologueFile ) ?
+								it->m_lastPrologueFile->path() : "(null)" )
+							<< " - Btw, the PauseMode Stack has "
+							<< m_pauseModeStack.size() << " elements");
+					}
 
 					pm_it = it;
 

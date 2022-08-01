@@ -19,45 +19,64 @@ import sys
 import os
 import errno
 import re
+import time
 import subprocess
 import traceback
 import requests
 import pathlib
 
 
-def remove_leading_directory(path_1):
+def split_leading_directory(file_path):
 	"""
-	Returns specified path with leading directory removed.
+	Splits away leading directory of path.
+
+	Presumes '/' path delimiter.
 	"""
-	path_2=''
-	while path_1:
-		head_tail = os.path.split(path_1)
-		new_path_1 = head_tail[0]
-		new_path_2 = os.path.join(head_tail[1], path_2)
-		if not new_path_1:
-			return path_2.rstrip('/')
+	delim = '/'
+	path_split = file_path.split(delim)
+	if len(path_split) > 0:
+		lead_dir = path_split[0]
+	else:
+		lead_dir = ''
+	if len(path_split) > 1:
+		rest = delim.join(path_split[1:])
+	else:
+		rest = ''
+	return lead_dir, rest
+
+
+def remove_drive(file_path):
+	"""
+	Remove drive from specified Windows path.
+	"""
+	if ':' in file_path:
+		path_parts = pathlib.PureWindowsPath(file_path.replace('/', '\\')).parts
+		if len(path_parts) > 1:
+			driveless_path = '\\' + '\\'.join(path_parts[1:])
 		else:
-			path_1 = new_path_1
-			path_2 = new_path_2
-	return ''
+			driverless_path = '\\'
+	else:
+		driveless_path = file_path
+	return driveless_path
 
 
 def determine_subdirectories(file_path):
 	"""
 	Determines image file subdirectory underneath IPTS directory.
 	"""
-	head_tail = os.path.split(file_path)
-	subdir = head_tail[0].replace('\\', '/').replace('C:/data/','')
-	subdir = remove_leading_directory(subdir)
+	head_tail = os.path.split(file_path.replace('\\', '/'))
+	driveless_path = remove_drive(head_tail[0]).replace('\\', '/') 
+	subdir = driveless_path.replace('/data/','')
+	lead_dir, subdir = split_leading_directory(subdir)
 	if subdir:
 		new_subdir = subdir
 	else:
 		new_subdir = 'SubdirectoryUnspecified'
-	print('\n\nhead_tail: {}\nsubdir: {}\nnew_subdir: {}\n\n'.format(head_tail, subdir, new_subdir))
-	return subdir, new_subdir
+	print('\n\nhead_tail: {}\ndriveless_path: {}\nlead_dir: {}\nsubdir: {}\nnew_subdir: {}\n\n'.format(head_tail, driveless_path, lead_dir, subdir, new_subdir))
+	return subdir, new_subdir, lead_dir
 
 
-def determine_source_and_target_directories(source_dir, target_dir, proposal, subdir, new_subdir, run_number):
+def determine_source_and_target_directories(source_dir, lead_dir, target_dir, proposal, subdir, new_subdir, run_number):
 	"""
 	Determines source and target directories for copying.
 	"""
@@ -66,7 +85,12 @@ def determine_source_and_target_directories(source_dir, target_dir, proposal, su
 		source_dir = os.path.expanduser(source_dir)
 	else:
 		source_dir = '/mcp'
-	initial_image_dir = "{}/{}/{}".format(source_dir, proposal, subdir)
+
+	# Check lead directory for match with proposal.
+	if not lead_dir == proposal:
+		print(f'\n\nWARNING: Unexpected input: lead directory ({lead_dir}) does not match current proposal ({proposal}).\n\n')
+	
+	initial_image_dir = "{}/{}/{}".format(source_dir, lead_dir, subdir)
 	if target_dir is not None:
 		# expand away tilde if present.
 		target_dir = os.path.expanduser(target_dir)
@@ -88,8 +112,11 @@ def get_files_to_copy(initial_image_dir, run_number):
 	for file_in_dir in files_to_copy_ini:
 		if re.search('Run_{}'.format(run_number), file_in_dir):
 			files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
-	
-	print('\n\nfiles_to_copy:\n{}\n\n'.format('\n'.join(str(f) for f in files_to_copy)))
+
+	# print('\n\nNumber of files to copy:\n{}\n\n'.format(len(files_to_copy)))
+	# Temporarily only print last 15 characters of file name to reduce log file load.	
+	# print('\n\nfiles_to_copy (last 15 chars):\n{}\n\n'.format('\n'.join(str(f[-15:]) for f in files_to_copy)))
+	# print('\n\nfiles_to_copy:\n{}\n\n'.format('\n'.join(str(f) for f in files_to_copy)))
 	# print('\n\nfiles_to_copy:\n{}\n\n'.format(files_to_copy))
 	return files_to_copy
 
@@ -162,6 +189,40 @@ def get_target_files(initial_image_dir, run_number, target_dir):
 	return target_files
 
 
+def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_period_sec=30.0, interval_period_sec=5.0):
+	"""
+	Construct list of taget files, but don't presume they all exist yet.
+
+	Wait until there has been no increase in the number of files for the specified wait period.
+	Files will be checked every interval according to the specified interval period.
+
+	"""
+	stable_files_count_time = 0.0
+	source_files = get_files_to_copy(initial_image_dir, run_number)
+	file_count = len(source_files)
+	time_val = time.time()
+	print('\nWaiting for stable file count. Current number of files to copy:{} stable file count time: {} (sec)\n'.format(file_count, stable_files_count_time))
+	while stable_files_count_time < wait_period_sec:
+		time.sleep(interval_period_sec)
+		source_files_now = get_files_to_copy(initial_image_dir, run_number)
+		file_count_now = len(source_files_now)
+		time_val_now = time.time()
+		if file_count_now == file_count:
+			stable_files_count_time += (time_val_now - time_val)
+		else:
+			stable_files_count_time = 0.0
+		time_val = time_val_now
+		source_files = source_files_now
+		file_count = file_count_now
+		print('\nWaiting for stable file count. Current number of files to copy:{} stable file count time: {} (sec)\n'.format(file_count, stable_files_count_time))
+
+	target_files = []
+	for source_file in source_files:
+		head_tail = os.path.split(source_file)
+		target_files.append(os.path.join(target_dir, head_tail[1]))
+	return target_files
+
+
 def copy_images(file_path, proposal, run_number, source_dir, target_dir):
 	"""
 	Copies image files for the specified run.
@@ -169,13 +230,14 @@ def copy_images(file_path, proposal, run_number, source_dir, target_dir):
 	print('\n\nIn copy_images().\nfile_path: {}\nproposal: {}\nrun_number: {}\n\n'.format(file_path, proposal, run_number))
 
 	# Determine proper subdirectories.
-	subdir, new_subdir = determine_subdirectories(file_path)
+	subdir, new_subdir, lead_dir = determine_subdirectories(file_path)
 
 	# Determine source and target directories.
-	initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, target_dir, proposal, subdir, new_subdir, run_number)
+	initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, lead_dir, target_dir, proposal, subdir, new_subdir, run_number)
 			
-	# Identify target files (for use in cataloging).
-	target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
+	# Identify target files (for use in cataloging). Wait for file count to be stable for at least 30.0 seconds.
+	# target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
+	target_files = get_target_files_patiently(initial_image_dir, run_number, new_image_dir, wait_period_sec=30.0)
 
 	print('\n\nIn copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
 
