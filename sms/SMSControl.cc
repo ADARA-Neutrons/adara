@@ -484,6 +484,8 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 void SMSControl::init(void)
 {
 	m_singleton = new SMSControl();
+
+	m_singleton->EPICSInit();
 }
 
 void SMSControl::late_config(const boost::property_tree::ptree &conf)
@@ -731,48 +733,45 @@ void ca_exception_handler( struct exception_handler_args args )
 		<< ", Continuing...!");
 }
 
-// Duh. We Need to Register This Callback
-// Before the SMSControl() Ctor Completes... ;-b
-class SMSControlReady {
+void SMSControl::ca_ready(void)
+{
+	DEBUG("ca_ready() Entry...");
 
-public:
+	SMSControl *ctrl = SMSControl::getInstance();
 
-	void ca_ready(void)
+	if ( ctrl )
 	{
-		DEBUG("ca_ready() Entry");
+		// Flush EPICS I/O...
+		int ca_status;
 
-		SMSControl *ctrl = SMSControl::getInstance();
+		ca_status = ca_poll();
 
-		if ( ctrl )
+		if ( !( ca_status & CA_M_SUCCESS ) )
 		{
-			// Flush EPICS I/O...
-			int ca_status;
-			if ( !( (ca_status = ca_poll()) & CA_M_SUCCESS ) )
+			// This is "O.K." for ca_poll() and ca_pend_event()... ;-D
+			if ( ca_status == ECA_TIMEOUT )
 			{
-				// This is "O.K." for ca_poll() and ca_pend_event()... ;-D
-				if ( ca_status == ECA_TIMEOUT )
-				{
-					DEBUG("EPICS Channel Access I/O"
-						<< " Successfully Flushed.");
-				}
-				else
-				{
-					ERROR("EPICS Channel Access Error in ca_poll(): "
-						<< ca_message(ca_status) );
-				}
+				DEBUG("ca_ready():"
+					<< " EPICS Channel Access I/O"
+					<< " Successfully Flushed.");
 			}
 			else
 			{
-				DEBUG("EPICS Channel Access I/O Flushed.");
+				ERROR("ca_ready():"
+					<< " EPICS Channel Access Error in ca_poll(): "
+					<< ca_message(ca_status) );
 			}
 		}
 		else
 		{
-			ERROR("ca_ready() NULL SMSControl Instance! Retry Later...");
+			DEBUG("ca_ready(): EPICS Channel Access I/O Flushed.");
 		}
 	}
-
-} SMSControlReadyInstance;
+	else
+	{
+		ERROR("ca_ready(): NULL SMSControl Instance! Retry Later...");
+	}
+}
 
 void ca_fd_notify( void *arg, int fd, int opened )
 {
@@ -781,22 +780,24 @@ void ca_fd_notify( void *arg, int fd, int opened )
 		<< " fd=" << fd
 		<< " opened=" << opened);
 
-	// Create Yet-Another-ReadyAdapter...? ;-D
-
-	DEBUG("ca_fd_notify():"
-		<< " SMSControl::m_fdregChannelAccess=0x"
-		<< std::hex
-		<< (long) SMSControl::m_fdregChannelAccess << std::dec);
+	// Create Yet-Another-ReadyAdapter... ;-D
 
 	if ( SMSControl::m_fdregChannelAccess ) {
+		DEBUG("ca_fd_notify(): Deleting Previous ReadAdapter"
+			<< " SMSControl::m_fdregChannelAccess=0x" << std::hex
+			<< (long) SMSControl::m_fdregChannelAccess << std::dec);
 		delete SMSControl::m_fdregChannelAccess;
 		SMSControl::m_fdregChannelAccess = NULL;
 	}
 
+	DEBUG("ca_fd_notify():"
+		<< " Creating ReadyAdapter for EPICS Channel Access fd=" << fd);
+
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	try {
 		SMSControl::m_fdregChannelAccess = new ReadyAdapter(fd, fdrRead,
-				boost::bind(&SMSControlReady::ca_ready,
-					SMSControlReadyInstance ),
+				boost::bind( &SMSControl::ca_ready, ctrl ),
 				1 /* verbose */ );
 	} catch (std::exception &e) {
 		ERROR( "Exception in ca_fd_notify()"
@@ -808,6 +809,153 @@ void ca_fd_notify( void *arg, int fd, int opened )
 			<< " Creating ReadyAdapter for EPICS Channel Access"
 			<< " File Descriptor fd=" << fd);
 		SMSControl::m_fdregChannelAccess = NULL; // just to be sure... ;-b
+	}
+}
+
+// Notify the IPTS-ITEMS IOC that "We're Alive" and request that it
+// Re-Send the IPTS Proposal and ITEMS Sample Information PVs...
+void SMSControl::IPTS_ITEMS_Resend(void)
+{
+	std::string resendPVName = m_beamlineId + ":CS:IPTS_ITEMS:SMS:Resend";
+	chid resend_chid;
+	int ca_status;
+
+	// Create Channel for Resend PV...
+	if ( !( (ca_status =
+			ca_create_channel( (const char *) resendPVName.c_str(),
+					0, 0, 0, &resend_chid ))
+				& CA_M_SUCCESS ) )
+	{
+		ERROR("IPTS-ITEMS Resend - "
+			<< "Channel Access Error in "
+			<< "ca_create_channel( " << resendPVName << " ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("IPTS-ITEMS Resend - "
+		<< "Channel Access Channel for PV \""
+		<< resendPVName << "\" Successfully Created");
+
+	double timeout = 3.0; // Channel Access Pending I/O Timeout (seconds)
+	if ( !( (ca_status = ca_pend_io( timeout )) & CA_M_SUCCESS ) )
+	{
+		ERROR("IPTS-ITEMS Resend - "
+			<< "Channel Access Error in Channel Connect "
+			<< "ca_pend_io( timeout=" << timeout << " ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("IPTS-ITEMS Resend - "
+		<< "Channel Access Pending I/O Successful for Channel Connect");
+
+	uint32_t resend = 1; // "Resend"... (tho value seems to not matter :-)
+	if ( !( (ca_status = ca_put( DBR_ENUM, resend_chid, &resend ))
+				& CA_M_SUCCESS ) )
+	{
+		ERROR("IPTS-ITEMS Resend - "
+			<< "Channel Access Error in "
+			<< "ca_put( DBR_ENUM, resend_chid=" << resend_chid
+				<< ", resend=" << resend << " ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("IPTS-ITEMS Resend Channel Access Put Request Successful");
+
+	if ( !( (ca_status = ca_pend_io( timeout )) & CA_M_SUCCESS ) )
+	{
+		ERROR("IPTS-ITEMS Resend - "
+			<< "Channel Access Error in Put Request "
+			<< "ca_pend_io( timeout=" << timeout << " ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("IPTS-ITEMS Resend - "
+		<< "Channel Access Pending I/O Successful, Resend Request Sent!");
+}
+
+void SMSControl::EPICSInit(void)
+{
+	// Create EPICS Channel Access Context and Exception Handler
+	// - Both for the IPTS-ITEMS Resend ca_put(), as well as for
+	// Monitoring Any Primary SMS Servers for Recording/Run Numbers...
+
+	int ca_status;
+
+	if ( !( (ca_status =
+			ca_context_create( ca_disable_preemptive_callback ))
+				& CA_M_SUCCESS ) )
+	{
+		ERROR("EPICS Channel Access Error in "
+			<< "ca_context_create( ca_disable_preemptive_callback ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("EPICS Channel Access Context Successfully Created");
+	m_epics_context = ca_current_context();
+
+	// Install EPICS Channel Access File Descriptor Notification Callback
+	if ( !( (ca_status = ca_add_fd_registration( ca_fd_notify, 0 ))
+				& CA_M_SUCCESS ) )
+	{
+		ERROR("EPICS Channel Access Error in "
+			<< "ca_add_fd_registration( ca_fd_notify, 0 ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("EPICS Channel Access"
+		<< " File Descriptor Notify Callback Installed");
+
+	// Install Non-Default (And Non-Terminating!) Channel Access
+	// Exception Handler for the SMSD...! ;-D
+	if ( !( (ca_status =
+			ca_add_exception_event( ca_exception_handler , 0 ))
+				& CA_M_SUCCESS ) )
+	{
+		ERROR("EPICS Channel Access Error in "
+			<< "ca_add_exception_event( ca_exception_handler, 0 ): "
+			<< ca_message(ca_status) );
+		return;
+	}
+	// Log as "Error" so we'll get notified if this is working... ;-D
+	ERROR("EPICS Channel Access Exception Handler Installed");
+
+	// Trigger IPTS-ITEMS Resend...
+	IPTS_ITEMS_Resend();
+
+	// *** ParADARA ***
+	// For *Secondary* SMS Instances, Create Channel Access Subscriptions
+	// To SMS Primary "Recording", "RunNumber" and "Paused" PVs... ;-D
+	if ( m_instanceId != 0 ) {
+
+		DEBUG("Secondary SMS Instance Id " << m_instanceId
+			<< " - Construct Primary SMS PV Prefix String...");
+
+		std::string PrimaryPVPrefix = m_beamlineId + ":SMS";
+
+		if ( m_altPrimaryPVPrefix.size()
+				&& m_altPrimaryPVPrefix.compare( "(unset)" ) )
+		{
+			DEBUG("Using Alternate Primary SMS PV Prefix String = "
+				<< "[" << m_altPrimaryPVPrefix << "]");
+			PrimaryPVPrefix = m_altPrimaryPVPrefix;
+		}
+
+		if ( PrimaryPVPrefix.compare( m_primaryPVPrefix ) )
+		{
+			DEBUG("Subscribe to Primary SMS PVs"
+				<< " Using Primary SMS PV Prefix"
+				<< " [" << PrimaryPVPrefix << "]");
+
+			m_primaryPVPrefix = PrimaryPVPrefix;
+
+			subscribeToPrimaryPVs( PrimaryPVPrefix );
+		}
 	}
 }
 
@@ -1193,143 +1341,6 @@ SMSControl::SMSControl() :
 	// Note: "Number" of States Includes State 0...
 	m_numStatesLast = 1;
 	m_numStatesResetCount = 10;
-
-	// Create EPICS Channel Access Context and Exception Handler
-	// - Both for the IPTS-ITEMS Resend ca_put(), as well as
-	// Any Primary SMS Servers to Monitor for Recording/Run Numbers...
-
-	int ca_status;
-
-	if ( !( (ca_status =
-			ca_context_create( ca_disable_preemptive_callback ))
-				& CA_M_SUCCESS ) )
-	{
-		ERROR("EPICS Channel Access Error in "
-			<< "ca_context_create( ca_disable_preemptive_callback ): "
-			<< ca_message(ca_status) );
-		return;
-	}
-	// Log as "Error" so we'll get notified if this is working... ;-D
-	ERROR("EPICS Channel Access Context Successfully Created");
-	m_epics_context = ca_current_context();
-
-	// Install Non-Default (And Non-Terminating!) Channel Access
-	// Exception Handler for the SMSD...! ;-D
-	if ( !( (ca_status =
-			ca_add_exception_event( ca_exception_handler , 0 ))
-				& CA_M_SUCCESS ) )
-	{
-		ERROR("EPICS Channel Access Error in "
-			<< "ca_add_exception_event( ca_exception_handler, 0 ): "
-			<< ca_message(ca_status) );
-		return;
-	}
-	// Log as "Error" so we'll get notified if this is working... ;-D
-	ERROR("EPICS Channel Access Exception Handler Installed");
-
-	// Install EPICS Channel Access File Descriptor Notification Callback
-	if ( !( (ca_status =
-			ca_add_fd_registration( ca_fd_notify, 0 ))
-				& CA_M_SUCCESS ) )
-	{
-		ERROR("EPICS Channel Access Error in "
-			<< "ca_add_fd_registration( ca_fd_notify, 0 ): "
-			<< ca_message(ca_status) );
-		return;
-	}
-	// Log as "Error" so we'll get notified if this is working... ;-D
-	ERROR("EPICS Channel Access"
-		<< " File Descriptor Notify Callback Installed");
-
-	// Notify the IPTS-ITEMS IOC that "We're Alive" and request that it
-	// Re-Send the IPTS Proposal and ITEMS Sample Information PVs...
-
-	std::string resendPVName = m_beamlineId + ":CS:IPTS_ITEMS:SMS:Resend";
-	chid resend_chid;
-	if ( !( (ca_status =
-			ca_create_channel( (const char *) resendPVName.c_str(),
-					0, 0, 0, &resend_chid ))
-				& CA_M_SUCCESS ) )
-	{
-		ERROR("IPTS-ITEMS Resend - "
-			<< "Channel Access Error in "
-			<< "ca_create_channel( " << resendPVName << " ): "
-			<< ca_message(ca_status) );
-		return;
-	}
-	// Log as "Error" so we'll get notified if this is working... ;-D
-	ERROR("IPTS-ITEMS Resend - "
-		<< "Channel Access Channel for PV \""
-		<< resendPVName << "\" Successfully Created");
-
-	double timeout = 3.0; // Channel Access Pending I/O Timeout (seconds)
-	if ( !( (ca_status = ca_pend_io( timeout )) & CA_M_SUCCESS ) )
-	{
-		ERROR("IPTS-ITEMS Resend - "
-			<< "Channel Access Error in Channel Connect "
-			<< "ca_pend_io( timeout=" << timeout << " ): "
-			<< ca_message(ca_status) );
-		return;
-	}
-	// Log as "Error" so we'll get notified if this is working... ;-D
-	ERROR("IPTS-ITEMS Resend - "
-		<< "Channel Access Pending I/O Successful for Channel Connect");
-
-	uint32_t resend = 1; // "Resend"... (tho value seems to not matter :-)
-	if ( !( (ca_status = ca_put( DBR_ENUM, resend_chid, &resend ))
-				& CA_M_SUCCESS ) )
-	{
-		ERROR("IPTS-ITEMS Resend - "
-			<< "Channel Access Error in "
-			<< "ca_put( DBR_ENUM, resend_chid=" << resend_chid
-				<< ", resend=" << resend << " ): "
-			<< ca_message(ca_status) );
-		return;
-	}
-	// Log as "Error" so we'll get notified if this is working... ;-D
-	ERROR("IPTS-ITEMS Resend Channel Access Put Request Successful");
-
-	if ( !( (ca_status = ca_pend_io( timeout )) & CA_M_SUCCESS ) )
-	{
-		ERROR("IPTS-ITEMS Resend - "
-			<< "Channel Access Error in Put Request "
-			<< "ca_pend_io( timeout=" << timeout << " ): "
-			<< ca_message(ca_status) );
-		return;
-	}
-	// Log as "Error" so we'll get notified if this is working... ;-D
-	ERROR("IPTS-ITEMS Resend - "
-		<< "Channel Access Pending I/O Successful, Resend Request Sent!");
-
-	// *** ParADARA ***
-	// For *Secondary* SMS Instances, Create Channel Access Subscriptions
-	// To SMS Primary "Recording", "RunNumber" and "Paused" PVs... ;-D
-	if ( m_instanceId != 0 ) {
-
-		DEBUG("Secondary SMS Instance Id " << m_instanceId
-			<< " - Construct Primary SMS PV Prefix String...");
-
-		std::string PrimaryPVPrefix = m_beamlineId + ":SMS";
-
-		if ( m_altPrimaryPVPrefix.size()
-				&& m_altPrimaryPVPrefix.compare( "(unset)" ) )
-		{
-			DEBUG("Using Alternate Primary SMS PV Prefix String = "
-				<< "[" << m_altPrimaryPVPrefix << "]");
-			PrimaryPVPrefix = m_altPrimaryPVPrefix;
-		}
-
-		if ( PrimaryPVPrefix.compare( m_primaryPVPrefix ) )
-		{
-			DEBUG("Subscribe to Primary SMS PVs"
-				<< " Using Primary SMS PV Prefix"
-				<< " [" << PrimaryPVPrefix << "]");
-
-			m_primaryPVPrefix = PrimaryPVPrefix;
-
-			subscribeToPrimaryPVs( PrimaryPVPrefix );
-		}
-	}
 }
 
 SMSControl::~SMSControl()
@@ -1395,8 +1406,6 @@ void SMSControl::subscribeToPrimaryPVs( std::string PrimaryPVPrefix )
 	DEBUG("subscribeToPrimaryPVs(): Subscribing to External Primary PVs"
 		<< " with PrimaryPVPrefix = [" << PrimaryPVPrefix << "]");
 
-	boost::unique_lock<boost::mutex> lock(m_mutex);
-
 	// Subscribe to the Primary "Recording" PV...
 	m_extRecordingPV = ExternalPVPtr(new ExternalPV("Recording",
 		PrimaryPVPrefix + ":Recording", PV_ENUM));
@@ -1421,16 +1430,14 @@ void SMSControl::unsubscribePrimaryPVs(void)
 	DEBUG("unsubscribePrimaryPVs():"
 		<< " Unsubscribing from External Primary PVs");
 
-	boost::unique_lock<boost::mutex> lock(m_mutex);
-
 	// Unsubscribe from the Primary "Recording" PV...
-	unsubscribePV( m_extRecordingPV, lock );
+	unsubscribePV( m_extRecordingPV );
 
 	// Unsubscribe from the Primary "RunNumber" PV...
-	unsubscribePV( m_extRunNumberPV, lock );
+	unsubscribePV( m_extRunNumberPV );
 
 	// Unsubscribe from the Primary "Paused" PV...
-	unsubscribePV( m_extPausedPV, lock );
+	unsubscribePV( m_extPausedPV );
 
 	// Flush EPICS I/O...
 	ca_flush_io();
@@ -1471,8 +1478,7 @@ void SMSControl::subscribePV( ExternalPVPtr pv )
 	}
 }
 
-void SMSControl::unsubscribePV( ExternalPVPtr pv,
-		boost::unique_lock<boost::mutex> & lock )
+void SMSControl::unsubscribePV( ExternalPVPtr pv )
 {
 	DEBUG("unsubscribePV(): Unsubscribing from External Primary "
 		<< pv->m_name << " PV with Connection String "
@@ -1510,20 +1516,14 @@ void SMSControl::unsubscribePV( ExternalPVPtr pv,
 					<< " for External Primary " << pv->m_name
 					<< " PV " << pv->m_connection);
 				
-				// *** Prevent Deadlock with New EPICS Callback Guard...!!
-				lock.unlock();
 				ca_clear_subscription( ich->second.m_evid );
-				lock.lock();
 			}
 
 			DEBUG("unsubscribePV(): Clearing Channel"
 				<< " for External Primary " << pv->m_name
 				<< " PV " << pv->m_connection);
 			
-			// *** Prevent Deadlock with New EPICS Callback Guard...!!
-			lock.unlock();
 			ca_clear_channel( ich->second.m_chid );
-			lock.lock();
 
 			// Update channel info index structures
 
@@ -1718,8 +1718,6 @@ SMSControl::epicsConnectionHandler( struct connection_handler_args a_args )
 		{
 			DEBUG("epicsConnectionHandler(): Connection Up!");
 
-			boost::lock_guard<boost::mutex> lock(ctrl->m_mutex);
-
 			std::map<chid,ChanInfo>::iterator ich =
 				ctrl->m_chan_info.find( a_args.chid );
 
@@ -1844,8 +1842,6 @@ SMSControl::epicsConnectionHandler( struct connection_handler_args a_args )
 		{
 			DEBUG("epicsConnectionHandler(): Connection Down...");
 
-			boost::unique_lock<boost::mutex> lock(ctrl->m_mutex);
-
 			std::map<chid,ChanInfo>::iterator ich =
 				ctrl->m_chan_info.find( a_args.chid );
 
@@ -1870,10 +1866,7 @@ SMSControl::epicsConnectionHandler( struct connection_handler_args a_args )
 					ERROR("epicsConnectionHandler():"
 						<< " Clearing subscription (Down?)" << pvStr);
 
-					// *** Prevent Deadlock with New EPICS Callback Guard!
-					lock.unlock();
 					ca_clear_subscription( ich->second.m_evid );
-					lock.lock();
 
 					ich->second.m_subscribed = false;
 				}
@@ -2189,8 +2182,6 @@ SMSControl::epicsEventHandler( struct event_handler_args a_args )
 		if ( epicsIsTimeRecordType( a_args.type ) )
 		{
 			DEBUG("epicsEventHandler(): Data Event");
-
-			boost::lock_guard<boost::mutex> lock(ctrl->m_mutex);
 
 			// Valid EPICS channel?
 			std::map<chid,ChanInfo>::iterator ich =
@@ -2526,8 +2517,6 @@ SMSControl::epicsEventHandler( struct event_handler_args a_args )
 		else if ( epicsIsCtrlRecordType( a_args.type ) )
 		{
 			DEBUG("epicsEventHandler(): Meta-Data Event");
-
-			boost::lock_guard<boost::mutex> lock(ctrl->m_mutex);
 
 			// Valid EPICS channel?
 			std::map<chid,ChanInfo>::iterator ich =

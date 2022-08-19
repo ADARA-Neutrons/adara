@@ -73,15 +73,20 @@ static LoggerPtr logger(Logger::getLogger("SMS"));
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-std::string SMSD_VERSION = "1.7.9";
+std::string SMSD_VERSION = "1.8.0";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
 
 static std::string config_file("/SNSlocal/sms/conf/smsd.conf");
+
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
+
+static bool become_daemon_sysv = false;
+static bool become_daemon_systemd = true;
+
 static Appender *console_appender;
-static bool become_daemon = true;
+static bool create_temp_logger = false;
 
 static int initCompleteFd = -1;
 
@@ -92,10 +97,13 @@ static void parse_options(int argc, char **argv)
 		("help,h", "Show usage information")
 		("version", "Show software version(s) information")
 		("foreground,f", "Don't become a daemon")
+		("sysv", "Become a SysV daemon")
+		("systemd", "Become a SystemD daemon (Default)")
 		("conf,c", po::value<std::string>(),
 				"Path to configuration file")
 		("logconf,l", po::value<std::string>(),
-				"Path to log4cxx property file");
+				"Path to log4cxx property file")
+		("logtemp", "Create temporary console logger");
 
 	po::variables_map vm;
 	try {
@@ -119,12 +127,24 @@ static void parse_options(int argc, char **argv)
 			<< std::endl;
 		exit(2);
 	}
-	if (vm.count("foreground"))
-		become_daemon = false;
+	if (vm.count("foreground")) {
+		become_daemon_sysv = false;
+		become_daemon_systemd = false;
+	}
+	if (vm.count("sysv")) {
+		become_daemon_sysv = true;
+		become_daemon_systemd = false;
+	}
+	if (vm.count("systemd")) {
+		become_daemon_sysv = false;
+		become_daemon_systemd = true;
+	}
 	if (vm.count("conf"))
 		config_file = vm["conf"].as<std::string>();
 	if (vm.count("logconf"))
 		log_conf = vm["logconf"].as<std::string>();
+	if (vm.count("logtemp"))
+		create_temp_logger = true;
 }
 
 static void setcredentials(const char *pname, ptree::ptree &conf)
@@ -268,10 +288,12 @@ static void verify_log4cxx_config(void)
 		return;
 
 	/* No console present, add one temporarily */
-	static const LogString pattern(LOG4CXX_STR("%c %p: %m%n"));
-	LayoutPtr layout(new PatternLayout(pattern));
-	console_appender = new ConsoleAppender(layout);
-	root->addAppender(console_appender);
+	if (create_temp_logger) {
+		static const LogString pattern(LOG4CXX_STR("%c %p: %m%n"));
+		LayoutPtr layout(new PatternLayout(pattern));
+		console_appender = new ConsoleAppender(layout);
+		root->addAppender(console_appender);
+	}
 }
 
 static void remove_temp_logger(void)
@@ -279,6 +301,9 @@ static void remove_temp_logger(void)
 	/* If we added a temporary console logger for startup, remove it
 	 */
 	if (console_appender) {
+
+		DEBUG("remove_temp_logger()");
+
 		LoggerPtr root = Logger::getRootLogger();
 		root->removeAppender(console_appender);
 
@@ -308,7 +333,7 @@ static void release_parent(uint64_t val)
 	}
 }
 
-static void daemonize(const char *pname)
+static void daemonize_sysv(const char *pname)
 {
 	pid_t pid;
 
@@ -373,7 +398,13 @@ static void daemonize(const char *pname)
 	/* We're the second child now; we are in our own session, but
 	 * are not the leader of it. Let initialization continue.
 	 */
-	DEBUG("daemonized (" << pname << ")");
+	DEBUG("SysV daemonized (" << pname << ")");
+}
+
+static void daemonize_systemd(const char *pname)
+{
+	DEBUG("SystemD daemonized pid=" << getpid() << " ppid=" << getppid()
+		<< " (" << pname << ")");
 }
 
 static void close_std_files(void)
@@ -424,6 +455,23 @@ int main(int argc, char **argv)
 
 	INFO("SMS Daemon Started, " << version_str);
 
+	block_signals();
+
+	if (become_daemon_sysv) {
+		daemonize_sysv(argv[0]);
+		close_std_files();
+	}
+	else if (become_daemon_systemd) {
+		daemonize_systemd(argv[0]);
+	}
+	else {
+		DEBUG("Running SMS Daemon in Foreground");
+	}
+
+	// Seems like a good idea to check the EPICS Environment... ;-D
+	INFO("EPICS Environment Settings:");
+	system("printenv | grep -i EPICS");
+
 	/* Try to Configure the SMS Daemon... (Catch Exceptions Dagnabbit.) */
 	try {
 		load_config(argv[0], conf, version_str);
@@ -434,11 +482,8 @@ int main(int argc, char **argv)
 		ERROR("Failed to Start (Load Config) -- Unknown Exception");
 		exit(1);
 	}
-	
 
-	block_signals();
-
-	/* Do all of the initialization we can before we become a daemon;
+	/* Do all of the initialization we can AFTER we become a daemon;
 	 * we'll do a post-daemon round of init as well, so that creation
 	 * of threads get the right parent, and allow for tasks that need
 	 * to happen later.
@@ -458,12 +503,8 @@ int main(int argc, char **argv)
 		exit(1);
 	}
 
-	if (become_daemon)
-		daemonize(argv[0]);
-
 	try {
 		StorageManager::lateInit();
-		close_std_files();
 		remove_temp_logger();
 	} catch (std::runtime_error e) {
 		ERROR("Failed to Start (Late Init): " << e.what());
@@ -478,6 +519,7 @@ int main(int argc, char **argv)
 	try {
 		release_parent(CHILD_INIT_SUCCESS);
 		for (;;) {
+			// Call File Descriptor Manager for Shared EPICS/Socket Select
 			// Reset Errno for this iteration...
 			errno = 0;
 			// Handle Callbacks on Open File Descriptors (Sockets, Files...)

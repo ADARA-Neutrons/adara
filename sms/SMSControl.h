@@ -319,9 +319,14 @@ public:
 
 	// External EPICS PV Subscription Methods
 
+	void ca_ready(void);
+	
+	void IPTS_ITEMS_Resend(void);
+
+	void EPICSInit(void);
+
 	void subscribePV( ExternalPVPtr pv );
-	void unsubscribePV( ExternalPVPtr pv,
-		boost::unique_lock<boost::mutex> & lock );
+	void unsubscribePV( ExternalPVPtr pv );
 
 	void subscribeToPrimaryPVs( std::string PrimaryPVPrefix );
 	void unsubscribePrimaryPVs(void);
