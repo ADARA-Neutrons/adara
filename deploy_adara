@@ -1798,8 +1798,8 @@ if [[ $PROG == "PVSD" || $PROG == "SMS_Daemon" ]]; then
 
 	echo -e "\nCurrent $PROG Status:\n" | tee -a $LOG
 
-	echo "sudo /sbin/service $service status" | tee -a $LOG
-	sudo /sbin/service $service status |& tee -a $LOG
+	echo "sudo systemctl status $service" | tee -a $LOG
+	sudo systemctl status $service |& tee -a $LOG
 
 	if [[ $PROG == "PVSD" ]]; then
 		echo -e "\nChecking Current Run/Recording Status of Beamline:\n"
@@ -1821,8 +1821,8 @@ if [[ $PROG == "PVSD" || $PROG == "SMS_Daemon" ]]; then
 		echo -e "\nRestarting $PROG service now on ${install_host}." \
 			| tee -a $LOG
 
-		echo "sudo /sbin/service $service restart" | tee -a $LOG
-		sudo /sbin/service $service restart |& tee -a $LOG
+		echo "sudo systemctl restart $service" | tee -a $LOG
+		sudo systemctl restart $service |& tee -a $LOG
 
 		restart_ok=$?
 
@@ -1841,8 +1841,8 @@ elif [[ $PROG == "DASMON_Server" || $PROG == "DASMON_Client" ]]; then
 
 	echo -e "\nCurrent $PROG Status:\n" | tee -a $LOG
 
-	echo "sudo /sbin/status $service" | tee -a $LOG
-	sudo /sbin/status $service |& tee -a $LOG
+	echo "sudo systemctl status $service" | tee -a $LOG
+	sudo systemctl status $service |& tee -a $LOG
 
 	echo -e -n \
 		"\nDo You want to Restart the $PROG service now [yes/No]? "
@@ -1855,8 +1855,8 @@ elif [[ $PROG == "DASMON_Server" || $PROG == "DASMON_Client" ]]; then
 		echo -e "\nRestarting $PROG service now on ${install_host}." \
 			| tee -a $LOG
 
-		echo "sudo /sbin/restart $service" | tee -a $LOG
-		sudo /sbin/restart $service |& tee -a $LOG
+		echo "sudo systemctl restart $service" | tee -a $LOG
+		sudo systemctl restart $service |& tee -a $LOG
 
 		restart_ok=$?
 
