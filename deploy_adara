@@ -270,7 +270,7 @@ if [ $IS_STC == 1 ]; then
 	HOST_TYPE="STC"
 elif [ $IS_PVSD == 1 ]; then
 	install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
-		| tail -1`
+		| head -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
 	install_suffix=`echo "$install_host" | sed 's/\..*//' \
 		| sed "s/${HOST_PREFIX}.*-//"`
@@ -324,12 +324,12 @@ elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
 	# Don't Munge nED-on-Wheels Install... ;-D
 	if [[ $now_ck != 0 ]]; then
 		install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
-			| tail -1`
+			| head -1`
 		install_branch=`echo "$install_host" | sed 's/-.*//'`
 		install_suffix=`echo "$install_host" | sed 's/\..*//' \
 			| sed "s/${HOST_PREFIX}.*-//"`
 	else
-		install_host=`hostname -A | sed 's/ /\n/g' | grep 'dasmon' | tail -1`
+		install_host=`hostname -A | sed 's/ /\n/g' | grep 'dasmon' | head -1`
 		install_branch=`echo "$install_host" | sed 's/-.*//'`
 		install_suffix=`echo "$install_host" | sed 's/\..*//' \
 			| sed "s/${install_branch}-//"`
@@ -347,7 +347,7 @@ elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
 	HOST_TYPE="DASMON"
 else
 	install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
-		| tail -1`
+		| head -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
 	install_suffix=`echo "$install_host" | sed 's/\..*//' \
 		| sed "s/${HOST_PREFIX}.*-//"`
