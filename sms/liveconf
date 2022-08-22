@@ -871,7 +871,8 @@ not_a_beamline_computer=0
 do_git_config=1
 do_config=1
 
-config_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}"`
+config_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
+	| head -1`
 config_blnum=`echo "$config_host" | sed 's/-.*//'`
 
 if [[ "$config_host" == "" || "$config_blnum" == "" ]]; then
