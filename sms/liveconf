@@ -216,7 +216,6 @@ option_name[$num_options]="alt_primary_pv_prefix"
 option_pv[$num_options]="AltPrimaryPVPrefix"
 option_pv_opt[$num_options]="-S"
 option_value_type[$num_options]="STRING(Alternate Primary SMS PV Prefix.)"
-option_default[$num_options]="(unset)"
 option_label[$num_options]="[Alternate Primary PV Prefix]"
 num_options=$(( num_options + 1 ))
 
