@@ -10,12 +10,40 @@ if [ -e $HOME/.bash_profile ] ; then
 	source $HOME/.bash_profile
 fi
 
+# Note: to ensure proper file permissions for captured system files,
+# please set your shell "umask" as follows before proceeding! ;-D
+umask 0002
+
 # Handle "Quiet" Operation Option for Cron Usage...
 # (Only output on errors...)
+UPDATE=0
 QUIET=0
-if [ "$1" == "--quiet" ]; then
+if [[ "$1" == "--quiet" ]]; then
 	QUIET=1
+elif [[ "$1" == "--update" ]]; then
+	UPDATE=1
+elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
+	echo -e "\nusage: confck [--quiet|--update]\n"
+	exit 0
 fi
+
+# ADARA Git Repo
+if [[ -z "$ADARA_DIR" ]]; then
+	ADARA_DIR="/usr/local/src/ADARA"
+	#ADARA_DIR="/SNS/users/$USER/gitsrc/ADARA"
+elif [[ $QUIET == 0 ]]; then
+	echo "Inheriting ADARA_DIR Value from User Environment:"
+	echo -e "\t[${ADARA_DIR}]"
+fi
+
+# Default Update/Installation Target Definitions
+SYSTEMCTL="/usr/bin/systemctl"
+DASMOND_LOG="/var/log/dasmond.log"
+MESSAGES_LOG="/var/log/messages"
+ADARA_BINARIES="/home/controls/config-dasmon/deploy"
+DASMON_LINKS="/usr/sbin"
+ACCEL_TIMING="/home/controls/Accelerator"
+ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config-dasmon/
@@ -71,9 +99,11 @@ DIFF_FILE()
 	local _label2="$1"
 	shift
 
+	# Git Repo Version of File
 	local _file1="$1"
 	shift
 
+	# System Deployed Version of File
 	local _file2="$1"
 	shift
 
@@ -84,9 +114,33 @@ DIFF_FILE()
 
 	echo "diff ${_file1} ${_file2}"
 	diff "${_file1}" "${_file2}"
-	_ckdiff=$?
+	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
+		# Update the Deployed System File or Git Repo File Version...
+		if [[ $UPDATE == 1 ]]; then
+			echo -e "\nPush/Deploy the System File (\"sys\"),"
+			echo -e "   or Pull/Update the Git Repo File (\"repo\"),"
+			echo -n "   or Do Nothing (\"nothing\")? [sys|repo|Nothing]: "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			# Push Latest Git Repo Version to System
+			if [[ "$ckUpdate" == "s" || "$ckUpdate" == "sys" ]]; then
+				echo "Deploying Latest Repo File to System:"
+				sudo /bin/cp -i "${_file1}" "${_file2}"
+			# Pull Latest System Version into Git Repo
+			elif [[ "$ckUpdate" == "r" || "$ckUpdate" == "repo" ]]; then
+				echo "Updating Repo with Latest Deployed System File:"
+				/bin/cp -i "${_file2}" "${_file1}"
+				git add "${_file1}"
+				git commit \
+					-m "Update Config Repo with Latest System File" \
+					"${_file1}"
+			# Do Nothing.
+			else
+				echo "Doing Nothing, as Requested."
+			fi
+		fi
 	fi
 
 	DIFF_STAT "${_label2}" "${_file2}" "${STAT_LIST}"
@@ -100,13 +154,16 @@ DIFF_FILE()
 
 CONFCK()
 {
-	nerrors=0
+	local _nerrors=0
+
+	echo
+	echo "Comparing Git Repo to Deployed:"
 
 	DIFF_FILE "Dasmon Daemon Config File" "Deployed" \
 		./dasmond/dasmond.cfg /home/dasmon/dasmond.cfg
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -118,7 +175,7 @@ CONFCK()
 			./dasmond/dasmond_def.cfg /home/dasmon/dasmond_def.cfg
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -132,7 +189,7 @@ CONFCK()
 			./dasmond/init.dasmond.conf /etc/init/dasmond.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -145,7 +202,7 @@ CONFCK()
 			/etc/systemd/system/dasmond.service
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -155,7 +212,7 @@ CONFCK()
 		./dasmond/usr.local.bin.dasmond /usr/local/bin/dasmond
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -164,7 +221,7 @@ CONFCK()
 		./dasmond/rsyslog.conf /etc/rsyslog.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -174,7 +231,7 @@ CONFCK()
 			./dasmond/dasmon_syslog.conf /etc/rsyslog.d/dasmon.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -184,7 +241,7 @@ CONFCK()
 		./dasmond/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -193,7 +250,7 @@ CONFCK()
 		./dasmond/etc.logrotate.d.dasmon_log /etc/logrotate.d/dasmon_log
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -202,7 +259,7 @@ CONFCK()
 		./dasmon/xinitrc.dasmon /etc/X11/xinit/xinitrc.dasmon
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	else
 		echo "Files are the Same."
 	fi
@@ -213,7 +270,7 @@ CONFCK()
 			./dasmon/init.dasmongui.conf /etc/init/dasmongui.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -226,7 +283,7 @@ CONFCK()
 			/etc/systemd/system/dasmongui.service
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
-			(( nerrors++ ))
+			(( _nerrors++ ))
 		else
 			echo "Files are the Same."
 		fi
@@ -236,45 +293,171 @@ CONFCK()
 	echo "Comparing Saved ADARA Admin Crontab to System:"
 	echo
 
+	local _check_update=0
 	crontab -l > /tmp/$USER.crontab.$$ 2>&1
 	if [[ $? != 0 || ! -s /tmp/$USER.crontab.$$ ]]; then
 		echo "Failure Retrieving ADARA Admin Crontab for DASMOND!"
-		(( nerrors++ ))
+		_check_update=1
+		(( _nerrors++ ))
 	else
 		echo "diff ./dasmond/$USER.crontab /tmp/$USER.crontab.$$"
 		diff ./dasmond/$USER.crontab /tmp/$USER.crontab.$$
 		if [ $? != 0 ]; then
 			echo "ADARA Admin Crontab for DASMOND Differed...!"
-			(( nerrors++ ))
+			_check_update=1
+			(( _nerrors++ ))
 		else
 			echo "ADARA Admin Crontab for DASMOND is the Same."
 		fi
 	fi
+	# Defer DASMOND Admin Crontab to Below...
+	if [[ ${_check_update} == 1 ]]; then
+		echo "Defer Fixing of DASMOND Admin Crontab..."
+		echo "(See Admin Crontab Create Below, or Fix Manually.)"
+	fi
 	/bin/rm -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
 		echo "Failure Deleting Temporary Admin Crontab File for DASMOND...!"
-		(( nerrors++ ))
+		(( _nerrors++ ))
 	fi
 
 	echo
-	if [ $nerrors -gt 0 ]; then
-		echo "$nerrors Files Differed!"
+	if [ ${_nerrors} -gt 0 ]; then
+		echo "${_nerrors} Errors/Files Differed!"
 	else
-		echo "All Files are the Same."
+		echo "All Files/Configs are the Same."
 	fi
-	echo
 
-	return $nerrors
+	return ${_nerrors}
 }
 
-doConfCk=`CONFCK 2>&1`
-_ckconfck=$?
-if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
-	echo -e "$doConfCk\n"
+if [[ $UPDATE == 1 ]]; then
+	CONFCK
+	_ckconfck=$?
+else
+	doConfCk=`CONFCK 2>&1`
+	_ckconfck=$?
+	if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doConfCk\n"
+	fi
 fi
 
 if [[ ${_ckconfck} != 0 ]]; then
 	echo -e "*** ConfCk FAILED...!\n"
 fi
+
+# In Update Mode, Perform Other Assorted Install Operations, As Needed...
+if [[ $UPDATE == 1 ]]; then
+
+	echo -e "Checking Other Assorted Install Operations, As Needed...\n"
+
+	# Check/Create DASMOND RSyslog Log File...
+	/bin/ls -l "${DASMOND_LOG}"
+	log_perms=`/bin/ls -l "${DASMOND_LOG}" | awk '{print $1}'`
+	log_group=`/bin/ls -l "${DASMOND_LOG}" | awk '{print $4}'`
+	if [[ ! -f "${DASMOND_LOG}"
+			|| "$log_perms" != "-rw-rw----"
+			|| "$log_group" != "users" ]]; then
+		echo -n "Create/Setup DASMOND RSyslog Log File? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			sudo touch "${DASMOND_LOG}"
+			sudo chgrp users "${DASMOND_LOG}"
+			sudo chmod g+rw "${DASMOND_LOG}"
+			/bin/ls -l "${DASMOND_LOG}"
+			# Restart RSyslog Service...?
+			sudo ${SYSTEMCTL} status rsyslog
+			echo -n "Restart RSyslog Service? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo ${SYSTEMCTL} restart rsyslog
+				sudo tail "${MESSAGES_LOG}"
+			fi
+		fi
+	fi
+	echo
+
+	# Check/Create DASMOND Administrator Crontab...
+	crontab -l
+	crontab_check=`crontab -l |& awk '{ print $1 " " $2 }'`
+	if [[ "$crontab_check" == "no crontab" ]]; then
+		echo -n "Create DASMOND Administrator Crontab? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			cron_file=`mktemp ./.confck.smsd.crontab.edit.file.XXXXXX`
+
+			echo "MAILTO=idac_adara_notify@email.ornl.gov" >> $cron_file
+			echo "0-59/10 * * * * /SNS/users/$USER/stuff/exec/dasmond_mon" \
+				>> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-dasmon/confck --quiet" \
+				>> $cron_file
+
+			# Install Administrator Crontab
+			crontab $cron_file
+			if [[ $? != 0 ]]; then
+				echo -e \
+					"\nError Creating DASMOND Administrator Crontab:\n"
+				/bin/cat $cron_file
+			fi
+
+			# Clean Up Temp Crontab File
+			/bin/rm $cron_file
+
+			# Check for Manual Crontab Edit
+			crontab -l
+			echo -e -n "\nDo you need to Manually Edit the Crontab?"
+			echo -n " [yes|No] "
+			read ck_edit
+			ck_edit=`echo "$ck_edit" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ck_edit" == "y" || "$ck_edit" == "yes" ]]; then
+				crontab -e
+			fi
+		fi
+	fi
+	echo
+
+	# Check/Create ADARA/DASMOND User System Bin Soft Links...
+	for i in dasmon dasmond ; do
+
+		echo "Checking ADARA/DASMOND User Local Bin Soft Links for: [$i]"
+
+		/bin/ls -l "${DASMON_LINKS}/$i"
+		if [[ ! -x "${DASMON_LINKS}/$i" ]]; then
+			echo -n "Create ADARA User Local Bin Soft Link for [$i]?"
+			echo -n " [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				sudo ln -s "${ADARA_BINARIES}/$i" "${DASMON_LINKS}/$i"
+				/bin/ls -l "${DASMON_LINKS}/$i"
+			fi
+		fi
+		echo
+	
+	done
+
+	# Check/Create Clone of SNS Accelerator Timing Git Repo...
+	/bin/ls -ld "${ACCEL_TIMING}"
+	if [[ ! -d "${ACCEL_TIMING}" ]]; then
+		echo -n "Create Clone of SNS Accelerator Timing Git Repo? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			git clone "${ACCEL_TIMING_REPO}" "${ACCEL_TIMING}"
+			/bin/ls -l "${ACCEL_TIMING}"
+		fi
+	fi
+	echo
+
+fi
+
+if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+	echo -e "Status = ${_ckconfck}\n"
+fi
+
 exit ${_ckconfck}
 
