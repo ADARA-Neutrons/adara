@@ -155,6 +155,8 @@ STC_HOST=""
 
 STC_PORT=""
 
+PRE="${BL}"
+
 RUN_NUMBERS=""
 
 for arg in "$@" ; do
@@ -227,6 +229,11 @@ for arg in "$@" ; do
 		echo -e "\nSetting SMS Data Option to:\n\t[${SMS_DATA_OPT}]"
 		SMS_LOG="/var/log/smsd${ALT}.log"
 		echo -e "\nSetting SMS Log File to:\n\t[${SMS_LOG}]"
+		# Construct SMS Live Control PV Prefix from ALT Suffix...
+		pre="${ALT}"
+		if [[ ${pre} =~ ^- ]]; then pre="${pre/-/}" ; fi # Strip Leading '-'
+		PRE=`echo "${BL}${pre}" | tr '[:lower:]' '[:upper:]'`
+		echo -e "\nSetting SMS Live Control PV Prefix to:\n\t[${PRE}]"
 	elif [[ "#$key#" == '#--sms_data#' ]]; then
 		SMS_DATA="${value%/}"
 		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
@@ -453,7 +460,7 @@ for dir in ${DIRS} ; do
 					/bin/rm translation_completed
 				fi
 
-				caput -S ${BL}:SMS:StorageManager:RescanRunDir `pwd`
+				caput -S ${PRE}:SMS:StorageManager:RescanRunDir `pwd`
 
 				sleep 3
 
