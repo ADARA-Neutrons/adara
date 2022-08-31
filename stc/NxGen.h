@@ -21,6 +21,13 @@
 #define TIME_USEC_UNITS "microsecond"
 
 
+// Note: Rate-Limited Logging History Instance is Part of NxGen Class:
+//    RateLimitedLogging::History m_RLLHistory_NxGen;
+
+// Rate-Limited Logging IDs...
+#define RLL_NON_NORM_BUF_FULL     0
+
+
 /*! \brief ADARA Stream Adapter class that provides NeXus file generation
  *
  * The NxGen class is a stream adapter subclass that specializes the
@@ -818,16 +825,24 @@ private:
                     // (Tho Log Error About It, Lest We Swell Up & Pop!)
                     else
                     {
-                        // TODO Add Rate-Limiting...?
-                        syslog( LOG_ERR,
-                            "[%i] %s: %s %s %s %s, %s: %s",
-                            g_pid, "STC Error", "NxPVInfo::flushBuffers()",
-                            this->m_device_str.c_str(),
-                            "Non-Normalized PV Buffer Full",
-                            "With No First Pulse Time Yet",
-                            "Deferring For Now",
-                            this->m_pv_str.c_str() );
-                        give_syslog_a_chance;
+                        // Rate-Limiting logging of
+                        // Non-Normalized PV Buffer Full...
+                        std::string log_info;
+                        if ( RateLimitedLogging::checkLog(
+                                m_nxgen.m_RLLHistory_NxGen,
+                                RLL_NON_NORM_BUF_FULL, this->m_pv_str,
+                                60, 10, 100, log_info ) ) {
+                            syslog( LOG_ERR,
+                                "[%i] %s: %s%s %s %s %s, %s: %s",
+                                g_pid, "STC Error", log_info.c_str(),
+                                "NxPVInfo::flushBuffers()",
+                                this->m_device_str.c_str(),
+                                "Non-Normalized PV Buffer Full",
+                                "With No First Pulse Time Yet",
+                                "Deferring For Now",
+                                this->m_pv_str.c_str() );
+                            give_syslog_a_chance;
+                        }
 
                         return( -1 );
                     }
@@ -2908,6 +2923,8 @@ public:
         unsigned short a_compression_level = 0,
         uint32_t a_verbose_level = 0 );
     ~NxGen();
+
+    RateLimitedLogging::History m_RLLHistory_NxGen;
 
     void dumpProcessingStatistics(void);
 
