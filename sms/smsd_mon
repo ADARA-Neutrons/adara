@@ -253,7 +253,7 @@ if [ $do_notify == 1 ]; then
 			| grep -v ";" | awk -F "=" '{print $2}'`
 		instance_id="${instance_id//[[:space:]]}"
 
-		if [[ -n ${instance_id} ]]; then
+		if [[ -n ${instance_id} && ${instance_id} -ne 0 ]]; then
 			prefix="${prefix}:SMS:${instance_id}"
 		else
 			prefix="${prefix}:SMS"
