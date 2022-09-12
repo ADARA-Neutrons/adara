@@ -249,7 +249,17 @@ if [ $do_notify == 1 ]; then
 			| grep -v ";" | awk -F "=" '{print $2}'`
 		prefix="${prefix//[[:space:]]}"
 
-		summaryPV="${prefix}:SMS:Summary"
+		instance_id=`grep "instance_id" ${SMSD_CONFIG} \
+			| grep -v ";" | awk -F "=" '{print $2}'`
+		instance_id="${instance_id//[[:space:]]}"
+
+		if [[ -n ${instance_id} ]]; then
+			prefix="${prefix}:SMS:${instance_id}"
+		else
+			prefix="${prefix}:SMS"
+		fi
+
+		summaryPV="${prefix}:Summary"
 
 		# Try 3 Times to Get the SMS Summary Status, as Needed...
 
@@ -295,10 +305,10 @@ if [ $do_notify == 1 ]; then
 				echo -e "   ${summary}\n"
 				NL="\n"
 
-				caget ${WAIT} -a "${prefix}:SMS:Recording"
-				caget ${WAIT} "${prefix}:SMS:RunNumber"
+				caget ${WAIT} -a "${prefix}:Recording"
+				caget ${WAIT} "${prefix}:RunNumber"
 				caget ${WAIT} "${summaryPV}"
-				caget ${WAIT} -S "${prefix}:SMS:SummaryReason"
+				caget ${WAIT} -S "${prefix}:SummaryReason"
 
 				echo
 
@@ -322,10 +332,10 @@ if [ $do_notify == 1 ]; then
 					echo -e " SMS${ALTLABEL} Summary Status Not OK!\n"
 					NL="\n"
 
-					caget ${WAIT} -a "${prefix}:SMS:Recording"
-					caget ${WAIT} "${prefix}:SMS:RunNumber"
+					caget ${WAIT} -a "${prefix}:Recording"
+					caget ${WAIT} "${prefix}:RunNumber"
 					caget ${WAIT} "${summaryPV}"
-					caget ${WAIT} -S "${prefix}:SMS:SummaryReason"
+					caget ${WAIT} -S "${prefix}:SummaryReason"
 
 					echo
 
