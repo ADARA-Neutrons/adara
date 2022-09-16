@@ -14,6 +14,9 @@ fi
 # please set your shell "umask" as follows before proceeding! ;-D
 umask 0002
 
+# Catch Errors Amidst Pipelines... ;-Q
+set -o pipefail
+
 # Handle "Quiet" Operation Option for Cron Usage...
 # (Only output on errors...)
 UPDATE=0
@@ -121,8 +124,8 @@ DIFF_FILE()
 	echo -e "\tto ${_label2}:"
 	echo
 
-	echo "diff ${_file1} ${_file2}"
-	diff "${_file1}" "${_file2}"
+	echo "diff ${_file1} ${_file2} | head -100"
+	diff "${_file1}" "${_file2}" | head -100
 	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
@@ -432,8 +435,20 @@ CONFCK()
 		echo "Directories/Files are the Same."
 	fi
 
+	# Deprecated SysV Startup File...
 	DIFF_FILE "SMSD${ALT} Init Script" "Deployed" \
-		./sms${ALT}/smsd${ALT}.initscript /etc/init.d/smsd${ALT}
+		./sms${ALT}/smsd${ALT}.initscript /etc/init.d/smsd${ALT}.XXX
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
+	# New SystemD Service Configuration...
+	DIFF_FILE "SMSD${ALT} SystemD Service Config" "Deployed" \
+		./sms${ALT}/smsd${ALT}.service \
+		/etc/systemd/system/smsd${ALT}.service
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -489,51 +504,104 @@ CONFCK()
 		echo "Files are the Same."
 	fi
 
+	# Deprecated SystemV ChkConfig Usage, Now Using SystemD SystemCtl...
+
+	#echo
+	#echo "Comparing Saved ChkConfig SMSD${ALT} ADARA Config to System:"
+	#echo
+
+	#local _check_update=0
+	#chkconfig --list smsd${ALT} > /tmp/chkconfig.smsd${ALT}.$$ 2>&1
+	#if [ $? != 0 ]; then
+	#	echo "Failure Retrieving System ChkConfig for SMSD${ALT}...!"
+	#	_check_update=1
+	#	(( _nerrors++ ))
+	#else
+	#	echo "diff ./sms${ALT}/chkconfig.smsd${ALT} /tmp/chkconfig.smsd${ALT}.$$"
+	#	diff ./sms${ALT}/chkconfig.smsd${ALT} /tmp/chkconfig.smsd${ALT}.$$
+	#	if [ $? != 0 ]; then
+	#		echo "System ChkConfig for SMSD${ALT} Differed...!"
+	#		_check_update=1
+	#		(( _nerrors++ ))
+	#	else
+	#		echo "System ChkConfig for SMSD${ALT} is the Same."
+	#	fi
+	#fi
+	#/bin/rm -f /tmp/chkconfig.smsd${ALT}.$$
+	#if [ $? != 0 ]; then
+	#	echo \
+	#   "Failure Deleting Temporary System ChkConfig File for SMSD${ALT}...!"
+	#	(( _nerrors++ ))
+	#fi
+	## Create SMSD Local Run Level...
+	#if [[ ${_check_update} == 1 ]]; then
+	#	if [[ $UPDATE == 1 ]]; then
+	#		echo -n "Create SMSD${ALT} Local Run Level? [yes|No] "
+	#		read ckUpdate
+	#		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+	#		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+	#			sudo chkconfig --add smsd${ALT}
+	#			chkconfig --list smsd${ALT}
+	#			sudo chkconfig smsd${ALT} on
+	#			chkconfig --list smsd${ALT}
+	#			/bin/rm -i ./sms${ALT}/chkconfig.smsd${ALT}
+	#			chkconfig --list smsd${ALT} \
+	#				> ./sms${ALT}/chkconfig.smsd${ALT} 2>&1
+	#		fi
+	#	else
+	#		echo -n "*** SMSD${ALT} Must Be Added to the"
+	#		echo " System ChkConfig Run Level!"
+	#	fi
+	#fi
+
+	# Compare SystemD SystemCtl Enabled...
+
 	echo
-	echo "Comparing Saved ChkConfig SMSD${ALT} ADARA Config to System:"
+	echo "Comparing Saved SystemCtl SMSD${ALT} ADARA Enabled to System:"
 	echo
 
 	local _check_update=0
-	chkconfig --list smsd${ALT} > /tmp/chkconfig.smsd${ALT}.$$ 2>&1
+	systemctl is-enabled smsd${ALT} \
+		> /tmp/systemctl.enabled.smsd${ALT}.$$ 2>&1
 	if [ $? != 0 ]; then
-		echo "Failure Retrieving System ChkConfig for SMSD${ALT}...!"
+		echo "Failure Retrieving SystemCtl Enabled for SMSD${ALT}...!"
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo "diff ./sms${ALT}/chkconfig.smsd${ALT} /tmp/chkconfig.smsd${ALT}.$$"
-		diff ./sms${ALT}/chkconfig.smsd${ALT} /tmp/chkconfig.smsd${ALT}.$$
+		echo -n "diff ./sms${ALT}/systemctl.enabled.smsd${ALT}"
+		echo " /tmp/systemctl.enabled.smsd${ALT}.$$"
+		diff ./sms${ALT}/systemctl.enabled.smsd${ALT} \
+			/tmp/systemctl.enabled.smsd${ALT}.$$
 		if [ $? != 0 ]; then
-			echo "System ChkConfig for SMSD${ALT} Differed...!"
+			echo "SystemCtl Enabled for SMSD${ALT} Differed...!"
 			_check_update=1
 			(( _nerrors++ ))
 		else
-			echo "System ChkConfig for SMSD${ALT} is the Same."
+			echo "SystemCtl Enabled for SMSD${ALT} is the Same."
 		fi
 	fi
-	/bin/rm -f /tmp/chkconfig.smsd${ALT}.$$
+	/bin/rm -f /tmp/systemctl.enabled.smsd${ALT}.$$
 	if [ $? != 0 ]; then
 		echo \
-	   "Failure Deleting Temporary System ChkConfig File for SMSD${ALT}...!"
+		"Failure Deleting Temporary SystemCtl Enabled File for SMSD${ALT}!"
 		(( _nerrors++ ))
 	fi
-	# Create SMSD Local Run Level...
+	# Enable SMSD Local Run Level...
 	if [[ ${_check_update} == 1 ]]; then
 		if [[ $UPDATE == 1 ]]; then
-			echo -n "Create SMSD${ALT} Local Run Level? [yes|No] "
+			echo -n "Enable SMSD${ALT} Local Run Level? [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo chkconfig --add smsd${ALT}
-				chkconfig --list smsd${ALT}
-				sudo chkconfig smsd${ALT} on
-				chkconfig --list smsd${ALT}
-				/bin/rm -i ./sms${ALT}/chkconfig.smsd${ALT}
-				chkconfig --list smsd${ALT} \
-					> ./sms${ALT}/chkconfig.smsd${ALT} 2>&1
+				sudo systemctl enable smsd${ALT}
+				systemctl is-enabled smsd${ALT}
+				/bin/rm -i ./sms${ALT}/systemctl.enabled.smsd${ALT}
+				systemctl is-enabled smsd${ALT} \
+					> ./sms${ALT}/systemctl.enabled.smsd${ALT} 2>&1
 			fi
 		else
 			echo -n "*** SMSD${ALT} Must Be Added to the"
-			echo " System ChkConfig Run Level!"
+			echo " SystemCtl Enabled Run Level!"
 		fi
 	fi
 
