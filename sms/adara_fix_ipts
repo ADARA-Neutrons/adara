@@ -1648,7 +1648,7 @@ ABSORB_WHITE_SPACE()
 	fi
 
 	_xml_tags="${_xml_tags} facility_name instrument_name run_number"
-	_xml_tags="${_xml_tags} no_sample_info/ name role"
+	_xml_tags="${_xml_tags} no_sample_info/ save_pixel_map/ name role"
 
 	# Proceed Through XML Tag List Until Needed White Space Absorbed...
 
