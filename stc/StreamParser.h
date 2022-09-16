@@ -77,6 +77,8 @@ public:
         { return m_run_info.run_number; }
     bool getNoSampleInfo() const
         { return m_run_info.no_sample_info; }
+    bool getSavePixelMap() const
+        { return m_run_info.save_pixel_map; }
 
     bool infoReady() const
         { return (m_info_rcvd & INFO_SENT); }

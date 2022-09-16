@@ -743,7 +743,7 @@ StreamParser::rxPacket
         ( a_pkt.mappingData() + a_pkt.payload_length()
             - sizeof(uint32_t) );
 
-    //uint32_t        base_physical;
+    uint32_t        base_physical;
     uint16_t        bank_id;
     uint16_t        pix_count;
 
@@ -778,8 +778,7 @@ StreamParser::rxPacket
 
     while ( rpos < epos )
     {
-        //base_physical = *rpos++;
-        rpos++;   // Skip Base Physical PixelId...
+        base_physical = *rpos++;
         bank_id = (uint16_t)(*rpos >> 16);
         pix_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
@@ -830,7 +829,8 @@ StreamParser::rxPacket
         const uint32_t *epos2 = rpos + pix_count;
         tot_pix_count += pix_count;
         while ( rpos < epos2 ) {
-            bi->m_logical_pixelids.push_back(*rpos++);
+            bi->m_logical_pixelids.push_back( *rpos++ );
+            bi->m_physical_pixelids.push_back( base_physical++ );
         }
 
         section_count++;
@@ -1011,8 +1011,8 @@ StreamParser::rxPacket
         // Append This Section's Logical PixelIds...
         for (uint32_t i=0 ; i < pix_count ; ++i)
         {
-            bi->m_logical_pixelids.push_back(
-                base_logical + i );
+            bi->m_logical_pixelids.push_back( base_logical + i );
+            bi->m_physical_pixelids.push_back( *rpos++ );
         }
 
         // syslog( LOG_INFO,
@@ -1020,9 +1020,6 @@ StreamParser::rxPacket
             // g_pid, "PixelMappingPkt", bank_id, base_logical, pix_count,
             // bi->m_logical_pixelids.size() );
         // give_syslog_a_chance;
-
-        // Next Section
-        rpos += pix_count;
     }
 
     // Also Add Unmapped and Error BankInfo to Map, as State=0...
@@ -1816,6 +1813,7 @@ StreamParser::processBankEvents
 
                 // Copy Any Saved Logical PixelIds for This Detector Bank
                 bi->m_logical_pixelids = bi0->m_logical_pixelids;
+                bi->m_physical_pixelids = bi0->m_physical_pixelids;
 
                 // Copy Any Saved Detector Bank Sets for This Detector Bank
                 bi->m_bank_sets = bi0->m_bank_sets;
@@ -2614,6 +2612,11 @@ StreamParser::rxPacket
                         (const xmlChar*) "no_sample_info") == 0 )
                 {
                     tmp_run_info.no_sample_info = true;
+                }
+                else if (xmlStrcmp( node->name,
+                        (const xmlChar*) "save_pixel_map") == 0 )
+                {
+                    tmp_run_info.save_pixel_map = true;
                 }
                 else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"sample" ) == 0 )
@@ -6548,6 +6551,14 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             (a_run_info.no_sample_info) ? "True" : "False" );
         give_syslog_a_chance;
         m_run_info.no_sample_info = a_run_info.no_sample_info;
+    }
+    if ( a_run_info.save_pixel_map != m_run_info.save_pixel_map ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STC Error:", "updateRunInfo()", "Save Pixel Map",
+            (m_run_info.save_pixel_map) ? "True" : "False",
+            (a_run_info.save_pixel_map) ? "True" : "False" );
+        give_syslog_a_chance;
+        m_run_info.save_pixel_map = a_run_info.save_pixel_map;
     }
     if ( m_run_info.sample_id.compare( a_run_info.sample_id ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",

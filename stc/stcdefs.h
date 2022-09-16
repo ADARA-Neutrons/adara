@@ -371,6 +371,7 @@ public:
     uint32_t                m_id;                   ///< ID of detector bank
     uint32_t                m_state;                ///< State of detector bank
     std::vector<uint32_t>   m_logical_pixelids;     ///< Logical PixelIds in detector bank
+    std::vector<uint32_t>   m_physical_pixelids;    ///< Physical PixelIds in detector bank
     uint32_t                m_buf_reserve;          ///< Event buffer initial capacity
     uint32_t                m_idx_buf_reserve;      ///< Index buffer initial capacity
     bool                    m_initialized;          ///< Has detector bank been initialized yet?
@@ -536,7 +537,8 @@ struct UserInfo
 struct RunInfo
 {
     RunInfo()
-        : run_number(0), run_title("NONE"), no_sample_info(false),
+        : run_number(0), run_title("NONE"),
+            no_sample_info(false), save_pixel_map(false),
             // Initialize Double Values to Prevent Undue Randomization
             // from Unset Values Later...! ;-Q
             sample_mass(0.0), sample_mass_density(0.0),
@@ -559,6 +561,7 @@ struct RunInfo
     std::string             das_version;
     std::string             facility_name;
     bool                    no_sample_info;
+    bool                    save_pixel_map;
     std::string             sample_id;
     std::string             sample_name;
     std::string             sample_nature;
