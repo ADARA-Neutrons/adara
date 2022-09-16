@@ -14,6 +14,9 @@ fi
 # please set your shell "umask" as follows before proceeding! ;-D
 umask 0002
 
+# Catch Errors Amidst Pipelines... ;-Q
+set -o pipefail
+
 # Handle "Quiet" Operation Option for Cron Usage...
 # (Only output on errors...)
 UPDATE=0
