@@ -104,6 +104,9 @@ private:
             m_histo_pid_path = m_instr_path + "/"
                 + m_nxgen.m_histo_pid_name;
 
+            m_histo_pid_path_raw = m_instr_path + "/"
+                + m_nxgen.m_histo_pid_name_raw;
+
             m_tofbin_path = m_instr_path + "/" + m_nxgen.m_tofbin_name;
         }
 
@@ -119,6 +122,7 @@ private:
         std::string             m_histo_path;       ///< Nexus path to histo "NXdata" group
         std::string             m_data_path;        ///< Nexus path to Histo data dataset
         std::string             m_histo_pid_path;   ///< Nexus path to Histo PID dataset
+        std::string             m_histo_pid_path_raw; ///< Nexus path to Histo Physical (Raw) PID dataset
         std::string             m_tofbin_path;      ///< Nexus path to Histo TOF Bin dataset
         bool                    m_nexus_bank_init;  ///< Are bank NeXus groups initialized?
         uint64_t                m_event_cur_size;   ///< Running size of TOF and PID datasets (same size)
@@ -3154,6 +3158,7 @@ private:
     std::string         m_pulse_time_name;      ///< Name of Pulse Time data in Nexus file
     std::string         m_data_name;            ///< Name of Histo data in Nexus file
     std::string         m_histo_pid_name;       ///< Name of Histo PixelId data in Nexus file
+    std::string         m_histo_pid_name_raw;   ///< Name of Histo Physical (Raw) PixelId data in Nexus file
     std::string         m_tofbin_name;          ///< Name of Histo TOF Bin data in Nexus file
     unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file (in Dataset Elements!)
     H5nx                m_h5nx;                 ///< HDF5 library object

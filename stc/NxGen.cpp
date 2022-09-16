@@ -68,6 +68,7 @@ NxGen::NxGen
     m_pulse_time_name(string("event_time_zero")),
     m_data_name(string("data")),
     m_histo_pid_name(string("pixel_id")),
+    m_histo_pid_name_raw(string("pixel_id_raw")),
     m_tofbin_name(string("time_of_flight")),
     m_chunk_size(a_chunk_size),
     m_h5nx(a_compression_level),
@@ -2129,6 +2130,9 @@ NxGen::bankFinalize
         if ( !(bi->m_nexus_bank_init) )
             initializeNxBank( bi, true );
 
+        // Track Whether Pixel Mapping Table has been Written to NeXus...
+        bool logical_pixel_map_written = false;
+
         // NeXus Event-based Data...
         if ( bi->m_has_event )
         {
@@ -2151,8 +2155,9 @@ NxGen::bankFinalize
         if ( bi->m_has_histo )
         {
             syslog( LOG_INFO,
-                "[%i] Detector Bank %d State %u - Writing Histogram Data",
-                g_pid, a_bank.m_id, a_bank.m_state );
+                "[%i] %s: Detector Bank %d State %u - %s",
+                g_pid, "NxGen::finalize()", a_bank.m_id, a_bank.m_state,
+                "Writing Histogram Data");
             give_syslog_a_chance;
 
             // Create & Write Histogram Multi-dimensional Data...
@@ -2161,8 +2166,8 @@ NxGen::bankFinalize
             dims.push_back( bi->m_num_tof_bins - 1 );
 #ifdef HISTO_TEST
             uint32_t num_pids = bi->m_logical_pixelids.size();
-            syslog( LOG_INFO, "[%i] %s for %s [%u x %u]",
-                g_pid, "Creating Dummy Histogram",
+            syslog( LOG_INFO, "[%i] %s: %s for %s [%u x %u]",
+                g_pid, "NxGen::finalize()", "Creating Dummy Histogram",
                 bi->m_instr_path.c_str(),
                 num_pids, bi->m_num_tof_bins - 1 );
             give_syslog_a_chance;
@@ -2197,9 +2202,10 @@ NxGen::bankFinalize
                 NeXus::FLOAT32, TIME_USEC_UNITS,
                 bi->m_tofbin_buffer.size() );
 
-            // Write out Bank PixelIds...
+            // Write out Bank Logical PixelIds...
             writeSlab( bi->m_histo_pid_path,
                 bi->m_logical_pixelids, 0 );
+            logical_pixel_map_written = true;
 
             // Add "Axis" Attribute for NeXus NXdata Standards Compat
             writeStringAttribute(
@@ -2230,6 +2236,45 @@ NxGen::bankFinalize
                 bi->m_histo_event_count, "" );
             writeScalar( bi->m_histo_path, "total_uncounted_counts",
                 bi->m_histo_event_uncounted, "" );
+        }
+
+        // (Optionally) Write Pixel Mapping Table to NeXus...
+        if ( getSavePixelMap() )
+        {
+            syslog( LOG_INFO,
+                "[%i] %s: Detector Bank %d State %u - %s, %s=%lu%s %s=%lu",
+                g_pid, "NxGen::finalize()", a_bank.m_id, a_bank.m_state,
+                "Optionally Saving Pixel Mapping Table For This Run",
+                "bi->m_logical_pixelids.size()",
+                bi->m_logical_pixelids.size(),
+                ( logical_pixel_map_written ? " (Already Written)" : "" ),
+                "bi->m_physical_pixelids.size()",
+                bi->m_physical_pixelids.size() );
+            give_syslog_a_chance;
+
+            // Logical Pixel Map...
+            if ( !logical_pixel_map_written )
+            {
+                // Create Bank Logical PixelIds Now...
+                // (including proper Chunk Size Overriding...! ;-D)
+                makeDataset( bi->m_instr_path, m_histo_pid_name,
+                    NeXus::UINT32, "", bi->m_logical_pixelids.size() );
+
+                // Write out Bank Logical PixelIds...
+                writeSlab( bi->m_histo_pid_path,
+                    bi->m_logical_pixelids, 0 );
+            }
+
+            // Physical Pixel Map...
+
+            // Create Bank Physical PixelIds Now...
+            // (including proper Chunk Size Overriding...! ;-D)
+            makeDataset( bi->m_instr_path, m_histo_pid_name_raw,
+                NeXus::UINT32, "", bi->m_physical_pixelids.size() );
+
+            // Write out Bank Physical PixelIds...
+            writeSlab( bi->m_histo_pid_path_raw,
+                bi->m_physical_pixelids, 0 );
         }
     }
     catch( TraceException &e )
