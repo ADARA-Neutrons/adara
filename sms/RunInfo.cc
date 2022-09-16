@@ -400,9 +400,10 @@ static void addElements(std::string &out, RunInfo::RunInfoMap &map,
 }
 
 RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
-		SMSControl *ctrl, bool sendSampleInRunInfo ) :
+		SMSControl *ctrl, bool sendSampleInRunInfo, bool savePixelMap ) :
 	m_facility(facility), m_beamline(beamline), m_ctrl(ctrl),
 	m_sendSampleInRunInfo(sendSampleInRunInfo),
+	m_savePixelMap(savePixelMap),
 	m_runNumber(0), m_lastRunNumber(0),
 	m_packetValid(false), m_packet(NULL), m_packetSize(0)
 {
@@ -427,9 +428,15 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 		+ "SendSampleInRunInfo", /* AutoSave */ true));
 	m_ctrl->addPV(m_sendSampleInRunInfoPV);
 
+	// Save Pixel Mapping Table into NeXus Data File...?
+	m_savePixelMapPV.reset(new smsBooleanPV(prefix
+		+ "SavePixelMap", /* AutoSave */ true));
+	m_ctrl->addPV(m_savePixelMapPV);
+
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_sendSampleInRunInfoPV->update( m_sendSampleInRunInfo, &now );
+	m_savePixelMapPV->update( m_savePixelMap, &now );
 
 	/* These fields describe the sample, and are optional */
 	prefix += "Sample:";
@@ -573,6 +580,14 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 			m_sendSampleInRunInfoPV->getName(), bvalue, ts ) ) {
 		m_sendSampleInRunInfo = bvalue;
 		m_sendSampleInRunInfoPV->update(bvalue, &ts);
+	}
+
+	// SavePixelMap
+
+	if ( StorageManager::getAutoSavePV(
+			m_savePixelMapPV->getName(), bvalue, ts ) ) {
+		m_savePixelMap = bvalue;
+		m_savePixelMapPV->update(bvalue, &ts);
 	}
 
 	// RunInfoFloat64PVs...
@@ -852,6 +867,12 @@ bool RunInfo::generatePacket( uint32_t runNumber )
 		addElements(xml, m_sample, "sample");
 	} else {
 		xml += "   <no_sample_info/>\n";
+	}
+
+	// Get Latest "Save Pixel Map" Value from PV...
+	m_savePixelMap = m_savePixelMapPV->value();
+	if ( m_savePixelMap ) {
+		xml += "   <save_pixel_map/>\n";
 	}
 
 	xml += "</runinfo>";

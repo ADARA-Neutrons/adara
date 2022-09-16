@@ -665,6 +665,7 @@ private:
 	static bool m_doPulseVetoCorrect;
 
 	static bool m_sendSampleInRunInfo;
+	static bool m_savePixelMap;
 
 	static bool m_allowNonOneToOnePixelMapping;
 

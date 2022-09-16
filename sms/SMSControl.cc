@@ -93,6 +93,7 @@ bool SMSControl::m_doPulsePchgCorrect;
 bool SMSControl::m_doPulseVetoCorrect;
 
 bool SMSControl::m_sendSampleInRunInfo;
+bool SMSControl::m_savePixelMap;
 
 bool SMSControl::m_allowNonOneToOnePixelMapping;
 
@@ -407,6 +408,9 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 			conf.get<bool>("sms.send_sample_in_run_info", false);
 	INFO("Setting Send Sample in Run Info to "
 		<< m_sendSampleInRunInfo << ".");
+
+	m_savePixelMap = conf.get<bool>("sms.save_pixel_map", false);
+	INFO("Setting Save Pixel Map in NeXus to " << m_savePixelMap << ".");
 
 	m_allowNonOneToOnePixelMapping =
 			conf.get<bool>("sms.allow_non_one_to_one_pixel_mappings",
@@ -1331,7 +1335,7 @@ SMSControl::SMSControl() :
 	m_beamlineInfo.reset(new BeamlineInfo(m_targetStationNumber,
 			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
 	m_runInfo.reset(new RunInfo(m_facility, m_beamlineId, this,
-		m_sendSampleInRunInfo));
+		m_sendSampleInRunInfo, m_savePixelMap));
 	m_geometry.reset(new Geometry(m_geometryPath));
 	m_pixelMap.reset(new PixelMap(m_pixelMapPath,
 		m_allowNonOneToOnePixelMapping, m_useOrigPixelMappingPkt));
