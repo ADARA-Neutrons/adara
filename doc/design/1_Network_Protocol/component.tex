@@ -1893,7 +1893,7 @@ is given in Figure~\ref{fig:protocol_monitor_event_section}.
 
 
 \newpage
-\subsubsection{Pixel Mapping Table Packet (to be deprecated...)}
+\subsubsection{Pixel Mapping Table Packet (Deprecated...)}
 \label{section:protocol_pixel_mapping_table}
 
 \begin{figure}[h]
@@ -1908,7 +1908,7 @@ is given in Figure~\ref{fig:protocol_monitor_event_section}.
     \bitheader{31,0} \\
     \wordbox{2}{Mapping Data ($N$ bytes)} \\
   \end{bytefield}
-  \caption{Packet Type 0x4002.0: Pixel Map Packet}
+  \caption{Packet Type 0x4002.0: Pixel Map Packet (Deprecated...)}
   \label{fig:protocol_packet_pixel_map}
 \end{figure}
 
@@ -1926,7 +1926,7 @@ more flexible ``Pixel Mapping Table Alternate'' packet types
 (see Section~\ref{section:protocol_pixel_mapping_alt_table_v0}
 or \ref{section:protocol_pixel_mapping_alt_table_v1}).
 
-The ``Pixel Mapping Table'' packet defined in
+The ``Pixel Mapping Table'' (Deprecated...) packet defined in
 Figure~\ref{fig:protocol_packet_pixel_map} will preserve
 any one-to-one pixel mapping table for
 consumers of the event stream. This packet must be present near the beginning
@@ -1946,7 +1946,7 @@ for the same experiment recording.
     \wordbox{1}{$\cdots$} \\
     \wordbox{1}{Physical ID $P$ (u32)} \\
   \end{bytefield}
-  \caption{Pixel Map Section}
+  \caption{Pixel Map Section (Deprecated...)}
   \label{fig:protocol_packet_pixel_map_section}
 \end{figure}
 
@@ -2011,7 +2011,7 @@ Normally, this mapping is one-to-one and reversible,
 however, as of the commissioning of the
 High Flux Isotope Reactor (HFIR) ``WAND'' Beamline (HB2C),
 there exists the potential for {\it Non One-to-One} pixel mappings.
-Therefore, this new ``Alternate'' Pixel Mapping Table packet type
+Therefore, this new ``Alternate'' Pixel Mapping Table V0 packet type
 must be used to communicate the details of such pixel maps,
 and indeed can and should be subsequently used
 for any or all pixel mapping tables from this point forward.
@@ -2019,15 +2019,15 @@ for any or all pixel mapping tables from this point forward.
 described in Section~\ref{section:protocol_pixel_mapping_table}
 will ultimately be phased out in favor of this new ``Alternate''
 packet type.)
-The ``Pixel Mapping Table Alternate'' packet type is effectively an
+The ``Pixel Mapping Table Alternate'' V0 packet type is effectively an
 {\it inverted organization} or ``mirror image'' of the original
-``Pixel Mapping Table'' packet type,
+``Pixel Mapping Table'' (Deprecated...) packet type,
 with ``Physical'' and ``Logical'' Pixel IDs {\it swapped}
 in the section organization,
 and an additional explicit ``Number of Detector Banks'' value
 inserted before the ``Mapping Data'' for convenience.
 
-The ``Pixel Mapping Table Alternate'' packet defined in
+The ``Pixel Mapping Table Alternate'' V0 packet defined in
 Figure~\ref{fig:protocol_packet_pixel_map_alt_v0} will preserve any table for
 consumers of the event stream. This packet must be present near the beginning
 of a new experiment recording, but may occur multiple times in the transmitted
@@ -2112,15 +2112,15 @@ Normally, this mapping is one-to-one and reversible,
 however, as of the commissioning of the
 High Flux Isotope Reactor (HFIR) ``WAND'' Beamline (HB2C),
 there exists the potential for {\it Non One-to-One} pixel mappings.
-Therefore, this new ``Alternate'' Pixel Mapping Table packet type
+Therefore, this new ``Alternate'' Pixel Mapping Table V1 packet type
 must be used to communicate the details of such pixel maps,
 and indeed can and should be subsequently used
 for any or all pixel mapping tables from this point forward.
-(Note that the original ``Pixel Mapping Table'' packet
+(Note that the original ``Pixel Mapping Table'' (Deprecated...) packet
 described in Section~\ref{section:protocol_pixel_mapping_table}
 will ultimately be phased out in favor of this new ``Alternate''
 packet type.)
-This ``Pixel Mapping Table Alternate'' packet type is effectively an
+This ``Pixel Mapping Table Alternate'' V1 packet type is effectively an
 {\it inverted organization} or ``mirror image'' of the original
 ``Pixel Mapping Table'' packet type,
 with ``Physical'' and ``Logical'' Pixel IDs {\it swapped}
@@ -2135,7 +2135,7 @@ for ``Very Large'' Pixel Mapping Tables
 which produces $4096 x 4096$ or over 16 million pixel IDs,
 for a very large resulting packet size of over 60 megabytes...!).
 
-The ``Pixel Mapping Table Alternate'' packet defined in
+The ``Pixel Mapping Table Alternate'' V1 packet defined in
 Figure~\ref{fig:protocol_packet_pixel_map_alt_v1} will preserve any table for
 consumers of the event stream. This packet must be present near the beginning
 of a new experiment recording, but may occur multiple times in the transmitted
@@ -2195,7 +2195,7 @@ To reduce the size of the mapping table, it is described using sections as
 defined in Figure~\ref{fig:protocol_packet_pixel_map_alt_section_v1_direct}
 or \ref{fig:protocol_packet_pixel_map_alt_section_v1_shorthand}.
 
-The ``Direct'' format section,
+The ``Direct'' V1 format section,
 as distinguished by the ``0'' in {\it Bit 15}
 of the ``Bank ID/Count'' word,
 is illustrated in
@@ -2216,7 +2216,7 @@ to physical pixel {\bf Base Physical ID}.
 and so on.
 The bank ID for each mapping is given by the section header.
 
-The ``Shorthand'' format section,
+The ``Shorthand'' V1 format section,
 as distinguished by the ``1'' in {\it Bit 15}
 of the ``Bank ID/Physical Step'' word
 (and the ``1'' in {\it Bit 15}
