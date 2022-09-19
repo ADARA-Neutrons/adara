@@ -13,7 +13,7 @@
 
 class PixelMap : boost::noncopyable {
 public:
-	typedef std::pair<uint32_t, uint16_t> Entry;
+	typedef std::pair<uint32_t, uint16_t> Entry; // (logical, bank)
 	typedef std::vector<Entry> Table;
 	typedef std::map<uint32_t, PixelMap::Entry> TempMap;
 
