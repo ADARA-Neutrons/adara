@@ -14,6 +14,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
 
 #include <stdio.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
@@ -21,17 +22,33 @@ static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
 #include "ADARA.h"
 #include "ADARAUtils.h"
 #include "PixelMap.h"
+#include "SMSControl.h"
 #include "StorageManager.h"
 
 std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 {
 	std::auto_ptr<TempMap> map(new TempMap);
+
 	std::set<uint32_t> output_pixels;
+
 	std::ifstream f(path.c_str());
+
 	std::string line;
+
+	uint32_t logical_start, logical_stop;
+	int32_t logical_step;
+
+	uint32_t phys_start, phys_stop;
+	int32_t phys_step;
+
 	uint32_t phys, logical, bank;
+
 	int lineno = 0;
-	char trash[2];
+
+	char logical_buf[255];
+	char phys_buf[255];
+	char trash[2] = "";
+
 	size_t pos;
 
 	if (f.fail()) {
@@ -40,9 +57,12 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 		throw std::runtime_error(msg);
 	}
 
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	INFO("readMap(): Opened Pixel Map File...");
 
 	for (;;) {
+
 		lineno++;
 		getline(f, line);
 		if (f.fail())
@@ -58,63 +78,178 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 		if (pos == std::string::npos)
 			continue;
 
-		if (sscanf(line.c_str(), "%u %u %u %1s\n",
-				&phys, &logical, &bank, trash) != 3) {
+		// Parse Line Into Physical and Logical Specifications, Plus Bank
+		// (and Any "Trash" Characters at the End of the Line...)
+		if (sscanf(line.c_str(), "%s %s %u %1s\n",
+				phys_buf, logical_buf, &bank, trash) != 3) {
 			std::string msg("Bad Entry in Pixel Map File, line ");
 			msg += boost::lexical_cast<std::string>(lineno);
 			throw std::runtime_error(msg);
 		}
 
-		if (phys & 0x80000000) {
-			std::string msg("Physical PixelId has Error Bit Set "
-				"in Pixel Map File, line ");
+		// Parse Any Closed-Form Physical PixelId Specification
+		if ( strstr(phys_buf, ":") != NULL ) {
+			if (sscanf(phys_buf, "%u:%u:%d",
+					&phys_start, &phys_stop, &phys_step) != 3) {
+				std::string msg("Bad Physical PixelId Entry Specification");
+				msg += " in Pixel Map File, line ";
+				msg += boost::lexical_cast<std::string>(lineno);
+				msg += " [";
+				msg += phys_buf;
+				msg += "]";
+				throw std::runtime_error(msg);
+			}
+			if ( ctrl->verbose() > 0 ) {
+				DEBUG("readMap(): Parsed"
+					<< " phys_start=" << phys_start
+					<< " phys_stop=" << phys_stop
+					<< " phys_step=" << phys_step);
+			}
+			// Adjust Physical PixelId Stop to "One Past" Last PixelId...
+			// (For More Intuitive Loop Termination... ;-D)
+			phys_stop += phys_step;
+		}
+
+		// Just a Plain Numerical Entry...
+		else {
+			if (sscanf(phys_buf, "%u", &phys) != 1) {
+				std::string msg("Bad Physical PixelId Entry Specification");
+				msg += " in Pixel Map File, line ";
+				msg += boost::lexical_cast<std::string>(lineno);
+				msg += " [";
+				msg += phys_buf;
+				msg += "]";
+				throw std::runtime_error(msg);
+			}
+			// Set Start/Stop/Step to Single Physical PixelId Step...
+			phys_start = phys;
+			phys_step = 1;
+			phys_stop = phys_start + phys_step;
+		}
+
+		// Parse Any Closed-Form Logical PixelId Specification
+		if ( strstr(logical_buf, ":") != NULL ) {
+			if (sscanf(logical_buf, "%u:%u:%d",
+					&logical_start, &logical_stop, &logical_step) != 3) {
+				std::string msg("Bad Logical PixelId Entry Specification");
+				msg += " in Pixel Map File, line ";
+				msg += boost::lexical_cast<std::string>(lineno);
+				msg += " [";
+				msg += logical_buf;
+				msg += "]";
+				throw std::runtime_error(msg);
+			}
+			if ( ctrl->verbose() > 0 ) {
+				DEBUG("readMap(): Parsed"
+					<< " logical_start=" << logical_start
+					<< " logical_stop=" << logical_stop
+					<< " logical_step=" << logical_step);
+			}
+			// Adjust Logical PixelId Stop to "One Past" Last PixelId...
+			// (For More Intuitive Loop Termination... ;-D)
+			logical_stop += logical_step;
+		}
+
+		// Just a Plain Numerical Entry...
+		else {
+			if (sscanf(logical_buf, "%u", &logical) != 1) {
+				std::string msg("Bad Logical PixelId Entry Specification");
+				msg += " in Pixel Map File, line ";
+				msg += boost::lexical_cast<std::string>(lineno);
+				msg += " [";
+				msg += logical_buf;
+				msg += "]";
+				throw std::runtime_error(msg);
+			}
+			// Set Start/Stop/Step to Single Logical PixelId Step...
+			logical_start = logical;
+			logical_step = 1;
+			logical_stop = logical_start + logical_step;
+		}
+
+		// Check/Process Each Physical-to-Logical PixelId In Turn...
+
+		for ( phys=phys_start, logical=logical_start ;
+				phys != phys_stop && logical != logical_stop ;
+				phys += phys_step, logical += logical_step ) {
+
+			if (phys & 0x80000000) {
+				std::string msg("Physical PixelId has Error Bit Set "
+					"in Pixel Map File, line ");
+				msg += boost::lexical_cast<std::string>(lineno);
+				throw std::runtime_error(msg);
+			}
+
+			if (map->count(phys)) {
+				std::string msg("Duplicate Physical PixelId ");
+				msg += boost::lexical_cast<std::string>(phys);
+				msg += " in Pixel Map File, line ";
+				msg += boost::lexical_cast<std::string>(lineno);
+				throw std::runtime_error(msg);
+			}
+
+			if (!m_allowNonOneToOnePixelMapping
+					&& output_pixels.count(logical)) {
+				std::string msg("Duplicate Logical PixelId ");
+				msg += boost::lexical_cast<std::string>(logical);
+				msg += " in Pixel Map File, line ";
+				msg += boost::lexical_cast<std::string>(lineno);
+				throw std::runtime_error(msg);
+			}
+
+			if (bank == PixelMap::UNMAPPED_BANK) {
+				std::string msg("Reserved Bank Id (Unmapped Bank) in "
+					"Pixel Map File, line ");
+				msg += boost::lexical_cast<std::string>(lineno);
+				throw std::runtime_error(msg);
+			}
+
+			if (bank == PixelMap::ERROR_BANK) {
+				std::string msg("Reserved Bank Id (Error Bank) in "
+					"Pixel Map File, line ");
+				msg += boost::lexical_cast<std::string>(lineno);
+				throw std::runtime_error(msg);
+			}
+
+			// Unused "Gap" in PixelId Space, Mark as Being "Unmapped" Bank
+			if (bank == ((uint32_t) -1)) {
+				bank = PixelMap::UNMAPPED_BANK;
+			}
+
+			else if (bank >= 0x10000) {
+				std::string msg(
+					"Out-of-Range Bank in Pixel Map File, line ");
+				msg += boost::lexical_cast<std::string>(lineno);
+				throw std::runtime_error(msg);
+			}
+
+			output_pixels.insert(logical);
+
+			map->insert(make_pair(phys, std::make_pair(logical, bank)));
+		}
+
+		// Make Sure the Physical and Logical Shorthand Sequence Aligned...
+		// (i.e. Everything Stopped Together... ;-D)
+		if ( phys != phys_stop || logical != logical_stop ) {
+			std::string msg("Misalignment Error in Pixel Map Shorthand");
+			msg += " - Physical and Logical Sequences";
+			msg += " Did Not End Together:";
+			msg += " phys_start="
+				+ boost::lexical_cast<std::string>( phys_start );
+			msg += " phys_stop="
+				+ boost::lexical_cast<std::string>( phys_stop );
+			msg += " phys_step="
+				+ boost::lexical_cast<std::string>( phys_step );
+			msg += " logical_start="
+				+ boost::lexical_cast<std::string>( logical_start );
+			msg += " logical_stop="
+				+ boost::lexical_cast<std::string>( logical_stop );
+			msg += " logical_step="
+				+ boost::lexical_cast<std::string>( logical_step );
+			msg += ", line ";
 			msg += boost::lexical_cast<std::string>(lineno);
 			throw std::runtime_error(msg);
 		}
-
-		if (map->count(phys)) {
-			std::string msg("Duplicate Physical PixelId ");
-			msg += boost::lexical_cast<std::string>(phys);
-			msg += " in Pixel Map File, line ";
-			msg += boost::lexical_cast<std::string>(lineno);
-			throw std::runtime_error(msg);
-		}
-
-		if (!m_allowNonOneToOnePixelMapping
-				&& output_pixels.count(logical)) {
-			std::string msg("Duplicate Logical PixelId ");
-			msg += boost::lexical_cast<std::string>(logical);
-			msg += " in Pixel Map File, line ";
-			msg += boost::lexical_cast<std::string>(lineno);
-			throw std::runtime_error(msg);
-		}
-
-		if (bank == PixelMap::UNMAPPED_BANK) {
-			std::string msg("Reserved Bank Id (Unmapped Bank) in "
-				"Pixel Map File, line ");
-			msg += boost::lexical_cast<std::string>(lineno);
-			throw std::runtime_error(msg);
-		}
-
-		if (bank == PixelMap::ERROR_BANK) {
-			std::string msg("Reserved Bank Id (Error Bank) in "
-				"Pixel Map File, line ");
-			msg += boost::lexical_cast<std::string>(lineno);
-			throw std::runtime_error(msg);
-		}
-
-		// Unused "Gap" in PixelId Space, Mark as Being "Unmapped" Bank...
-		if (bank == ((uint32_t) -1))
-			bank = PixelMap::UNMAPPED_BANK;
-
-		else if (bank >= 0x10000) {
-			std::string msg("Out-of-Range Bank in Pixel Map File, line ");
-			msg += boost::lexical_cast<std::string>(lineno);
-			throw std::runtime_error(msg);
-		}
-
-		output_pixels.insert(logical);
-		map->insert(make_pair(phys, std::make_pair(logical, bank)));
 	}
 
 	INFO("readMap(): Done Reading Pixel Map File."
