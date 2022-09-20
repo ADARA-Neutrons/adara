@@ -2166,12 +2166,11 @@ for the same experiment recording.
     \bitbox{32}{Base/Starting Physical ID (``$START_{Physical}$'', u32)} \\
     \bitbox{16}{Bank ID (u16)} & 
     \bitbox{1}{1} & 
-    \bitbox{15}{Physical Step (``$STEP_{Physical}$'', u15)} \\
+    \bitbox{15}{Count (``$P$'', u15)} \\
     \bitbox{32}{Stopping Physical ID (``$STOP_{Physical}$'', u32)} \\
     \bitbox{32}{Base/Starting) Logical ID (``$START_{Logical}$'', u32)} \\
-    \bitbox{16}{Count (``$P$'', u16)} & 
-    \bitbox{1}{1} & 
-    \bitbox{15}{Logical Step (``$STEP_{Logical}$'', u15)} \\
+    \bitbox{16}{Physical Step (``$STEP_{Physical}$'', u16)} &
+    \bitbox{16}{Logical Step (``$STEP_{Logical}$'', u16)} \\
     \bitbox{32}{Stopping Logical ID (``$STOP_{Logical}$'', u32)} \\
   \end{bytefield}
   \caption{Pixel Map Alt Section - Version 1, ``Shorthand'' Format}
@@ -2201,12 +2200,13 @@ of the ``Bank ID/Count'' word,
 is illustrated in
 Figure~\ref{fig:protocol_packet_pixel_map_alt_section_v1_direct}.
 The {\bf Base Physical ID} defines the offset into the physical ID space
-for which this section defines mappings. {\bf Count} gives the number of
-mapping entries in this section, and {\bf Bank ID} describes the bank
-containing these pixels.
+for which this section defines mappings.
+The now-15-Bit {\bf Count} field gives the number of
+mapping entries in this section, and {\bf Bank ID} describes the
+detector bank containing these pixels.
 
 Here, each entry in the section describes a physical to logical
-(and bank) mapping.
+(and the bank) mapping.
 Each entry gives the logical ID for the mapping, and the physical ID is
 determined by adding the entry's zero-based index (from the section header)
 to the {\bf Base Physical ID}.
@@ -2218,18 +2218,21 @@ The bank ID for each mapping is given by the section header.
 
 The ``Shorthand'' V1 format section,
 as distinguished by the ``1'' in {\it Bit 15}
-of the ``Bank ID/Physical Step'' word
-(and the ``1'' in {\it Bit 15}
-of the ``Count/Logical Step'' word),
+of the ``Bank ID/Count'' word,
 is illustrated in
 Figure~\ref{fig:protocol_packet_pixel_map_alt_section_v1_shorthand}.
 Here, everything is completely different. Lol... ;-D
 
-Note that a {\it Single Bank} may be described by {\bf multiple sections}
+Note that in either formatting case here,
+a {\it Single Bank} may be described by {\bf multiple sections}
 if the physical/logical ID space is not contiguous,
 {\bf OR} if the total number of pixel IDs in the bank is ``too large,''
-i.e. specifically more than 65535
-(the capacity of the 16-bit section {\bf Count}).
+i.e. specifically more than {\it 32767},
+which is the capacity of the now-15-Bit section {\bf Count}.
+(Note the reduction of 1 Bit in the {\bf Count} field
+for this Pixel Map Alt V1 Packet,
+to be able to distinguish between the ``Direct''
+and ``Shorthand'' variants.)
 
 
 \newpage
