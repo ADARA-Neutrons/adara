@@ -2169,8 +2169,8 @@ for the same experiment recording.
     \bitbox{15}{Count (``$P$'', u15)} \\
     \bitbox{32}{Stopping Physical ID (``$STOP_{Physical}$'', u32)} \\
     \bitbox{32}{Base/Starting) Logical ID (``$START_{Logical}$'', u32)} \\
-    \bitbox{16}{Physical Step (``$STEP_{Physical}$'', u16)} &
-    \bitbox{16}{Logical Step (``$STEP_{Logical}$'', u16)} \\
+    \bitbox{16}{Physical Step (``$STEP_{Physical}$'', i16)} &
+    \bitbox{16}{Logical Step (``$STEP_{Logical}$'', i16)} \\
     \bitbox{32}{Stopping Logical ID (``$STOP_{Logical}$'', u32)} \\
   \end{bytefield}
   \caption{Pixel Map Alt Section - Version 1, ``Shorthand'' Format}
@@ -2605,7 +2605,7 @@ kknow about the marker type indicated by this packet, and the client is not
 required to honor it.
 \item{\bf Type} describes the type of annotation as given by
 Table~\ref{table:protocol_stream_annotation_values}.
-\item{\bf Scan Index} indentifies a step in a scan series, if non-zero.
+\item{\bf Scan Index} identifies a step in a scan series, if non-zero.
 \item{\bf Comment Length} is the length of the comment that follows, not
 including padding.
 \item{\bf Comment} is an optional UTF-8 encoded comment.  This field is padded
