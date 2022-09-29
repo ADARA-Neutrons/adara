@@ -13,9 +13,10 @@
 
 class PixelMap : boost::noncopyable {
 public:
-	typedef std::pair<uint32_t, uint16_t> Entry; // (logical, bank)
+	typedef std::pair<uint32_t, uint16_t> Entry; // ( logical, bank )
 	typedef std::vector<Entry> Table;
 	typedef std::map<uint32_t, PixelMap::Entry> TempMap;
+		// ( physical, Entry=( logical, bank ) )
 
 	PixelMap(const std::string &path,
 		bool allowNonOneToOnePixelMapping,
@@ -34,12 +35,12 @@ public:
 	// (This better equal the number of "Special" Bank Indices...!)
 	enum { REAL_BANK_OFFSET = 2 };
 
-	bool mapEvent(uint32_t phys, uint32_t &logical, uint16_t &bank) {
-		if (phys < m_table.size()) {
-			logical = m_table[phys].first;
-			bank = m_table[phys].second;
+	bool mapEvent(uint32_t physical, uint32_t &logical, uint16_t &bank) {
+		if (physical < m_table.size()) {
+			logical = m_table[physical].first;
+			bank = m_table[physical].second;
 		} else {
-			logical = phys | 0x80000000;
+			logical = physical | 0x80000000;
 			bank = UNMAPPED_BANK;
 		}
 

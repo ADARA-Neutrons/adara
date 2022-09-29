@@ -38,15 +38,15 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 	uint32_t logical_start, logical_stop;
 	int32_t logical_step;
 
-	uint32_t phys_start, phys_stop;
-	int32_t phys_step;
+	uint32_t physical_start, physical_stop;
+	int32_t physical_step;
 
-	uint32_t phys, logical, bank;
+	uint32_t physical, logical, bank;
 
 	int lineno = 0;
 
+	char physical_buf[255];
 	char logical_buf[255];
-	char phys_buf[255];
 	char trash[2] = "";
 
 	size_t pos;
@@ -68,12 +68,12 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 		if (f.fail())
 			break;
 
-		/* Truncate at the comment character */
+		// Truncate at the comment character
 		pos = line.find_first_of("#");
 		if (pos != std::string::npos)
 			line.resize(pos);
 
-		/* Skip blank lines */
+		// Skip blank lines
 		pos = line.find_first_not_of(" \t");
 		if (pos == std::string::npos)
 			continue;
@@ -81,50 +81,50 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 		// Parse Line Into Physical and Logical Specifications, Plus Bank
 		// (and Any "Trash" Characters at the End of the Line...)
 		if (sscanf(line.c_str(), "%s %s %u %1s\n",
-				phys_buf, logical_buf, &bank, trash) != 3) {
+				physical_buf, logical_buf, &bank, trash) != 3) {
 			std::string msg("Bad Entry in Pixel Map File, line ");
 			msg += boost::lexical_cast<std::string>(lineno);
 			throw std::runtime_error(msg);
 		}
 
 		// Parse Any Closed-Form Physical PixelId Specification
-		if ( strstr(phys_buf, ":") != NULL ) {
-			if (sscanf(phys_buf, "%u:%u:%d",
-					&phys_start, &phys_stop, &phys_step) != 3) {
+		if ( strstr(physical_buf, ":") != NULL ) {
+			if (sscanf(physical_buf, "%u:%u:%d",
+					&physical_start, &physical_stop, &physical_step) != 3) {
 				std::string msg("Bad Physical PixelId Entry Specification");
 				msg += " in Pixel Map File, line ";
 				msg += boost::lexical_cast<std::string>(lineno);
 				msg += " [";
-				msg += phys_buf;
+				msg += physical_buf;
 				msg += "]";
 				throw std::runtime_error(msg);
 			}
 			if ( ctrl->verbose() > 0 ) {
 				DEBUG("readMap(): Parsed"
-					<< " phys_start=" << phys_start
-					<< " phys_stop=" << phys_stop
-					<< " phys_step=" << phys_step);
+					<< " physical_start=" << physical_start
+					<< " physical_stop=" << physical_stop
+					<< " physical_step=" << physical_step);
 			}
 			// Adjust Physical PixelId Stop to "One Past" Last PixelId...
 			// (For More Intuitive Loop Termination... ;-D)
-			phys_stop += phys_step;
+			physical_stop += physical_step;
 		}
 
 		// Just a Plain Numerical Entry...
 		else {
-			if (sscanf(phys_buf, "%u", &phys) != 1) {
+			if (sscanf(physical_buf, "%u", &physical) != 1) {
 				std::string msg("Bad Physical PixelId Entry Specification");
 				msg += " in Pixel Map File, line ";
 				msg += boost::lexical_cast<std::string>(lineno);
 				msg += " [";
-				msg += phys_buf;
+				msg += physical_buf;
 				msg += "]";
 				throw std::runtime_error(msg);
 			}
 			// Set Start/Stop/Step to Single Physical PixelId Step...
-			phys_start = phys;
-			phys_step = 1;
-			phys_stop = phys_start + phys_step;
+			physical_start = physical;
+			physical_step = 1;
+			physical_stop = physical_start + physical_step;
 		}
 
 		// Parse Any Closed-Form Logical PixelId Specification
@@ -169,20 +169,20 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 
 		// Check/Process Each Physical-to-Logical PixelId In Turn...
 
-		for ( phys=phys_start, logical=logical_start ;
-				phys != phys_stop && logical != logical_stop ;
-				phys += phys_step, logical += logical_step ) {
+		for ( physical=physical_start, logical=logical_start ;
+				physical != physical_stop && logical != logical_stop ;
+				physical += physical_step, logical += logical_step ) {
 
-			if (phys & 0x80000000) {
+			if (physical & 0x80000000) {
 				std::string msg("Physical PixelId has Error Bit Set "
 					"in Pixel Map File, line ");
 				msg += boost::lexical_cast<std::string>(lineno);
 				throw std::runtime_error(msg);
 			}
 
-			if (map->count(phys)) {
+			if (map->count(physical)) {
 				std::string msg("Duplicate Physical PixelId ");
-				msg += boost::lexical_cast<std::string>(phys);
+				msg += boost::lexical_cast<std::string>(physical);
 				msg += " in Pixel Map File, line ";
 				msg += boost::lexical_cast<std::string>(lineno);
 				throw std::runtime_error(msg);
@@ -225,21 +225,21 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 
 			output_pixels.insert(logical);
 
-			map->insert(make_pair(phys, std::make_pair(logical, bank)));
+			map->insert(make_pair(physical, std::make_pair(logical, bank)));
 		}
 
 		// Make Sure the Physical and Logical Shorthand Sequence Aligned...
 		// (i.e. Everything Stopped Together... ;-D)
-		if ( phys != phys_stop || logical != logical_stop ) {
+		if ( physical != physical_stop || logical != logical_stop ) {
 			std::string msg("Misalignment Error in Pixel Map Shorthand");
 			msg += " - Physical and Logical Sequences";
 			msg += " Did Not End Together:";
-			msg += " phys_start="
-				+ boost::lexical_cast<std::string>( phys_start );
-			msg += " phys_stop="
-				+ boost::lexical_cast<std::string>( phys_stop );
-			msg += " phys_step="
-				+ boost::lexical_cast<std::string>( phys_step );
+			msg += " physical_start="
+				+ boost::lexical_cast<std::string>( physical_start );
+			msg += " physical_stop="
+				+ boost::lexical_cast<std::string>( physical_stop );
+			msg += " physical_step="
+				+ boost::lexical_cast<std::string>( physical_step );
 			msg += " logical_start="
 				+ boost::lexical_cast<std::string>( logical_start );
 			msg += " logical_stop="
@@ -273,91 +273,375 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 					      uint32_t &packetSize)
 {
-	std::queue<uint16_t> sections;
+	std::queue<uint32_t> section_words;
+
 	TempMap::iterator it, end;
-	uint32_t payload, expected, bank_count;
+
+	uint32_t physical_start = -1, physical_stop = -1;
+	int32_t physical_step = 0;
+
+	uint32_t logical_start = -1, logical_stop = -1;
+	int32_t logical_step = 0;
+
+	uint32_t last_physical = -1, last_logical = -1;
+	uint32_t next_physical = -1, next_logical = -1;
+
+	uint32_t physical, logical;
+
 	uint32_t tot_pixelid_count;
-	uint32_t section_count;
+
+	uint32_t phys_and_log_step;
+	uint32_t bank_and_count;
+
+	uint32_t payload;
+
 	struct timespec now;
+
 	uint32_t *u32;
-	uint16_t i, entries, bank;
-	uint16_t max_section_pixelid_count = 0xffff; // 16 bit section count
+
+	uint16_t max_section_pixelid_count = 0x7fff; // *15* bit section count
+	uint16_t entries, bank, last_bank = -1;
+
+	SMSControl *ctrl = SMSControl::getInstance();
 
 	DEBUG("genAltPacket() Entry");
 
-	/* We now support Non-One-to-One Pixel Mappings, therefore
-	 * we must also avoid using any "Inverse" Mappings, as these
-	 * are practically impossible for some beamlines (e.g. HFIR WAND).
-	 * Just use physical->logical map "as is" for generating the
-	 * pixel map packet.
-	 */
+	// We now support Non-One-to-One Pixel Mappings, therefore
+	// we must also avoid using any "Inverse" Mappings, as these
+	// are practically impossible for some beamlines (e.g. HFIR WAND).
+	// Just use physical->logical map "as is" for generating the
+	// pixel map packet.
 
-	/* NOTE: This "Alternate" Pixel Mapping Table Packet is effectively
-	 * a "Mirror Image" of the Original Pixel Mapping Table Packet,
-	 * with "Logical" PixelIds now Swapped with "Physical" PixelIds
-	 * Everywhere, in a "Inverted" (ha ha) organizational structure. ;-D
-	 *
-	 * We also pack in One Handy Extra Value _Before_ the Mapping Data,
-	 * to Avoid Future Issues - explicitly include the "Number of Banks"!
-	 */
+	// NOTE: This "Alternate" Pixel Mapping Table Packet is effectively
+	// a "Mirror Image" of the Original Pixel Mapping Table Packet,
+	// with "Logical" PixelIds now Swapped with "Physical" PixelIds
+	// Everywhere, in a "Inverted" (ha ha) organizational structure. ;-D
 
-	/* We're always going to have at least one section, with the first
-	 * physical pixel in it.
-	 */
-	it = map->begin();
-	expected = it->first + 1; // expected next Physical PixelId...
-	entries = 1;
-	bank = it->second.second;
+	// We also pack in One Handy Extra Value _Before_ the Mapping Data,
+	// to Avoid Future Issues - explicitly include the "Number of Banks"!
+
+	// ALSO NOTE: This Version 1 (or Greater) Packet Type now also supports
+	// an Efficient "Shorthand" Section Format, which like the new
+	// "Start:Stop:Step" notation in the Pixel Mapping Table File Format,
+	// can be used to compactly represent *HUGE* Pixel Maps that would
+	// otherwise be prohibitive in terms of Packet Size. ;-D
 
 	tot_pixelid_count = 0;
-	section_count = 0;
+	payload = 0;
 
-	for (++it, end = map->end(); it != end; ++it) {
-		/* If we've found a discontinuity in the physical pixels,
-		 * or we changed banks, OR we have _Filled Up_ this section
-		 * with the Max Section PixelId Count (16 bits, 0xffff = 65535),
-		 * then we have to start a new section.
-		 */
-		if (it->first != expected || it->second.second != bank
-				|| entries >= max_section_pixelid_count) {
-			sections.push(entries);
+	// We're always going to have at least one section, with the first
+	// physical pixel in it.
+
+	it = map->begin();
+
+	physical = it->first;
+	logical = it->second.first;
+	bank = it->second.second;
+
+	// First PixelId Specification...
+
+	physical_start = physical;
+	physical_stop = physical;
+
+	logical_start = logical;
+	logical_stop = logical;
+
+	last_physical = physical;
+	last_logical = logical;
+	last_bank = bank;
+
+	entries = 1;
+
+	for ( ++it, end = map->end(); it != end; ++it ) {
+
+		physical = it->first;
+		logical = it->second.first;
+		bank = it->second.second;
+
+		// If we've found a discontinuity in the physical pixels,
+		// or we changed banks, OR we have _Filled Up_ this section
+		// with the Max Section PixelId Count (*15* bits, 0x7fff = 32767),
+		// then we have to start a new section.
+		// -> Capture the "Last Bank" Section... :-D
+		if ( bank != last_bank
+				|| ( physical_step != 0 && physical != next_physical )
+				|| ( logical_step != 0 && logical != next_logical )
+				|| entries >= max_section_pixelid_count ) {
+
 			// Skip Unmapped Banks...! Don't Count/Send Unmapped PixelIds...
 			// No Need to Send These Over the Wire!
-			if ( bank != (uint16_t) -1 ) {
+			if ( last_bank != (uint16_t) -1 ) {
+
+				// Valid Shorthand Sequence Captured,
+				// Use Shorthand Section Format...
+				if ( physical_start != physical_stop
+							&& physical_step != 0
+						&& logical_start != logical_stop
+							&& logical_step != 0 ) {
+
+					// Base/Starting Physical PixelId
+					section_words.push(physical_start);
+
+					// Bank ID, "1", Count
+					bank_and_count = (uint32_t) last_bank << 16;
+					bank_and_count |= 0x1 << 15;
+					bank_and_count |= entries;
+					section_words.push(bank_and_count);
+
+					// Stopping Physical PixelId
+					section_words.push(physical_stop);
+
+					// Base/Starting Logical PixelId
+					section_words.push(logical_start);
+
+					// Physical Step, Logical Step
+					phys_and_log_step = physical_step << 16;
+					if ( ctrl->verbose() > 1 ) {
+						DEBUG("genAltPacket():" << std::hex
+							<< " physical_step=0x" << physical_step
+							<< " phys_and_log_step=0x" << phys_and_log_step
+							<< std::dec);
+					}
+					phys_and_log_step |= logical_step & 0xFFFF;
+					if ( ctrl->verbose() > 1 ) {
+						DEBUG("genAltPacket():" << std::hex
+							<< " logical_step=0x" << logical_step
+							<< " phys_and_log_step=0x" << phys_and_log_step
+							<< std::dec);
+					}
+					section_words.push(phys_and_log_step);
+
+					// Stopping Logical PixelId
+					section_words.push(logical_stop);
+
+					if ( ctrl->verbose() > 0 ) {
+						DEBUG("genAltPacket(): Shorthand Section"
+							<< " bank=" << last_bank
+							<< " count=" << entries
+							<< " bank_and_count=0x"
+							<< std::hex << bank_and_count << std::dec
+							<< " physical="
+							<< physical_start << ":"
+							<< physical_stop << ":"
+							<< physical_step
+							<< " phys_and_log_step=0x"
+							<< std::hex << phys_and_log_step << std::dec
+							<< " logical="
+							<< logical_start << ":"
+							<< logical_stop << ":"
+							<< logical_step);
+					}
+				}
+
+				// Invalid Shorthand Sequence,
+				// Just Dump Direct Pixelid Section Format...
+				else {
+
+					// Base Physical PixelId
+					section_words.push(physical_start);
+
+					// Bank ID, "0", Count
+					bank_and_count = (uint32_t) last_bank << 16;
+					bank_and_count |= 0x0 << 15; // NOOP... :-D
+					bank_and_count |= entries; // Count, Always == 1...
+					section_words.push(bank_and_count);
+
+					// Logical PixelId, The "Only One"
+					// (Or Else We Would Have Used the "Shorthand" Format!)
+					section_words.push(logical_start);
+
+					if ( ctrl->verbose() > 0 ) {
+						DEBUG("genAltPacket(): Direct Section"
+							<< " bank=" << last_bank
+							<< " count=" << entries
+							<< " bank_and_count=0x"
+							<< std::hex << bank_and_count << std::dec
+							<< " physical="
+							<< physical_start
+							<< " logical="
+							<< logical_start);
+					}
+				}
+
 				tot_pixelid_count += entries;
-				section_count++;
 			}
+
+			// Reset Section Bookkeeping...
+
+			physical_start = -1;
+			physical_stop = -1;
+			physical_step = 0;
+
+			logical_start = -1;
+			logical_stop = -1;
+			logical_step = 0;
+
+			last_physical = -1;
+			last_logical = -1;
+			last_bank = -1;
+
+			next_physical = -1;
+			next_logical = -1;
+
 			entries = 0;
-			bank = it->second.second;
+
+			// Start New Shorthand Section...
+
+			physical_start = physical;
+
+			logical_start = logical;
+
+			last_bank = bank;
 		}
+
+		// Otherwise, Check for New Sequence Step Sizes...
+
+		else if ( physical_step == 0 && logical_step == 0 ) {
+
+			physical_step = physical - last_physical;
+
+			logical_step = logical - last_logical;
+		}
+
+		// Extend the End of the Physical/Logical PixelId Sequence...
+
+		physical_stop = physical;
+
+		logical_stop = logical;
+
+		// Capture Last Physical/Logical PixelIds for Next Line...
+
+		last_physical = physical;
+
+		last_logical = logical;
+
+		// Compute Expected Next Physical & Logical PixelIds...
+		
+		if ( physical_step != 0 && logical_step != 0 ) {
+
+			next_physical = physical + physical_step;
+
+			next_logical = logical + logical_step;
+		}
+
+		// Increment the Current Number of Entries Count...
+
 		entries++;
-		expected = it->first + 1; // expected next Physical PixelId...
 	}
 
-	/* Push the last section we were working on. */
-	sections.push(entries);
-	// Skip Unmapped Banks...! No Need to Send These Over the Wire!
-	if ( bank != (uint16_t) -1 ) {
+	// Push the last section we were working on.
+
+	// Skip Unmapped Banks...! Don't Count/Send Unmapped PixelIds...
+	// No Need to Send These Over the Wire!
+	if ( last_bank != (uint16_t) -1 ) {
+
+		// Valid Shorthand Sequence Captured,
+		// Use Shorthand Section Format...
+		if ( physical_start != physical_stop && physical_step != 0
+				&& logical_start != logical_stop && logical_step != 0 ) {
+
+			// Base/Starting Physical PixelId
+			section_words.push(physical_start);
+
+			// Bank ID, "1", Count
+			bank_and_count = (uint32_t) last_bank << 16;
+			bank_and_count |= 0x1 << 15;
+			bank_and_count |= entries;
+			section_words.push(bank_and_count);
+
+			// Stopping Physical PixelId
+			section_words.push(physical_stop);
+
+			// Base/Starting Logical PixelId
+			section_words.push(logical_start);
+
+			// Physical Step, Logical Step
+			phys_and_log_step = physical_step << 16;
+			if ( ctrl->verbose() > 1 ) {
+				DEBUG("genAltPacket():" << std::hex
+					<< " physical_step=0x" << physical_step
+					<< " phys_and_log_step=0x" << phys_and_log_step
+					<< std::dec);
+			}
+			phys_and_log_step |= logical_step & 0xFFFF;
+			if ( ctrl->verbose() > 1 ) {
+				DEBUG("genAltPacket():" << std::hex
+					<< " logical_step=0x" << logical_step
+					<< " phys_and_log_step=0x" << phys_and_log_step
+					<< std::dec);
+			}
+			section_words.push(phys_and_log_step);
+
+			// Stopping Logical PixelId
+			section_words.push(logical_stop);
+
+			if ( ctrl->verbose() > 0 ) {
+				DEBUG("genAltPacket(): Shorthand Section"
+					<< " bank=" << last_bank
+					<< " count=" << entries
+					<< " bank_and_count=0x"
+					<< std::hex << bank_and_count << std::dec
+					<< " physical="
+					<< physical_start << ":"
+					<< physical_stop << ":"
+					<< physical_step
+					<< " phys_and_log_step=0x"
+					<< std::hex << phys_and_log_step << std::dec
+					<< " logical="
+					<< logical_start << ":"
+					<< logical_stop << ":"
+					<< logical_step);
+			}
+		}
+
+		// Invalid Shorthand Sequence,
+		// Just Dump Direct Pixelid Section Format...
+		else {
+
+			// Base Physical PixelId
+			section_words.push(physical_start);
+
+			// Bank ID, "0", Count
+			bank_and_count = (uint32_t) last_bank << 16;
+			bank_and_count |= 0x0 << 15; // NOOP... :-D
+			bank_and_count |= entries; // Count, Always == 1...
+			section_words.push(bank_and_count);
+
+			// Logical PixelId, The "Only One"
+			// (Or Else We Would Have Used the "Shorthand" Format!)
+			section_words.push(logical_start);
+
+			if ( ctrl->verbose() > 0 ) {
+				DEBUG("genAltPacket(): Direct Section"
+					<< " bank=" << last_bank
+					<< " count=" << entries
+					<< " bank_and_count=0x"
+					<< std::hex << bank_and_count << std::dec
+					<< " physical="
+					<< physical_start
+					<< " logical="
+					<< logical_start);
+			}
+		}
+
 		tot_pixelid_count += entries;
-		section_count++;
 	}
 
-	DEBUG("section_count=" << section_count);
-	DEBUG("sections.size()=" << sections.size());
-	DEBUG("tot_pixelid_count=" << tot_pixelid_count);
-	DEBUG("map->size()=" << map->size());
+	DEBUG("genAltPacket(): section_words.size()=" << section_words.size());
+	DEBUG("genAltPacket(): tot_pixelid_count=" << tot_pixelid_count);
+	DEBUG("genAltPacket(): map->size()=" << map->size());
 
-	/* Now, build the packet; we have enough information to calculate
-	 * its size.
-	 */
-	payload = section_count * ( sizeof(uint32_t) + (2 * sizeof(uint16_t)) );
-	DEBUG("payload(sections)=" << payload);
-	payload += tot_pixelid_count * sizeof(uint32_t);
-	DEBUG("payload(tot_pixelid_count)=" << payload);
+	// Now, build the packet; we have enough information to calculate
+	// its size.
+
+	payload = section_words.size() * sizeof(uint32_t);
+	DEBUG("genAltPacket(): payload(mapping data)=" << payload);
+
 	payload += sizeof(uint32_t); // for Explicit "Number of Banks"! ;-D
-	DEBUG("payload(numbanks)=" << payload);
+	DEBUG("genAltPacket(): payload(numbanks)=" << payload);
+
 	packetSize = payload + sizeof(ADARA::Header);
-	DEBUG("packetSize=" << packetSize);
+	DEBUG("genAltPacket(): packetSize=" << packetSize);
 
 	boost::shared_array<uint8_t> pkt(new uint8_t[packetSize]);
 
@@ -373,28 +657,13 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 
 	*u32++ = (m_numBanks - 1); // Note: Artificially Incremented By 1...!
 
-	it = map->begin();
-	while ( !sections.empty() ) {
-		entries = sections.front();
-		sections.pop();
+	// Just Copy All the Section Words into the Packet :-D
 
-		// Skip Unmapped Banks...! No Need to Send These Over the Wire!
-		if ( it->second.second == (uint16_t) -1 ) {
-			std::advance( it, entries );
-			continue;
-		}
+	while ( !section_words.empty() ) {
 
-		/* First the header (base physical ID, bankid, count) */
-		bank_count = (uint32_t) it->second.second << 16;
-		bank_count |= entries;
+		*u32++ = section_words.front();
 
-		*u32++ = it->first;
-		*u32++ = bank_count;
-
-		/* Then the entries (logical id) */
-		for (i = 0; i < entries; ++it, ++i) {
-			*u32++ = it->second.first;
-		}
+		section_words.pop();
 	}
 
 	//DEBUG("Resulting Size: u32=" << std::hex << u32
@@ -402,56 +671,70 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 		//<< " Effective Size: (4 * (u32 - pkt.get()))="
 		//<< std::dec << ( 4 * ( u32 - ((uint32_t *) pkt.get()) ) ) );
 
-	DEBUG("Done");
+	DEBUG("genAltPacket(): Done");
 
 	return pkt;
 }
 
+// Note: The Original genPacket() Method Below Will Still "Work"
+// with the Latest Pixel Map Handling, With One Exception. Because
+// an "Inverted" Map is Used Here to Generate the PixelMappingPkt
+// Packet, the Ordering of the Pixel Map is by *Logical* Rather than
+// by Physical PixelIds... ;-D  So if you're using "SavePixelMap"
+// to capture the Pixel Map Datasets into the NeXus via the STC,
+// Any _Negative Step_ Sequences will be in *Reverse* Order...! ;-D
 boost::shared_array<uint8_t> PixelMap::genPacket(TempMap *map,
 					      uint32_t &packetSize)
 {
 	std::queue<uint16_t> sections;
+
 	TempMap inverted;
 	TempMap::iterator it, end;
-	uint32_t phys, logical, payload, expected, bank_count;
+
+	uint32_t physical, logical;
+	uint32_t expected;
+
+	uint32_t bank_and_count;
+	uint32_t payload;
+
 	struct timespec now;
+
 	uint32_t *u32;
-	uint16_t i, entries, bank;
+
 	uint16_t max_section_pixelid_count = 0xffff; // 16 bit section count
+	uint16_t i, entries, bank;
 
-DEBUG("genPacket() Entry");
+	DEBUG("genPacket() Entry");
 
-	/* A physical->logical map is better for parsing and for building
-	 * the lookup table used for normal operations, but going logical
-	 * to physical is better for generating the pixel map packet.
-	 * Since we guarantee a one-to-one mapping during load, we don't
-	 * have to worry about duplicate keys here.
-	 */
+	// A physical->logical map is better for parsing and for building
+	// the lookup table used for normal operations, but going logical
+	// to physical is better for generating the pixel map packet.
+	// Since we guarantee a one-to-one mapping during load, we don't
+	// have to worry about duplicate keys here.
+
 	// NOTE: _Can_ Break for "m_allowNonOneToOnePixelMapping == true" case!!
 	// -> Ordering of Banks in Map can "Cover Up" some Bank Numbers...!
 	// -> Where Possible going forward, Use "PixelMappingAltPkt"...! ;-D
 	// -> See Trac Ticket #1043, for HFIR WAND/HB2C...
 	for (it = map->begin(), end = map->end(); it != end; ++it) {
-		phys = it->first;
+		physical = it->first;
 		logical = it->second.first;
 		bank = it->second.second;
-		inverted.insert(make_pair(logical, std::make_pair(phys, bank)));
+		inverted.insert(make_pair(logical, std::make_pair(physical, bank)));
 	}
 
-	/* We're always going to have at least one section, with the first
-	 * logical pixel in it.
-	 */
+	// We're always going to have at least one section, with the first
+	// logical pixel in it.
 	it = inverted.begin();
 	expected = it->first + 1; // expected next Logical PixelId...
 	entries = 1;
 	bank = it->second.second;
 
 	for (++it, end = inverted.end(); it != end; ++it) {
-		/* If we've found a discontinuity in the logical pixels,
-		 * or we changed banks, OR we have _Filled Up_ this section
-		 * with the Max Section PixelId Count (16 bits, 0xffff = 65535),
-		 * then we have to start a new section.
-		 */
+		// If we've found a discontinuity in the logical pixels,
+		// or we changed banks, OR we have _Filled Up_ this section
+		// with the Max Section PixelId Count (16 bits, 0xffff = 65535),
+		// then we have to start a new section.
 		if (it->first != expected || it->second.second != bank
 				|| entries >= max_section_pixelid_count) {
 			sections.push(entries);
@@ -462,19 +745,18 @@ DEBUG("genPacket() Entry");
 		expected = it->first + 1; // expected next Logical PixelId...
 	}
 
-	/* Push the last section we were working on. */
+	// Push the last section we were working on.
 	sections.push(entries);
 
-DEBUG("sections.size()=" << sections.size());
+	DEBUG("genPacket(): sections.size()=" << sections.size());
 
-	/* Now, build the packet; we have enough information to calculate
-	 * its size.
-	 */
+	// Now, build the packet; we have enough information to calculate
+	// its size.
 	payload = sections.size() * (sizeof(uint32_t) + 2 * sizeof(uint16_t));
 	payload += inverted.size() * sizeof(uint32_t);
-DEBUG("payload=" << payload);
+	DEBUG("genPacket(): payload=" << payload);
 	packetSize = payload + sizeof(ADARA::Header);
-DEBUG("packetSize=" << packetSize);
+	DEBUG("genPacket(): packetSize=" << packetSize);
 
 	boost::shared_array<uint8_t> pkt(new uint8_t[packetSize]);
 
@@ -493,19 +775,19 @@ DEBUG("packetSize=" << packetSize);
 		entries = sections.front();
 		sections.pop();
 
-		/* First the header (base logical ID, bankid, count) */
-		bank_count = (uint32_t) it->second.second << 16;
-		bank_count |= entries;
+		// First the header (base logical ID, bankid, count)
+		bank_and_count = (uint32_t) it->second.second << 16;
+		bank_and_count |= entries;
 
 		*u32++ = it->first;
-		*u32++ = bank_count;
+		*u32++ = bank_and_count;
 
-		/* Then the entries (physical id) */
+		// Then the entries (physical id)
 		for (i = 0; i < entries; ++it, ++i)
 			*u32++ = it->second.first;
 	}
 
-DEBUG("Done");
+	DEBUG("genPacket(): Done");
 
 	return pkt;
 }
@@ -520,7 +802,7 @@ PixelMap::PixelMap(const std::string &path,
 	TempMap::iterator it, end;
 	std::set<uint32_t> banks;
 	uint32_t max_logical = 0;
-	uint32_t max_phys = 0;
+	uint32_t max_physical = 0;
 	uint32_t i;
 
 	INFO("Entry PixelMap(): m_allowNonOneToOnePixelMapping="
@@ -530,8 +812,8 @@ PixelMap::PixelMap(const std::string &path,
 
 	end = map->end();
 	for (it = map->begin(); it != end; ++it) {
-		if (it->first > max_phys)
-			max_phys = it->first;
+		if (it->first > max_physical)
+			max_physical = it->first;
 		if (it->second.first != ((uint32_t) -1)
 				&& it->second.first > max_logical) {
 			max_logical = it->second.first;
@@ -543,31 +825,28 @@ PixelMap::PixelMap(const std::string &path,
 	}
 
 	INFO("Pixel Map Stats:"
-		<< " max_phys=" << max_phys
+		<< " max_physical=" << max_physical
 		<< " max_logical=" << max_logical
 		<< " m_numBanks=" << m_numBanks);
 
-	/* Count from zero to the largest bank, that's how many slots will
-	 * be needed.
-	 */
+	// Count from zero to the largest bank, that's how many slots will
+	// be needed.
 	m_numBanks++;
 
-	/* It's easier to parse into a std::map, but a vector is 100x faster
-	 * for lookups in the tests I've performed. No real surprise there...
-	 *
-	 * First we populate with the "unmapped pixel" mapping, then fill
-	 * in the valid entries.
-	 */
-	m_table.reserve(max_phys + 1);
-	for (i = 0; i <= max_phys; ++i) {
+	// It's easier to parse into a std::map, but a vector is 100x faster
+	// for lookups in the tests I've performed. No real surprise there...
+
+	// First we populate with the "unmapped pixel" mapping, then fill
+	// in the valid entries.
+	m_table.reserve(max_physical + 1);
+	for (i = 0; i <= max_physical; ++i) {
 		m_table.push_back(
 			std::make_pair( i | 0x80000000,
 				(uint16_t) PixelMap::UNMAPPED_BANK ) );
 	}
 
-	/* While we're at it, _Also_ create a "Logical-to-Bank" lookup vector,
-	 * for the case where a Data Source has _Already_ mapped the PixelId...
-	 */
+	// While we're at it, _Also_ create a "Logical-to-Bank" lookup vector,
+	// for the case where a Data Source has _Already_ mapped the PixelId...
 	m_banks.reserve(max_logical + 1);
 	for (i = 0; i <= max_logical; ++i) {
 		m_banks.push_back( PixelMap::UNMAPPED_BANK );
