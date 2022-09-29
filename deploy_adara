@@ -156,7 +156,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.7.0"
+DEPLOY_VERSION="1.7.1"
 
 TMP_DIR="/tmp"
 
