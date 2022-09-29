@@ -11,7 +11,7 @@
 #include "ADARAUtils.h"
 
 /// This sets the size of the ADARA parser stream buffer in bytes
-#define ADARA_IN_BUF_SIZE   0x3000000  // For PixelMap!
+#define ADARA_IN_BUF_SIZE   0x3000000  // For Old "Direct" PixelMap Pkt!
 
 #define MAX_DEVICE_ID   100
 
