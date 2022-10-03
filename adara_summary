@@ -241,6 +241,7 @@ declare -A nHostSMSDLastEventSource
 declare -A nHostSMSDLastEventSourceREC
 declare -A nHostSMSDSTCConnectionFailed
 declare -A nHostSMSDLostConnectionToSTC
+declare -A nHostSMSDTimedOutConnectingSTC
 declare -A nHostSMSDLiveClientLogs
 declare -A nHostSMSDConnResetByPeer
 declare -A nHostSMSDNoSuchFileOrDirectory
@@ -481,6 +482,7 @@ PARSE_LOG()
 		nHostSMSDLastEventSourceREC[$host]=0
 		nHostSMSDSTCConnectionFailed[$host]=0
 		nHostSMSDLostConnectionToSTC[$host]=0
+		nHostSMSDTimedOutConnectingSTC[$host]=0
 		nHostSMSDLiveClientLogs[$host]=0
 		nHostSMSDConnResetByPeer[$host]=0
 		nHostSMSDNoSuchFileOrDirectory[$host]=0
@@ -1505,6 +1507,13 @@ PARSE_LOG()
 			nHostSMSDLostConnectionToSTC[$host]=$(( \
 				nHostSMSDLostConnectionToSTC[$host] + 1 ))
 
+		# "Timed Out Connecting to STC at..." Log
+		elif [[ "$log" =~ \
+				Timed${S}Out${S}Connecting${S}to${S}STC${S}at ]]; then
+			#echo "Timed Out Connecting to STC at..."
+			nHostSMSDTimedOutConnectingSTC[$host]=$(( \
+				nHostSMSDTimedOutConnectingSTC[$host] + 1 ))
+
 		# Conglomerated "LiveClient" Logs
 		elif [[ "$log" =~ SMS.LiveClient ]]; then
 			#echo "LiveClient..."
@@ -2334,6 +2343,10 @@ for h in ${HostList} ; do
 	if [[ ${nHostSMSDLostConnectionToSTC[$h]} -gt 0 ]]; then
 		echo -n "   *** ${nHostSMSDLostConnectionToSTC[$h]} "
 		echo "SMSD \"Lost Connection to STC for Run...\" Logs"
+	fi
+	if [[ ${nHostSMSDTimedOutConnectingSTC[$h]} -gt 0 ]]; then
+		echo -n "   *** ${nHostSMSDTimedOutConnectingSTC[$h]} "
+		echo "SMSD \"Timed Out Connecting to STC at...\" Logs"
 	fi
 	if [[ ${nHostSMSDDataSourceTimedOut[$h]} -gt 0 ]]; then
 		if [[ ${nHostSMSDDataSourceTimedOutREC[$h]} -gt 0 ]]; then
