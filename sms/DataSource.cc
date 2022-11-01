@@ -2293,9 +2293,9 @@ bool DataSource::rxPacket(const ADARA::Packet &pkt)
 				if ( RateLimitedLogging::checkLog( RLLHistory_DataSource,
 						RLL_PULSEID_ZERO, m_name,
 						2, 10, 100, log_info ) ) {
-					WARN(log_info
+					ERROR(log_info
 						<< ( m_ctrl->getRecording() ? "[RECORDING] " : "" )
-						<< "Received pulse id 0 from " << m_name);
+						<< "Received Pulse Id of 0.0 from " << m_name);
 				}
 				return false;
 			}
