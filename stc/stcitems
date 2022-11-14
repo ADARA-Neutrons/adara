@@ -176,6 +176,9 @@ DUMP_SAMPLE_DASLOGS()
 				-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Name/value" \
 				-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Formula/time" \
 				-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Formula/value" \
+				-p "/entry/start_time" \
+				-p "/entry/end_time" \
+				-p "/entry/duration" \
 				-v -l
 		fi
 
@@ -236,12 +239,13 @@ DUMP_SAMPLE_DASLOGS()
 			echo
 
 			echo "${NXLS} \${nexus_file_path} \\"
-			echo "-p "/entry/DASlogs/${blprefix}:CS:ITEMS/time" \\"
-			echo "-p "/entry/DASlogs/${blprefix}:CS:ITEMS/value" \\"
-			echo "-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Name/time" \\"
-			echo "-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Name/value" \\"
-			echo "-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Formula/time" \\"
-			echo "-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Formula/value" \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS/time \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS/value \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS:Name/time \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS:Name/value \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS:Formula/time \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS:Formula/value \\"
+			echo "-p /entry/duration \\"
 			echo "-v -l"
 
 		fi
