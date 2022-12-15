@@ -72,8 +72,11 @@ def determine_subdirectories(file_path):
 		new_subdir = subdir
 	else:
 		new_subdir = 'SubdirectoryUnspecified'
-	print('\n\nhead_tail: {}\ndriveless_path: {}\nlead_dir: {}\nsubdir: {}\nnew_subdir: {}\n\n'.format(head_tail, driveless_path, lead_dir, subdir, new_subdir))
-	return subdir, new_subdir, lead_dir
+	# Validate path
+	path_valid = re.search('^/data/IPTS-\d+', driveless_path.strip()) is not None
+	print('\n\nhead_tail: {}\ndriveless_path: {}\nlead_dir: {}\nsubdir: {}\nnew_subdir: {}\npath_valid: {}\n\n'.format(
+		head_tail, driveless_path, lead_dir, subdir, new_subdir, path_valid))
+	return subdir, new_subdir, lead_dir, path_valid
 
 
 def determine_source_and_target_directories(source_dir, lead_dir, target_dir, proposal, subdir, new_subdir, run_number):
@@ -230,24 +233,28 @@ def copy_images(file_path, proposal, run_number, source_dir, target_dir):
 	print('\n\nIn copy_images().\nfile_path: {}\nproposal: {}\nrun_number: {}\n\n'.format(file_path, proposal, run_number))
 
 	# Determine proper subdirectories.
-	subdir, new_subdir, lead_dir = determine_subdirectories(file_path)
+	subdir, new_subdir, lead_dir, path_valid = determine_subdirectories(file_path)
 
-	# Determine source and target directories.
-	initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, lead_dir, target_dir, proposal, subdir, new_subdir, run_number)
-			
-	# Identify target files (for use in cataloging). Wait for file count to be stable for at least 30.0 seconds.
-	# target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
-	target_files = get_target_files_patiently(initial_image_dir, run_number, new_image_dir, wait_period_sec=30.0)
+	if path_valid:
+		# Determine source and target directories.
+		initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, lead_dir, target_dir, proposal, subdir, new_subdir, run_number)
+				
+		# Identify target files (for use in cataloging). Wait for file count to be stable for at least 30.0 seconds.
+		# target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
+		target_files = get_target_files_patiently(initial_image_dir, run_number, new_image_dir, wait_period_sec=30.0)
 
-	print('\n\nIn copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
+		print('\n\nIn copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
 
-	# Assure target directory exists.
-	assure_directory_exists(new_image_dir)
+		# Assure target directory exists.
+		assure_directory_exists(new_image_dir)
 
-	# copy_files_individually(files_to_copy, new_image_dir)
-	copy_files_batch(initial_image_dir, new_image_dir, run_number)
+		# copy_files_individually(files_to_copy, new_image_dir)
+		copy_files_batch(initial_image_dir, new_image_dir, run_number)
+	else:
+		print('\n\nIn copy_images().\nInvalid Path. Now images copied.\n\n')
+		target_files = []
 
-	return target_files
+	return target_files, path_valid
 
 
 def get_creds():
@@ -288,7 +295,7 @@ def catalog_images(files_to_catalog, creds=None):
 				print("\n\nCataloging ERROR for file {}: {}\n\n".format(file_path, e.response.json()))
 				raise
 		else:
-			print('\nNonapplicable file: {}. Skipping catalog./n'.format(file_path))
+			print('\nNonapplicable file: {}. Skipping catalog.\n'.format(file_path))
 			pass
 
 def finish_up(rtn_code):
@@ -344,8 +351,14 @@ def do_pre_post_imaging(arg_list):
 		parms_present = all (p is not None for p in [file_path, proposal, run_number])
 
 		if parms_present is not None:
-			files_to_catalog = copy_images(file_path, proposal, run_number, source_dir, target_dir)
-			catalog_images(files_to_catalog)
+			files_to_catalog, path_valid = copy_images(file_path, proposal, run_number, source_dir, target_dir)
+			if files_to_catalog is not None and (len(files_to_catalog) > 0):
+				catalog_images(files_to_catalog)
+			else:
+				if path_valid:
+					# Fail on not finding image files. This could help with intermittent mount connection issues.
+					print('\n\nERROR: No image files found.\n\n')
+					return_code = -3								
 		else:
 			print('\n\nERROR: Not all parameters present.\n\n')
 			return_code = -2
