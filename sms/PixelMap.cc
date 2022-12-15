@@ -519,9 +519,87 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 		
 		if ( physical_step != 0 && logical_step != 0 ) {
 
-			next_physical = physical + physical_step;
+			// Prevent Physical or Logical Step "Overflow"...!
+			// (Greater/Less Than 16-bit Integer Space in Packet...)
+			//    - 0x7FFF is Max 16-bit Integer or 32767
+			//    - Hence 0xFFFF is Max negative Integer or -32767
 
-			next_logical = logical + logical_step;
+			if ( physical_step > 32767 || physical_step < -32767
+					|| logical_step > 32767 || logical_step < -32767 ) {
+
+				ERROR("genAltPacket(): PixelId Step Overflow!"
+					<< " (> +/-32767=0x7FFF 16-bit Signed Integer)"
+					<< " physical_step=" << physical_step
+					<< " (0x" << std::hex << physical_step
+						<< std::dec << ")"
+					<< " logical_step=" << logical_step
+					<< " (0x" << std::hex << logical_step
+						<< std::dec << ")"
+					<< " - Dump as Direct Pixel Map Section."
+					<< " ("
+					<< " bank=" << last_bank
+					<< " count=" << entries
+					<< " physical_start=" << physical_start
+					<< " physical=" << physical
+					<< " logical_start=" << logical_start
+					<< " logical=" << logical
+					<< " )");
+
+				// Dump Direct Pixelid Section Format...
+
+				// Base Physical PixelId
+				section_words.push(physical_start);
+
+				// Bank ID, "0", Count
+				bank_and_count = (uint32_t) last_bank << 16;
+				bank_and_count |= 0x0 << 15; // NOOP... :-D
+				bank_and_count |= entries; // Count, Always == 1...
+				section_words.push(bank_and_count);
+
+				// Logical PixelId, The "Only One"
+				// (Or Else We Would Have Used the "Shorthand" Format!)
+				section_words.push(logical_start);
+
+				if ( ctrl->verbose() > 0 ) {
+					DEBUG("genAltPacket(): Direct Section"
+						<< " bank=" << last_bank
+						<< " count=" << entries
+						<< " bank_and_count=0x"
+						<< std::hex << bank_and_count << std::dec
+						<< " physical="
+						<< physical_start
+						<< " logical="
+						<< logical_start);
+				}
+
+				// Adjust Section Bookkeeping to Move Past 1st Map
+				// (And Continue On... ;-D)
+
+				physical_start = physical;
+				physical_stop = physical;
+				physical_step = 0;
+
+				logical_start = logical;
+				logical_stop = logical;
+				logical_step = 0;
+
+				last_physical = physical;
+				last_logical = logical;
+				last_bank = bank;
+
+				next_physical = -1;
+				next_logical = -1;
+
+				entries = 0;
+			}
+
+			// Just Do Normal Step Increments...
+			else {
+
+				next_physical = physical + physical_step;
+
+				next_logical = logical + logical_step;
+			}
 		}
 
 		// Increment the Current Number of Entries Count...
