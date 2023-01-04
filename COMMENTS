@@ -4,7 +4,7 @@ ADARA Comments, Notes and Annotations
 
 I've completely overhauled how all this stuff works. :-D
 
-You can set:
+* You can set:
 
    - Annotation Comments (BLXXX:SMS:Marker:AnnotationComment)
       -> can add as many comments as you'd like...
@@ -19,19 +19,46 @@ You can set:
 	  as appropriate
 
    - Run "Notes" (BLXXX:SMS:Marker:NotesComment)
-      -> can only set *Exactly Once* per run...
+      -> can only be set *Exactly Once* per run...
       -> shows up in the NeXus under "/entry/notes"
       -> any "additional" Run Notes are ignored, but automatically appended
-      to the set of Annotation comments in "/entry/DASlogs/comments"...
+      to the set of Annotation comments in "/entry/DASlogs/comments" with
+	  the string prefix "[DISCARDED RUN NOTES]"...
       (we don't throw anything away... :-)
 
 These various annotations can be set at any time _Before_ the Run Starts
 or _During_ the Run... (Everything gets reset on Run Stop... :-)
 
+* Run Notes Auto Reset Option:
+
+There is a "NotesCommentAutoReset" option in ADARA (set via the
+"BLXXX:SMS:Marker:NotesCommentAutoReset" PV), which controls whether or
+not the Run Notes are cleared out/reset at the End of each Run.
+
+If NotesCommentAutoReset is *Enabled* (true), then the Run Notes will
+be emptied/unset at the End of the Previous Run, and then can be set
+Exactly Once before the End of the Next Run.
+
+But if NotesCommentAutoReset is *Disabled* (false), then the "Last Value"
+of the Run Notes at the end of the Previous Run will be *Preserved* and
+used for the Next Run...! In this case, the Run Notes can still be
+Changed/Overwritten at Any Time after the End of that Last Run, right up
+until the Start of the Next Run, at which time those Run Notes are
+"locked in".
+
+Therefore, with NotesCommentAutoReset *Disabled*, this means that the
+Run Notes PV can be set "again and again" to a different value, in the
+middle of a given Run, and these settings will be *Ignored* and simply
+"queued up" as the New Run Notes being saved ahead for the *Next Run*. ;-D
+
+* Backwards Compatibility:
+
 Fyi, the "BLXXX::SMS:Marker:Comment" PV, with associated Trigger PVs
 "BLXXX:SMS:Marker:Annotate" and "BLXXX:SMS:Marker:RunComment", will
 still work, but it's the old gruesome "trigger-based" commenting approach,
 which is now deprecated... :-)
+
+* Summary:
 
 It's possible that the CSS screens for your beamline don't yet provide
 access/entries to all these annotation types, but they are "available",
@@ -42,5 +69,5 @@ Please let us know! :-)
 Enjoy!
    Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
  
-[Last Updated: August 20, 2020]
+[Last Updated: January 4, 2023]
 
