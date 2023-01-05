@@ -37,7 +37,9 @@ not the Run Notes are cleared out/reset at the End of each Run.
 
 If NotesCommentAutoReset is *Enabled* (true), then the Run Notes will
 be emptied/unset at the End of the Previous Run, and then can be set
-Exactly Once before the End of the Next Run.
+Exactly Once before the End of the Next Run. (The Run Notes can be
+set multiple times *Before* the Next Run has actually started, but
+once the Next Run Starts, it gets "locked in".)
 
 But if NotesCommentAutoReset is *Disabled* (false), then the "Last Value"
 of the Run Notes at the end of the Previous Run will be *Preserved* and
