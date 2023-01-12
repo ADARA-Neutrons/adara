@@ -292,6 +292,14 @@ option_label[$num_options]="[Auto-Reset the Run Notes Between Runs]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
+option_name[$num_options]="run_notes_updates_enabled"
+option_pv[$num_options]="RunNotesUpdatesEnabled"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Enable Run Notes Updates During the Run]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
 option_name[$num_options]="intermittent_data_threshold"
 option_pv[$num_options]="Control:IntermittentDataThreshold"
 option_value_type[$num_options]="UINT32_VALUE(number_of_missing_pulses)"
@@ -1603,6 +1611,8 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:${SMS}:Marker:NotesComment
 		caget $WAIT ${PRE}:${SMS}:Marker:NotesCommentAutoReset
 		caget $WAIT -S ${PRE}:${SMS}:Marker:AnnotationComment
+
+		caget $WAIT ${PRE}:${SMS}:RunNotesUpdatesEnabled
 
 		echo
 
