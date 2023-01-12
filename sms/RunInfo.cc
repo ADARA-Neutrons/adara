@@ -400,7 +400,7 @@ static void addElements(std::string &out, RunInfo::RunInfoMap &map,
 }
 
 RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
-		SMSControl *ctrl, bool sendSampleInRunInfo, bool savePixelMap ) :
+		SMSControl *ctrl, bool sendSampleInRunInfo, bool savePixelMap) :
 	m_facility(facility), m_beamline(beamline), m_ctrl(ctrl),
 	m_sendSampleInRunInfo(sendSampleInRunInfo),
 	m_savePixelMap(savePixelMap),
@@ -873,6 +873,11 @@ bool RunInfo::generatePacket( uint32_t runNumber )
 	m_savePixelMap = m_savePixelMapPV->value();
 	if ( m_savePixelMap ) {
 		xml += "   <save_pixel_map/>\n";
+	}
+
+	// Get Latest "Run Notes Updates Enabled" Value from PV...
+	if ( m_ctrl->getRunNotesUpdatesEnabled() ) {
+		xml += "   <run_notes_updates_enabled/>\n";
 	}
 
 	xml += "</runinfo>";
