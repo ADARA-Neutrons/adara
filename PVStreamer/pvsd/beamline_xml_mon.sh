@@ -6,6 +6,9 @@
 # for Any Uncommitted Changes
 #
 
+# Catch Errors Amidst Pipelines... ;-Q
+set -o pipefail
+
 # Source Local EPICS Beamline Environment (e.g. $BEAMLINE):
 . /home/controls/share/master/scripts/beamline_profile.sh
 
@@ -38,11 +41,23 @@ CHECK_BEAMLINE_XML_DIFF()
 }
 
 # Check for Committed But Not Yet Pushed Changes...!
+origin_branch=""
 CHECK_BEAMLINE_XML_DIFF_ORIGIN()
 {
 	local _err=0
 
-	git diff origin/master ${BEAMLINE_XML}
+	# Determine Checked Out Branch for Remote/Origin Comparison...
+	local _branch=`git branch -a | grep "^* " | awk '{print $2}'`
+	local _status=$?
+	if [[ "${_status}" != 0 ]]; then
+		_err="${_status}"
+		# Defer to "master" Branch...
+		_branch="master"
+	fi
+	origin_branch="${_branch}"
+
+	# Now Check the Given Branch at the Remote/Origin...
+	git diff origin/${_branch} ${BEAMLINE_XML}
 	local _status=$?
 	if [[ "${_status}" != 0 ]]; then
 		_err="${_status}"
@@ -75,7 +90,8 @@ CHECK_BEAMLINE_XML()
 		_err="${_status}"
 	fi
 	if [[ "${diffCkOrigin}" != "${diffCk}" ]]; then
-		echo -e "Committed Local Changes Not Yet Pushed to Origin:\n"
+		echo -e -n "Committed Local Changes Not Yet Pushed to Origin"
+		echo -e " (Branch \"${origin_branch}\"):\n"
 		echo "${diffCkOrigin}"
 	fi
 
