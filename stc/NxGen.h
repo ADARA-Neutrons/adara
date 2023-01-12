@@ -2983,7 +2983,8 @@ protected:
     void                monitorPulseGap( STC::MonitorInfo &a_monitor,
                             uint64_t a_count );
     void                monitorFinalize( STC::MonitorInfo &a_monitor );
-    void                runComment( const std::string &a_comment,
+    void                runComment( double a_time, uint64_t a_ts_nano,
+                            const std::string &a_comment,
                             bool a_force_init = false );
     void                writeDeviceEnums( STC::Identifier a_devId,
                             std::vector<STC::PVEnumeratedType>
@@ -3171,7 +3172,9 @@ private:
     uint64_t                    m_pulse_flags_cur_size; ///< Current size of pulse flags dataset
 
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
-    std::string                 m_runComment;           /// Capture the Singular Run Comment for the Nexus file
+    std::string                 m_runComment;           /// Capture the "Singular" Run Comment for the Nexus file
+    double                      m_runComment_time;      /// Time for the "Singular" Run Comment
+    uint64_t                    m_runComment_ts_nano;   /// Nanoseconds for the "Singular" Run Comment
     bool                        m_nexus_run_comment_init; /// Has the Nexus Run Comment been Initialized yet or not?
     std::string                 m_geometryXml;          /// Capture the Geometry/IDF XML for the Nexus file
     bool                        m_nexus_geometry_init;  /// Has the Nexus Geometry/IDF been Initialized yet or not?

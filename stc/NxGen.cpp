@@ -760,16 +760,30 @@ NxGen::finalize
 
         // Make Sure We Have "Some" Overall Run Comment... ;-D
         if ( !m_nexus_run_comment_init ) {
-            if ( m_runComment.size() > 0 )
-                runComment( m_runComment, true );
+            if ( m_runComment.size() > 0 ) {
+                runComment( m_runComment_time, m_runComment_ts_nano,
+                    m_runComment, true );
+            }
             else {
+                struct timespec now;
+                clock_gettime( CLOCK_REALTIME_COARSE, &now );
+                uint64_t dummy_ts_nano = timespec_to_nsec( now );
+                double dummy_time =
+                    ( dummy_ts_nano
+                        - timespec_to_nsec( a_run_metrics.run_start_time )
+                    ) / NANO_PER_SECOND_D;
                 std::string dummy = "(unset)";
-                syslog( LOG_INFO, "[%i] %s: %s - %s [%s]",
+                syslog( LOG_INFO,
+                    "[%i] %s: %s - %s [%s] %lu.%09lu (%s=%lu)",
                     g_pid, "NxGen::finalize()",
                     "No Run Comment Has Been Set For This Run",
-                    "Setting Dummy Empty Run Comment", dummy.c_str() );
+                    "Setting Dummy Empty Run Comment", dummy.c_str(),
+                    (unsigned long)(dummy_ts_nano / NANO_PER_SECOND_LL)
+                        - ADARA::EPICS_EPOCH_OFFSET,
+                    (unsigned long)(dummy_ts_nano % NANO_PER_SECOND_LL),
+                    "dummy_ts_nano", dummy_ts_nano );
                 give_syslog_a_chance;
-                runComment( dummy, true );
+                runComment( dummy_time, dummy_ts_nano, dummy, true );
             }
         }
 
@@ -2630,35 +2644,104 @@ NxGen::monitorFinalize
 void
 NxGen::runComment
 (
+    double a_time,                  ///< [in] Time associated with run comments
+    uint64_t a_ts_nano,             ///< [in] Actual Timestamp in Nanoseconds
     const std::string &a_comment,   ///< [in] Overall run comments
     bool a_force_init               ///< [in] Force Initialize?
 )
 {
     // Always Handle Duplicate Run Comment, Even if Not Writing to NeXus.
     if ( m_runComment.size() > 0 && m_runComment.compare( a_comment ) ) {
-        syslog( LOG_ERR, "[%i] %s %s: New [%s] != Orig [%s] - %s",
-            g_pid, "STC Error:", "Duplicate Run Comment Specified",
-            a_comment.c_str(), m_runComment.c_str(),
-            "Discarding..." );
-        give_syslog_a_chance;
+        // Are Updates to the Run Notes Enabled During the Run...?
+        if ( getRunNotesUpdatesEnabled() ) {
+            syslog( LOG_INFO,
+             "[%i] %s: %s - %s [%s] -> %s [%s] %lu.%09lu (%s=%lu) (%s=%d)",
+                g_pid, "NxGen::runComment()",
+                "Updating Run Notes Comment Prior to Write",
+                "Orig", m_runComment.c_str(), "New", a_comment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                "ts_nano", a_ts_nano,
+                "a_force_init", a_force_init );
+            give_syslog_a_chance;
+            // Push Previous Run Notes Comment onto Generic Annotations...
+            markerComment( m_runComment_time, m_runComment_ts_nano,
+                "[OVERWRITTEN RUN NOTES] " + m_runComment );
+            // Update Run Notes Comment for This Run...
+            m_runComment_time = a_time;
+            m_runComment_ts_nano = a_ts_nano;
+            m_runComment = a_comment;
+        }
+        else {
+            syslog( LOG_ERR,
+     "[%i] %s %s: %s - %s [%s] != %s [%s] %lu.%09lu (%s=%lu) - %s (%s=%d)",
+                g_pid, "STC Error:", "NxGen::runComment()",
+                "Duplicate Run Notes Comment Specified",
+                "New", a_comment.c_str(), "Orig", m_runComment.c_str(),
+                (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                    - ADARA::EPICS_EPOCH_OFFSET,
+                (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+                "ts_nano", a_ts_nano,
+                "Discarding...",
+                "a_force_init", a_force_init );
+            give_syslog_a_chance;
+            // Save Duplicate Run Notes Comment onto Generic Annotations...
+            markerComment( a_time, a_ts_nano,
+                "[DUPLICATE RUN NOTES] " + a_comment );
+        }
     }
 
     // Save for Future Reference (& Retries, if No Working Directory Yet!)
     else {
+        m_runComment_time = a_time;
+        m_runComment_ts_nano = a_ts_nano;
         m_runComment = a_comment;
 
-        syslog( LOG_INFO, "[%i] %s: %s: [%s]",
+        syslog( LOG_INFO, "[%i] %s: %s [%s] %lu.%09lu (%s=%lu) (%s=%d)",
             g_pid, "NxGen::runComment()",
-            "Run Comment Set to", m_runComment.c_str() );
+            "Run Notes Comment Set to", m_runComment.c_str(),
+            (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                - ADARA::EPICS_EPOCH_OFFSET,
+            (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+            "ts_nano", a_ts_nano,
+            "a_force_init", a_force_init );
         give_syslog_a_chance;
     }
 
     if ( !m_gen_nexus )
         return;
 
-    // Already Initialized...
-    if ( m_nexus_run_comment_init )
+    // Last Chance to Actually Write Run Notes to NeXus...?
+    if ( !a_force_init )
+    {
+        syslog( LOG_INFO, "[%i] %s: %s - %s [%s]",
+            g_pid, "NxGen::runComment()",
+            "Not the Last Chance to Write Run Notes Comment",
+            "Deferring Until Later...", m_runComment.c_str() );
+        give_syslog_a_chance;
         return;
+    }
+
+    // Already Initialized...?!
+    if ( m_nexus_run_comment_init )
+    {
+        syslog( LOG_ERR,
+            "[%i] %s %s: %s - %s %s [%s] %lu.%09lu (%s=%lu) - %s (%s=%d)",
+            g_pid, "STC Error:", "NxGen::runComment()",
+            "Duplicate Run Notes Comment Write Attempt",
+            "Run Notes Already Written to NeXus!",
+            "Current/Pending Run Notes Value:",
+            m_runComment.c_str(),
+            (unsigned long)(a_ts_nano / NANO_PER_SECOND_LL)
+                - ADARA::EPICS_EPOCH_OFFSET,
+            (unsigned long)(a_ts_nano % NANO_PER_SECOND_LL),
+            "ts_nano", a_ts_nano,
+            "Discarding...",
+            "a_force_init", a_force_init );
+        give_syslog_a_chance;
+        return;
+    }
 
     // Do We Have a Valid Initialized NeXus Data File...?
     if ( !initialize( a_force_init ) )
@@ -2668,7 +2751,7 @@ NxGen::runComment
             syslog( LOG_ERR, "[%i] %s %s: %s - %s",
                 g_pid, "STC Error:", "NxGen::runComment()",
                 "Failed to Force Initialize NeXus File",
-                "Losing Run Comment Data!" );
+                "Losing Run Notes Comment Data!" );
             give_syslog_a_chance;
         }
         else
@@ -2685,11 +2768,26 @@ NxGen::runComment
     try
     {
         writeString( m_entry_path, "notes", m_runComment );
+
+        string run_notes_time_str =
+            timeToISO8601( nsec_to_timespec( m_runComment_ts_nano ) );
+        writeStringAttribute( m_entry_path + "/notes",
+            "time", run_notes_time_str );
     }
     catch( TraceException &e )
     {
         RETHROW_TRACE( e, "runComment() failed." )
     }
+
+    syslog( LOG_INFO, "[%i] %s: %s [%s] %lu.%09lu (%s=%lu) (%s=%d)",
+        g_pid, "NxGen::runComment()",
+        "Final Run Notes Comment Written", m_runComment.c_str(),
+        (unsigned long)(m_runComment_ts_nano / NANO_PER_SECOND_LL)
+            - ADARA::EPICS_EPOCH_OFFSET,
+        (unsigned long)(m_runComment_ts_nano % NANO_PER_SECOND_LL),
+        "ts_nano", m_runComment_ts_nano,
+        "a_force_init", a_force_init );
+    give_syslog_a_chance;
 
     m_nexus_run_comment_init = true;
 }
