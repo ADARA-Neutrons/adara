@@ -539,6 +539,7 @@ struct RunInfo
     RunInfo()
         : run_number(0), run_title("NONE"),
             no_sample_info(false), save_pixel_map(false),
+            run_notes_updates_enabled(true),
             // Initialize Double Values to Prevent Undue Randomization
             // from Unset Values Later...! ;-Q
             sample_mass(0.0), sample_mass_density(0.0),
@@ -562,6 +563,7 @@ struct RunInfo
     std::string             facility_name;
     bool                    no_sample_info;
     bool                    save_pixel_map;
+    bool                    run_notes_updates_enabled;
     std::string             sample_id;
     std::string             sample_name;
     std::string             sample_nature;
@@ -1395,7 +1397,8 @@ public:
                                 uint64_t a_count ) = 0;
     virtual void            monitorFinalize(
                                 STC::MonitorInfo &a_monitor ) = 0;
-    virtual void            runComment( const std::string &a_comment,
+    virtual void            runComment( double a_time, uint64_t a_ts_nano,
+                                const std::string &a_comment,
                                 bool a_force_init = false ) = 0;
     virtual void            markerPause( double a_time,
                                 uint64_t a_ts_nano,
