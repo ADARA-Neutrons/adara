@@ -2784,6 +2784,12 @@ StreamParser::rxPacket
                 {
                     tmp_run_info.save_pixel_map = true;
                 }
+                else if (xmlStrcmp( node->name,
+                        (const xmlChar*) "run_notes_updates_enabled")
+                            == 0 )
+                {
+                    tmp_run_info.run_notes_updates_enabled = true;
+                }
                 else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"sample" ) == 0 )
                 {
@@ -5938,7 +5944,7 @@ StreamParser::rxPacket
         markerScanStop( t, ts_nano, a_pkt.scanIndex(), a_pkt.comment() );
         break;
     case ADARA::MarkerType::OVERALL_RUN_COMMENT:
-        runComment( a_pkt.comment() );
+        runComment( t, ts_nano, a_pkt.comment() );
         break;
     case ADARA::MarkerType::SYSTEM:
         // Just Log System Comments, Don't Insert Into NeXus...
@@ -6725,6 +6731,17 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             (a_run_info.save_pixel_map) ? "True" : "False" );
         give_syslog_a_chance;
         m_run_info.save_pixel_map = a_run_info.save_pixel_map;
+    }
+    if ( a_run_info.run_notes_updates_enabled
+            != m_run_info.run_notes_updates_enabled ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STC Error:", "updateRunInfo()",
+            "Run Notes Updates Enabled",
+            (m_run_info.run_notes_updates_enabled) ? "True" : "False",
+            (a_run_info.run_notes_updates_enabled) ? "True" : "False" );
+        give_syslog_a_chance;
+        m_run_info.run_notes_updates_enabled =
+            a_run_info.run_notes_updates_enabled;
     }
     if ( m_run_info.sample_id.compare( a_run_info.sample_id ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
