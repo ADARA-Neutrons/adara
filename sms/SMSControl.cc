@@ -99,7 +99,8 @@ bool SMSControl::m_allowNonOneToOnePixelMapping;
 
 bool SMSControl::m_useOrigPixelMappingPkt;
 
-bool SMSControl::m_notesCommentAutoReset;
+bool SMSControl::m_notesCommentAutoReset; // Note: Live PV in Markers...!
+bool SMSControl::m_runNotesUpdatesEnabled;
 
 uint32_t SMSControl::m_intermittentDataThreshold;
 
@@ -427,6 +428,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 			conf.get<bool>("sms.run_notes_auto_reset", true);
 	INFO("Setting Run Notes Auto Reset to "
 		<< m_notesCommentAutoReset << ".");
+
+	m_runNotesUpdatesEnabled =
+			conf.get<bool>("sms.run_notes_updates_enabled", true);
+	INFO("Setting Run Notes Updates Enabled to "
+		<< m_runNotesUpdatesEnabled << ".");
 
 	m_intermittentDataThreshold =
 			conf.get<uint32_t>("sms.intermittent_data_threshold", 9);
@@ -1018,6 +1024,11 @@ SMSControl::SMSControl() :
 						PVPrefixPV(m_pvPrefix + ":AltPrimaryPVPrefix",
 						/* AutoSave */ true));
 
+	m_pvRunNotesUpdatesEnabled = boost::shared_ptr<smsBooleanPV>(new
+						smsBooleanPV(m_pvPrefix
+							+ ":RunNotesUpdatesEnabled",
+						/* AutoSave */ true));
+
 	m_pvNoEoPPulseBufferSize = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "NoEoPPulseBufferSize", 0, INT32_MAX,
@@ -1102,6 +1113,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvSummaryReason);
 	addPV(m_pvInstanceId);
 	addPV(m_pvAltPrimaryPVPrefix);
+	addPV(m_pvRunNotesUpdatesEnabled);
 	addPV(m_pvNoEoPPulseBufferSize);
 	addPV(m_pvMaxPulseBufferSize);
 	addPV(m_pvPopPulseBuffer);
@@ -1156,6 +1168,9 @@ SMSControl::SMSControl() :
 
 	// Set the "ParADARA" Alternate Primary SMS PV Prefix String...
 	m_pvAltPrimaryPVPrefix->update(m_altPrimaryPVPrefix, &now);
+
+	// Set the Run Notes Updates Enabled During the Run...
+	m_pvRunNotesUpdatesEnabled->update(m_runNotesUpdatesEnabled, &now);
 
 	// Initialize "Oldest" DataSource Max Time
 	m_oldestMaxDataSourceTime.tv_sec = 0; // EPICS Time...!
@@ -1234,6 +1249,12 @@ SMSControl::SMSControl() :
 			m_pvAltPrimaryPVPrefix->getName(), value, ts ) ) {
 		m_altPrimaryPVPrefix = value;
 		m_pvAltPrimaryPVPrefix->update(value, &ts);
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvRunNotesUpdatesEnabled->getName(), bvalue, ts ) ) {
+		m_runNotesUpdatesEnabled = bvalue;
+		m_pvRunNotesUpdatesEnabled->update(bvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV(

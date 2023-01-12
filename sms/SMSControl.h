@@ -360,6 +360,11 @@ public:
 	void setPrimaryPVPrefix( std::string PrimaryPVPrefix )
 		{ m_primaryPVPrefix = PrimaryPVPrefix; }
 
+	bool getRunNotesUpdatesEnabled(void) {
+		m_runNotesUpdatesEnabled = m_pvRunNotesUpdatesEnabled->value();
+		return m_runNotesUpdatesEnabled;
+	}
+
 	void sourceUp(uint32_t srcId);
 	void sourceDown(uint32_t srcId, bool stateChanged);
 
@@ -987,7 +992,9 @@ private:
 
 	static bool m_useOrigPixelMappingPkt;
 
-	static bool m_notesCommentAutoReset;
+	static bool m_notesCommentAutoReset; // Note: Live PV in Markers...!
+	static bool m_runNotesUpdatesEnabled;
+	boost::shared_ptr<smsBooleanPV> m_pvRunNotesUpdatesEnabled;
 
 	boost::shared_ptr<smsUint32PV> m_pvIntermittentDataThreshold;
 	static uint32_t m_intermittentDataThreshold;
