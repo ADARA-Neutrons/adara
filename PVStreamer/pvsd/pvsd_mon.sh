@@ -24,6 +24,17 @@ ADARA_MONITOR_PVS="${BL}:CS:Adara:PVStreamer \
 #LOG_HOME="/SNS/users/$USER"
 LOG_HOME="$HOME"
 
+# Handle Scenario Where ${LOG_HOME} Directory is Missing/Unmounted...!
+# -> as needed, just write to /tmp until the Directory Mount returns...
+# --> this will ensure we can still do Proper Error Counting...! ;-D
+if [[ ! -d ${LOG_HOME} ]]; then
+	LOG_HOME="/tmp"
+	USING_ALT_LOG_HOME="\n\n[Note: Using Alternate \${LOG_HOME\} ="
+	USING_ALT_LOG_HOME="${USING_ALT_LOG_HOME} [${LOG_HOME}]"
+else
+	USING_ALT_LOG_HOME=""
+fi
+
 host=`hostname`
 #echo "host=$host"
 
@@ -51,7 +62,8 @@ S="[[:space:]]"
 # The Minute When We Gasp Our Dying Breath and Beg for Help... ;-D
 SOS_MIN=0
 
-NL=""
+NL=`date`
+NL="${NL}\n\n"
 
 #
 # Parse Command Line Options... ;-)
@@ -482,6 +494,11 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 
 	fi
 
+fi
+
+# Log If Using Alternate Log Home Directory...
+if [[ ${log_error} != 0 && ${USING_ALT_LOG_HOME} != "" ]]; then
+	echo -e "${NL}${USING_ALT_LOG_HOME}"
 fi
 
 # Set Error Count for Next Invocation,
