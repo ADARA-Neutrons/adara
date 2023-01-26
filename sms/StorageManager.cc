@@ -505,6 +505,8 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 
 	m_container_cleanup_timeout_double = conf.get<double>(
 		"storage.container_cleanup_timeout", 1.0);
+
+	// ALSO Update Actual Internal Container Cleanup Timeout Fields!
 	m_container_cleanup_timeout.tv_sec =
 		(uint32_t) m_container_cleanup_timeout_double;
 	m_container_cleanup_timeout.tv_nsec =
@@ -847,6 +849,18 @@ void StorageManager::lateInit(void)
 			m_pvContainerCleanupTimeout->getName(), dvalue, ts ) ) {
 		m_container_cleanup_timeout_double = dvalue;
 		m_pvContainerCleanupTimeout->update(dvalue, &ts);
+
+		// ALSO Update Actual Internal Container Cleanup Timeout Fields!
+		m_container_cleanup_timeout.tv_sec =
+			(uint32_t) m_container_cleanup_timeout_double;
+		m_container_cleanup_timeout.tv_nsec =
+			(uint32_t) ( ( m_container_cleanup_timeout_double
+					- ((double) m_container_cleanup_timeout.tv_sec) )
+				* NANO_PER_SECOND_D );
+		DEBUG("Storage Container Cleanup Timeout Set to "
+			<< m_container_cleanup_timeout_double
+			<< " -> (" << m_container_cleanup_timeout.tv_sec
+				<< ", " << m_container_cleanup_timeout.tv_nsec << ")");
 	}
 
 	/* We need a timestamp for the initial index entry; any timestamp
@@ -2253,6 +2267,7 @@ StorageManager::findContainerByTime(
 		if ( !approximatelyEqual( container_cleanup_timeout,
 				m_container_cleanup_timeout_double, FLOAT64_EPSILON ) )
 		{
+			// Update Actual Internal Container Cleanup Timeout Fields!
 			m_container_cleanup_timeout_double = container_cleanup_timeout;
 			m_container_cleanup_timeout.tv_sec =
 				(uint32_t) m_container_cleanup_timeout_double;
