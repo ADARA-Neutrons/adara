@@ -47,6 +47,9 @@ SYSTEMCTL="/usr/bin/systemctl"
 SMSD_LOG="/var/log/smsd${ALT}.log"
 PVSD_LOG="/var/log/pvsd.log"
 STC_LOG="/var/log/stc.log"
+DASMON_HOME="/home"
+DASMON_USER="dasmon"
+DASMON_UID="501"
 DASMOND_LOG="/var/log/dasmond.log"
 MESSAGES_LOG="/var/log/messages"
 RSYSLOG_PIPES="/etc/rsyslog.pipes"
@@ -1227,6 +1230,39 @@ if [[ $UPDATE == 1 ]]; then
 		fi
 	fi
 	echo
+
+	# Check/Create Local DASMON User and Home Area for Config
+	if [[ ! -d ${DASMON_HOME} ]]; then
+		echo -e "Home Directory for DASMON User Not Found...!\n"
+		/bin/ls -l ${DASMON_HOME}
+		echo -e -n "\nCreate Home Directory for DASMON? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			sudo mkdir ${DASMON_HOME}
+		fi
+	fi
+	if [[ ! -d ${DASMON_HOME}/${DASMON_USER} ]]; then
+		echo -e "DASMON User Directory Not Found...!\n"
+		/bin/ls -l ${DASMON_HOME}/${DASMON_USER}
+		echo -e -n "\nCreate DASMON User and Home Directory? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			sudo useradd -b ${DASMON_HOME} -u ${DASMON_UID} -m -U \
+				-s /sbin/nologin ${DASMON_USER}
+			sudo chmod og+rx ${DASMON_HOME}/${DASMON_USER}
+			/bin/ls -ld ${DASMON_HOME}/${DASMON_USER}
+			grep ${DASMON_USER} /etc/passwd
+			grep ${DASMON_USER} /etc/group
+			# Go Ahead and Create Base DASMON GUI Client Config
+			# (It probably matches what's in the Git Repo anyway...! ;-D)
+			sudo sh -c 'echo -e "[rules]\\n[signals]" \
+				> ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg'
+			/bin/ls -l ${DASMON_HOME}/${DASMON_USER}
+			/bin/cat ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg
+		fi
+	fi
 
 	# Check/Create DASMON RSyslog Log File...
 	if [[ $DO_DASMON_CONFCK == 1 ]]; then
