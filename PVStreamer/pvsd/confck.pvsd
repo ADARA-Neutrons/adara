@@ -52,6 +52,13 @@ PVSD_LINK="/usr/sbin/pvsd"
 PVSD_BINARY="/home/controls/config-dassrv1/deploy/pvsd"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
+DIFF="/usr/bin/diff"
+TAIL="/usr/bin/tail"
+AWK="/usr/bin/awk"
+GREP="/bin/grep"
+LN="/usr/bin/ln"
+CP="/bin/cp"
+LS="/bin/ls"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config-dassrv1/
@@ -80,13 +87,13 @@ DIFF_STAT()
 	fi
 	echo "${_file}" >> .tmp.A.$$
 
-	grep "${_file}$" "${_statlist}" > .tmp.B.$$
+	${GREP} "${_file}$" "${_statlist}" > .tmp.B.$$
 	local _ckgrep=$?
 	if [ ${_ckgrep} != 0 ]; then
 		_status=${_ckgrep}
 	fi
 
-	diff .tmp.A.$$ .tmp.B.$$
+	${DIFF} .tmp.A.$$ .tmp.B.$$
 	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
@@ -120,8 +127,8 @@ DIFF_FILE()
 	echo -e "\tto ${_label2}:"
 	echo
 
-	echo "diff ${_file1} ${_file2}"
-	diff "${_file1}" "${_file2}"
+	echo "${DIFF} ${_file1} ${_file2}"
+	${DIFF} "${_file1}" "${_file2}"
 	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
@@ -135,11 +142,11 @@ DIFF_FILE()
 			# Push Latest Git Repo Version to System
 			if [[ "$ckUpdate" == "s" || "$ckUpdate" == "sys" ]]; then
 				echo "Deploying Latest Repo File to System:"
-				sudo /bin/cp -i "${_file1}" "${_file2}"
+				sudo ${CP} -i "${_file1}" "${_file2}"
 			# Pull Latest System Version into Git Repo
 			elif [[ "$ckUpdate" == "r" || "$ckUpdate" == "repo" ]]; then
 				echo "Updating Repo with Latest Deployed System File:"
-				/bin/cp -i "${_file2}" "${_file1}"
+				${CP} -i "${_file2}" "${_file1}"
 				git add "${_file1}"
 				git commit \
 					-m "Update Config Repo with Latest System File" \
@@ -260,8 +267,8 @@ CONFCK()
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo "diff ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
-		diff ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
+		echo "${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
+		${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
 		if [ $? != 0 ]; then
 			echo "System ChkConfig for PVSD Differed...!"
 			_check_update=1
@@ -301,8 +308,8 @@ CONFCK()
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo "diff ./pvsd/$USER.crontab /tmp/$USER.crontab.$$"
-		diff ./pvsd/$USER.crontab /tmp/$USER.crontab.$$
+		echo "${DIFF} ./pvsd/$USER.crontab /tmp/$USER.crontab.$$"
+		${DIFF} ./pvsd/$USER.crontab /tmp/$USER.crontab.$$
 		if [ $? != 0 ]; then
 			echo "ADARA Admin Crontab for PVSD Differed...!"
 			_check_update=1
@@ -357,9 +364,9 @@ if [[ $UPDATE == 1 ]]; then
 	echo -e "Checking Other Assorted Install Operations, As Needed...\n"
 
 	# Check/Create PVSD RSyslog Log File...
-	/bin/ls -l "${PVSD_LOG}"
-	log_perms=`/bin/ls -l "${PVSD_LOG}" | awk '{print $1}'`
-	log_group=`/bin/ls -l "${PVSD_LOG}" | awk '{print $4}'`
+	${LS} -l "${PVSD_LOG}"
+	log_perms=`${LS} -l "${PVSD_LOG}" | ${AWK} '{print $1}'`
+	log_group=`${LS} -l "${PVSD_LOG}" | ${AWK} '{print $4}'`
 	if [[ ! -f "${PVSD_LOG}"
 			|| "$log_perms" != "-rw-rw----"
 			|| "$log_group" != "users" ]]; then
@@ -370,7 +377,7 @@ if [[ $UPDATE == 1 ]]; then
 			sudo touch "${PVSD_LOG}"
 			sudo chgrp users "${PVSD_LOG}"
 			sudo chmod g+rw "${PVSD_LOG}"
-			/bin/ls -l "${PVSD_LOG}"
+			${LS} -l "${PVSD_LOG}"
 			# Restart RSyslog Service...?
 			sudo ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
@@ -378,14 +385,14 @@ if [[ $UPDATE == 1 ]]; then
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 				sudo ${SYSTEMCTL} restart rsyslog
-				sudo tail "${MESSAGES_LOG}"
+				sudo ${TAIL} "${MESSAGES_LOG}"
 			fi
 		fi
 	fi
 	echo
 
 	# Check/Create RSyslog Pipes...
-	/bin/ls -l "${RSYSLOG_PIPES}"
+	${LS} -l "${RSYSLOG_PIPES}"
 	if [[ ! -d "${RSYSLOG_PIPES}" ]]; then
 		echo -n "Create RSyslog Pipes? [yes|No] "
 		read ckUpdate
@@ -395,10 +402,10 @@ if [[ $UPDATE == 1 ]]; then
 			sudo "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
 			sudo chgrp snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
 			sudo chmod 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
-			/bin/ls -l "${RSYSLOG_PIPES}"
+			${LS} -l "${RSYSLOG_PIPES}"
 			# Set Big Error Pipe...
 			echo "Set Big Error Pipe..."
-			/bin/cp ${ADARA_DIR}/big_err_pipe.c /tmp
+			${CP} ${ADARA_DIR}/big_err_pipe.c /tmp
 			cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
 			/tmp/big_err_pipe
 		fi
@@ -406,7 +413,7 @@ if [[ $UPDATE == 1 ]]; then
 	echo
 
 	# Check/Create RSyslog Cache...
-	/bin/ls -ld "${RSYSLOG_CACHE}"
+	${LS} -ld "${RSYSLOG_CACHE}"
 	if [[ ! -d "${RSYSLOG_CACHE}" ]]; then
 		echo -n "Create RSyslog Cache? [yes|No] "
 		read ckUpdate
@@ -419,14 +426,14 @@ if [[ $UPDATE == 1 ]]; then
 			sudo chown snsdata "${RSYSLOG_CACHE}"
 			sudo chgrp adara "${RSYSLOG_CACHE}"
 			sudo chmod g+ws "${RSYSLOG_CACHE}"
-			/bin/ls -ld "${RSYSLOG_CACHE}"
+			${LS} -ld "${RSYSLOG_CACHE}"
 		fi
 	fi
 	echo
 
 	# Check/Create PVSD Administrator Crontab...
 	crontab -l
-	crontab_check=`crontab -l |& awk '{ print $1 " " $2 }'`
+	crontab_check=`crontab -l |& ${AWK} '{ print $1 " " $2 }'`
 	if [[ "$crontab_check" == "no crontab" ]]; then
 		echo -n "Create PVSD Administrator Crontab? [yes|No] "
 		read ckUpdate
@@ -498,27 +505,27 @@ if [[ $UPDATE == 1 ]]; then
 	echo
 
 	# Check/Create PVSD User Local Bin Soft Link...
-	/bin/ls -l "${PVSD_LINK}"
+	${LS} -l "${PVSD_LINK}"
 	if [[ ! -x "${PVSD_LINK}" ]]; then
 		echo -n "Create PVSD User Local Bin Soft Link? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo ln -s "${PVSD_BINARY}" "${PVSD_LINK}"
-			/bin/ls -l "${PVSD_LINK}"
+			sudo ${LN} -s "${PVSD_BINARY}" "${PVSD_LINK}"
+			${LS} -l "${PVSD_LINK}"
 		fi
 	fi
 	echo
 
 	# Check/Create Clone of SNS Accelerator Timing Git Repo...
-	/bin/ls -ld "${ACCEL_TIMING}"
+	${LS} -ld "${ACCEL_TIMING}"
 	if [[ ! -d "${ACCEL_TIMING}" ]]; then
 		echo -n "Create Clone of SNS Accelerator Timing Git Repo? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 			git clone "${ACCEL_TIMING_REPO}" "${ACCEL_TIMING}"
-			/bin/ls -l "${ACCEL_TIMING}"
+			${LS} -l "${ACCEL_TIMING}"
 		fi
 	fi
 	echo

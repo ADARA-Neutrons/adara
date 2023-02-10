@@ -17,6 +17,10 @@ elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
 	exit 0
 fi
 
+# Default Update/Installation Target Definitions
+DIFF="/usr/bin/diff"
+CP="/bin/cp"
+
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config-stc-config/
 
@@ -48,8 +52,8 @@ CONFIG_DIFF_DIR()
 			echo -e "Ignoring confck.\n"
 		else
 
-			echo "diff $file ${LOCAL_DATA}/$file"
-			diff "$file" "${LOCAL_DATA}/$file"
+			echo "${DIFF} $file ${LOCAL_DATA}/$file"
+			${DIFF} "$file" "${LOCAL_DATA}/$file"
 
 			if [ $? != 0 ] ; then
 				diff_cnt=$(( $diff_cnt + 1 ))
@@ -66,13 +70,13 @@ CONFIG_DIFF_DIR()
 					if [[ "$ckUpdate" == "s" \
 							|| "$ckUpdate" == "sys" ]]; then
 						echo "Deploying Latest Repo File to System:"
-						sudo /bin/cp -i "$file" "${LOCAL_DATA}/$file"
+						sudo ${CP} -i "$file" "${LOCAL_DATA}/$file"
 					# Pull Latest System Version into Git Repo
 					elif [[ "$ckUpdate" == "r" \
 							|| "$ckUpdate" == "repo" ]]; then
 						echo \
 						   "Updating Repo with Latest Deployed System File:"
-						/bin/cp -i "${LOCAL_DATA}/$file" "$file"
+						${CP} -i "${LOCAL_DATA}/$file" "$file"
 						git add "$file"
 						git commit \
 						   -m "Update Config Repo with Latest System File" \

@@ -67,6 +67,15 @@ DASMON_BINARIES="/home/controls/config-now1${ALT}/deploy"
 DASMON_LINKS="/usr/sbin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
+DIFF="/usr/bin/diff"
+HEAD="/usr/bin/head"
+TAIL="/usr/bin/tail"
+AWK="/usr/bin/awk"
+GREP="/bin/grep"
+SED="/bin/sed"
+LN="/usr/bin/ln"
+CP="/bin/cp"
+LS="/bin/ls"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config-now1${ALT}/
@@ -98,13 +107,13 @@ DIFF_STAT()
 	fi
 	echo "${_file}" >> .tmp.A.$$
 
-	grep "${_file}$" "${_statlist}" > .tmp.B.$$
+	${GREP} "${_file}$" "${_statlist}" > .tmp.B.$$
 	local _ckgrep=$?
 	if [ ${_ckgrep} != 0 ]; then
 		_status=${_ckgrep}
 	fi
 
-	diff .tmp.A.$$ .tmp.B.$$
+	${DIFF} .tmp.A.$$ .tmp.B.$$
 	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
@@ -138,8 +147,8 @@ DIFF_FILE()
 	echo -e "\tto ${_label2}:"
 	echo
 
-	echo "diff ${_file1} ${_file2} | head -100"
-	diff "${_file1}" "${_file2}" | head -100
+	echo "${DIFF} ${_file1} ${_file2} | ${HEAD} -100"
+	${DIFF} "${_file1}" "${_file2}" | ${HEAD} -100
 	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
@@ -153,11 +162,11 @@ DIFF_FILE()
 			# Push Latest Git Repo Version to System
 			if [[ "$ckUpdate" == "s" || "$ckUpdate" == "sys" ]]; then
 				echo "Deploying Latest Repo File to System:"
-				sudo /bin/cp -i "${_file1}" "${_file2}"
+				sudo ${CP} -i "${_file1}" "${_file2}"
 			# Pull Latest System Version into Git Repo
 			elif [[ "$ckUpdate" == "r" || "$ckUpdate" == "repo" ]]; then
 				echo "Updating Repo with Latest Deployed System File:"
-				/bin/cp -i "${_file2}" "${_file1}"
+				${CP} -i "${_file2}" "${_file1}"
 				git add "${_file1}"
 				git commit \
 					-m "Update Config Repo with Latest System File" \
@@ -214,14 +223,14 @@ DIFF_DIR()
 	# Make sure there's something to check...  :)
 	#
 
-	local _nfiles1=`ls -l "${_dir1}/" | wc | awk '{print $1}'`
+	local _nfiles1=`ls -l "${_dir1}/" | wc | ${AWK} '{print $1}'`
 	_nfiles1=$(( _nfiles1 - 1 ))
 
 	if [[ ${_nfiles1} -lt 1 ]]; then
 		echo "Note: Empty Directory:  [${_dir1}]"
 	fi
 
-	local _nfiles2=`ls -l "${_dir2}/" | wc | awk '{print $1}'`
+	local _nfiles2=`ls -l "${_dir2}/" | wc | ${AWK} '{print $1}'`
 	_nfiles2=$(( _nfiles2 - 1 ))
 
 	if [[ ${_nfiles2} -lt 1 ]]; then
@@ -257,18 +266,18 @@ DIFF_DIR()
 			local _lsdir1=`ls -l "${_dir1}/$base"`
 			if [[ -n "${_lsdir1}" ]]; then
 				echo "${_lsdir1}" \
-					| sed "s@${_dir1}/$base@\n\t${_dir1}/$base\n\t\t@"
+					| ${SED} "s@${_dir1}/$base@\n\t${_dir1}/$base\n\t\t@"
 			fi
 
 			local _lsdir2=`ls -l "${_dir2}/$base"`
 			if [[ -n "${_lsdir2}" ]]; then
 				echo "${_lsdir2}" \
-					| sed "s@${_dir2}/$base@\n\t${_dir2}/$base\n\t\t@"
+					| ${SED} "s@${_dir2}/$base@\n\t${_dir2}/$base\n\t\t@"
 			fi
 
 			# Dereference Source Link...
 			local _link1=`echo "${_lsdir1}" \
-				| awk -F " -> " '{print $2}'`
+				| ${AWK} -F " -> " '{print $2}'`
 			if [[ -z "${_link1}" ]]; then
 				echo -e "\n*** Error Dereferencing Link at:"
 				echo -e "\t[${_dir1}/$base]"
@@ -277,7 +286,7 @@ DIFF_DIR()
 
 			# Dereference Destination Link...
 			local _link2=`echo "${_lsdir2}" \
-				| awk -F " -> " '{print $2}'`
+				| ${AWK} -F " -> " '{print $2}'`
 			if [[ -z "${_link2}" ]]; then
 				echo -e "\n*** Error Dereferencing Link at:"
 				echo -e "\t[${_dir2}/$base]"
@@ -336,7 +345,7 @@ CK_SNS_LOCAL_DIRS()
 			echo -e "\n*** ADARA SNS LOCAL Directory is Missing:"
 			echo -e "\n   ${SNSLOCAL}"
 			echo
-			/bin/ls -ld "${SNSLOCAL}"
+			${LS} -ld "${SNSLOCAL}"
 			echo -e -n "\nCreate the ADARA SNS LOCAL Directory? [yes|No] "
 			read ckSNSLocal
 			ckSNSLocal=`echo "$ckSNSLocal" | tr '[:upper:]' '[:lower:]'`
@@ -344,7 +353,7 @@ CK_SNS_LOCAL_DIRS()
 				sudo mkdir "${SNSLOCAL}"
 				sudo chmod +rx "${SNSLOCAL}"
 				echo
-				/bin/ls -ld "${SNSLOCAL}"
+				${LS} -ld "${SNSLOCAL}"
 			fi
 		fi
 
@@ -354,7 +363,7 @@ CK_SNS_LOCAL_DIRS()
 			echo -e "\n*** ADARA/SMS Daemon Directory is Missing:"
 			echo -e "\n   ${_smsdir}"
 			echo
-			/bin/ls -ld "${_smsdir}"
+			${LS} -ld "${_smsdir}"
 			echo -e -n "\nCreate ADARA/SMS Daemon Directory? [yes|No] "
 			read ckSMSDir
 			ckSMSDir=`echo "$ckSMSDir" | tr '[:upper:]' '[:lower:]'`
@@ -364,7 +373,7 @@ CK_SNS_LOCAL_DIRS()
 				sudo chgrp adara "${_smsdir}"
 				sudo chmod g+ws "${_smsdir}"
 				echo
-				/bin/ls -ld "${_smsdir}"
+				${LS} -ld "${_smsdir}"
 			fi
 		fi
 
@@ -374,7 +383,7 @@ CK_SNS_LOCAL_DIRS()
 			echo -e "\n*** ADARA/SMS Config Directory is Missing:"
 			echo -e "\n   ${_smsconf}"
 			echo
-			/bin/ls -ld "${_smsconf}"
+			${LS} -ld "${_smsconf}"
 			echo -e -n "\nCreate ADARA/SMS Config Directory? [yes|No] "
 			read ckSMSConf
 			ckSMSConf=`echo "$ckSMSConf" | tr '[:upper:]' '[:lower:]'`
@@ -384,7 +393,7 @@ CK_SNS_LOCAL_DIRS()
 				sudo chgrp adara "${_smsconf}"
 				sudo chmod g+ws "${_smsconf}"
 				echo
-				/bin/ls -ld "${_smsconf}"
+				${LS} -ld "${_smsconf}"
 			fi
 		fi
 
@@ -394,7 +403,7 @@ CK_SNS_LOCAL_DIRS()
 			echo -e "\n*** ADARA/SMS Data Directory is Missing:"
 			echo -e "\n   ${_smsdata}"
 			echo
-			/bin/ls -ld "${_smsdata}"
+			${LS} -ld "${_smsdata}"
 			echo -e -n "\nCreate ADARA/SMS Data Directory? [yes|No] "
 			read ckSMSData
 			ckSMSData=`echo "$ckSMSData" | tr '[:upper:]' '[:lower:]'`
@@ -404,7 +413,7 @@ CK_SNS_LOCAL_DIRS()
 				sudo chgrp adara "${_smsdata}"
 				sudo chmod g+ws "${_smsdata}"
 				echo
-				/bin/ls -ld "${_smsdata}"
+				${LS} -ld "${_smsdata}"
 			fi
 		fi
 
@@ -414,7 +423,7 @@ CK_SNS_LOCAL_DIRS()
 			echo -e "\n*** ADARA/SMS \"Next Run\" File is Missing:"
 			echo -e "\n   ${_sms_next_run}"
 			echo
-			/bin/ls -ld "${_sms_next_run}"
+			${LS} -ld "${_sms_next_run}"
 			echo -e -n "\nCreate ADARA/SMS \"Next Run\" File? [yes|No] "
 			read ckSMSNextRun
 			ckSMSNextRun=`echo "$ckSMSNextRun" | tr '[:upper:]' '[:lower:]'`
@@ -425,7 +434,7 @@ CK_SNS_LOCAL_DIRS()
 				sudo chgrp adara "${_sms_next_run}"
 				sudo chmod g+w "${_sms_next_run}"
 				echo
-				/bin/ls -ld "${_sms_next_run}"
+				${LS} -ld "${_sms_next_run}"
 				echo -e "\nNew ADARA/SMS \"Next Run\" File Contents:\n"
 				/bin/cat "${_sms_next_run}"
 			fi
@@ -534,8 +543,10 @@ SMS_CONFCK()
 	#	_check_update=1
 	#	(( _nerrors++ ))
 	#else
-	#	echo "diff ./sms${ALT}/chkconfig.smsd${ALT} /tmp/chkconfig.smsd${ALT}.$$"
-	#	diff ./sms${ALT}/chkconfig.smsd${ALT} /tmp/chkconfig.smsd${ALT}.$$
+	#	echo "${DIFF} ./sms${ALT}/chkconfig.smsd${ALT} \
+	#		/tmp/chkconfig.smsd${ALT}.$$"
+	#	${DIFF} ./sms${ALT}/chkconfig.smsd${ALT} \
+	#		/tmp/chkconfig.smsd${ALT}.$$
 	#	if [ $? != 0 ]; then
 	#		echo "System ChkConfig for SMSD${ALT} Differed...!"
 	#		_check_update=1
@@ -585,9 +596,9 @@ SMS_CONFCK()
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo -n "diff ./sms${ALT}/systemctl.enabled.smsd${ALT}"
+		echo -n "${DIFF} ./sms${ALT}/systemctl.enabled.smsd${ALT}"
 		echo " /tmp/systemctl.enabled.smsd${ALT}.$$"
-		diff ./sms${ALT}/systemctl.enabled.smsd${ALT} \
+		${DIFF} ./sms${ALT}/systemctl.enabled.smsd${ALT} \
 			/tmp/systemctl.enabled.smsd${ALT}.$$
 		if [ $? != 0 ]; then
 			echo "SystemCtl Enabled for SMSD${ALT} Differed...!"
@@ -633,8 +644,8 @@ SMS_CONFCK()
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo "diff ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$"
-		diff ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$
+		echo "${DIFF} ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$"
+		${DIFF} ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$
 		if [ $? != 0 ]; then
 			echo "ADARA Admin Crontab for SMSD${ALT} Differed...!"
 			_check_update=1
@@ -756,8 +767,8 @@ PVSD_CONFCK()
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo "diff ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
-		diff ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
+		echo "${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
+		${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
 		if [ $? != 0 ]; then
 			echo "System ChkConfig for PVSD Differed...!"
 			_check_update=1
@@ -873,8 +884,8 @@ CONFIG_DIFF_DIR()
 
 			# File Diff
 
-			echo "diff ${_file} /${_file}"
-			diff "${_file}" "/${_file}"
+			echo "${DIFF} ${_file} /${_file}"
+			${DIFF} "${_file}" "/${_file}"
 
 
 			if [ $? != 0 ] ; then
@@ -892,13 +903,13 @@ CONFIG_DIFF_DIR()
 					if [[ "$ckUpdate" == "s" \
 							|| "$ckUpdate" == "sys" ]]; then
 						echo "Deploying Latest Repo File to System:"
-						sudo /bin/cp -i "${_file}" "/${_file}"
+						sudo ${CP} -i "${_file}" "/${_file}"
 					# Pull Latest System Version into Git Repo
 					elif [[ "$ckUpdate" == "r" \
 							|| "$ckUpdate" == "repo" ]]; then
 						echo \
 						   "Updating Repo with Latest Deployed System File:"
-						/bin/cp -i "/${_file}" "${_file}"
+						${CP} -i "/${_file}" "${_file}"
 						git add "${_file}"
 						git commit \
 						   -m "Update Config Repo with Latest System File" \
@@ -1148,9 +1159,9 @@ if [[ $UPDATE == 1 ]]; then
 	echo -e "Checking Other Assorted Install Operations, As Needed...\n"
 
 	# Check/Create SMSD RSyslog Log File...
-	/bin/ls -l "${SMSD_LOG}"
-	log_perms=`/bin/ls -l "${SMSD_LOG}" | awk '{print $1}'`
-	log_group=`/bin/ls -l "${SMSD_LOG}" | awk '{print $4}'`
+	${LS} -l "${SMSD_LOG}"
+	log_perms=`${LS} -l "${SMSD_LOG}" | ${AWK} '{print $1}'`
+	log_group=`${LS} -l "${SMSD_LOG}" | ${AWK} '{print $4}'`
 	if [[ ! -f "${SMSD_LOG}"
 			|| "$log_perms" != "-rw-rw----"
 			|| "$log_group" != "users" ]]; then
@@ -1161,7 +1172,7 @@ if [[ $UPDATE == 1 ]]; then
 			sudo touch "${SMSD_LOG}"
 			sudo chgrp users "${SMSD_LOG}"
 			sudo chmod g+rw "${SMSD_LOG}"
-			/bin/ls -l "${SMSD_LOG}"
+			${LS} -l "${SMSD_LOG}"
 			# Restart RSyslog Service...?
 			sudo ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
@@ -1169,16 +1180,16 @@ if [[ $UPDATE == 1 ]]; then
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 				sudo ${SYSTEMCTL} restart rsyslog
-				sudo tail "${MESSAGES_LOG}"
+				sudo ${TAIL} "${MESSAGES_LOG}"
 			fi
 		fi
 	fi
 	echo
 
 	# Check/Create PVSD RSyslog Log File...
-	/bin/ls -l "${PVSD_LOG}"
-	log_perms=`/bin/ls -l "${PVSD_LOG}" | awk '{print $1}'`
-	log_group=`/bin/ls -l "${PVSD_LOG}" | awk '{print $4}'`
+	${LS} -l "${PVSD_LOG}"
+	log_perms=`${LS} -l "${PVSD_LOG}" | ${AWK} '{print $1}'`
+	log_group=`${LS} -l "${PVSD_LOG}" | ${AWK} '{print $4}'`
 	if [[ ! -f "${PVSD_LOG}"
 			|| "$log_perms" != "-rw-rw----"
 			|| "$log_group" != "users" ]]; then
@@ -1189,7 +1200,7 @@ if [[ $UPDATE == 1 ]]; then
 			sudo touch "${PVSD_LOG}"
 			sudo chgrp users "${PVSD_LOG}"
 			sudo chmod g+rw "${PVSD_LOG}"
-			/bin/ls -l "${PVSD_LOG}"
+			${LS} -l "${PVSD_LOG}"
 			# Restart RSyslog Service...?
 			sudo ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
@@ -1197,16 +1208,16 @@ if [[ $UPDATE == 1 ]]; then
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 				sudo ${SYSTEMCTL} restart rsyslog
-				sudo tail "${MESSAGES_LOG}"
+				sudo ${TAIL} "${MESSAGES_LOG}"
 			fi
 		fi
 	fi
 	echo
 
 	# Check/Create STC RSyslog Log File...
-	/bin/ls -l "${STC_LOG}"
-	log_perms=`/bin/ls -l "${STC_LOG}" | awk '{print $1}'`
-	log_group=`/bin/ls -l "${STC_LOG}" | awk '{print $4}'`
+	${LS} -l "${STC_LOG}"
+	log_perms=`${LS} -l "${STC_LOG}" | ${AWK} '{print $1}'`
+	log_group=`${LS} -l "${STC_LOG}" | ${AWK} '{print $4}'`
 	if [[ ! -f "${STC_LOG}"
 			|| "$log_perms" != "-rw-rw----"
 			|| "$log_group" != "users" ]]; then
@@ -1217,7 +1228,7 @@ if [[ $UPDATE == 1 ]]; then
 			sudo touch "${STC_LOG}"
 			sudo chgrp users "${STC_LOG}"
 			sudo chmod g+rw "${STC_LOG}"
-			/bin/ls -l "${STC_LOG}"
+			${LS} -l "${STC_LOG}"
 			# Restart RSyslog Service...?
 			sudo ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
@@ -1225,7 +1236,7 @@ if [[ $UPDATE == 1 ]]; then
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 				sudo ${SYSTEMCTL} restart rsyslog
-				sudo tail "${MESSAGES_LOG}"
+				sudo ${TAIL} "${MESSAGES_LOG}"
 			fi
 		fi
 	fi
@@ -1234,7 +1245,7 @@ if [[ $UPDATE == 1 ]]; then
 	# Check/Create Local DASMON User and Home Area for Config
 	if [[ ! -d ${DASMON_HOME} ]]; then
 		echo -e "Home Directory for DASMON User Not Found...!\n"
-		/bin/ls -l ${DASMON_HOME}
+		${LS} -l ${DASMON_HOME}
 		echo -e -n "\nCreate Home Directory for DASMON? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
@@ -1244,7 +1255,7 @@ if [[ $UPDATE == 1 ]]; then
 	fi
 	if [[ ! -d ${DASMON_HOME}/${DASMON_USER} ]]; then
 		echo -e "DASMON User Directory Not Found...!\n"
-		/bin/ls -l ${DASMON_HOME}/${DASMON_USER}
+		${LS} -l ${DASMON_HOME}/${DASMON_USER}
 		echo -e -n "\nCreate DASMON User and Home Directory? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
@@ -1252,23 +1263,23 @@ if [[ $UPDATE == 1 ]]; then
 			sudo useradd -b ${DASMON_HOME} -u ${DASMON_UID} -m -U \
 				-s /sbin/nologin ${DASMON_USER}
 			sudo chmod og+rx ${DASMON_HOME}/${DASMON_USER}
-			/bin/ls -ld ${DASMON_HOME}/${DASMON_USER}
-			grep ${DASMON_USER} /etc/passwd
-			grep ${DASMON_USER} /etc/group
+			${LS} -ld ${DASMON_HOME}/${DASMON_USER}
+			${GREP} ${DASMON_USER} /etc/passwd
+			${GREP} ${DASMON_USER} /etc/group
 			# Go Ahead and Create Base DASMON GUI Client Config
 			# (It probably matches what's in the Git Repo anyway...! ;-D)
 			sudo sh -c 'echo -e "[rules]\\n[signals]" \
 				> ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg'
-			/bin/ls -l ${DASMON_HOME}/${DASMON_USER}
+			${LS} -l ${DASMON_HOME}/${DASMON_USER}
 			/bin/cat ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg
 		fi
 	fi
 
 	# Check/Create DASMON RSyslog Log File...
 	if [[ $DO_DASMON_CONFCK == 1 ]]; then
-		/bin/ls -l "${DASMOND_LOG}"
-		log_perms=`/bin/ls -l "${DASMOND_LOG}" | awk '{print $1}'`
-		log_group=`/bin/ls -l "${DASMOND_LOG}" | awk '{print $4}'`
+		${LS} -l "${DASMOND_LOG}"
+		log_perms=`${LS} -l "${DASMOND_LOG}" | ${AWK} '{print $1}'`
+		log_group=`${LS} -l "${DASMOND_LOG}" | ${AWK} '{print $4}'`
 		if [[ ! -f "${DASMOND_LOG}"
 				|| "$log_perms" != "-rw-rw----"
 				|| "$log_group" != "users" ]]; then
@@ -1279,7 +1290,7 @@ if [[ $UPDATE == 1 ]]; then
 				sudo touch "${DASMOND_LOG}"
 				sudo chgrp users "${DASMOND_LOG}"
 				sudo chmod g+rw "${DASMOND_LOG}"
-				/bin/ls -l "${DASMOND_LOG}"
+				${LS} -l "${DASMOND_LOG}"
 				# Restart RSyslog Service...?
 				sudo ${SYSTEMCTL} status rsyslog
 				echo -n "Restart RSyslog Service? [yes|No] "
@@ -1287,7 +1298,7 @@ if [[ $UPDATE == 1 ]]; then
 				ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 				if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 					sudo ${SYSTEMCTL} restart rsyslog
-					sudo tail "${MESSAGES_LOG}"
+					sudo ${TAIL} "${MESSAGES_LOG}"
 				fi
 			fi
 		fi
@@ -1295,7 +1306,7 @@ if [[ $UPDATE == 1 ]]; then
 	fi
 
 	# Check/Create RSyslog Pipes...
-	/bin/ls -l "${RSYSLOG_PIPES}"
+	${LS} -l "${RSYSLOG_PIPES}"
 	if [[ ! -d "${RSYSLOG_PIPES}" ]]; then
 		echo -n "Create RSyslog Pipes? [yes|No] "
 		read ckUpdate
@@ -1305,10 +1316,10 @@ if [[ $UPDATE == 1 ]]; then
 			sudo "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
 			sudo chgrp snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
 			sudo chmod 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
-			/bin/ls -l "${RSYSLOG_PIPES}"
+			${LS} -l "${RSYSLOG_PIPES}"
 			# Set Big Error Pipe...
 			echo "Set Big Error Pipe..."
-			/bin/cp ${ADARA_DIR}/big_err_pipe.c /tmp
+			${CP} ${ADARA_DIR}/big_err_pipe.c /tmp
 			cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
 			/tmp/big_err_pipe
 		fi
@@ -1316,7 +1327,7 @@ if [[ $UPDATE == 1 ]]; then
 	echo
 
 	# Check/Create RSyslog Cache...
-	/bin/ls -ld "${RSYSLOG_CACHE}"
+	${LS} -ld "${RSYSLOG_CACHE}"
 	if [[ ! -d "${RSYSLOG_CACHE}" ]]; then
 		echo -n "Create RSyslog Cache? [yes|No] "
 		read ckUpdate
@@ -1331,14 +1342,14 @@ if [[ $UPDATE == 1 ]]; then
 			sudo chown snsdata "${RSYSLOG_CACHE}"
 			sudo chgrp adara "${RSYSLOG_CACHE}"
 			sudo chmod g+ws "${RSYSLOG_CACHE}"
-			/bin/ls -ld "${RSYSLOG_CACHE}"
+			${LS} -ld "${RSYSLOG_CACHE}"
 		fi
 	fi
 	echo
 
 	# Check/Create ADARA Administrator Crontab...
 	crontab -l
-	crontab_check=`crontab -l |& awk '{ print $1 " " $2 }'`
+	crontab_check=`crontab -l |& ${AWK} '{ print $1 " " $2 }'`
 	if [[ "$crontab_check" == "no crontab" ]]; then
 		echo -n "Create ADARA Administrator Crontab? [yes|No] "
 		read ckUpdate
@@ -1506,15 +1517,15 @@ if [[ $UPDATE == 1 ]]; then
 
 		echo "Checking ADARA/SMSD User Local Bin Soft Links for: [$i]"
 
-		/bin/ls -l "${ADARA_LINKS}/$i"
+		${LS} -l "${ADARA_LINKS}/$i"
 		if [[ ! -x "${ADARA_LINKS}/$i" ]]; then
 			echo -n "Create ADARA User Local Bin Soft Link for [$i]?"
 			echo -n " [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ln -s "${ADARA_BINARIES}/$i" "${ADARA_LINKS}/$i"
-				/bin/ls -l "${ADARA_LINKS}/$i"
+				sudo ${LN} -s "${ADARA_BINARIES}/$i" "${ADARA_LINKS}/$i"
+				${LS} -l "${ADARA_LINKS}/$i"
 			fi
 		fi
 		echo
@@ -1522,14 +1533,14 @@ if [[ $UPDATE == 1 ]]; then
 	done
 
 	# Check/Create PVSD User Local Bin Soft Link...
-	/bin/ls -l "${PVSD_LINK}"
+	${LS} -l "${PVSD_LINK}"
 	if [[ ! -x "${PVSD_LINK}" ]]; then
 		echo -n "Create PVSD User Local Bin Soft Link? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo ln -s "${PVSD_BINARY}" "${PVSD_LINK}"
-			/bin/ls -l "${PVSD_LINK}"
+			sudo ${LN} -s "${PVSD_BINARY}" "${PVSD_LINK}"
+			${LS} -l "${PVSD_LINK}"
 		fi
 	fi
 	echo
@@ -1539,15 +1550,15 @@ if [[ $UPDATE == 1 ]]; then
 
 		echo "Checking ADARA/STC User System Bin Soft Links for: [$i]"
 
-		/bin/ls -l "${STC_LINKS}/$i"
+		${LS} -l "${STC_LINKS}/$i"
 		if [[ ! -x "${STC_LINKS}/$i" ]]; then
 			echo -n "Create ADARA/STC User System Bin Soft Link for [$i]?"
 			echo -n " [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ln -s "${STC_BINARIES}/$i" "${STC_LINKS}/$i"
-				/bin/ls -l "${STC_LINKS}/$i"
+				sudo ${LN} -s "${STC_BINARIES}/$i" "${STC_LINKS}/$i"
+				${LS} -l "${STC_LINKS}/$i"
 			fi
 		fi
 		echo
@@ -1561,15 +1572,16 @@ if [[ $UPDATE == 1 ]]; then
 
 			echo "Checking DASMON User Local Bin Soft Links for: [$i]"
 
-			/bin/ls -l "${DASMON_LINKS}/$i"
+			${LS} -l "${DASMON_LINKS}/$i"
 			if [[ ! -x "${DASMON_LINKS}/$i" ]]; then
 				echo -n "Create DASMON User Local Bin Soft Link for [$i]?"
 				echo -n " [yes|No] "
 				read ckUpdate
 				ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 				if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-					sudo ln -s "${DASMON_BINARIES}/$i" "${DASMON_LINKS}/$i"
-					/bin/ls -l "${DASMON_LINKS}/$i"
+					sudo ${LN} -s "${DASMON_BINARIES}/$i" \
+						"${DASMON_LINKS}/$i"
+					${LS} -l "${DASMON_LINKS}/$i"
 				fi
 			fi
 			echo
@@ -1586,15 +1598,16 @@ if [[ $UPDATE == 1 ]]; then
 		echo -n "Checking ADARA/SMSD-${ALT} User Local Bin Soft Links for:"
 		echo " [$i${ALT}]"
 
-		/bin/ls -l "${ADARA_LINKS}/$i${ALT}"
+		${LS} -l "${ADARA_LINKS}/$i${ALT}"
 		if [[ ! -x "${ADARA_LINKS}/$i${ALT}" ]]; then
 			echo -n "Create ADARA User Local Bin Soft Link for [$i${ALT}]?"
 			echo -n " [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ln -s "${ADARA_BINARIES}/$i" "${ADARA_LINKS}/$i${ALT}"
-				/bin/ls -l "${ADARA_LINKS}/$i${ALT}"
+				sudo ${LN} -s "${ADARA_BINARIES}/$i" \
+					"${ADARA_LINKS}/$i${ALT}"
+				${LS} -l "${ADARA_LINKS}/$i${ALT}"
 			fi
 		fi
 		echo
@@ -1602,14 +1615,14 @@ if [[ $UPDATE == 1 ]]; then
 	fi
 
 	# Check/Create Clone of SNS Accelerator Timing Git Repo...
-	/bin/ls -ld "${ACCEL_TIMING}"
+	${LS} -ld "${ACCEL_TIMING}"
 	if [[ ! -d "${ACCEL_TIMING}" ]]; then
 		echo -n "Create Clone of SNS Accelerator Timing Git Repo? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 			git clone "${ACCEL_TIMING_REPO}" "${ACCEL_TIMING}"
-			/bin/ls -l "${ACCEL_TIMING}"
+			${LS} -l "${ACCEL_TIMING}"
 		fi
 	fi
 	echo

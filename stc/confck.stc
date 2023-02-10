@@ -51,6 +51,13 @@ STC_BINARIES="/home/controls/config/deploy"
 STC_LINKS="/usr/sbin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
+DIFF="/usr/bin/diff"
+TAIL="/usr/bin/tail"
+AWK="/usr/bin/awk"
+GREP="/bin/grep"
+LN="/usr/bin/ln"
+CP="/bin/cp"
+LS="/bin/ls"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config/
@@ -82,13 +89,13 @@ CONFIG_DIFF_STAT()
 	fi
 	echo "${_file}" >> .tmp.A.$$
 
-	grep "${_file}$" "${_statlist}" > .tmp.B.$$
+	${GREP} "${_file}$" "${_statlist}" > .tmp.B.$$
 	local _ckgrep=$?
 	if [ ${_ckgrep} != 0 ]; then
 		_status=${_ckgrep}
 	fi
 
-	diff .tmp.A.$$ .tmp.B.$$
+	${DIFF} .tmp.A.$$ .tmp.B.$$
 	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
@@ -135,8 +142,8 @@ CONFIG_DIFF_DIR()
 
 			# File Diff
 
-			echo "diff ${_file} /${_file}"
-			diff "${_file}" "/${_file}"
+			echo "${DIFF} ${_file} /${_file}"
+			${DIFF} "${_file}" "/${_file}"
 
 			if [ $? != 0 ] ; then
 				diff_cnt=$(( $diff_cnt + 1 ))
@@ -153,13 +160,13 @@ CONFIG_DIFF_DIR()
 					if [[ "$ckUpdate" == "s" \
 							|| "$ckUpdate" == "sys" ]]; then
 						echo "Deploying Latest Repo File to System:"
-						sudo /bin/cp -i "${_file}" "/${_file}"
+						sudo ${CP} -i "${_file}" "/${_file}"
 					# Pull Latest System Version into Git Repo
 					elif [[ "$ckUpdate" == "r" \
 							|| "$ckUpdate" == "repo" ]]; then
 						echo \
 						   "Updating Repo with Latest Deployed System File:"
-						/bin/cp -i "/${_file}" "${_file}"
+						${CP} -i "/${_file}" "${_file}"
 						git add "${_file}"
 						git commit \
 						   -m "Update Config Repo with Latest System File" \
@@ -215,8 +222,8 @@ CONFCK()
 		_check_update=1
 		diff_cnt=$(( $diff_cnt + 1 ))
 	else
-		echo "diff ./$USER.crontab /tmp/$USER.crontab.$$"
-		diff ./$USER.crontab /tmp/$USER.crontab.$$
+		echo "${DIFF} ./$USER.crontab /tmp/$USER.crontab.$$"
+		${DIFF} ./$USER.crontab /tmp/$USER.crontab.$$
 		if [ $? != 0 ]; then
 			echo "ADARA Admin Crontab for STC Differed...!"
 			_check_update=1
@@ -264,9 +271,9 @@ if [[ $UPDATE == 1 ]]; then
 	echo -e "Checking Other Assorted Install Operations, As Needed...\n"
 
 	# Check/Create STC RSyslog Log File...
-	/bin/ls -l "${STC_LOG}"
-	log_perms=`/bin/ls -l "${STC_LOG}" | awk '{print $1}'`
-	log_group=`/bin/ls -l "${STC_LOG}" | awk '{print $4}'`
+	${LS} -l "${STC_LOG}"
+	log_perms=`${LS} -l "${STC_LOG}" | ${AWK} '{print $1}'`
+	log_group=`${LS} -l "${STC_LOG}" | ${AWK} '{print $4}'`
 	if [[ ! -f "${STC_LOG}"
 			|| "$log_perms" != "-rw-rw----"
 			|| "$log_group" != "users" ]]; then
@@ -277,7 +284,7 @@ if [[ $UPDATE == 1 ]]; then
 			sudo touch "${STC_LOG}"
 			sudo chgrp users "${STC_LOG}"
 			sudo chmod g+rw "${STC_LOG}"
-			/bin/ls -l "${STC_LOG}"
+			${LS} -l "${STC_LOG}"
 			# Restart RSyslog Service...?
 			sudo ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
@@ -285,14 +292,14 @@ if [[ $UPDATE == 1 ]]; then
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 				sudo ${SYSTEMCTL} restart rsyslog
-				sudo tail "${MESSAGES_LOG}"
+				sudo ${TAIL} "${MESSAGES_LOG}"
 			fi
 		fi
 	fi
 	echo
 
 	# Check/Create RSyslog Pipes...
-	/bin/ls -l "${RSYSLOG_PIPES}"
+	${LS} -l "${RSYSLOG_PIPES}"
 	if [[ ! -d "${RSYSLOG_PIPES}" ]]; then
 		echo -n "Create RSyslog Pipes? [yes|No] "
 		read ckUpdate
@@ -302,10 +309,10 @@ if [[ $UPDATE == 1 ]]; then
 			sudo "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
 			sudo chgrp snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
 			sudo chmod 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
-			/bin/ls -l "${RSYSLOG_PIPES}"
+			${LS} -l "${RSYSLOG_PIPES}"
 			# Set Big Error Pipe...
 			echo "Set Big Error Pipe..."
-			/bin/cp ${ADARA_DIR}/big_err_pipe.c /tmp
+			${CP} ${ADARA_DIR}/big_err_pipe.c /tmp
 			cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
 			/tmp/big_err_pipe
 		fi
@@ -313,7 +320,7 @@ if [[ $UPDATE == 1 ]]; then
 	echo
 
 	# Check/Create RSyslog Cache...
-	/bin/ls -ld "${RSYSLOG_CACHE}"
+	${LS} -ld "${RSYSLOG_CACHE}"
 	if [[ ! -d "${RSYSLOG_CACHE}" ]]; then
 		echo -n "Create RSyslog Cache? [yes|No] "
 		read ckUpdate
@@ -326,14 +333,14 @@ if [[ $UPDATE == 1 ]]; then
 			sudo chown snsdata "${RSYSLOG_CACHE}"
 			sudo chgrp adara "${RSYSLOG_CACHE}"
 			sudo chmod g+ws "${RSYSLOG_CACHE}"
-			/bin/ls -ld "${RSYSLOG_CACHE}"
+			${LS} -ld "${RSYSLOG_CACHE}"
 		fi
 	fi
 	echo
 
 	# Check/Create STC Administrator Crontab...
 	crontab -l
-	crontab_check=`crontab -l |& awk '{ print $1 " " $2 }'`
+	crontab_check=`crontab -l |& ${AWK} '{ print $1 " " $2 }'`
 	if [[ "$crontab_check" == "no crontab" ]]; then
 		echo -n "Create STC Administrator Crontab? [yes|No] "
 		read ckUpdate
@@ -398,15 +405,15 @@ if [[ $UPDATE == 1 ]]; then
 
 		echo "Checking ADARA/STC User System Bin Soft Links for: [$i]"
 
-		/bin/ls -l "${STC_LINKS}/$i"
+		${LS} -l "${STC_LINKS}/$i"
 		if [[ ! -x "${STC_LINKS}/$i" ]]; then
 			echo -n "Create ADARA/STC User System Bin Soft Link for [$i]?"
 			echo -n " [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ln -s "${STC_BINARIES}/$i" "${STC_LINKS}/$i"
-				/bin/ls -l "${STC_LINKS}/$i"
+				sudo ${LN} -s "${STC_BINARIES}/$i" "${STC_LINKS}/$i"
+				${LS} -l "${STC_LINKS}/$i"
 			fi
 		fi
 		echo
@@ -414,14 +421,14 @@ if [[ $UPDATE == 1 ]]; then
 	done
 
 	# Check/Create Clone of SNS Accelerator Timing Git Repo...
-	/bin/ls -ld "${ACCEL_TIMING}"
+	${LS} -ld "${ACCEL_TIMING}"
 	if [[ ! -d "${ACCEL_TIMING}" ]]; then
 		echo -n "Create Clone of SNS Accelerator Timing Git Repo? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 			git clone "${ACCEL_TIMING_REPO}" "${ACCEL_TIMING}"
-			/bin/ls -l "${ACCEL_TIMING}"
+			${LS} -l "${ACCEL_TIMING}"
 		fi
 	fi
 	echo

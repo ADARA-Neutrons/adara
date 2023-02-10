@@ -56,6 +56,15 @@ ADARA_BINARIES="/home/controls/config-daq1${ALT}/deploy"
 ADARA_LINKS="/usr/local/bin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
+DIFF="/usr/bin/diff"
+HEAD="/usr/bin/head"
+TAIL="/usr/bin/tail"
+AWK="/usr/bin/awk"
+GREP="/bin/grep"
+SED="/bin/sed"
+LN="/usr/bin/ln"
+CP="/bin/cp"
+LS="/bin/ls"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config-daq1${ALT}/
@@ -84,13 +93,13 @@ DIFF_STAT()
 	fi
 	echo "${_file}" >> .tmp.A.$$
 
-	grep "${_file}$" "${_statlist}" > .tmp.B.$$
+	${GREP} "${_file}$" "${_statlist}" > .tmp.B.$$
 	local _ckgrep=$?
 	if [ ${_ckgrep} != 0 ]; then
 		_status=${_ckgrep}
 	fi
 
-	diff .tmp.A.$$ .tmp.B.$$
+	${DIFF} .tmp.A.$$ .tmp.B.$$
 	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
@@ -124,8 +133,8 @@ DIFF_FILE()
 	echo -e "\tto ${_label2}:"
 	echo
 
-	echo "diff ${_file1} ${_file2} | head -100"
-	diff "${_file1}" "${_file2}" | head -100
+	echo "${DIFF} ${_file1} ${_file2} | ${HEAD} -100"
+	${DIFF} "${_file1}" "${_file2}" | ${HEAD} -100
 	local _ckdiff=$?
 	if [ ${_ckdiff} != 0 ]; then
 		_status=${_ckdiff}
@@ -139,11 +148,11 @@ DIFF_FILE()
 			# Push Latest Git Repo Version to System
 			if [[ "$ckUpdate" == "s" || "$ckUpdate" == "sys" ]]; then
 				echo "Deploying Latest Repo File to System:"
-				sudo /bin/cp -i "${_file1}" "${_file2}"
+				sudo ${CP} -i "${_file1}" "${_file2}"
 			# Pull Latest System Version into Git Repo
 			elif [[ "$ckUpdate" == "r" || "$ckUpdate" == "repo" ]]; then
 				echo "Updating Repo with Latest Deployed System File:"
-				/bin/cp -i "${_file2}" "${_file1}"
+				${CP} -i "${_file2}" "${_file1}"
 				git add "${_file1}"
 				git commit \
 					-m "Update Config Repo with Latest System File" \
@@ -200,14 +209,14 @@ DIFF_DIR()
 	# Make sure there's something to check...  :)
 	#
 
-	local _nfiles1=`ls -l "${_dir1}/" | wc | awk '{print $1}'`
+	local _nfiles1=`ls -l "${_dir1}/" | wc | ${AWK} '{print $1}'`
 	_nfiles1=$(( _nfiles1 - 1 ))
 
 	if [[ ${_nfiles1} -lt 1 ]]; then
 		echo "Note: Empty Directory:  [${_dir1}]"
 	fi
 
-	local _nfiles2=`ls -l "${_dir2}/" | wc | awk '{print $1}'`
+	local _nfiles2=`ls -l "${_dir2}/" | wc | ${AWK} '{print $1}'`
 	_nfiles2=$(( _nfiles2 - 1 ))
 
 	if [[ ${_nfiles2} -lt 1 ]]; then
@@ -243,18 +252,18 @@ DIFF_DIR()
 			local _lsdir1=`ls -l "${_dir1}/$base"`
 			if [[ -n "${_lsdir1}" ]]; then
 				echo "${_lsdir1}" \
-					| sed "s@${_dir1}/$base@\n\t${_dir1}/$base\n\t\t@"
+					| ${SED} "s@${_dir1}/$base@\n\t${_dir1}/$base\n\t\t@"
 			fi
 
 			local _lsdir2=`ls -l "${_dir2}/$base"`
 			if [[ -n "${_lsdir2}" ]]; then
 				echo "${_lsdir2}" \
-					| sed "s@${_dir2}/$base@\n\t${_dir2}/$base\n\t\t@"
+					| ${SED} "s@${_dir2}/$base@\n\t${_dir2}/$base\n\t\t@"
 			fi
 
 			# Dereference Source Link...
 			local _link1=`echo "${_lsdir1}" \
-				| awk -F " -> " '{print $2}'`
+				| ${AWK} -F " -> " '{print $2}'`
 			if [[ -z "${_link1}" ]]; then
 				echo -e "\n*** Error Dereferencing Link at:"
 				echo -e "\t[${_dir1}/$base]"
@@ -263,7 +272,7 @@ DIFF_DIR()
 
 			# Dereference Destination Link...
 			local _link2=`echo "${_lsdir2}" \
-				| awk -F " -> " '{print $2}'`
+				| ${AWK} -F " -> " '{print $2}'`
 			if [[ -z "${_link2}" ]]; then
 				echo -e "\n*** Error Dereferencing Link at:"
 				echo -e "\t[${_dir2}/$base]"
@@ -322,7 +331,7 @@ CK_SNS_LOCAL_DIRS()
 			echo -e "\n*** ADARA SNS LOCAL Directory is Missing:"
 			echo -e "\n   ${SNSLOCAL}"
 			echo
-			/bin/ls -ld "${SNSLOCAL}"
+			${LS} -ld "${SNSLOCAL}"
 			echo -e -n "\nCreate the ADARA SNS LOCAL Directory? [yes|No] "
 			read ckSNSLocal
 			ckSNSLocal=`echo "$ckSNSLocal" | tr '[:upper:]' '[:lower:]'`
@@ -330,7 +339,7 @@ CK_SNS_LOCAL_DIRS()
 				sudo mkdir "${SNSLOCAL}"
 				sudo chmod +rx "${SNSLOCAL}"
 				echo
-				/bin/ls -ld "${SNSLOCAL}"
+				${LS} -ld "${SNSLOCAL}"
 			fi
 		fi
 
@@ -340,7 +349,7 @@ CK_SNS_LOCAL_DIRS()
 			echo -e "\n*** ADARA/SMS Daemon Directory is Missing:"
 			echo -e "\n   ${_smsdir}"
 			echo
-			/bin/ls -ld "${_smsdir}"
+			${LS} -ld "${_smsdir}"
 			echo -e -n "\nCreate ADARA/SMS Daemon Directory? [yes|No] "
 			read ckSMSDir
 			ckSMSDir=`echo "$ckSMSDir" | tr '[:upper:]' '[:lower:]'`
@@ -350,7 +359,7 @@ CK_SNS_LOCAL_DIRS()
 				sudo chgrp adara "${_smsdir}"
 				sudo chmod g+ws "${_smsdir}"
 				echo
-				/bin/ls -ld "${_smsdir}"
+				${LS} -ld "${_smsdir}"
 			fi
 		fi
 
@@ -360,7 +369,7 @@ CK_SNS_LOCAL_DIRS()
 			echo -e "\n*** ADARA/SMS Config Directory is Missing:"
 			echo -e "\n   ${_smsconf}"
 			echo
-			/bin/ls -ld "${_smsconf}"
+			${LS} -ld "${_smsconf}"
 			echo -e -n "\nCreate ADARA/SMS Config Directory? [yes|No] "
 			read ckSMSConf
 			ckSMSConf=`echo "$ckSMSConf" | tr '[:upper:]' '[:lower:]'`
@@ -370,7 +379,7 @@ CK_SNS_LOCAL_DIRS()
 				sudo chgrp adara "${_smsconf}"
 				sudo chmod g+ws "${_smsconf}"
 				echo
-				/bin/ls -ld "${_smsconf}"
+				${LS} -ld "${_smsconf}"
 			fi
 		fi
 
@@ -380,7 +389,7 @@ CK_SNS_LOCAL_DIRS()
 			echo -e "\n*** ADARA/SMS Data Directory is Missing:"
 			echo -e "\n   ${_smsdata}"
 			echo
-			/bin/ls -ld "${_smsdata}"
+			${LS} -ld "${_smsdata}"
 			echo -e -n "\nCreate ADARA/SMS Data Directory? [yes|No] "
 			read ckSMSData
 			ckSMSData=`echo "$ckSMSData" | tr '[:upper:]' '[:lower:]'`
@@ -390,7 +399,7 @@ CK_SNS_LOCAL_DIRS()
 				sudo chgrp adara "${_smsdata}"
 				sudo chmod g+ws "${_smsdata}"
 				echo
-				/bin/ls -ld "${_smsdata}"
+				${LS} -ld "${_smsdata}"
 			fi
 		fi
 
@@ -400,7 +409,7 @@ CK_SNS_LOCAL_DIRS()
 			echo -e "\n*** ADARA/SMS \"Next Run\" File is Missing:"
 			echo -e "\n   ${_sms_next_run}"
 			echo
-			/bin/ls -ld "${_sms_next_run}"
+			${LS} -ld "${_sms_next_run}"
 			echo -e -n "\nCreate ADARA/SMS \"Next Run\" File? [yes|No] "
 			read ckSMSNextRun
 			ckSMSNextRun=`echo "$ckSMSNextRun" | tr '[:upper:]' '[:lower:]'`
@@ -411,7 +420,7 @@ CK_SNS_LOCAL_DIRS()
 				sudo chgrp adara "${_sms_next_run}"
 				sudo chmod g+w "${_sms_next_run}"
 				echo
-				/bin/ls -ld "${_sms_next_run}"
+				${LS} -ld "${_sms_next_run}"
 				echo -e "\nNew ADARA/SMS \"Next Run\" File Contents:\n"
 				/bin/cat "${_sms_next_run}"
 			fi
@@ -517,8 +526,10 @@ CONFCK()
 	#	_check_update=1
 	#	(( _nerrors++ ))
 	#else
-	#	echo "diff ./sms${ALT}/chkconfig.smsd${ALT} /tmp/chkconfig.smsd${ALT}.$$"
-	#	diff ./sms${ALT}/chkconfig.smsd${ALT} /tmp/chkconfig.smsd${ALT}.$$
+	#	echo "${DIFF} ./sms${ALT}/chkconfig.smsd${ALT} \
+	#		/tmp/chkconfig.smsd${ALT}.$$"
+	#	${DIFF} ./sms${ALT}/chkconfig.smsd${ALT} \
+	#		/tmp/chkconfig.smsd${ALT}.$$
 	#	if [ $? != 0 ]; then
 	#		echo "System ChkConfig for SMSD${ALT} Differed...!"
 	#		_check_update=1
@@ -568,9 +579,9 @@ CONFCK()
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo -n "diff ./sms${ALT}/systemctl.enabled.smsd${ALT}"
+		echo -n "${DIFF} ./sms${ALT}/systemctl.enabled.smsd${ALT}"
 		echo " /tmp/systemctl.enabled.smsd${ALT}.$$"
-		diff ./sms${ALT}/systemctl.enabled.smsd${ALT} \
+		${DIFF} ./sms${ALT}/systemctl.enabled.smsd${ALT} \
 			/tmp/systemctl.enabled.smsd${ALT}.$$
 		if [ $? != 0 ]; then
 			echo "SystemCtl Enabled for SMSD${ALT} Differed...!"
@@ -616,8 +627,8 @@ CONFCK()
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo "diff ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$"
-		diff ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$
+		echo "${DIFF} ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$"
+		${DIFF} ./sms${ALT}/$USER.crontab /tmp/$USER.crontab.$$
 		if [ $? != 0 ]; then
 			echo "ADARA Admin Crontab for SMSD${ALT} Differed...!"
 			_check_update=1
@@ -670,9 +681,9 @@ if [[ $UPDATE == 1 ]]; then
 	echo -e "Checking Other Assorted Install Operations, As Needed...\n"
 
 	# Check/Create SMSD RSyslog Log File...
-	/bin/ls -l "${SMSD_LOG}"
-	log_perms=`/bin/ls -l "${SMSD_LOG}" | awk '{print $1}'`
-	log_group=`/bin/ls -l "${SMSD_LOG}" | awk '{print $4}'`
+	${LS} -l "${SMSD_LOG}"
+	log_perms=`${LS} -l "${SMSD_LOG}" | ${AWK} '{print $1}'`
+	log_group=`${LS} -l "${SMSD_LOG}" | ${AWK} '{print $4}'`
 	if [[ ! -f "${SMSD_LOG}"
 			|| "$log_perms" != "-rw-rw----"
 			|| "$log_group" != "users" ]]; then
@@ -683,7 +694,7 @@ if [[ $UPDATE == 1 ]]; then
 			sudo touch "${SMSD_LOG}"
 			sudo chgrp users "${SMSD_LOG}"
 			sudo chmod g+rw "${SMSD_LOG}"
-			/bin/ls -l "${SMSD_LOG}"
+			${LS} -l "${SMSD_LOG}"
 			# Restart RSyslog Service...?
 			sudo ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
@@ -691,14 +702,14 @@ if [[ $UPDATE == 1 ]]; then
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 				sudo ${SYSTEMCTL} restart rsyslog
-				sudo tail "${MESSAGES_LOG}"
+				sudo ${TAIL} "${MESSAGES_LOG}"
 			fi
 		fi
 	fi
 	echo
 
 	# Check/Create RSyslog Pipes...
-	/bin/ls -l "${RSYSLOG_PIPES}"
+	${LS} -l "${RSYSLOG_PIPES}"
 	if [[ ! -d "${RSYSLOG_PIPES}" ]]; then
 		echo -n "Create RSyslog Pipes? [yes|No] "
 		read ckUpdate
@@ -708,10 +719,10 @@ if [[ $UPDATE == 1 ]]; then
 			sudo "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
 			sudo chgrp snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
 			sudo chmod 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
-			/bin/ls -l "${RSYSLOG_PIPES}"
+			${LS} -l "${RSYSLOG_PIPES}"
 			# Set Big Error Pipe...
 			echo "Set Big Error Pipe..."
-			/bin/cp ${ADARA_DIR}/big_err_pipe.c /tmp
+			${CP} ${ADARA_DIR}/big_err_pipe.c /tmp
 			cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
 			/tmp/big_err_pipe
 		fi
@@ -719,7 +730,7 @@ if [[ $UPDATE == 1 ]]; then
 	echo
 
 	# Check/Create RSyslog Cache...
-	/bin/ls -ld "${RSYSLOG_CACHE}"
+	${LS} -ld "${RSYSLOG_CACHE}"
 	if [[ ! -d "${RSYSLOG_CACHE}" ]]; then
 		echo -n "Create RSyslog Cache? [yes|No] "
 		read ckUpdate
@@ -734,14 +745,14 @@ if [[ $UPDATE == 1 ]]; then
 			sudo chown snsdata "${RSYSLOG_CACHE}"
 			sudo chgrp adara "${RSYSLOG_CACHE}"
 			sudo chmod g+ws "${RSYSLOG_CACHE}"
-			/bin/ls -ld "${RSYSLOG_CACHE}"
+			${LS} -ld "${RSYSLOG_CACHE}"
 		fi
 	fi
 	echo
 
 	# Check/Create SMSD Administrator Crontab...
 	crontab -l
-	crontab_check=`crontab -l |& awk '{ print $1 " " $2 }'`
+	crontab_check=`crontab -l |& ${AWK} '{ print $1 " " $2 }'`
 	if [[ "$crontab_check" == "no crontab" ]]; then
 		echo -n "Create SMSD${ALT} Administrator Crontab? [yes|No] "
 		read ckUpdate
@@ -822,15 +833,15 @@ if [[ $UPDATE == 1 ]]; then
 
 		echo "Checking ADARA/SMSD User Local Bin Soft Links for: [$i]"
 
-		/bin/ls -l "${ADARA_LINKS}/$i"
+		${LS} -l "${ADARA_LINKS}/$i"
 		if [[ ! -x "${ADARA_LINKS}/$i" ]]; then
 			echo -n "Create ADARA User Local Bin Soft Link for [$i]?"
 			echo -n " [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ln -s "${ADARA_BINARIES}/$i" "${ADARA_LINKS}/$i"
-				/bin/ls -l "${ADARA_LINKS}/$i"
+				sudo ${LN} -s "${ADARA_BINARIES}/$i" "${ADARA_LINKS}/$i"
+				${LS} -l "${ADARA_LINKS}/$i"
 			fi
 		fi
 		echo
@@ -845,15 +856,16 @@ if [[ $UPDATE == 1 ]]; then
 		echo -n "Checking ADARA/SMSD-${ALT} User Local Bin Soft Links for:"
 		echo " [$i${ALT}]"
 
-		/bin/ls -l "${ADARA_LINKS}/$i${ALT}"
+		${LS} -l "${ADARA_LINKS}/$i${ALT}"
 		if [[ ! -x "${ADARA_LINKS}/$i${ALT}" ]]; then
 			echo -n "Create ADARA User Local Bin Soft Link for [$i${ALT}]?"
 			echo -n " [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ln -s "${ADARA_BINARIES}/$i" "${ADARA_LINKS}/$i${ALT}"
-				/bin/ls -l "${ADARA_LINKS}/$i${ALT}"
+				sudo ${LN} -s "${ADARA_BINARIES}/$i" \
+					"${ADARA_LINKS}/$i${ALT}"
+				${LS} -l "${ADARA_LINKS}/$i${ALT}"
 			fi
 		fi
 		echo
@@ -861,14 +873,14 @@ if [[ $UPDATE == 1 ]]; then
 	fi
 
 	# Check/Create Clone of SNS Accelerator Timing Git Repo...
-	/bin/ls -ld "${ACCEL_TIMING}"
+	${LS} -ld "${ACCEL_TIMING}"
 	if [[ ! -d "${ACCEL_TIMING}" ]]; then
 		echo -n "Create Clone of SNS Accelerator Timing Git Repo? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 			git clone "${ACCEL_TIMING_REPO}" "${ACCEL_TIMING}"
-			/bin/ls -l "${ACCEL_TIMING}"
+			${LS} -l "${ACCEL_TIMING}"
 		fi
 	fi
 	echo
