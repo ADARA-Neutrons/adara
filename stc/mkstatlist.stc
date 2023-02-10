@@ -1,0 +1,32 @@
+#!/bin/bash
+
+STAT_LIST="./stat_list"
+
+STC_SYSTEM_FILES="/etc/xinetd.d/stc* \
+	/usr/local/bin/stc* \
+	/etc/cron.d/stc_rsyslog_mailer \
+	/etc/rsyslog.conf \
+	/etc/rsyslog.d/adaraMailer.conf \
+	/etc/rsyslog.d/adaramailer.conf \
+	/etc/rsyslog.d/stclog.conf \
+	/etc/services \
+	/usr/local/bin/rsyslogMailer \
+	/etc/logrotate.d/stc_log"
+
+if [[ -f "${STAT_LIST}" ]]; then
+	echo -e "\nError: Stat List Already Exists... Bailing...\n"
+	ls -l ${STAT_LIST}
+	exit -1
+fi
+
+touch "${STAT_LIST}"
+
+for file in ${STC_SYSTEM_FILES} ; do
+
+	echo "STC System File: $file"
+
+	stat --printf='%A %F %U %G ' "${file}" >> "${STAT_LIST}"
+	echo "${file}" >> "${STAT_LIST}"
+
+done
+

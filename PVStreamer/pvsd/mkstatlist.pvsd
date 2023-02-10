@@ -1,0 +1,33 @@
+#!/bin/bash
+
+STAT_LIST="./stat_list"
+
+PVSD_SYSTEM_FILES="/usr/local/bin/pvsd \
+	/etc/init.d/pvsd \
+	/etc/rsyslog.conf \
+	/etc/rsyslog.d/adaraMailer.conf \
+	/etc/rsyslog.d/pvsd_syslog.conf \
+	/usr/local/bin/rsyslogMailer \
+	/etc/crontab \
+	/etc/cron.d/epics_rsyslog_mailer \
+	/etc/logrotate.d/pvsd_log \
+	/usr/local/bin/pvsd_mon.sh \
+	/usr/local/bin/beamline_xml_mon.sh"
+
+if [[ -f "${STAT_LIST}" ]]; then
+	echo -e "\nError: Stat List Already Exists... Bailing...\n"
+	ls -l ${STAT_LIST}
+	exit -1
+fi
+
+touch "${STAT_LIST}"
+
+for file in ${PVSD_SYSTEM_FILES} ; do
+
+	echo "PVSD System File: $file"
+
+	stat --printf='%A %F %U %G ' "${file}" >> "${STAT_LIST}"
+	echo "${file}" >> "${STAT_LIST}"
+
+done
+
