@@ -373,14 +373,18 @@ if [[ $UPDATE == 1 ]]; then
 
 	# Check/Create Local DASMON User and Home Area for Config
 	if [[ ! -d ${DASMON_HOME} ]]; then
-		echo -e "Home Directory for DASMON User Not Found...!\n"
+		echo -e "Home Directory Not Found...!\n"
 		${LS} -l ${DASMON_HOME}
-		echo -e -n "\nCreate Home Directory for DASMON? [yes|No] "
+		echo -e -n "\nCreate Home Directory? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 			${SUDO} ${MKDIR} ${DASMON_HOME}
 		fi
+	else
+		echo -e "Home Directory Found.\n"
+		${LS} -l ${DASMON_HOME}
+		echo
 	fi
 	if [[ ! -d ${DASMON_HOME}/${DASMON_USER} ]]; then
 		echo -e "DASMON User Directory Not Found...!\n"
@@ -392,15 +396,30 @@ if [[ $UPDATE == 1 ]]; then
 			${SUDO} useradd -b ${DASMON_HOME} -u ${DASMON_UID} -m -U \
 				-s /sbin/nologin ${DASMON_USER}
 			${SUDO} ${CHMOD} og+rx ${DASMON_HOME}/${DASMON_USER}
+			echo "DASMON Home Directory:"
 			${LS} -ld ${DASMON_HOME}/${DASMON_USER}
+			echo "DASMON User in /etc/passwd:"
 			${GREP} ${DASMON_USER} /etc/passwd
+			echo "DASMON Group in /etc/group:"
 			${GREP} ${DASMON_USER} /etc/group
+			echo
+		fi
+	fi
+	if [[ ! -f ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg ]]; then
+		echo -e "DASMON GUI Client Config File Not Found...!\n"
+		${LS} -l ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg
+		echo -e -n "\nCreate DASMON GUI Client Config File? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 			# Go Ahead and Create Base DASMON GUI Client Config
 			# (It probably matches what's in the Git Repo anyway...! ;-D)
-			${SUDO} ${SH} -c 'echo -e "[rules]\\n[signals]" \
-				> ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg'
-			${LS} -l ${DASMON_HOME}/${DASMON_USER}
-			/bin/cat ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg
+			CONFIG="${DASMON_HOME}/${DASMON_USER}/dasmond.cfg"
+			${SUDO} ${SH} -c "echo -e \"[rules]\\n[signals]\" > ${CONFIG}"
+			echo "DASMON GUI Client Config:"
+			${LS} -l ${CONFIG}
+			/bin/cat ${CONFIG}
+			echo
 		fi
 	fi
 
