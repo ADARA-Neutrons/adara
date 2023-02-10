@@ -19,6 +19,7 @@ fi
 
 # Default Update/Installation Target Definitions
 DIFF="/usr/bin/diff"
+SUDO="/usr/bin/sudo"
 CP="/bin/cp"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
@@ -70,7 +71,7 @@ CONFIG_DIFF_DIR()
 					if [[ "$ckUpdate" == "s" \
 							|| "$ckUpdate" == "sys" ]]; then
 						echo "Deploying Latest Repo File to System:"
-						sudo ${CP} -i "$file" "${LOCAL_DATA}/$file"
+						${SUDO} ${CP} -i "$file" "${LOCAL_DATA}/$file"
 					# Pull Latest System Version into Git Repo
 					elif [[ "$ckUpdate" == "r" \
 							|| "$ckUpdate" == "repo" ]]; then

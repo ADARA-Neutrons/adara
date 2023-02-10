@@ -51,13 +51,20 @@ STC_BINARIES="/home/controls/config/deploy"
 STC_LINKS="/usr/sbin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
+CHMOD="/usr/bin/chmod"
+CHGRP="/usr/bin/chgrp"
+CHOWN="/usr/bin/chown"
+MKDIR="/usr/bin/mkdir"
+TOUCH="/usr/bin/touch"
 DIFF="/usr/bin/diff"
+SUDO="/usr/bin/sudo"
 TAIL="/usr/bin/tail"
 AWK="/usr/bin/awk"
 GREP="/bin/grep"
 LN="/usr/bin/ln"
 CP="/bin/cp"
 LS="/bin/ls"
+RM="/bin/rm"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config/
@@ -101,7 +108,7 @@ CONFIG_DIFF_STAT()
 		_status=${_ckdiff}
 	fi
 
-	/bin/rm .tmp.A.$$ .tmp.B.$$
+	${RM} .tmp.A.$$ .tmp.B.$$
 
 	return ${_status}
 }
@@ -160,7 +167,7 @@ CONFIG_DIFF_DIR()
 					if [[ "$ckUpdate" == "s" \
 							|| "$ckUpdate" == "sys" ]]; then
 						echo "Deploying Latest Repo File to System:"
-						sudo ${CP} -i "${_file}" "/${_file}"
+						${SUDO} ${CP} -i "${_file}" "/${_file}"
 					# Pull Latest System Version into Git Repo
 					elif [[ "$ckUpdate" == "r" \
 							|| "$ckUpdate" == "repo" ]]; then
@@ -237,7 +244,7 @@ CONFCK()
 		echo "Defer Fixing of STC Admin Crontab..."
 		echo "(See Admin Crontab Create Below, or Fix Manually.)"
 	fi
-	/bin/rm -f /tmp/$USER.crontab.$$
+	${RM} -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
 		echo "Failure Deleting Temporary Admin Crontab File for STC...!"
 		diff_cnt=$(( $diff_cnt + 1 ))
@@ -281,18 +288,18 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo touch "${STC_LOG}"
-			sudo chgrp users "${STC_LOG}"
-			sudo chmod g+rw "${STC_LOG}"
+			${SUDO} ${TOUCH} "${STC_LOG}"
+			${SUDO} ${CHGRP} users "${STC_LOG}"
+			${SUDO} ${CHMOD} g+rw "${STC_LOG}"
 			${LS} -l "${STC_LOG}"
 			# Restart RSyslog Service...?
-			sudo ${SYSTEMCTL} status rsyslog
+			${SUDO} ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ${SYSTEMCTL} restart rsyslog
-				sudo ${TAIL} "${MESSAGES_LOG}"
+				${SUDO} ${SYSTEMCTL} restart rsyslog
+				${SUDO} ${TAIL} "${MESSAGES_LOG}"
 			fi
 		fi
 	fi
@@ -305,10 +312,10 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo mkdir "${RSYSLOG_PIPES}"
-			sudo "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
-			sudo chgrp snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
-			sudo chmod 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
+			${SUDO} ${MKDIR} "${RSYSLOG_PIPES}"
+			${SUDO} "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
+			${SUDO} ${CHGRP} snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
+			${SUDO} ${CHMOD} 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
 			${LS} -l "${RSYSLOG_PIPES}"
 			# Set Big Error Pipe...
 			echo "Set Big Error Pipe..."
@@ -327,12 +334,12 @@ if [[ $UPDATE == 1 ]]; then
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 			if [[ ! -d "${SNSLOCAL}" ]]; then
-				sudo mkdir "${SNSLOCAL}"
+				${SUDO} ${MKDIR} "${SNSLOCAL}"
 			fi
-			sudo mkdir "${RSYSLOG_CACHE}"
-			sudo chown snsdata "${RSYSLOG_CACHE}"
-			sudo chgrp adara "${RSYSLOG_CACHE}"
-			sudo chmod g+ws "${RSYSLOG_CACHE}"
+			${SUDO} ${MKDIR} "${RSYSLOG_CACHE}"
+			${SUDO} ${CHOWN} snsdata "${RSYSLOG_CACHE}"
+			${SUDO} ${CHGRP} adara "${RSYSLOG_CACHE}"
+			${SUDO} ${CHMOD} g+ws "${RSYSLOG_CACHE}"
 			${LS} -ld "${RSYSLOG_CACHE}"
 		fi
 	fi
@@ -385,7 +392,7 @@ if [[ $UPDATE == 1 ]]; then
 			fi
 
 			# Clean Up Temp Crontab File
-			/bin/rm $cron_file
+			${RM} $cron_file
 
 			# Check for Manual Crontab Edit
 			crontab -l
@@ -412,7 +419,7 @@ if [[ $UPDATE == 1 ]]; then
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ${LN} -s "${STC_BINARIES}/$i" "${STC_LINKS}/$i"
+				${SUDO} ${LN} -s "${STC_BINARIES}/$i" "${STC_LINKS}/$i"
 				${LS} -l "${STC_LINKS}/$i"
 			fi
 		fi

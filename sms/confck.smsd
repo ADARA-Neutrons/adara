@@ -55,8 +55,15 @@ ADARA_BINARIES="/home/controls/config-daq1${ALT}/deploy"
 ADARA_LINKS="/usr/local/bin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
+Editor="/usr/bin/vim"
+CHMOD="/usr/bin/chmod"
+CHGRP="/usr/bin/chgrp"
+CHOWN="/usr/bin/chown"
+MKDIR="/usr/bin/mkdir"
+TOUCH="/usr/bin/touch"
 DIFF="/usr/bin/diff"
 HEAD="/usr/bin/head"
+SUDO="/usr/bin/sudo"
 TAIL="/usr/bin/tail"
 AWK="/usr/bin/awk"
 GREP="/bin/grep"
@@ -64,6 +71,7 @@ SED="/bin/sed"
 LN="/usr/bin/ln"
 CP="/bin/cp"
 LS="/bin/ls"
+RM="/bin/rm"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config-daq1${ALT}/
@@ -104,7 +112,7 @@ DIFF_STAT()
 		_status=${_ckdiff}
 	fi
 
-	/bin/rm .tmp.A.$$ .tmp.B.$$
+	${RM} .tmp.A.$$ .tmp.B.$$
 
 	return ${_status}
 }
@@ -147,7 +155,7 @@ DIFF_FILE()
 			# Push Latest Git Repo Version to System
 			if [[ "$ckUpdate" == "s" || "$ckUpdate" == "sys" ]]; then
 				echo "Deploying Latest Repo File to System:"
-				sudo ${CP} -i "${_file1}" "${_file2}"
+				${SUDO} ${CP} -i "${_file1}" "${_file2}"
 			# Pull Latest System Version into Git Repo
 			elif [[ "$ckUpdate" == "r" || "$ckUpdate" == "repo" ]]; then
 				echo "Updating Repo with Latest Deployed System File:"
@@ -335,8 +343,8 @@ CK_SNS_LOCAL_DIRS()
 			read ckSNSLocal
 			ckSNSLocal=`echo "$ckSNSLocal" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckSNSLocal" == "y" || "$ckSNSLocal" == "yes" ]]; then
-				sudo mkdir "${SNSLOCAL}"
-				sudo chmod +rx "${SNSLOCAL}"
+				${SUDO} ${MKDIR} "${SNSLOCAL}"
+				${SUDO} ${CHMOD} +rx "${SNSLOCAL}"
 				echo
 				${LS} -ld "${SNSLOCAL}"
 			fi
@@ -353,10 +361,10 @@ CK_SNS_LOCAL_DIRS()
 			read ckSMSDir
 			ckSMSDir=`echo "$ckSMSDir" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckSMSDir" == "y" || "$ckSMSDir" == "yes" ]]; then
-				sudo mkdir "${_smsdir}"
-				sudo chown snsdata "${_smsdir}"
-				sudo chgrp adara "${_smsdir}"
-				sudo chmod g+ws "${_smsdir}"
+				${SUDO} ${MKDIR} "${_smsdir}"
+				${SUDO} ${CHOWN} snsdata "${_smsdir}"
+				${SUDO} ${CHGRP} adara "${_smsdir}"
+				${SUDO} ${CHMOD} g+ws "${_smsdir}"
 				echo
 				${LS} -ld "${_smsdir}"
 			fi
@@ -373,10 +381,10 @@ CK_SNS_LOCAL_DIRS()
 			read ckSMSConf
 			ckSMSConf=`echo "$ckSMSConf" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckSMSConf" == "y" || "$ckSMSConf" == "yes" ]]; then
-				sudo mkdir "${_smsconf}"
-				sudo chown snsdata "${_smsconf}"
-				sudo chgrp adara "${_smsconf}"
-				sudo chmod g+ws "${_smsconf}"
+				${SUDO} ${MKDIR} "${_smsconf}"
+				${SUDO} ${CHOWN} snsdata "${_smsconf}"
+				${SUDO} ${CHGRP} adara "${_smsconf}"
+				${SUDO} ${CHMOD} g+ws "${_smsconf}"
 				echo
 				${LS} -ld "${_smsconf}"
 			fi
@@ -393,10 +401,10 @@ CK_SNS_LOCAL_DIRS()
 			read ckSMSData
 			ckSMSData=`echo "$ckSMSData" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckSMSData" == "y" || "$ckSMSData" == "yes" ]]; then
-				sudo mkdir "${_smsdata}"
-				sudo chown snsdata "${_smsdata}"
-				sudo chgrp adara "${_smsdata}"
-				sudo chmod g+ws "${_smsdata}"
+				${SUDO} ${MKDIR} "${_smsdata}"
+				${SUDO} ${CHOWN} snsdata "${_smsdata}"
+				${SUDO} ${CHGRP} adara "${_smsdata}"
+				${SUDO} ${CHMOD} g+ws "${_smsdata}"
 				echo
 				${LS} -ld "${_smsdata}"
 			fi
@@ -414,10 +422,10 @@ CK_SNS_LOCAL_DIRS()
 			ckSMSNextRun=`echo "$ckSMSNextRun" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckSMSNextRun" == "y"
 					|| "$ckSMSNextRun" == "yes" ]]; then
-				sudo vi "${_sms_next_run}"
-				sudo chown snsdata "${_sms_next_run}"
-				sudo chgrp adara "${_sms_next_run}"
-				sudo chmod g+w "${_sms_next_run}"
+				${SUDO} ${Editor} "${_sms_next_run}"
+				${SUDO} ${CHOWN} snsdata "${_sms_next_run}"
+				${SUDO} ${CHGRP} adara "${_sms_next_run}"
+				${SUDO} ${CHMOD} g+w "${_sms_next_run}"
 				echo
 				${LS} -ld "${_sms_next_run}"
 				echo -e "\nNew ADARA/SMS \"Next Run\" File Contents:\n"
@@ -537,7 +545,7 @@ CONFCK()
 	#		echo "System ChkConfig for SMSD${ALT} is the Same."
 	#	fi
 	#fi
-	#/bin/rm -f /tmp/chkconfig.smsd${ALT}.$$
+	#${RM} -f /tmp/chkconfig.smsd${ALT}.$$
 	#if [ $? != 0 ]; then
 	#	echo \
 	#   "Failure Deleting Temporary System ChkConfig File for SMSD${ALT}...!"
@@ -550,11 +558,11 @@ CONFCK()
 	#		read ckUpdate
 	#		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 	#		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-	#			sudo chkconfig --add smsd${ALT}
+	#			${SUDO} chkconfig --add smsd${ALT}
 	#			chkconfig --list smsd${ALT}
-	#			sudo chkconfig smsd${ALT} on
+	#			${SUDO} chkconfig smsd${ALT} on
 	#			chkconfig --list smsd${ALT}
-	#			/bin/rm -i ./sms${ALT}/chkconfig.smsd${ALT}
+	#			${RM} -i ./sms${ALT}/chkconfig.smsd${ALT}
 	#			chkconfig --list smsd${ALT} \
 	#				> ./sms${ALT}/chkconfig.smsd${ALT} 2>&1
 	#		fi
@@ -590,7 +598,7 @@ CONFCK()
 			echo "SystemCtl Enabled for SMSD${ALT} is the Same."
 		fi
 	fi
-	/bin/rm -f /tmp/systemctl.enabled.smsd${ALT}.$$
+	${RM} -f /tmp/systemctl.enabled.smsd${ALT}.$$
 	if [ $? != 0 ]; then
 		echo \
 		"Failure Deleting Temporary SystemCtl Enabled File for SMSD${ALT}!"
@@ -603,9 +611,9 @@ CONFCK()
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ${SYSTEMCTL} enable smsd${ALT}
+				${SUDO} ${SYSTEMCTL} enable smsd${ALT}
 				${SYSTEMCTL} is-enabled smsd${ALT}
-				/bin/rm -i ./sms${ALT}/systemctl.enabled.smsd${ALT}
+				${RM} -i ./sms${ALT}/systemctl.enabled.smsd${ALT}
 				${SYSTEMCTL} is-enabled smsd${ALT} \
 					> ./sms${ALT}/systemctl.enabled.smsd${ALT} 2>&1
 			fi
@@ -641,7 +649,7 @@ CONFCK()
 		echo "Defer Fixing of SMSD${ALT} Admin Crontab..."
 		echo "(See Admin Crontab Create Below, or Fix Manually.)"
 	fi
-	/bin/rm -f /tmp/$USER.crontab.$$
+	${RM} -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
 		echo \
 		  "Failure Deleting Temporary Admin Crontab File for SMSD${ALT}...!"
@@ -690,18 +698,18 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo touch "${SMSD_LOG}"
-			sudo chgrp users "${SMSD_LOG}"
-			sudo chmod g+rw "${SMSD_LOG}"
+			${SUDO} ${TOUCH} "${SMSD_LOG}"
+			${SUDO} ${CHGRP} users "${SMSD_LOG}"
+			${SUDO} ${CHMOD} g+rw "${SMSD_LOG}"
 			${LS} -l "${SMSD_LOG}"
 			# Restart RSyslog Service...?
-			sudo ${SYSTEMCTL} status rsyslog
+			${SUDO} ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ${SYSTEMCTL} restart rsyslog
-				sudo ${TAIL} "${MESSAGES_LOG}"
+				${SUDO} ${SYSTEMCTL} restart rsyslog
+				${SUDO} ${TAIL} "${MESSAGES_LOG}"
 			fi
 		fi
 	fi
@@ -714,10 +722,10 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo mkdir "${RSYSLOG_PIPES}"
-			sudo "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
-			sudo chgrp snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
-			sudo chmod 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
+			${SUDO} ${MKDIR} "${RSYSLOG_PIPES}"
+			${SUDO} "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
+			${SUDO} ${CHGRP} snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
+			${SUDO} ${CHMOD} 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
 			${LS} -l "${RSYSLOG_PIPES}"
 			# Set Big Error Pipe...
 			echo "Set Big Error Pipe..."
@@ -737,13 +745,13 @@ if [[ $UPDATE == 1 ]]; then
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 			# Note: Now Already Handled in CK_SNS_LOCAL_DIRS()...
 			if [[ ! -d "${SNSLOCAL}" ]]; then
-				sudo mkdir "${SNSLOCAL}"
-				sudo chmod +rx "${SNSLOCAL}"
+				${SUDO} ${MKDIR} "${SNSLOCAL}"
+				${SUDO} ${CHMOD} +rx "${SNSLOCAL}"
 			fi
-			sudo mkdir "${RSYSLOG_CACHE}"
-			sudo chown snsdata "${RSYSLOG_CACHE}"
-			sudo chgrp adara "${RSYSLOG_CACHE}"
-			sudo chmod g+ws "${RSYSLOG_CACHE}"
+			${SUDO} ${MKDIR} "${RSYSLOG_CACHE}"
+			${SUDO} ${CHOWN} snsdata "${RSYSLOG_CACHE}"
+			${SUDO} ${CHGRP} adara "${RSYSLOG_CACHE}"
+			${SUDO} ${CHMOD} g+ws "${RSYSLOG_CACHE}"
 			${LS} -ld "${RSYSLOG_CACHE}"
 		fi
 	fi
@@ -809,7 +817,7 @@ if [[ $UPDATE == 1 ]]; then
 			fi
 
 			# Clean Up Temp Crontab File
-			/bin/rm $cron_file
+			${RM} $cron_file
 
 			# Check for Manual Crontab Edit
 			crontab -l
@@ -839,7 +847,7 @@ if [[ $UPDATE == 1 ]]; then
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ${LN} -s "${ADARA_BINARIES}/$i" "${ADARA_LINKS}/$i"
+				${SUDO} ${LN} -s "${ADARA_BINARIES}/$i" "${ADARA_LINKS}/$i"
 				${LS} -l "${ADARA_LINKS}/$i"
 			fi
 		fi
@@ -862,7 +870,7 @@ if [[ $UPDATE == 1 ]]; then
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ${LN} -s "${ADARA_BINARIES}/$i" \
+				${SUDO} ${LN} -s "${ADARA_BINARIES}/$i" \
 					"${ADARA_LINKS}/$i${ALT}"
 				${LS} -l "${ADARA_LINKS}/$i${ALT}"
 			fi

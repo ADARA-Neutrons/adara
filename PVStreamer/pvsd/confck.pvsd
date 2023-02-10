@@ -52,13 +52,20 @@ PVSD_LINK="/usr/sbin/pvsd"
 PVSD_BINARY="/home/controls/config-dassrv1/deploy/pvsd"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
+CHMOD="/usr/bin/chmod"
+CHGRP="/usr/bin/chgrp"
+CHOWN="/usr/bin/chown"
+MKDIR="/usr/bin/mkdir"
+TOUCH="/usr/bin/touch"
 DIFF="/usr/bin/diff"
+SUDO="/usr/bin/sudo"
 TAIL="/usr/bin/tail"
 AWK="/usr/bin/awk"
 GREP="/bin/grep"
 LN="/usr/bin/ln"
 CP="/bin/cp"
 LS="/bin/ls"
+RM="/bin/rm"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config-dassrv1/
@@ -99,7 +106,7 @@ DIFF_STAT()
 		_status=${_ckdiff}
 	fi
 
-	/bin/rm .tmp.A.$$ .tmp.B.$$
+	${RM} .tmp.A.$$ .tmp.B.$$
 
 	return ${_status}
 }
@@ -142,7 +149,7 @@ DIFF_FILE()
 			# Push Latest Git Repo Version to System
 			if [[ "$ckUpdate" == "s" || "$ckUpdate" == "sys" ]]; then
 				echo "Deploying Latest Repo File to System:"
-				sudo ${CP} -i "${_file1}" "${_file2}"
+				${SUDO} ${CP} -i "${_file1}" "${_file2}"
 			# Pull Latest System Version into Git Repo
 			elif [[ "$ckUpdate" == "r" || "$ckUpdate" == "repo" ]]; then
 				echo "Updating Repo with Latest Deployed System File:"
@@ -277,7 +284,7 @@ CONFCK()
 			echo "System ChkConfig for PVSD is the Same."
 		fi
 	fi
-	/bin/rm -f /tmp/chkconfig.pvsd.$$
+	${RM} -f /tmp/chkconfig.pvsd.$$
 	if [ $? != 0 ]; then
 		echo "Failure Deleting Temporary System ChkConfig File for PVSD...!"
 		(( _nerrors++ ))
@@ -288,11 +295,11 @@ CONFCK()
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo chkconfig --add pvsd
+			${SUDO} chkconfig --add pvsd
 			chkconfig --list pvsd
-			sudo chkconfig pvsd on
+			${SUDO} chkconfig pvsd on
 			chkconfig --list pvsd
-			/bin/rm -i pvsd/chkconfig.pvsd
+			${RM} -i pvsd/chkconfig.pvsd
 			chkconfig --list pvsd > ./pvsd/chkconfig.pvsd 2>&1
 		fi
 	fi
@@ -323,7 +330,7 @@ CONFCK()
 		echo "Defer Fixing of PVSD Admin Crontab..."
 		echo "(See Admin Crontab Create Below, or Fix Manually.)"
 	fi
-	/bin/rm -f /tmp/$USER.crontab.$$
+	${RM} -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
 		echo "Failure Deleting Temporary Admin Crontab File for PVSD...!"
 		(( _nerrors++ ))
@@ -374,18 +381,18 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo touch "${PVSD_LOG}"
-			sudo chgrp users "${PVSD_LOG}"
-			sudo chmod g+rw "${PVSD_LOG}"
+			${SUDO} ${TOUCH} "${PVSD_LOG}"
+			${SUDO} ${CHGRP} users "${PVSD_LOG}"
+			${SUDO} ${CHMOD} g+rw "${PVSD_LOG}"
 			${LS} -l "${PVSD_LOG}"
 			# Restart RSyslog Service...?
-			sudo ${SYSTEMCTL} status rsyslog
+			${SUDO} ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ${SYSTEMCTL} restart rsyslog
-				sudo ${TAIL} "${MESSAGES_LOG}"
+				${SUDO} ${SYSTEMCTL} restart rsyslog
+				${SUDO} ${TAIL} "${MESSAGES_LOG}"
 			fi
 		fi
 	fi
@@ -398,10 +405,10 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo mkdir "${RSYSLOG_PIPES}"
-			sudo "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
-			sudo chgrp snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
-			sudo chmod 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
+			${SUDO} ${MKDIR} "${RSYSLOG_PIPES}"
+			${SUDO} "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
+			${SUDO} ${CHGRP} snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
+			${SUDO} ${CHMOD} 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
 			${LS} -l "${RSYSLOG_PIPES}"
 			# Set Big Error Pipe...
 			echo "Set Big Error Pipe..."
@@ -420,12 +427,12 @@ if [[ $UPDATE == 1 ]]; then
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 			if [[ ! -d "${SNSLOCAL}" ]]; then
-				sudo mkdir "${SNSLOCAL}"
+				${SUDO} ${MKDIR} "${SNSLOCAL}"
 			fi
-			sudo mkdir "${RSYSLOG_CACHE}"
-			sudo chown snsdata "${RSYSLOG_CACHE}"
-			sudo chgrp adara "${RSYSLOG_CACHE}"
-			sudo chmod g+ws "${RSYSLOG_CACHE}"
+			${SUDO} ${MKDIR} "${RSYSLOG_CACHE}"
+			${SUDO} ${CHOWN} snsdata "${RSYSLOG_CACHE}"
+			${SUDO} ${CHGRP} adara "${RSYSLOG_CACHE}"
+			${SUDO} ${CHMOD} g+ws "${RSYSLOG_CACHE}"
 			${LS} -ld "${RSYSLOG_CACHE}"
 		fi
 	fi
@@ -486,7 +493,7 @@ if [[ $UPDATE == 1 ]]; then
 			# Install Administrator Crontab
 			crontab $cron_file
 			# Clean Up Temp Crontab File
-			/bin/rm $cron_file
+			${RM} $cron_file
 			# Check for Manual Crontab Edit
 			if [[ $manual_edit == 1 ]]; then
 				crontab -e
@@ -511,7 +518,7 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo ${LN} -s "${PVSD_BINARY}" "${PVSD_LINK}"
+			${SUDO} ${LN} -s "${PVSD_BINARY}" "${PVSD_LINK}"
 			${LS} -l "${PVSD_LINK}"
 		fi
 	fi

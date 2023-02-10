@@ -50,13 +50,20 @@ ADARA_BINARIES="/home/controls/config-dasmon/deploy"
 DASMON_LINKS="/usr/sbin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
+CHMOD="/usr/bin/chmod"
+CHGRP="/usr/bin/chgrp"
+MKDIR="/usr/bin/mkdir"
+TOUCH="/usr/bin/touch"
 DIFF="/usr/bin/diff"
+SUDO="/usr/bin/sudo"
 TAIL="/usr/bin/tail"
 AWK="/usr/bin/awk"
 GREP="/bin/grep"
 LN="/usr/bin/ln"
 CP="/bin/cp"
 LS="/bin/ls"
+RM="/bin/rm"
+SH="/bin/sh"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config-dasmon/
@@ -97,7 +104,7 @@ DIFF_STAT()
 		_status=${_ckdiff}
 	fi
 
-	/bin/rm .tmp.A.$$ .tmp.B.$$
+	${RM} .tmp.A.$$ .tmp.B.$$
 
 	return ${_status}
 }
@@ -140,7 +147,7 @@ DIFF_FILE()
 			# Push Latest Git Repo Version to System
 			if [[ "$ckUpdate" == "s" || "$ckUpdate" == "sys" ]]; then
 				echo "Deploying Latest Repo File to System:"
-				sudo ${CP} -i "${_file1}" "${_file2}"
+				${SUDO} ${CP} -i "${_file1}" "${_file2}"
 			# Pull Latest System Version into Git Repo
 			elif [[ "$ckUpdate" == "r" || "$ckUpdate" == "repo" ]]; then
 				echo "Updating Repo with Latest Deployed System File:"
@@ -328,7 +335,7 @@ CONFCK()
 		echo "Defer Fixing of DASMOND Admin Crontab..."
 		echo "(See Admin Crontab Create Below, or Fix Manually.)"
 	fi
-	/bin/rm -f /tmp/$USER.crontab.$$
+	${RM} -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
 		echo "Failure Deleting Temporary Admin Crontab File for DASMOND...!"
 		(( _nerrors++ ))
@@ -372,7 +379,7 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo mkdir ${DASMON_HOME}
+			${SUDO} ${MKDIR} ${DASMON_HOME}
 		fi
 	fi
 	if [[ ! -d ${DASMON_HOME}/${DASMON_USER} ]]; then
@@ -382,15 +389,15 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo useradd -b ${DASMON_HOME} -u ${DASMON_UID} -m -U \
+			${SUDO} useradd -b ${DASMON_HOME} -u ${DASMON_UID} -m -U \
 				-s /sbin/nologin ${DASMON_USER}
-			sudo chmod og+rx ${DASMON_HOME}/${DASMON_USER}
+			${SUDO} ${CHMOD} og+rx ${DASMON_HOME}/${DASMON_USER}
 			${LS} -ld ${DASMON_HOME}/${DASMON_USER}
 			${GREP} ${DASMON_USER} /etc/passwd
 			${GREP} ${DASMON_USER} /etc/group
 			# Go Ahead and Create Base DASMON GUI Client Config
 			# (It probably matches what's in the Git Repo anyway...! ;-D)
-			sudo sh -c 'echo -e "[rules]\\n[signals]" \
+			${SUDO} ${SH} -c 'echo -e "[rules]\\n[signals]" \
 				> ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg'
 			${LS} -l ${DASMON_HOME}/${DASMON_USER}
 			/bin/cat ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg
@@ -408,18 +415,18 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			sudo touch "${DASMOND_LOG}"
-			sudo chgrp users "${DASMOND_LOG}"
-			sudo chmod g+rw "${DASMOND_LOG}"
+			${SUDO} ${TOUCH} "${DASMOND_LOG}"
+			${SUDO} ${CHGRP} users "${DASMOND_LOG}"
+			${SUDO} ${CHMOD} g+rw "${DASMOND_LOG}"
 			${LS} -l "${DASMOND_LOG}"
 			# Restart RSyslog Service...?
-			sudo ${SYSTEMCTL} status rsyslog
+			${SUDO} ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ${SYSTEMCTL} restart rsyslog
-				sudo ${TAIL} "${MESSAGES_LOG}"
+				${SUDO} ${SYSTEMCTL} restart rsyslog
+				${SUDO} ${TAIL} "${MESSAGES_LOG}"
 			fi
 		fi
 	fi
@@ -451,7 +458,7 @@ if [[ $UPDATE == 1 ]]; then
 			fi
 
 			# Clean Up Temp Crontab File
-			/bin/rm $cron_file
+			${RM} $cron_file
 
 			# Check for Manual Crontab Edit
 			crontab -l
@@ -478,7 +485,7 @@ if [[ $UPDATE == 1 ]]; then
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo ${LN} -s "${ADARA_BINARIES}/$i" "${DASMON_LINKS}/$i"
+				${SUDO} ${LN} -s "${ADARA_BINARIES}/$i" "${DASMON_LINKS}/$i"
 				${LS} -l "${DASMON_LINKS}/$i"
 			fi
 		fi
