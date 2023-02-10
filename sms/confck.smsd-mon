@@ -801,7 +801,7 @@ if [[ $UPDATE == 1 ]]; then
 
 			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
 			echo -n "0 8 * * *" >> $cron_file
-			echo -n " /SNS/users/$USER/gitsrc/ADARA/adara_monitor" \
+			echo -n " ${ADARA_DIR}/adara_monitor" \
 				>> $cron_file
 			echo " --oneshot" >> $cron_file
 			echo >> $cron_file
