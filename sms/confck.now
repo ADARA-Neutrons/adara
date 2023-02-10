@@ -578,7 +578,7 @@ SMS_CONFCK()
 	echo
 
 	local _check_update=0
-	systemctl is-enabled smsd${ALT} \
+	${SYSTEMCTL} is-enabled smsd${ALT} \
 		> /tmp/systemctl.enabled.smsd${ALT}.$$ 2>&1
 	if [ $? != 0 ]; then
 		echo "Failure Retrieving SystemCtl Enabled for SMSD${ALT}...!"
@@ -610,10 +610,10 @@ SMS_CONFCK()
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				sudo systemctl enable smsd${ALT}
-				systemctl is-enabled smsd${ALT}
+				sudo ${SYSTEMCTL} enable smsd${ALT}
+				${SYSTEMCTL} is-enabled smsd${ALT}
 				/bin/rm -i ./sms${ALT}/systemctl.enabled.smsd${ALT}
-				systemctl is-enabled smsd${ALT} \
+				${SYSTEMCTL} is-enabled smsd${ALT} \
 					> ./sms${ALT}/systemctl.enabled.smsd${ALT} 2>&1
 			fi
 		else
