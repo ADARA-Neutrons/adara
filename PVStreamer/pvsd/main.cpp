@@ -339,7 +339,11 @@ int main(int argc, char *argv[])
         {
             if ( !( ++count % 5 ) )
             {
-                combus->status( ::ADARA::ComBus::STATUS_OK );
+                if ( !(combus->status( ::ADARA::ComBus::STATUS_OK )) )
+                {
+                    syslog( LOG_ERR, "PVSD ERROR: %s",
+                        "Broadcasting PVSD ComBus Status OK Message" );
+                }
             }
 
             if ( !( count % 300 ) )
