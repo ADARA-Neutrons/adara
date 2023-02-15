@@ -15,6 +15,21 @@
 namespace ADARA {
 namespace DASMON {
 
+/// Used to Identify "Special" Detector Bank Ids (Error & Unmapped)
+enum SpecialBankIds
+{
+    UNMAPPED_BANK   = 0xffffffff,
+    ERROR_BANK      = 0xfffffffe
+};
+
+/// Used to Identify "Special" Detector Bank Indices (Error & Unmapped)
+enum SpecialBankIndices
+{
+    UNMAPPED_BANK_INDEX = 0,
+    ERROR_BANK_INDEX    = 1,
+    NUM_SPECIAL_BANKS   = 2
+};
+
 struct PktStats
 {
     PktStats()
