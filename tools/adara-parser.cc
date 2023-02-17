@@ -798,27 +798,36 @@ bool Parser::rxPacket(const ADARA::RunStatusPkt &pkt)
 			{
 				uint32_t fileNum = pkt.fileNumber();
 				uint32_t modeNum = 0;
+				uint32_t pauseFileNum = pkt.pauseFileNumber();
+				uint32_t paused = pkt.paused();
+				uint32_t addendumFileNum = pkt.addendumFileNumber();
+				uint32_t addendum = pkt.addendum();
+
 				// Embedded Mode Number...?
 				if ( fileNum > 0xfff )
 				{
 					modeNum = ( fileNum >> 12 ) & 0xfff;
 					fileNum &= 0xfff;
-					printf("    Mode index %u, File index %u\n",
-						modeNum, fileNum);
+					printf( "    %s %u, %s %u\n",
+						"Mode Index", modeNum,
+						"File Index", fileNum );
+					printf( "    %s %u (%s=%u), %s %u (%s=%u)\n",
+						"Pause Index", pauseFileNum,
+						"paused", paused,
+						"Addendum Index", addendumFileNum,
+						"addendum", addendum );
 				}
 				else
 				{
-					printf("    File index %u\n", fileNum);
+					printf( "    %s %u\n",
+						"File Index", fileNum );
+					printf( "    %s %u (%s=%u), %s %u (%s=%u)\n",
+						"Pause Index", pauseFileNum,
+						"paused", paused,
+						"Addendum Index", addendumFileNum,
+						"addendum", addendum );
 				}
 			}
-#if 0
-			if (pkt.version() == 0x01) {
-				printf("    Paused 0x%x Pause File index %u\n",
-					pkt.paused(), pkt.pauseFileNumber());
-				printf("    Addendum 0x%x Addendum File index %u\n",
-					pkt.addendum(), pkt.addendumFileNumber());
-			}
-#endif
 		}
 	}
 

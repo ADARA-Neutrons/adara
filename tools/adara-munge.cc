@@ -142,11 +142,10 @@ class MungeParser : public ADARA::POSIXParser {
 public:
 	MungeParser() :
 		ADARA::POSIXParser(ADARA_IN_BUF_SIZE, ADARA_IN_BUF_SIZE),
-		m_run_start_epoch(0), m_run_file_number(0), m_run_number(0),
-#if 0
+		m_run_start_epoch(0),
 		m_addendum_file_number(0), m_addendum(false),
 		m_pause_file_number(0), m_paused(false),
-#endif
+		m_run_file_number(0), m_run_number(0),
 		m_case(0),
 		m_skip_pkt(false),
 		m_addRunEnd(false),
@@ -218,10 +217,8 @@ public:
 
 	void addRunStatus( uint32_t m_run_number, uint32_t m_run_start_epoch,
 		uint32_t m_run_file_number,
-#if 0
-		uint32_t m_paused_file_number, bool m_paused,
+		uint32_t m_pause_file_number, bool m_paused,
 		uint32_t m_addendum_file_number, bool m_addendum,
-#endif
 		ADARA::RunStatus::Enum status );
 
 	void addRunStart( struct timespec *ts );
@@ -240,12 +237,10 @@ private:
 	struct timespec m_starttime;
 	struct timespec m_endtime;
 	uint32_t m_run_start_epoch;
-#if 0
 	uint32_t m_addendum_file_number;
 	bool m_addendum;
-	uint32_t m_paused_file_number;
+	uint32_t m_pause_file_number;
 	bool m_paused;
-#endif
 	uint32_t m_run_file_number;
 	uint32_t m_run_number;
 	uint32_t m_case;
@@ -769,29 +764,36 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 			{
 				uint32_t fileNum = pkt.fileNumber();
 				uint32_t modeNum = 0;
+				uint32_t pauseFileNum = pkt.pauseFileNumber();
+				uint32_t paused = pkt.paused();
+				uint32_t addendumFileNum = pkt.addendumFileNumber();
+				uint32_t addendum = pkt.addendum();
+
 				// Embedded Mode Number...?
 				if ( fileNum > 0xfff )
 				{
 					modeNum = ( fileNum >> 12 ) & 0xfff;
 					fileNum &= 0xfff;
-					fprintf( stderr, "    Mode index %u, File index %u\n",
-						modeNum, fileNum );
+					fprintf( stderr, "    %s %u, %s %u\n",
+						"Mode Index", modeNum,
+						"File Index", fileNum );
+					fprintf( stderr, "    %s %u (%s=%u), %s %u (%s=%u)\n",
+						"Pause Index", pauseFileNum,
+						"paused", paused,
+						"Addendum Index", addendumFileNum,
+						"addendum", addendum );
 				}
 				else
 				{
-					fprintf( stderr, "    File index %u\n", fileNum );
+					fprintf( stderr, "    %s %u\n",
+						"File Index", fileNum );
+					fprintf( stderr, "    %s %u (%s=%u), %s %u (%s=%u)\n",
+						"Pause Index", pauseFileNum,
+						"paused", paused,
+						"Addendum Index", addendumFileNum,
+						"addendum", addendum );
 				}
 			}
-#if 0
-			if (pkt.version() == 0x01) {
-				fprintf( stderr,
-					"    Paused 0x%x Pause File index %u\n",
-					pkt.paused(), pkt.pauseFileNumber() );
-				fprintf( stderr,
-					"    Addendum 0x%x Addendum File index %u\n",
-					pkt.addendum(), pkt.addendumFileNumber() );
-			}
-#endif
 		}
 	}
 
@@ -813,12 +815,10 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 				m_run_number = pkt.runNumber();
 				m_run_start_epoch = pkt.runStart();
 				m_run_file_number = pkt.fileNumber();
-#if 0
 				m_pause_file_number = pkt.pauseFileNumber();
 				m_paused = pkt.paused();
 				m_addendum_file_number = pkt.addendumFileNumber();
 				m_addendum = pkt.addendum();
-#endif
 
 				std::cerr << "Captured Run Status Meta-Data:"
 					<< std::endl
@@ -828,9 +828,8 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 					<< "- Run File Number = " << m_run_file_number
 						<< " (0x" << std::hex << m_run_file_number
 							<< std::dec << ")"
-#if 0
-					<< "- Paused File Number = " << m_paused_file_number
-						<< " (0x" << std::hex << m_paused_file_number
+					<< "- Paused File Number = " << m_pause_file_number
+						<< " (0x" << std::hex << m_pause_file_number
 							<< std::dec << ")"
 					<< "- Paused = " << m_paused
 						<< " (0x" << std::hex << m_paused
@@ -842,7 +841,6 @@ bool MungeParser::rxPacket(const ADARA::RunStatusPkt &pkt)
 					<< "- Addendum = " << m_addendum
 						<< " (0x" << std::hex << m_addendum
 							<< std::dec << ")"
-#endif
 						<< std::endl;
 			}
 
@@ -952,27 +950,19 @@ struct run_status_packet {
 	uint32_t    run_number;
 	uint32_t    run_start;
 	uint32_t    status_number;
-#if 0
-	uint32_t    paused_number;
+	uint32_t    pause_number;
 	uint32_t    addendum_number;
-#endif
 } __attribute__((packed));
 
 void MungeParser::addRunStatus( uint32_t run_number,
 		uint32_t run_start_epoch, uint32_t run_file_number,
-#if 0
-		uint32_t paused_file_number, bool paused,
+		uint32_t pause_file_number, bool paused,
 		uint32_t addendum_file_number, bool addendum,
-#endif
 		ADARA::RunStatus::Enum status )
 {
 	struct run_status_packet spkt = {
 		hdr : {
-#if 0
 			payload_len : 20,
-#else
-			payload_len : 12,
-#endif
 			pkt_format : ADARA_PKT_TYPE(
 				ADARA::PacketType::RUN_STATUS_TYPE,
 				ADARA::PacketType::RUN_STATUS_VERSION ),
@@ -989,14 +979,12 @@ void MungeParser::addRunStatus( uint32_t run_number,
 	// Ignore Paused File Number in RunStatus Packet...
 	// (TODO Figure out how to munge this field if we ever need
 	// to _Recover_ any Paused Files into a given run...! ;-)
-	// [Solved in V1 Packet Type... Yet To Be Activated... ;-]
+	// [Solved in V1 Packet Type... Activated as of 1.8.1]
 	spkt.status_number = run_file_number | ((uint32_t) status << 24);
 
-#if 0
-	spkt.paused_number = pause_file_number | ((uint32_t) paused << 24);
+	spkt.pause_number = pause_file_number | ((uint32_t) paused << 24);
 	spkt.addendum_number = addendum_file_number
 		| ((uint32_t) addendum << 24);
-#endif
 
 	m_out.write( (const char *)&spkt, sizeof(spkt) );
 }
@@ -2240,9 +2228,8 @@ void MungeParser::parse(int argc, char **argv)
 				<< "- Run File Number = " << m_run_file_number
 					<< " (0x" << std::hex << m_run_file_number
 						<< std::dec << ")"
-#if 0
-				<< "- Paused File Number = " << m_paused_file_number
-					<< " (0x" << std::hex << m_paused_file_number
+				<< "- Paused File Number = " << m_pause_file_number
+					<< " (0x" << std::hex << m_pause_file_number
 						<< std::dec << ")"
 				<< "- Paused = " << m_paused
 					<< " (0x" << std::hex << m_paused
@@ -2254,15 +2241,12 @@ void MungeParser::parse(int argc, char **argv)
 				<< "- Addendum = " << m_addendum
 					<< " (0x" << std::hex << m_addendum
 						<< std::dec << ")"
-#endif
 				<< std::endl;
 
 			addRunStatus( m_run_number, m_run_start_epoch,
 				m_run_file_number,
-#if 0
-				m_paused_file_number, m_paused,
+				m_pause_file_number, m_paused,
 				m_addendum_file_number, m_addendum,
-#endif
 				ADARA::RunStatus::END_RUN );
 		}
 
@@ -2277,9 +2261,8 @@ void MungeParser::parse(int argc, char **argv)
 				<< "- Run File Number = " << m_run_file_number << std::endl
 					<< " (0x" << std::hex << m_run_file_number
 						<< std::dec << ")"
-#if 0
-				<< "- Paused File Number = " << m_paused_file_number
-					<< " (0x" << std::hex << m_paused_file_number
+				<< "- Paused File Number = " << m_pause_file_number
+					<< " (0x" << std::hex << m_pause_file_number
 						<< std::dec << ")"
 				<< "- Paused = " << m_paused
 					<< " (0x" << std::hex << m_paused
@@ -2291,7 +2274,6 @@ void MungeParser::parse(int argc, char **argv)
 				<< "- Addendum = " << m_addendum
 					<< " (0x" << std::hex << m_addendum
 						<< std::dec << ")"
-#endif
 				<< "Can't Add Final Run Status Packet..."
 				<< std::endl;
 		}
