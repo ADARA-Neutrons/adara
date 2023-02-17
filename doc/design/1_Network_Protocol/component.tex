@@ -182,9 +182,11 @@ system.
 		\ref{section:protocol_pixel_mapping_alt_table_v0} \\
 	0x4102.1 & Pixel Mapping Alternate Table V1 &
 		\ref{section:protocol_pixel_mapping_alt_table_v1} \\
-	0x4003.0 & Run Status &
-		\ref{section:protocol_run_status} \\
-	0x4004.0 & Run Informtaion &
+	0x4003.0 & Run Status V0 &
+		\ref{section:protocol_run_status_v0} \\
+	0x4003.1 & Run Status V1 &
+		\ref{section:protocol_run_status_v1} \\
+	0x4004.0 & Run Information &
 		\ref{section:protocol_run_information} \\
 	0x4005.0 & Translation Complete &
 		\ref{section:protocol_translation_complete} \\
@@ -1302,7 +1304,8 @@ for the run, the SMS will send the following prologue:
 \item Pixel Mapping Table (Section~\ref{section:protocol_pixel_mapping_table}), or
 \item Pixel Mapping Alt Table, Version 0 (Section~\ref{section:protocol_pixel_mapping_alt_table_v0}), or
 \item Pixel Mapping Alt Table, Version 1 (Section~\ref{section:protocol_pixel_mapping_alt_table_v1})
-\item Run Status (Section~\ref{section:protocol_run_status})
+\item Run Status, Version 0 (Section~\ref{section:protocol_run_status_v0}), or
+\item Run Status, Version 1 (Section~\ref{section:protocol_run_status_v1})
 \item Run Information (Section~\ref{section:protocol_run_information})
 \item Geometry (Section~\ref{section:protocol_geometry})
 \item Beamline Info (Section~\ref{section:protocol_beamline_info_v1})
@@ -1332,7 +1335,7 @@ Service is free to handle to these packets as it deems appropriate.
 At the end of an experiment recording, the SMS will send a Run Status Packet
 indicating the end of a run and that all data has been sent. The Translation
 Service will finalize its work, and respond with a Translation Complete Packet
-(Section~\ref{section:protocol_translation_complete}) indicating sucess or the
+(Section~\ref{section:protocol_translation_complete}) indicating success or the
 error encountered.  The Translation Service need not wait for receipt of the
 Run Status Packet from the SMS prior to indicating an error; early notification
 is preferred.  Once the Translation Complete Packet is received from the
@@ -1350,7 +1353,8 @@ Hello, it will send the following prologue:
 \item Pixel Mapping Table (Section~\ref{section:protocol_pixel_mapping_table}), or
 \item Pixel Mapping Alt Table, Version 0 (Section~\ref{section:protocol_pixel_mapping_alt_table_v0}), or
 \item Pixel Mapping Alt Table, Version 1 (Section~\ref{section:protocol_pixel_mapping_alt_table_v1})
-\item Run Status (Section~\ref{section:protocol_run_status})
+\item Run Status, Version 0 (Section~\ref{section:protocol_run_status_v0}), or
+\item Run Status, Version 1 (Section~\ref{section:protocol_run_status_v1})
 \item Geometry (Section~\ref{section:protocol_geometry})
 \item Beamline Info (Section~\ref{section:protocol_beamline_info_v1})
 \item Beam Monitor Config (Optional, Sections~\ref{section:protocol_beam_monitor_config_v0} and \ref{section:protocol_beam_monitor_config_v1})
@@ -2384,8 +2388,8 @@ and ``Shorthand'' formatting variants.)
 
 
 \newpage
-\subsubsection{Run Status Packet}
-\label{section:protocol_run_status}
+\subsubsection{Run Status Packet  - Version 0 (Original)}
+\label{section:protocol_run_status_v0}
 
 \begin{figure}[h]
   \centering
@@ -2402,8 +2406,8 @@ and ``Shorthand'' formatting variants.)
     \bitbox{8}{Status} &
     \bitbox{24}{File Number} \\
   \end{bytefield}
-  \caption{Packet Type 0x4003.0: Run Status Packet}
-  \label{fig:protocol_packet_status}
+  \caption{Packet Type 0x4003.0: Run Status Packet V0}
+  \label{fig:protocol_packet_status_v0}
 \end{figure}
 
 \begin{table}[h]
@@ -2420,10 +2424,10 @@ and ``Shorthand'' formatting variants.)
     \end{tabular}
   \end{center}
   \caption {Run Status Definitions}
-  \label{table:protocol_run_status_values}
+  \label{table:protocol_run_status_values_v0}
 \end{table}
 
-The ``Run Status'' packet is used to indicate if we are currently in an
+The ``Run Status'' packet, Version 0 (Original), is used to indicate if we are currently in an
 experimental run, and if so, identify it. This packet must be sent/written at
 the start of each experimental run, and should be written to the start of
 each event data file to tag it with the run data it contains.
@@ -2436,19 +2440,116 @@ field is 0 if we are not currently recording an experimental run.
 \item{\bf Run Start} contains the seconds portion of the time that we began
 the current experiment run. This field is 0 if we are not currently recording
 data. This field is relative to the EPICS epoch.
-\item{\bf Status} is defined in Table~\ref{table:protocol_run_status_values}.
-\item{\bf File Number} indentifies which file this data is stored in. This
-field is undefined if we are not currently recording an experimental run.
+\item{\bf Status} is defined in
+Table~\ref{table:protocol_run_status_values_v0}.
+\item{\bf File Number} identifies which file this raw data is stored in.
+This field is undefined if we are not currently recording an
+experimental run.
 \end{itemize}
 
 The Stream Management Service (SMS) breaks experimental recordings into multiple
-chunks to allow a gradual reclaimation of storage space once the recording
+local ``raw data file''
+chunks to allow a gradual reclamation of storage space once the recording
 has been translated to a NeXus file. This process increases the window in
 which at least partial data from a experiment can be retrieved from the SMS
 in the case that a problem is detected after the guaranteed recovery period.
 Rather than relying solely on the filename (which could be subject to human
 error) to determine how much of the recording has been preserved, the
-``Run Status'' packet provides an authoratative source for the amount
+``Run Status'' packet provides an authoritative source for the amount
+of time and approximate data missing by using the {\bf Run Start} and
+{\bf File Number} fields along with the administrator controlled chunk size.
+
+
+\newpage
+\subsubsection{Run Status Packet  - Version 1}
+\label{section:protocol_run_status_v1}
+
+\begin{figure}[h]
+  \centering
+  \begin{bytefield}[bitwidth=1em]{32}
+    \bitheader{31,0} \\
+    \wordbox{1}{Payload Length = 20} \\
+    \wordbox{1}{0x00400301} \\
+    \wordbox{1}{Timestamp (seconds)} \\
+    \wordbox{1}{Timestamp (nanoseconds)} \\
+
+    \bitheader{31,24,23,0} \\
+    \wordbox{1}{Run Number (u32)} \\
+    \wordbox{1}{Run Start (seconds, u32)} \\
+    \bitbox{8}{Status} &
+    \bitbox{24}{File Number} \\
+    \bitbox{8}{Paused} &
+    \bitbox{24}{Pause File Number} \\
+    \bitbox{8}{Addendum} &
+    \bitbox{24}{Addendum File Number} \\
+  \end{bytefield}
+  \caption{Packet Type 0x4003.1: Run Status Packet V1}
+  \label{fig:protocol_packet_status_v1}
+\end{figure}
+
+\begin{table}[h]
+  \begin{center}
+    \begin{tabular}{c | l}
+	Value & Definition \\
+	\hline
+	0 & No current run \\
+	1 & Beginning new run \\
+	2 & Continuing current run (end of file marker) \\
+	3 & Continuing current run (new file marker) \\
+	4 & Ending current run \\
+	5 & System status snapshot \\
+    \end{tabular}
+  \end{center}
+  \caption {Run Status Definitions}
+  \label{table:protocol_run_status_values_v1}
+\end{table}
+
+The ``Run Status'' packet, Version 1, is used to indicate if we are currently in an
+experimental run, and if so, identify it. This packet must be sent/written at
+the start of each experimental run, and should be written to the start of
+each event data file to tag it with the run data it contains.
+This updated version of the Run Status packet includes additional fields
+for any ``Paused'' mode of data collection,
+and if so the associated ``Pause File Number'' index of the raw data file,
+as well as whether the given raw data file
+was a manually-added ``Addendum'' file,
+and if so the associated ``Addendum File Number'' index
+of the raw data file, respectively (see below).
+
+\begin{itemize}
+\item{\bf Payload Length} is 20 bytes.
+\item{\bf Timestamp} is the current system time when the packet is created.
+\item{\bf Run Number} is the identifier for the current experimental run. This
+field is 0 if we are not currently recording an experimental run.
+\item{\bf Run Start} contains the seconds portion of the time that we began
+the current experiment run. This field is 0 if we are not currently recording
+data. This field is relative to the EPICS epoch.
+\item{\bf Status} is defined in
+Table~\ref{table:protocol_run_status_values_v1}.
+\item{\bf File Number} identifies which file this raw data is stored in.
+This field is undefined if we are not currently recording an
+experimental run.
+\item{\bf Paused} is a boolean value that specifies whether the
+data acquisition was in a ``Paused'' mode of operation when this
+given Run Status packet was generated.
+\item{\bf Pause File Number} identifies the associated ``Pause File
+Number'' index of the raw data file.
+\item{\bf Addendum} is a boolean value that specifies whether the
+specific raw data file was manually inserted as an ``Addendum''
+when this given Run Status packet was generated.
+\item{\bf Addendum File Number} identifies the associated
+``Addendum File Number'' index of the raw data file.
+\end{itemize}
+
+The Stream Management Service (SMS) breaks experimental recordings into multiple
+local ``raw data file''
+chunks to allow a gradual reclamation of storage space once the recording
+has been translated to a NeXus file. This process increases the window in
+which at least partial data from a experiment can be retrieved from the SMS
+in the case that a problem is detected after the guaranteed recovery period.
+Rather than relying solely on the filename (which could be subject to human
+error) to determine how much of the recording has been preserved, the
+``Run Status'' packet provides an authoritative source for the amount
 of time and approximate data missing by using the {\bf Run Start} and
 {\bf File Number} fields along with the administrator controlled chunk size.
 
