@@ -95,6 +95,8 @@ bool SMSControl::m_doPulseVetoCorrect;
 bool SMSControl::m_sendSampleInRunInfo;
 bool SMSControl::m_savePixelMap;
 
+bool SMSControl::m_useAncientRunStatusPkt;
+
 bool SMSControl::m_allowNonOneToOnePixelMapping;
 
 bool SMSControl::m_useOrigPixelMappingPkt;
@@ -412,6 +414,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 
 	m_savePixelMap = conf.get<bool>("sms.save_pixel_map", false);
 	INFO("Setting Save Pixel Map in NeXus to " << m_savePixelMap << ".");
+
+	m_useAncientRunStatusPkt =
+		conf.get<bool>("sms.use_ancient_run_status_pkt", false);
+	INFO("Setting Use Ancient Run Status Packet Format to "
+		<< m_useAncientRunStatusPkt << ".");
 
 	m_allowNonOneToOnePixelMapping =
 			conf.get<bool>("sms.allow_non_one_to_one_pixel_mappings",

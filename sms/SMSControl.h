@@ -459,6 +459,9 @@ public:
 
 	boost::shared_ptr<Markers> getMarkers(void) { return m_markers; }
 
+	bool getUseAncientRunStatusPkt(void)
+		{ return m_useAncientRunStatusPkt; }
+
 	void updateVerbose(void);
 
 	uint32_t verbose(void) { return m_verbose; }
@@ -987,6 +990,8 @@ private:
 
 	static bool m_sendSampleInRunInfo;
 	static bool m_savePixelMap;
+
+	static bool m_useAncientRunStatusPkt;
 
 	static bool m_allowNonOneToOnePixelMapping;
 
