@@ -679,6 +679,12 @@ StreamParser::rxPacket
         uint32_t fileNum = a_pkt.fileNumber();
         uint32_t modeNum = 0;
 
+        // Decode Any Paused Mode or Addendum File Index (SMS After 1.8.1)
+        uint32_t pauseFileNum = a_pkt.pauseFileNumber();
+        uint32_t paused = a_pkt.paused();
+        uint32_t addendumFileNum = a_pkt.addendumFileNumber();
+        uint32_t addendum = a_pkt.addendum();
+
         // Embedded Mode Number...?
         if ( fileNum > 0xfff )
         {
@@ -686,15 +692,27 @@ StreamParser::rxPacket
             fileNum &= 0xfff;
 
             syslog( LOG_INFO,
-                "[%i] %s, Mode Index #%d, File Index #%d, %s = %s.",
-                g_pid, "Run Status", modeNum, fileNum,
+               "[%i] %s, %s%d, %s%d, %s%d (%s=%d), %s%d (%s=%d), %s = %s.",
+                g_pid, "Run Status",
+                "Mode Index #", modeNum,
+                "File Index #", fileNum,
+                "Pause Index #", pauseFileNum,
+                "paused", paused,
+                "Addendum Index #", addendumFileNum,
+                "addendum", addendum,
                 "Processing State", getProcessingStateString().c_str() );
             give_syslog_a_chance;
         }
         else
         {
-            syslog( LOG_INFO, "[%i] %s, File Index #%d, %s = %s.",
-                g_pid, "Run Status", fileNum,
+            syslog( LOG_INFO,
+               "[%i] %s, %s%d, %s%d (%s=%d), %s%d (%s=%d), %s = %s.",
+                g_pid, "Run Status",
+                "File Index #", fileNum,
+                "Pause Index #", pauseFileNum,
+                "paused", paused,
+                "Addendum Index #", addendumFileNum,
+                "addendum", addendum,
                 "Processing State", getProcessingStateString().c_str() );
             give_syslog_a_chance;
         }
