@@ -393,7 +393,6 @@ RunStatusPkt::RunStatusPkt(const uint8_t *data, uint32_t len) :
 			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
-#if 0
 	else if (m_version == 0x01
 			&& m_payload_len != (5 * sizeof(uint32_t))) {
 		std::stringstream ss;
@@ -403,9 +402,8 @@ RunStatusPkt::RunStatusPkt(const uint8_t *data, uint32_t len) :
 			<< m_payload_len;
 		throw invalid_packet(ss.str());
 	}
-#endif
 	else if (m_version > ADARA::PacketType::RUN_STATUS_VERSION
-			&& m_payload_len < (3 * sizeof(uint32_t))) {
+			&& m_payload_len < (5 * sizeof(uint32_t))) {
 		std::stringstream ss;
 		ss << ( (uint32_t) (m_pulseId >> 32) )
 			<< "." << ( (uint32_t) m_pulseId );
