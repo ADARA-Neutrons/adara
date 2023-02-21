@@ -1177,11 +1177,15 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingAltPkt &a_pkt )
         // Done
 
         syslog( LOG_INFO,
-            "%s: %s Tot=%u Max=%u Skip=%u, Sections Used=%u Skip=%u",
+            "%s: %s %s=%u %s=%u %s=%u, %s=%u %s=%u %s=%lu",
             "ADARA::PixelMappingAltPkt",
             "Done with Packet, PixelIds",
-            tot_pixel_count, max_pid, skip_pixel_count,
-            section_count, skip_sections );
+            "Tot", tot_pixel_count,
+            "Max", max_pid,
+            "Skip", skip_pixel_count,
+            "Sections Used", section_count,
+            "Skip", skip_sections,
+            "PixelBankMap.size()", m_pixbankmap.size() );
         usleep(30000); // give syslog a chance...
 
         m_pixbankmap_processed = true;
@@ -1260,6 +1264,14 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
                 rpos++;
             }
         }
+
+        syslog( LOG_INFO, "%s: %s %s=%u, %s=%lu",
+            "ADARA::PixelMappingPkt",
+            "Done with Packet, PixelIds",
+            "Max", max_pid,
+            "PixelBankMap.size()", m_pixbankmap.size() );
+        usleep(30000); // give syslog a chance...
+
         m_pixbankmap_processed = true;
     }
 
