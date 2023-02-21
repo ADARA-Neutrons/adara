@@ -374,13 +374,30 @@ public:
 		field[1] = runStart;
 	}
 
-#if 0
-	uint32_t pauseFileNumber(void) const { return m_fields[3] & 0xffffff; }
-	uint32_t paused(void) const { return m_fields[3] >> 24; }
-	uint32_t addendumFileNumber(void) const
-		{ return m_fields[4] & 0xffffff; }
-	uint32_t addendum(void) const { return m_fields[4] >> 24; }
-#endif
+	uint32_t pauseFileNumber(void) const {
+		if ( m_version >= 0x01 ) {
+			return m_fields[3] & 0xffffff;
+		}
+		else return( 0 );
+	}
+	uint32_t paused(void) const {
+		if ( m_version >= 0x01 ) {
+			return m_fields[3] >> 24;
+		}
+		else return( 0 );
+	}
+	uint32_t addendumFileNumber(void) const {
+		if ( m_version >= 0x01 ) {
+			return m_fields[4] & 0xffffff;
+		}
+		else return( 0 );
+	}
+	uint32_t addendum(void) const {
+		if ( m_version >= 0x01 ) {
+			return m_fields[4] >> 24;
+		}
+		else return( 0 );
+	}
 
 private:
 	const uint32_t *m_fields;

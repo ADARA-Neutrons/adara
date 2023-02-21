@@ -11,7 +11,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STC_VERSION "1.13.2"
+#define STC_VERSION "1.13.3"
 extern pid_t g_pid;
 
 #define STC_DOUBLE_EPSILON (0.00000000000001)
@@ -371,6 +371,7 @@ public:
     uint32_t                m_id;                   ///< ID of detector bank
     uint32_t                m_state;                ///< State of detector bank
     std::vector<uint32_t>   m_logical_pixelids;     ///< Logical PixelIds in detector bank
+    std::vector<uint32_t>   m_physical_pixelids;    ///< Physical PixelIds in detector bank
     uint32_t                m_buf_reserve;          ///< Event buffer initial capacity
     uint32_t                m_idx_buf_reserve;      ///< Index buffer initial capacity
     bool                    m_initialized;          ///< Has detector bank been initialized yet?
@@ -536,7 +537,9 @@ struct UserInfo
 struct RunInfo
 {
     RunInfo()
-        : run_number(0), run_title("NONE"), no_sample_info(false),
+        : run_number(0), run_title("NONE"),
+            no_sample_info(false), save_pixel_map(false),
+            run_notes_updates_enabled(true),
             // Initialize Double Values to Prevent Undue Randomization
             // from Unset Values Later...! ;-Q
             sample_mass(0.0), sample_mass_density(0.0),
@@ -559,6 +562,8 @@ struct RunInfo
     std::string             das_version;
     std::string             facility_name;
     bool                    no_sample_info;
+    bool                    save_pixel_map;
+    bool                    run_notes_updates_enabled;
     std::string             sample_id;
     std::string             sample_name;
     std::string             sample_nature;
@@ -1392,7 +1397,8 @@ public:
                                 uint64_t a_count ) = 0;
     virtual void            monitorFinalize(
                                 STC::MonitorInfo &a_monitor ) = 0;
-    virtual void            runComment( const std::string &a_comment,
+    virtual void            runComment( double a_time, uint64_t a_ts_nano,
+                                const std::string &a_comment,
                                 bool a_force_init = false ) = 0;
     virtual void            markerPause( double a_time,
                                 uint64_t a_ts_nano,

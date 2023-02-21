@@ -846,74 +846,348 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingAltPkt &a_pkt )
         const uint32_t *epos = (const uint32_t *)
             ( a_pkt.mappingData() + a_pkt.payload_length()
                 - sizeof(uint32_t) );
+        const uint32_t *rpos_save;
         const uint32_t *epos2;
 
-        uint32_t        pid;
-        uint32_t        max_pid = 0;
-        bool            first_pid = true;
-        uint16_t        bank_id;
-        uint16_t        pix_count;
+        int32_t physical_start, physical_stop;
+        int32_t physical_step;
+
+        int32_t logical_start, logical_stop;
+        int32_t logical_step;
+
+        int32_t logical;
+
+        uint16_t bank_id;
+        uint16_t is_shorthand;
+        uint16_t pixel_count;
+
+        uint32_t last_pid, pid;
+        uint32_t max_pid = 0;
+        bool first_pid = true;
+
+        int16_t cnt;
+
+        // Get number of banks (largest bank id) explicitly from packet
+        uint16_t bank_count = (uint16_t) a_pkt.numBanks();
+
+        syslog( LOG_INFO, "%s: Max Bank = %u",
+            "ADARA::PixelMappingAltPkt", bank_count );
+        usleep(30000); // give syslog a chance...
 
         m_bank_info.clear();
+
+        m_pixbankmap.clear();
+
+        // Now build banks and populate bank container
+
+        uint32_t skip_pixel_count = 0;
+        uint32_t tot_pixel_count = 0;
+        uint32_t skip_sections = 0;
+        uint32_t section_count = 0;
 
         // Build banks and analyze Logical pid range
         while ( rpos < epos )
         {
-            rpos++; // Skip Base Physical ID
+            // Base/Starting Physical PixelId
+            physical_start = *rpos++;
+
+            // BankID, 0/1=Direct/Shorthand Bit, Pixel Count...
             bank_id = (uint16_t)(*rpos >> 16);
-            pix_count = (uint16_t)(*rpos & 0xFFFF);
+            is_shorthand = (uint16_t)((*rpos & 0x8000) >> 15);
+            pixel_count = (uint16_t)(*rpos & 0x7FFF);
             rpos++;
+
+#ifdef DEBUG_PIXMAP
+            syslog( LOG_INFO, "%s: %s = %d, %s = %u, %s = %u, %s = %u",
+                "ADARA::PixelMappingAltPkt",
+                "Base/Starting Physical", physical_start,
+                "Bank ID", bank_id,
+                "Is Shorthand", is_shorthand,
+                "Count", pixel_count );
+            usleep(30000); // give syslog a chance...
+#endif
+
+            // Process Shorthand PixelId Section...
+            if ( is_shorthand )
+            {
+                // Stopping Physical PixelId
+                physical_stop = *rpos++;
+
+                // Base/Starting Logical PixelId
+                logical_start = *rpos++;
+
+                // Physical and Logical Step
+                physical_step = (int16_t)(*rpos >> 16);
+                logical_step = (int16_t)(*rpos & 0xFFFF);
+                rpos++;
+
+                // Stopping Logical PixelId
+                logical_stop = *rpos++;
+
+#ifdef DEBUG_PIXMAP
+                syslog( LOG_INFO, "%s: %s %s=%d/%d/%d %s=%d/%d/%d",
+                    "ADARA::PixelMappingAltPkt", "Shorthand Section",
+                    "physical",
+                    physical_start, physical_stop, physical_step,
+                    "logical",
+                    logical_start, logical_stop, logical_step );
+                usleep(30000); // give syslog a chance...
+#endif
+
+                // Verify Physical PixelId Count Versus Section Count...
+                cnt = ( physical_stop - physical_start + physical_step )
+                    / physical_step;
+                if ( cnt != (int32_t) pixel_count )
+                {
+                    syslog( LOG_ERR,
+                        "%s: %s %s=%d/%d/%d %s=%d/%d/%d: %d != %d - %s",
+                        "ADARA::PixelMappingAltPkt",
+                        "Physical PixelId Count Mismatch",
+                        "physical",
+                        physical_start, physical_stop, physical_step,
+                        "logical",
+                        logical_start, logical_stop, logical_step,
+                        cnt, pixel_count,
+                        "Skip Section..." );
+                    usleep(30000); // give syslog a chance...
+
+                    // Next Section
+                    skip_pixel_count += pixel_count;
+                    skip_sections++;
+                    continue;
+                }
+
+                // Verify Logical PixelId Count Versus Section Count...
+                cnt = ( logical_stop - logical_start + logical_step )
+                    / logical_step;
+                if ( cnt != (int32_t) pixel_count )
+                {
+                    syslog( LOG_ERR,
+                        "%s: %s %s=%d/%d/%d %s=%d/%d/%d: %d != %d - %s",
+                        "ADARA::PixelMappingAltPkt",
+                        "Logical PixelId Count Mismatch",
+                        "physical",
+                        physical_start, physical_stop, physical_step,
+                        "logical",
+                        logical_start, logical_stop, logical_step,
+                        cnt, pixel_count,
+                        "Skip Section..." );
+                    usleep(30000); // give syslog a chance...
+
+                    // Next Section
+                    skip_pixel_count += pixel_count;
+                    skip_sections++;
+                    continue;
+                }
+
+                // Note: Assume Physical and Logical Counts
+                // Match Each Other If They Both Match the
+                // Same Internal Section Count... ;-D
+
+                // Skip Unmapped Sections of Pixel Map...!
+                if ( bank_id == (uint16_t) UNMAPPED_BANK )
+                {
+                    syslog( LOG_ERR,
+                        "%s: Unmapped Shorthand Section - Skip...",
+                        "ADARA::PixelMappingAltPkt" );
+                    usleep(30000); // give syslog a chance...
+
+                    // Next Section
+                    skip_pixel_count += pixel_count;
+                    skip_sections++;
+                    continue;
+                }
+
+                // Determine Latest Max Logical PixelId...
+
+                if ( logical_step > 0 )
+                    pid = logical_stop;
+                else
+                    pid = logical_start; // Negative Step...
+
+                bool set = false;
+
+                if ( pid != (uint32_t) -1 )
+                {
+                    if ( first_pid )
+                    {
+                        max_pid = pid;
+                        first_pid = false;
+                        set = true;
+                    }
+                    else if ( pid > max_pid )
+                    {
+                        max_pid = pid;
+                        set = true;
+                    }
+                }
+
+                if ( set )
+                {
+                    m_pixbankmap.resize( max_pid + 1, -1 );
+
+#ifdef DEBUG_PIXMAP
+                    syslog( LOG_ERR,
+                        "%s: Max Logical PixelId Set to %u",
+                        "ADARA::PixelMappingAltPkt", max_pid );
+                    usleep(30000); // give syslog a chance...
+#endif
+                }
+
+                // Just Save the Logical PixelId to Bank Mapping...
+                for ( logical=logical_start ;
+                        logical != logical_stop ; logical += logical_step )
+                {
+                    m_pixbankmap[ (uint32_t) logical ] = bank_id;
+                }
+
+                // Append "Stop" PixelIds Too...! ;-D
+                m_pixbankmap[ (uint32_t) logical_stop ] = bank_id;
+
+                // Done with This Shorthand Section
+
+                tot_pixel_count += pixel_count;
+
+#ifdef DEBUG_PIXMAP
+                syslog( LOG_INFO,
+                    "%s: %s, %s=%u %s=%d/%d/%d %s=%d/%d/%d %s=%u %s=%u",
+                    "ADARA::PixelMappingAltPkt",
+                    "Done with Shorthand Section",
+                    "bank_id", bank_id,
+                    "physical",
+                    physical_start, physical_stop, physical_step,
+                    "logical",
+                    logical_start, logical_stop, logical_step,
+                    "count", pixel_count,
+                    "total", tot_pixel_count );
+                usleep(30000); // give syslog a chance...
+#endif
+            }
+
+            // Process Direct PixelId Section...
+            else
+            {
+                // Skip Unmapped Sections of Pixel Map...!
+                if ( bank_id == (uint16_t) UNMAPPED_BANK )
+                {
+                    syslog( LOG_ERR,
+                        "%s: Unmapped Direct Section - Skip...",
+                        "ADARA::PixelMappingAltPkt" );
+                    usleep(30000); // give syslog a chance...
+
+                    // Next Section
+                    skip_pixel_count += pixel_count;
+                    rpos += pixel_count;
+                    skip_sections++;
+                    continue;
+                }
+
+                // Determine Latest Max Logical PixelId...
+
+                epos2 = rpos + pixel_count;
+
+                rpos_save = rpos;
+
+                bool set = false;
+
+                while ( rpos < epos2 )
+                {
+                    // Logical PixelId...
+                    pid = *rpos++;
+                    if ( pid == (uint32_t) -1 )
+                        continue;
+                    if ( first_pid )
+                    {
+                        max_pid = pid;
+                        first_pid = false;
+                        set = true;
+                    }
+                    else if ( pid > max_pid )
+                    {
+                        max_pid = pid;
+                        set = true;
+                    }
+                }
+
+                if ( set )
+                {
+                    m_pixbankmap.resize( max_pid + 1, -1 );
+
+#ifdef DEBUG_PIXMAP
+                    syslog( LOG_ERR,
+                        "%s: Max Logical PixelId Set to %u",
+                        "ADARA::PixelMappingAltPkt", max_pid );
+                    usleep(30000); // give syslog a chance...
+#endif
+                }
+
+                // Just Save the Logical PixelId to Bank Mapping...
+
+                rpos = rpos_save;
+
+                last_pid = -1;
+
+                while ( rpos < epos2 )
+                {
+                    pid = *rpos++;
+                    if ( pid == (uint32_t) -1 )
+                        continue;
+                    last_pid = pid;
+
+                    // Store Bank ID to Logical PixelIds Map
+                    m_pixbankmap[pid] = bank_id;
+                }
+
+                tot_pixel_count += pixel_count;
+
+                // Done with This Direct Section
+
+#ifdef DEBUG_PIXMAP
+                syslog( LOG_INFO,
+                    "%s: %s, %s=%u %s=%d %s=%u count=%u tot=%u",
+                    "ADARA::PixelMappingAltPkt",
+                    "Done with Direct Section",
+                    "bank_id", bank_id,
+                    "physical", physical_start,
+                    "Last Logical PixelId", last_pid,
+                    pixel_count, tot_pixel_count );
+                usleep(30000); // give syslog a chance...
+#endif
+            }
 
             // Save bank ID
             // (Can be Overwritten in the case of
             // Multiple Pixel Map Section sub-headers for a given Bank,
-            // but this is O.K., as BankInfo() is Just for Bookkeeping. :-)
+            // but this is O.K., as BankInfo() is Just for Bookkeeping.
             m_bank_info[bank_id] = BankInfo(bank_id);
 
-            epos2 = rpos + pix_count;
-            while ( rpos < epos2 )
-            {
-                // Logical PixelId...
-                pid = *rpos++;
-                if ( pid == (uint32_t) -1 )
-                    continue;
-                if ( first_pid )
-                {
-                    max_pid = pid;
-                    first_pid = false;
-                }
-                else if ( pid > max_pid )
-                    max_pid = pid;
-            }
+            section_count++;
         }
 
-        m_pixbankmap.clear();
-        m_pixbankmap.resize( max_pid + 1, -1 );
+        // Also Add Unmapped and Error BankInfo to Map, as State=0...
 
-        syslog( LOG_ERR, "%s: Max Logical PixelId = %u",
-            "ADARA::PixelMappingAltPkt", max_pid );
+        // Unmapped BankInfo
+        m_bank_info[ UNMAPPED_BANK_INDEX ] =
+            BankInfo( UNMAPPED_BANK_INDEX );
+
+        // Error BankInfo
+        m_bank_info[ ERROR_BANK_INDEX ] =
+            BankInfo( ERROR_BANK_INDEX );
+
+        // Done
+
+        syslog( LOG_INFO,
+            "%s: %s %s=%u %s=%u %s=%u, %s=%u %s=%u %s=%lu",
+            "ADARA::PixelMappingAltPkt",
+            "Done with Packet, PixelIds",
+            "Tot", tot_pixel_count,
+            "Max", max_pid,
+            "Skip", skip_pixel_count,
+            "Sections Used", section_count,
+            "Skip", skip_sections,
+            "PixelBankMap.size()", m_pixbankmap.size() );
         usleep(30000); // give syslog a chance...
 
-        // Build Logical-Pid-to-Bank Index
-        rpos = (const uint32_t *) a_pkt.mappingData();
-        while ( rpos < epos )
-        {
-            rpos++; // Skip Base Physical ID
-            bank_id = (uint16_t)(*rpos >> 16);
-            pix_count = (uint16_t)(*rpos & 0xFFFF);
-            rpos++;
-
-            epos2 = rpos + pix_count;
-            while ( rpos < epos2 )
-            {
-                pid = *rpos++;
-                if ( pid == (uint32_t) -1 )
-                    continue;
-
-                // Store Bank ID to Logical PixelIds Map
-                m_pixbankmap[pid] = bank_id;
-            }
-        }
         m_pixbankmap_processed = true;
     }
 
@@ -940,7 +1214,7 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
         uint32_t        max_pid = 0;
         bool            first_pid = true;
         uint16_t        bank_id;
-        uint16_t        pix_count;
+        uint16_t        pixel_count;
 
         m_bank_info.clear();
 
@@ -949,7 +1223,7 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
         {
             pid = *rpos++; // Base Logical ID
             bank_id = (uint16_t)(*rpos >> 16);
-            pix_count = (uint16_t)(*rpos & 0xFFFF);
+            pixel_count = (uint16_t)(*rpos & 0xFFFF);
             rpos++;
 
             // Save bank ID
@@ -959,7 +1233,7 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
             m_bank_info[bank_id] = BankInfo(bank_id);
 
             // Max Logical PixelId for This Section is Base + Count - 1...
-            pid += pix_count - 1;
+            pid += pixel_count - 1;
 
             if ( first_pid )
             {
@@ -979,10 +1253,10 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
         {
             pid = *rpos++; // Base Logical ID
             bank_id = (uint16_t)(*rpos >> 16);
-            pix_count = (uint16_t)(*rpos & 0xFFFF);
+            pixel_count = (uint16_t)(*rpos & 0xFFFF);
             rpos++;
 
-            epos2 = rpos + pix_count;
+            epos2 = rpos + pixel_count;
             while ( rpos < epos2 )
             {
                 // Store Bank ID to Logical PixelIds Map
@@ -990,6 +1264,14 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingPkt &a_pkt )
                 rpos++;
             }
         }
+
+        syslog( LOG_INFO, "%s: %s %s=%u, %s=%lu",
+            "ADARA::PixelMappingPkt",
+            "Done with Packet, PixelIds",
+            "Max", max_pid,
+            "PixelBankMap.size()", m_pixbankmap.size() );
+        usleep(30000); // give syslog a chance...
+
         m_pixbankmap_processed = true;
     }
 

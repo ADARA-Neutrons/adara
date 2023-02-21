@@ -28,7 +28,7 @@ public:
 	typedef std::map<std::string, RunInfoPVSharedPtr> RunInfoMap;
 
 	RunInfo(const std::string &facility, const std::string &beamline,
-		SMSControl *ctrl, bool sendSampleInRunInfo);
+		SMSControl *ctrl, bool sendSampleInRunInfo, bool savePixelMap);
 	~RunInfo();
 
 	void lock(void);
@@ -70,6 +70,7 @@ private:
 	SMSControl *m_ctrl;
 
 	bool m_sendSampleInRunInfo;
+	bool m_savePixelMap;
 
 	RunInfoPVSharedPtr m_propId;
 
@@ -81,6 +82,7 @@ private:
 	RunUserInfoPVSharedPtr m_userPV;
 
 	boost::shared_ptr<smsBooleanPV> m_sendSampleInRunInfoPV;
+	boost::shared_ptr<smsBooleanPV> m_savePixelMapPV;
 
 	RunInfoPVSharedPtr m_massPV;
 	RunInfoFloat64PVSharedPtr m_massFloat64PV;

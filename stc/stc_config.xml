@@ -798,5 +798,29 @@
 		</element>
 	</command>
 
+	<!-- Pre-Post-Auto-Reduction Command Interface (for Timepix3 Image Files from CG1D) -->
+	<command>
+		<name>Timepix3Command</name>
+		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_timepix3.py</path>
+		<!-- Imaging Mode Conditional PV Check -->
+		<condition>
+			<name>Timepixe3 Imaging Mode</name>
+			<pattern>CG1D:CS:UE:Timepix3Mode$</pattern>
+			<value>1</value><!-- Timepix3 Imaging Mode Activated -->
+		</condition>
+		<element>
+			<pattern>:MeasTpxFilePath$</pattern>
+			<name>TpxFilePath</name>
+		</element>
+		<element>
+			<pattern>:Det:N1:TIFF:FilePath$</pattern>
+			<name>TIFFFilePath</name>
+		</element>
+		<element>
+			<pattern>:Det:N1:TIFF:FileName$</pattern>
+			<name>TIFFFileName</name>
+		</element>
+	</command>
+
 </stc_config>
 

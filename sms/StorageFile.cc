@@ -36,15 +36,20 @@ struct sync_packet {
 	//char		comment[];
 } __attribute__((packed));
 
+struct ancient_run_status_packet {
+	ADARA::Header	hdr;
+	uint32_t	run_number;
+	uint32_t	run_start; // EPICS Time...!
+	uint32_t	status_number;
+} __attribute__((packed));
+
 struct run_status_packet {
 	ADARA::Header	hdr;
 	uint32_t	run_number;
 	uint32_t	run_start; // EPICS Time...!
 	uint32_t	status_number;
-#if 0
 	uint32_t	paused_number;
 	uint32_t	addendum_number;
-#endif
 } __attribute__((packed));
 
 off_t StorageFile::m_max_sync_distance = 16 * 1024 * 1024;
@@ -259,64 +264,129 @@ void StorageFile::addSync(void)
 
 void StorageFile::addRunStatus(ADARA::RunStatus::Enum status)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
+	bool useAncientRunStatusPkt = ctrl->getUseAncientRunStatusPkt();
+
+	struct ancient_run_status_packet ancient_spkt = {
+		hdr : {
+			payload_len : 12,
+			pkt_format : ADARA_PKT_TYPE(
+				ADARA::PacketType::RUN_STATUS_TYPE, 0x00 ),
+		},
+	};
+
 	struct run_status_packet spkt = {
 		hdr : {
-#if 0
 			payload_len : 20,
-#else
-			payload_len : 12,
-#endif
 			pkt_format : ADARA_PKT_TYPE(
 				ADARA::PacketType::RUN_STATUS_TYPE,
 				ADARA::PacketType::RUN_STATUS_VERSION ),
 		},
 	};
+
 	struct timespec now;
 
 	clock_gettime(CLOCK_REALTIME, &now);
-	spkt.hdr.ts_sec = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
-	spkt.hdr.ts_nsec = now.tv_nsec;
 
-	spkt.run_number = m_runNumber;
+	if ( useAncientRunStatusPkt )
+	{
+		ancient_spkt.hdr.ts_sec = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
+		ancient_spkt.hdr.ts_nsec = now.tv_nsec;
 
-	if (m_runNumber) {
-		// Convert Wallclock Time to EPICS Time...
-		spkt.run_start = m_startTime - ADARA::EPICS_EPOCH_OFFSET;
+		ancient_spkt.run_number = m_runNumber;
+
+		if (m_runNumber) {
+			// Convert Wallclock Time to EPICS Time...
+			ancient_spkt.run_start =
+				m_startTime - ADARA::EPICS_EPOCH_OFFSET;
+		}
+	}
+
+	else
+	{
+		spkt.hdr.ts_sec = now.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
+		spkt.hdr.ts_nsec = now.tv_nsec;
+
+		spkt.run_number = m_runNumber;
+
+		if (m_runNumber) {
+			// Convert Wallclock Time to EPICS Time...
+			spkt.run_start = m_startTime - ADARA::EPICS_EPOCH_OFFSET;
+		}
 	}
 
 	// Ignore Paused File Number in RunStatus Packet...
 	// (TODO Figure out how to munge this field if we ever need
 	// to _Recover_ any Paused Files into a given run...! ;-)
-	// [Solved in V1 Packet Type, See Below... Yet To Be Activated... ;-]
-	spkt.status_number = (m_fileNumber & 0xfff)
-		| ((m_modeNumber & 0xfff) << 12)
-		| ((uint32_t) status << 24);
+	// [Solved in V1 Packet Type, See Below... Activated as of 1.8.1]
+	if ( useAncientRunStatusPkt )
+	{
+		ancient_spkt.status_number = (m_fileNumber & 0xfff)
+			| ((m_modeNumber & 0xfff) << 12)
+			| ((uint32_t) status << 24);
+	}
 
-#if 0
-	spkt.paused_number = m_pauseFileNumber | ((uint32_t) m_paused << 24);
-	spkt.addendum_number = m_addendumFileNumber
-		| ((uint32_t) m_addendum << 24);
-#endif
+	else
+	{
+		spkt.status_number = (m_fileNumber & 0xfff)
+			| ((m_modeNumber & 0xfff) << 12)
+			| ((uint32_t) status << 24);
+
+		spkt.paused_number = m_pauseFileNumber
+			| ((uint32_t) m_paused << 24);
+		spkt.addendum_number = m_addendumFileNumber
+			| ((uint32_t) m_addendum << 24);
+	}
 
 	// Stuff Run Status Packet into IoVector for Write to Disk...
-	IoVector iovec(1);
-	iovec[0].iov_base = &spkt;
-	iovec[0].iov_len = sizeof(spkt);
 
-	// Write Run Status Packet to Disk...
-	if ( !write(iovec, sizeof(spkt), false) ) {
-		// Something Went Wrong Writing This Run Status Pkt to Disk!
-		// We will therefore LOSE THIS DATA as a result of the error,
-		// so LOG IT HERE in the hopes it can be salvaged later...! ;-Q
-		// Fortunately, We'll get Another Copy of this Run Status Pkt
-		// with the _Next_ Data File, so we _May_ Be Ok here...?
-		std::stringstream ss;
-		ss << "LOST Run Status Packet"
-			<< " modeNumber=" << m_modeNumber
-			<< " fileNumber=" << m_fileNumber
-			<< " pauseFileNumber=" << m_pauseFileNumber
-			<< " status=" << status;
-		StorageManager::logIoVector(ss.str(), iovec);
+	IoVector iovec(1);
+
+	if ( useAncientRunStatusPkt )
+	{
+		iovec[0].iov_base = &ancient_spkt;
+		iovec[0].iov_len = sizeof(ancient_spkt);
+
+		// Write Run Status Packet to Disk...
+		if ( !write(iovec, sizeof(ancient_spkt), false) ) {
+			// Something Went Wrong Writing This Run Status Pkt to Disk!
+			// We will therefore LOSE THIS DATA as a result of the error,
+			// so LOG IT HERE in the hopes it can be salvaged later...! ;-Q
+			// Fortunately, We'll get Another Copy of this Run Status Pkt
+			// with the _Next_ Data File, so we _May_ Be Ok here...?
+			std::stringstream ss;
+			ss << "LOST Ancient Run Status Packet"
+				<< " status=" << status
+				<< " modeNumber=" << m_modeNumber
+				<< " fileNumber=" << m_fileNumber;
+			StorageManager::logIoVector(ss.str(), iovec);
+		}
+	}
+
+	else
+	{
+		iovec[0].iov_base = &spkt;
+		iovec[0].iov_len = sizeof(spkt);
+
+		// Write Run Status Packet to Disk...
+		if ( !write(iovec, sizeof(spkt), false) ) {
+			// Something Went Wrong Writing This Run Status Pkt to Disk!
+			// We will therefore LOSE THIS DATA as a result of the error,
+			// so LOG IT HERE in the hopes it can be salvaged later...! ;-Q
+			// Fortunately, We'll get Another Copy of this Run Status Pkt
+			// with the _Next_ Data File, so we _May_ Be Ok here...?
+			std::stringstream ss;
+			ss << "LOST Run Status Packet"
+				<< " status=" << status
+				<< " modeNumber=" << m_modeNumber
+				<< " fileNumber=" << m_fileNumber
+				<< " pauseFileNumber=" << m_pauseFileNumber
+				<< " paused=" << m_paused
+				<< " addendumFileNumber=" << m_addendumFileNumber
+				<< " addendum=" << m_addendum;
+			StorageManager::logIoVector(ss.str(), iovec);
+		}
 	}
 }
 

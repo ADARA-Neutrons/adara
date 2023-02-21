@@ -814,7 +814,7 @@ RESUBMIT_RUN()
 		echo -e " the Original Data File Location."
 
 		# Base ONCat Curl Command...
-		local _catcmd="curl -X DELETE"
+		local _catcmd="${CURL} -X DELETE"
 
 		# Get Special ONCat Authentication Certificate from User Area
 		local _catauth=`/bin/cat ${ONCAT_AUTH}`
@@ -833,7 +833,7 @@ RESUBMIT_RUN()
 		echo -e "\nExecuting ONCat Catalog Remove Command:"
 		echo -e "\n   ${_catcmd}"
 
-		${_catcmd}
+		eval ${_catcmd}
 		local _ckcatcmd=$?
 
 		if [[ ${_ckcatcmd} != 0 ]]; then
@@ -849,7 +849,7 @@ RESUBMIT_RUN()
 		# Just In Case, Spew Forth the Command to Undo What We Just Did!
 
 		# Base ONCat Curl Command...
-		local _undocatcmd="curl -X POST"
+		local _undocatcmd="${CURL} -X POST"
 
 		# Special ONCat Authentication Certificate (from User Area)
 		_undocatcmd="${_undocatcmd} -H 'Authorization: Bearer ${_catauth}'"
@@ -1647,7 +1647,7 @@ ABSORB_WHITE_SPACE()
 	fi
 
 	_xml_tags="${_xml_tags} facility_name instrument_name run_number"
-	_xml_tags="${_xml_tags} no_sample_info/ name role"
+	_xml_tags="${_xml_tags} no_sample_info/ save_pixel_map/ name role"
 
 	# Proceed Through XML Tag List Until Needed White Space Absorbed...
 

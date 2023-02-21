@@ -186,8 +186,17 @@ ComBusRouter::run()
             // Check to be sure all threads are running (i.e. ticker values should be changing)
             // If a thread is stuck, set fault condition and log failed thread state
 
-            if ( proc_stall < TIMEOUT && metrics_stall < TIMEOUT && db_stall < TIMEOUT )
-                m_combus.status( ADARA::ComBus::STATUS_OK );
+            if ( proc_stall < TIMEOUT
+                    && metrics_stall < TIMEOUT
+                    && db_stall < TIMEOUT )
+            {
+                if ( !(m_combus.status( ADARA::ComBus::STATUS_OK )) )
+                {
+                    syslog( LOG_ERR, "%s - %s",
+                        "StreamMonitor Error",
+                        "Broadcasting DASMON ComBus Status OK Message" );
+                }
+            }
             else
             {
                 syslog( LOG_ERR,
@@ -198,7 +207,12 @@ ComBusRouter::run()
                     "db_stall", db_stall,
                     "TIMEOUT", TIMEOUT);
                 usleep(30000); // give syslog a chance...
-                m_combus.status( ADARA::ComBus::STATUS_FAULT );
+                if ( !(m_combus.status( ADARA::ComBus::STATUS_FAULT )) )
+                {
+                    syslog( LOG_ERR, "%s - %s",
+                        "StreamMonitor Error",
+                        "Broadcasting DASMON ComBus Status FAULT Message" );
+                }
             }
         }
 

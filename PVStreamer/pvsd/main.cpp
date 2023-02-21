@@ -57,7 +57,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.7.7"
+#define PVSD_VERSION "1.7.8"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -339,7 +339,11 @@ int main(int argc, char *argv[])
         {
             if ( !( ++count % 5 ) )
             {
-                combus->status( ::ADARA::ComBus::STATUS_OK );
+                if ( !(combus->status( ::ADARA::ComBus::STATUS_OK )) )
+                {
+                    syslog( LOG_ERR, "PVSD ERROR: %s",
+                        "Broadcasting PVSD ComBus Status OK Message" );
+                }
             }
 
             if ( !( count % 300 ) )

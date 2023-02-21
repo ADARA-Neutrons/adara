@@ -29,7 +29,7 @@ RateLimitedLogging::History RLLHistory_StreamParserH;
 #define RLL_ANNOTATION_EARLY                 6
 
 /// This sets the size of the ADARA parser stream buffer in bytes
-#define ADARA_IN_BUF_SIZE   0x3000000  // For PixelMap!
+#define ADARA_IN_BUF_SIZE   0x3000000  // For Old "Direct" PixelMap Pkt!
 
 
 //---------------------------------------------------------------------------------------------------------------------
@@ -679,6 +679,12 @@ StreamParser::rxPacket
         uint32_t fileNum = a_pkt.fileNumber();
         uint32_t modeNum = 0;
 
+        // Decode Any Paused Mode or Addendum File Index (SMS After 1.8.1)
+        uint32_t pauseFileNum = a_pkt.pauseFileNumber();
+        uint32_t paused = a_pkt.paused();
+        uint32_t addendumFileNum = a_pkt.addendumFileNumber();
+        uint32_t addendum = a_pkt.addendum();
+
         // Embedded Mode Number...?
         if ( fileNum > 0xfff )
         {
@@ -686,15 +692,27 @@ StreamParser::rxPacket
             fileNum &= 0xfff;
 
             syslog( LOG_INFO,
-                "[%i] %s, Mode Index #%d, File Index #%d, %s = %s.",
-                g_pid, "Run Status", modeNum, fileNum,
+               "[%i] %s, %s%d, %s%d, %s%d (%s=%d), %s%d (%s=%d), %s = %s.",
+                g_pid, "Run Status",
+                "Mode Index #", modeNum,
+                "File Index #", fileNum,
+                "Pause Index #", pauseFileNum,
+                "paused", paused,
+                "Addendum Index #", addendumFileNum,
+                "addendum", addendum,
                 "Processing State", getProcessingStateString().c_str() );
             give_syslog_a_chance;
         }
         else
         {
-            syslog( LOG_INFO, "[%i] %s, File Index #%d, %s = %s.",
-                g_pid, "Run Status", fileNum,
+            syslog( LOG_INFO,
+               "[%i] %s, %s%d, %s%d (%s=%d), %s%d (%s=%d), %s = %s.",
+                g_pid, "Run Status",
+                "File Index #", fileNum,
+                "Pause Index #", pauseFileNum,
+                "paused", paused,
+                "Addendum Index #", addendumFileNum,
+                "addendum", addendum,
                 "Processing State", getProcessingStateString().c_str() );
             give_syslog_a_chance;
         }
@@ -743,9 +761,19 @@ StreamParser::rxPacket
         ( a_pkt.mappingData() + a_pkt.payload_length()
             - sizeof(uint32_t) );
 
-    //uint32_t        base_physical;
-    uint16_t        bank_id;
-    uint16_t        pix_count;
+    int32_t physical_start, physical_stop;
+    int32_t physical_step;
+
+    int32_t logical_start, logical_stop;
+    int32_t logical_step;
+
+    int32_t physical, logical;
+
+    uint16_t bank_id;
+    uint16_t is_shorthand;
+    uint16_t pixel_count;
+
+    int16_t cnt;
 
     // Note: a vector is used for BankInfo instances where the bank_id
     // is the offset into the vector. This is safe as bank IDs are
@@ -771,78 +799,233 @@ StreamParser::rxPacket
 
     // Now build banks and populate bank container
 
-    uint32_t skip_pix_count = 0;
-    uint32_t tot_pix_count = 0;
+    uint32_t skip_pixel_count = 0;
+    uint32_t tot_pixel_count = 0;
     uint32_t skip_sections = 0;
     uint32_t section_count = 0;
 
     while ( rpos < epos )
     {
-        //base_physical = *rpos++;
-        rpos++;   // Skip Base Physical PixelId...
+        // Base/Starting Physical PixelId
+        physical_start = *rpos++;
+
+        // BankID, 0/1=Direct/Shorthand Bit, Pixel Count...
         bank_id = (uint16_t)(*rpos >> 16);
-        pix_count = (uint16_t)(*rpos & 0xFFFF);
+        is_shorthand = (uint16_t)((*rpos & 0x8000) >> 15);
+        pixel_count = (uint16_t)(*rpos & 0x7FFF);
         rpos++;
 
-        //syslog( LOG_INFO,
-            //"[%i] %s: Base Physical = %u, Bank ID = %u, Count = %u",
-            //g_pid, "PixelMappingAltPkt",
-            //base_physical, bank_id, pix_count );
-        //give_syslog_a_chance;
-
-        // Skip Unmapped Sections of Pixel Map...!
-        if ( bank_id == (uint16_t) UNMAPPED_BANK )
-        {
-            //syslog( LOG_INFO, "[%i] %s: Unmapped Section - Skip...",
-                //g_pid, "PixelMappingAltPkt" );
-            //give_syslog_a_chance;
-
-            // Next Section
-            skip_pix_count += pix_count;
-            rpos += pix_count;
-            skip_sections++;
-            continue;
+        if ( m_verbose_level > 1 ) {
+            syslog( LOG_INFO,
+                "[%i] %s: %s = %d, %s = %u, %s = %u, %s = %u",
+                g_pid, "PixelMappingAltPkt",
+                "Base/Starting Physical", physical_start,
+                "Bank ID", bank_id,
+                "Is Shorthand", is_shorthand,
+                "Count", pixel_count );
+            give_syslog_a_chance;
         }
 
-        // For Initial Creation of BankInfo Map, Just Do All as State=0...
-        // Note: Max Bank is Maximum Detector Bank ID...
-        bsindex = NUM_SPECIAL_BANKS
-            + bank_id + ( 0 * ( m_maxBank + 1 ) );
-
-        bi = m_banks_arr[ bsindex ];
-
-        // Create New BankInfo...
-        if ( bi == NULL )
+        // Set Up BankInfo Map for Any *Mapped* Sections of Pixel Map...!
+        if ( bank_id != (uint16_t) UNMAPPED_BANK )
         {
-            // Create BankInfo Instance
-            m_banks_arr[ bsindex ] = makeBankInfo( bank_id, 0,
-                m_event_buf_write_thresh, m_anc_buf_write_thresh );
+            // For Initial Creation of BankInfo Map,
+            // Just Do All as State=0...
+            // Note: Max Bank is Maximum Detector Bank ID...
+            bsindex = NUM_SPECIAL_BANKS
+                + bank_id + ( 0 * ( m_maxBank + 1 ) );
 
             bi = m_banks_arr[ bsindex ];
 
-            // Try to Associate Any Detector Bank Sets that
-            // Contain This Bank Id...
-            bi->m_bank_sets =
-                getDetectorBankSets( static_cast<uint32_t>(bank_id) );
+            // Create New BankInfo...
+            if ( bi == NULL )
+            {
+                // Create BankInfo Instance
+                m_banks_arr[ bsindex ] = makeBankInfo( bank_id, 0,
+                    m_event_buf_write_thresh, m_anc_buf_write_thresh );
+
+                bi = m_banks_arr[ bsindex ];
+
+                // Try to Associate Any Detector Bank Sets that
+                // Contain This Bank Id...
+                bi->m_bank_sets =
+                    getDetectorBankSets( static_cast<uint32_t>(bank_id) );
+            }
         }
 
-        // Append This Section's Logical PixelIds...
-        const uint32_t *epos2 = rpos + pix_count;
-        tot_pix_count += pix_count;
-        while ( rpos < epos2 ) {
-            bi->m_logical_pixelids.push_back(*rpos++);
+        // Process Shorthand PixelId Section...
+        if ( is_shorthand )
+        {
+            // Stopping Physical PixelId
+            physical_stop = *rpos++;
+
+            // Base/Starting Logical PixelId
+            logical_start = *rpos++;
+
+            // Physical and Logical Step
+            physical_step = (int16_t)(*rpos >> 16);
+            logical_step = (int16_t)(*rpos & 0xFFFF);
+            rpos++;
+
+            // Stopping Logical PixelId
+            logical_stop = *rpos++;
+
+            if ( m_verbose_level > 1 ) {
+                syslog( LOG_INFO,
+                    "[%i] %s: %s %s=%d/%d/%d %s=%d/%d/%d",
+                    g_pid, "PixelMappingAltPkt", "Shorthand Section",
+                    "physical",
+                    physical_start, physical_stop, physical_step,
+                    "logical",
+                    logical_start, logical_stop, logical_step );
+                give_syslog_a_chance;
+            }
+
+            // Verify Physical PixelId Count Versus Section Count...
+            cnt = ( physical_stop - physical_start + physical_step )
+                / physical_step;
+            if ( cnt != (int32_t) pixel_count )
+            {
+                syslog( LOG_INFO,
+                    "[%i] %s: %s %s=%d/%d/%d %s=%d/%d/%d: %d != %d - %s",
+                    g_pid, "PixelMappingAltPkt",
+                    "Physical PixelId Count Mismatch",
+                    "physical",
+                    physical_start, physical_stop, physical_step,
+                    "logical",
+                    logical_start, logical_stop, logical_step,
+                    cnt, pixel_count,
+                    "Skip Section..." );
+                give_syslog_a_chance;
+
+                // Next Section
+                skip_pixel_count += pixel_count;
+                skip_sections++;
+                continue;
+            }
+
+            // Verify Logical PixelId Count Versus Section Count...
+            cnt = ( logical_stop - logical_start + logical_step )
+                / logical_step;
+            if ( cnt != (int32_t) pixel_count )
+            {
+                syslog( LOG_INFO,
+                    "[%i] %s: %s %s=%d/%d/%d %s=%d/%d/%d: %d != %d - %s",
+                    g_pid, "PixelMappingAltPkt",
+                    "Logical PixelId Count Mismatch",
+                    "physical",
+                    physical_start, physical_stop, physical_step,
+                    "logical",
+                    logical_start, logical_stop, logical_step,
+                    cnt, pixel_count,
+                    "Skip Section..." );
+                give_syslog_a_chance;
+
+                // Next Section
+                skip_pixel_count += pixel_count;
+                skip_sections++;
+                continue;
+            }
+
+            // Note: Assume Physical and Logical Counts Match Each Other
+            // If They Both Match the Same Internal Section Count... ;-D
+
+            // Skip Unmapped Sections of Pixel Map...!
+            if ( bank_id == (uint16_t) UNMAPPED_BANK )
+            {
+                syslog( LOG_INFO,
+                    "[%i] %s: Unmapped Shorthand Section - Skip...",
+                    g_pid, "PixelMappingAltPkt" );
+                give_syslog_a_chance;
+
+                // Next Section
+                skip_pixel_count += pixel_count;
+                skip_sections++;
+                continue;
+            }
+
+            // Append This Section's Logical (& Physical) PixelIds...
+            for ( physical=physical_start, logical=logical_start ;
+                    physical != physical_stop && logical != logical_stop ;
+                    physical += physical_step, logical += logical_step )
+            {
+                bi->m_logical_pixelids.push_back( (uint32_t) logical );
+
+                bi->m_physical_pixelids.push_back( (uint32_t) physical );
+            }
+
+            // Append "Stop" PixelIds Too...! ;-D
+
+            bi->m_logical_pixelids.push_back( (uint32_t) logical_stop );
+
+            bi->m_physical_pixelids.push_back( (uint32_t) physical_stop );
+
+            // Done with This Shorthand Section
+
+            tot_pixel_count += pixel_count;
+
+            if ( m_verbose_level > 0 ) {
+                syslog( LOG_INFO,
+                 "[%i] %s: %s, %s=%u %s=%d/%d/%d %s=%d/%d/%d %s=%u %s=%lu",
+                    g_pid, "PixelMappingAltPkt",
+                    "Done with Shorthand Section",
+                    "bank_id", bank_id,
+                    "physical",
+                    physical_start, physical_stop, physical_step,
+                    "logical",
+                    logical_start, logical_stop, logical_step,
+                    "count", pixel_count,
+                    "total", bi->m_logical_pixelids.size() );
+                give_syslog_a_chance;
+            }
+        }
+
+        // Process Direct PixelId Section...
+        else
+        {
+            // Skip Unmapped Sections of Pixel Map...!
+            if ( bank_id == (uint16_t) UNMAPPED_BANK )
+            {
+                syslog( LOG_INFO,
+                    "[%i] %s: Unmapped Direct Section - Skip...",
+                    g_pid, "PixelMappingAltPkt" );
+                give_syslog_a_chance;
+
+                // Next Section
+                skip_pixel_count += pixel_count;
+                rpos += pixel_count;
+                skip_sections++;
+                continue;
+            }
+
+            // Append This Section's Logical (& Physical) PixelIds...
+
+            const uint32_t *epos2 = rpos + pixel_count;
+
+            tot_pixel_count += pixel_count;
+
+            while ( rpos < epos2 )
+            {
+                bi->m_logical_pixelids.push_back( *rpos++ );
+
+                bi->m_physical_pixelids.push_back(
+                    (uint32_t) physical_start++ );
+            }
+
+            if ( m_verbose_level > 0 ) {
+                syslog( LOG_INFO,
+                    "[%i] %s: %s, %s=%u %s=%d %s=%u count=%u tot=%lu",
+                    g_pid, "PixelMappingAltPkt",
+                    "Done with Direct Section",
+                    "bank_id", bank_id, "physical_start", physical_start,
+                    "Last Logical PixelId",
+                    bi->m_logical_pixelids.back(),
+                    pixel_count, bi->m_logical_pixelids.size() );
+                give_syslog_a_chance;
+            }
         }
 
         section_count++;
-
-        // syslog( LOG_INFO,
-            // "[%i] %s: %s, %s=%u %s=%u %s = %u count=%u tot=%lu",
-            // g_pid, "PixelMappingAltPkt", "Done with Section",
-            // "bank_id", bank_id, "base_physical", base_physical,
-            // "Last Logical PixelId",
-            // bi->m_logical_pixelids.back(),
-            // pix_count, bi->m_logical_pixelids.size() );
-        // give_syslog_a_chance;
     }
 
     // Also Add Unmapped and Error BankInfo to Map, as State=0...
@@ -884,9 +1067,9 @@ StreamParser::rxPacket
     // Done
 
     syslog( LOG_INFO,
-        "[%i] %s: %s, PixelIds Tot=%u Skip=%u, Sections Tot=%u Skip=%u",
+        "[%i] %s: %s, PixelIds Tot=%u Skip=%u, Sections Used=%u Skip=%u",
         g_pid, "PixelMappingAltPkt", "Done with Packet",
-        tot_pix_count, skip_pix_count, section_count, skip_sections );
+        tot_pixel_count, skip_pixel_count, section_count, skip_sections );
     give_syslog_a_chance;
 
     // The receipt of a pixel mapping packet allows state to progress
@@ -923,7 +1106,7 @@ StreamParser::rxPacket
 
     uint32_t        base_logical;
     uint16_t        bank_id;
-    uint16_t        pix_count;
+    uint16_t        pixel_count;
 
     // Note: a vector is used for BankInfo instances where the bank_id
     // is the offset into the vector. This is safe as bank IDs are
@@ -944,11 +1127,11 @@ StreamParser::rxPacket
     {
         rpos2++;
         bank_id = (uint16_t)(*rpos2 >> 16);
-        pix_count = (uint16_t)(*rpos2 & 0xFFFF);
+        pixel_count = (uint16_t)(*rpos2 & 0xFFFF);
         rpos2++;
         syslog( LOG_INFO,
-            "[%i] %s: bank_id=%u pix_count=%u", g_pid, "PixelMappingPkt",
-            bank_id, pix_count );
+            "[%i] %s: bank_id=%u pixel_count=%u", g_pid, "PixelMappingPkt",
+            bank_id, pixel_count );
         give_syslog_a_chance;
         if ( bank_id != (uint16_t) UNMAPPED_BANK && bank_id > bank_count )
         {
@@ -958,7 +1141,7 @@ StreamParser::rxPacket
                 bank_count );
             give_syslog_a_chance;
         }
-        rpos2 += pix_count;
+        rpos2 += pixel_count;
     }
 
     syslog( LOG_INFO,
@@ -975,14 +1158,14 @@ StreamParser::rxPacket
     {
         base_logical = *rpos++;
         bank_id = (uint16_t)(*rpos >> 16);
-        pix_count = (uint16_t)(*rpos & 0xFFFF);
+        pixel_count = (uint16_t)(*rpos & 0xFFFF);
         rpos++;
 
         // Skip Unmapped Sections of Pixel Map...!
         if ( bank_id == (uint16_t) UNMAPPED_BANK )
         {
             // Next Section
-            rpos += pix_count;
+            rpos += pixel_count;
             continue;
         }
 
@@ -1008,21 +1191,19 @@ StreamParser::rxPacket
                 getDetectorBankSets( static_cast<uint32_t>(bank_id) );
         }
 
-        // Append This Section's Logical PixelIds...
-        for (uint32_t i=0 ; i < pix_count ; ++i)
+        // Append This Section's Logical (& Physical) PixelIds...
+        for (uint32_t i=0 ; i < pixel_count ; ++i)
         {
-            bi->m_logical_pixelids.push_back(
-                base_logical + i );
+            bi->m_logical_pixelids.push_back( base_logical + i );
+            bi->m_physical_pixelids.push_back( *rpos++ );
         }
 
         // syslog( LOG_INFO,
             // "[%i] %s: bank_id=%u base_logical=%u count=%u tot=%lu",
-            // g_pid, "PixelMappingPkt", bank_id, base_logical, pix_count,
+            // g_pid, "PixelMappingPkt",
+            // bank_id, base_logical, pixel_count,
             // bi->m_logical_pixelids.size() );
         // give_syslog_a_chance;
-
-        // Next Section
-        rpos += pix_count;
     }
 
     // Also Add Unmapped and Error BankInfo to Map, as State=0...
@@ -1816,6 +1997,7 @@ StreamParser::processBankEvents
 
                 // Copy Any Saved Logical PixelIds for This Detector Bank
                 bi->m_logical_pixelids = bi0->m_logical_pixelids;
+                bi->m_physical_pixelids = bi0->m_physical_pixelids;
 
                 // Copy Any Saved Detector Bank Sets for This Detector Bank
                 bi->m_bank_sets = bi0->m_bank_sets;
@@ -2614,6 +2796,17 @@ StreamParser::rxPacket
                         (const xmlChar*) "no_sample_info") == 0 )
                 {
                     tmp_run_info.no_sample_info = true;
+                }
+                else if (xmlStrcmp( node->name,
+                        (const xmlChar*) "save_pixel_map") == 0 )
+                {
+                    tmp_run_info.save_pixel_map = true;
+                }
+                else if (xmlStrcmp( node->name,
+                        (const xmlChar*) "run_notes_updates_enabled")
+                            == 0 )
+                {
+                    tmp_run_info.run_notes_updates_enabled = true;
                 }
                 else if ( xmlStrcmp( node->name,
                         (const xmlChar*)"sample" ) == 0 )
@@ -5769,7 +5962,7 @@ StreamParser::rxPacket
         markerScanStop( t, ts_nano, a_pkt.scanIndex(), a_pkt.comment() );
         break;
     case ADARA::MarkerType::OVERALL_RUN_COMMENT:
-        runComment( a_pkt.comment() );
+        runComment( t, ts_nano, a_pkt.comment() );
         break;
     case ADARA::MarkerType::SYSTEM:
         // Just Log System Comments, Don't Insert Into NeXus...
@@ -6548,6 +6741,25 @@ StreamParser::updateRunInfo( const RunInfo &a_run_info )
             (a_run_info.no_sample_info) ? "True" : "False" );
         give_syslog_a_chance;
         m_run_info.no_sample_info = a_run_info.no_sample_info;
+    }
+    if ( a_run_info.save_pixel_map != m_run_info.save_pixel_map ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STC Error:", "updateRunInfo()", "Save Pixel Map",
+            (m_run_info.save_pixel_map) ? "True" : "False",
+            (a_run_info.save_pixel_map) ? "True" : "False" );
+        give_syslog_a_chance;
+        m_run_info.save_pixel_map = a_run_info.save_pixel_map;
+    }
+    if ( a_run_info.run_notes_updates_enabled
+            != m_run_info.run_notes_updates_enabled ) {
+        syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",
+            g_pid, "STC Error:", "updateRunInfo()",
+            "Run Notes Updates Enabled",
+            (m_run_info.run_notes_updates_enabled) ? "True" : "False",
+            (a_run_info.run_notes_updates_enabled) ? "True" : "False" );
+        give_syslog_a_chance;
+        m_run_info.run_notes_updates_enabled =
+            a_run_info.run_notes_updates_enabled;
     }
     if ( m_run_info.sample_id.compare( a_run_info.sample_id ) ) {
         syslog( LOG_ERR, "[%i] %s %s: Updating RunInfo %s: [%s] -> [%s]",

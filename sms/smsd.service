@@ -1,0 +1,23 @@
+
+[Unit]
+Description=ADARA SMS Daemon
+Requires=autofs.service
+After=autofs.service
+Wants=autofs.service
+BindsTo=autofs.service
+After=epics-controls-env.service
+Requires=epics-controls-env.service
+
+[Service]
+Type=simple
+User=snsdata
+Group=adara
+Restart=always
+EnvironmentFile=-/var/run/controls.env
+ExecStart=/usr/local/bin/smsd
+#ExecStart=/usr/bin/su - snsdata -s /bin/bash -c "/usr/local/bin/smsd"
+
+TimeoutSec=0
+
+[Install]
+WantedBy=multi-user.target

@@ -19,6 +19,7 @@
 #include "ADARA.h"
 #include "ADARAUtils.h"
 #include "ADARAPackets.h"
+#include "SMSControlPV.h"
 #include "ReadyAdapter.h"
 #include "Storage.h"
 
@@ -359,6 +360,11 @@ public:
 	void setPrimaryPVPrefix( std::string PrimaryPVPrefix )
 		{ m_primaryPVPrefix = PrimaryPVPrefix; }
 
+	bool getRunNotesUpdatesEnabled(void) {
+		m_runNotesUpdatesEnabled = m_pvRunNotesUpdatesEnabled->value();
+		return m_runNotesUpdatesEnabled;
+	}
+
 	void sourceUp(uint32_t srcId);
 	void sourceDown(uint32_t srcId, bool stateChanged);
 
@@ -453,6 +459,9 @@ public:
 
 	boost::shared_ptr<Markers> getMarkers(void) { return m_markers; }
 
+	bool getUseAncientRunStatusPkt(void)
+		{ return m_useAncientRunStatusPkt; }
+
 	void updateVerbose(void);
 
 	uint32_t verbose(void) { return m_verbose; }
@@ -462,6 +471,321 @@ public:
 	static void late_config(const boost::property_tree::ptree &conf);
 
 	typedef std::vector<ADARA::Event> EventVector;
+
+	// Fast Event/Meta-Data Bandwidth Statistics Collection Structures ;-D
+
+	struct BandwidthStruct {
+
+		BandwidthStruct( std::string device_name,
+			std::string device_id_spec, std::string pv_label,
+			uint32_t pixelId ) :
+				m_device_name(device_name),
+				m_device_id_spec(device_id_spec),
+				m_pv_label(pv_label),
+				m_pixelId(pixelId),
+				m_count_second(0),
+				m_count_minute(0),
+				m_count_tenmin(0)
+		{ }
+
+		~BandwidthStruct(void)
+		{
+			m_pvBandwidthSecond.reset();
+			m_pvBandwidthMinute.reset();
+			m_pvBandwidthTenMin.reset();
+		}
+
+		void createBandwidthPVs( SMSControl *ctrl,
+				std::string prefix, struct timespec now )
+		{
+			m_pvBandwidthSecond = boost::shared_ptr<smsUint32PV>(new
+				smsUint32PV(prefix
+					+ ":" + m_pv_label + "BandwidthSecond"));
+			m_pvBandwidthMinute = boost::shared_ptr<smsUint32PV>(new
+				smsUint32PV(prefix
+					+ ":" + m_pv_label + "BandwidthMinute"));
+			m_pvBandwidthTenMin = boost::shared_ptr<smsUint32PV>(new
+				smsUint32PV(prefix
+					+ ":" + m_pv_label + "BandwidthTenMin"));
+
+			ctrl->addPV(m_pvBandwidthSecond);
+			ctrl->addPV(m_pvBandwidthMinute);
+			ctrl->addPV(m_pvBandwidthTenMin);
+
+			m_pvBandwidthSecond->update( m_count_second, &now );
+			m_pvBandwidthMinute->update( m_count_minute, &now );
+			m_pvBandwidthTenMin->update( m_count_tenmin, &now );
+		}
+
+		void resetBandwidthStatistics(void)
+		{
+			m_count_second = 0;
+			m_count_minute = 0;
+			m_count_tenmin = 0;
+		}
+
+		std::string			m_device_name;
+		std::string			m_device_id_spec;
+		std::string			m_pv_label;
+
+		// PixelId = 0xTDDDXXXX:
+		//    T = PixelId Type/Class
+		//       (Monitor = 0x4, Chopper = 0x7, Fast-Meta = 0x5/0x6, etc)
+		//    DDD = Device ID (only for Meta-Data Events...!)
+		//    XXXX = Chopper TOF, Analog Value,
+		//       or Digital Trigger Falling/Rising (e.g. 0x000[0/1]...)
+		// Note: for Neutron Detectors, Specific PixelId = 0x0DDDXXXX. :-D
+		uint32_t			m_pixelId;
+
+		uint32_t			m_count_second;
+		uint32_t			m_count_minute;
+		uint32_t			m_count_tenmin;
+
+		boost::shared_ptr<smsUint32PV> m_pvBandwidthSecond;
+		boost::shared_ptr<smsUint32PV> m_pvBandwidthMinute;
+		boost::shared_ptr<smsUint32PV> m_pvBandwidthTenMin;
+	};
+
+	typedef boost::shared_ptr<BandwidthStruct> BandwidthStructPtr;
+
+	struct SourceBandwidthStruct {
+
+		SourceBandwidthStruct( std::string device_name ) :
+				m_device_name(device_name)
+		{
+			m_eventBandwidth = BandwidthStructPtr( new BandwidthStruct(
+				m_device_name, "Neutron Events", "Event",
+				0x00000000 ) );
+			m_metaBandwidth = BandwidthStructPtr( new BandwidthStruct(
+				m_device_name, "Meta-Data Events", "Meta",
+				0x70000000 ) );
+			m_errBandwidth = BandwidthStructPtr( new BandwidthStruct(
+				m_device_name, "Neutron Error Events", "Err",
+				0x80000000 ) );
+		}
+
+		~SourceBandwidthStruct()
+		{
+			m_eventBandwidth.reset();
+			m_metaBandwidth.reset();
+			m_errBandwidth.reset();
+		}
+
+		std::string			m_device_name;
+
+		BandwidthStructPtr m_eventBandwidth;
+		BandwidthStructPtr m_metaBandwidth;
+		BandwidthStructPtr m_errBandwidth;
+	};
+
+	typedef boost::shared_ptr<SourceBandwidthStruct>
+		SourceBandwidthStructPtr;
+
+	struct DataSourceBandwidthStruct {
+
+		DataSourceBandwidthStruct( std::string device_name ) :
+				m_device_name(device_name)
+		{
+			m_pulseBandwidth = BandwidthStructPtr( new BandwidthStruct(
+				m_device_name, "Neutron Pulses", "Pulse", 0x00000000 ) );
+
+			m_dataSourceBandwidth = SourceBandwidthStructPtr(
+				new SourceBandwidthStruct( m_device_name ) );
+		}
+
+		~DataSourceBandwidthStruct()
+		{
+			m_pulseBandwidth.reset();
+
+			m_dataSourceBandwidth.reset();
+
+			// Reset HW Sources Bandwidth Structs...
+			std::vector<SourceBandwidthStructPtr>::iterator hwSrcBWi;
+			for ( hwSrcBWi=m_hwSourcesBandwidth.begin() ;
+					hwSrcBWi != m_hwSourcesBandwidth.end() ; ++hwSrcBWi ) {
+				(*hwSrcBWi).reset();
+			}
+			m_hwSourcesBandwidth.clear();
+		}
+
+		std::string			m_device_name;
+
+		BandwidthStructPtr m_pulseBandwidth;
+
+		SourceBandwidthStructPtr m_dataSourceBandwidth;
+
+		std::vector<SourceBandwidthStructPtr> m_hwSourcesBandwidth;
+		// Count of Number of Hardware Sources Already Provided in:
+		//    ${SMS}:DataSource:<DataSourceIndex>:NumHWSources
+	};
+
+	typedef boost::shared_ptr<DataSourceBandwidthStruct>
+		DataSourceBandwidthStructPtr;
+
+	struct TriggerBandwidthStruct {
+
+		TriggerBandwidthStruct( std::string device_name,
+			std::string device_id_spec, std::string pv_label,
+			uint32_t pixelId ) :
+				m_device_name(device_name),
+				m_device_id_spec(device_id_spec),
+				m_pv_label(pv_label),
+				m_pixelId(pixelId)
+		{
+			m_triggerBandwidth = BandwidthStructPtr(
+				new BandwidthStruct(
+					m_device_name, m_device_id_spec, m_pv_label,
+					m_pixelId ) );
+
+			m_triggerFallingBandwidth = BandwidthStructPtr(
+				new BandwidthStruct(
+					m_device_name, m_device_id_spec + "_Falling",
+					m_pv_label, m_pixelId | 0x00000000 ) );
+			m_triggerRisingBandwidth = BandwidthStructPtr(
+				new BandwidthStruct(
+					m_device_name, m_device_id_spec + "_Rising",
+					m_pv_label, m_pixelId | 0x00000001 ) );
+		}
+
+		~TriggerBandwidthStruct()
+		{
+			m_triggerBandwidth.reset();
+			m_triggerFallingBandwidth.reset();
+			m_triggerRisingBandwidth.reset();
+		}
+
+		std::string			m_device_name;
+		std::string			m_device_id_spec;
+		std::string			m_pv_label;
+
+		uint32_t			m_pixelId;
+
+		BandwidthStructPtr m_triggerBandwidth;
+
+		BandwidthStructPtr m_triggerFallingBandwidth;
+		BandwidthStructPtr m_triggerRisingBandwidth;
+	};
+
+	typedef boost::shared_ptr<TriggerBandwidthStruct>
+		TriggerBandwidthStructPtr;
+
+	struct OverallBandwidthStruct {
+
+		OverallBandwidthStruct( SMSControl *ctrl,
+				std::string prefix, struct timespec now )
+		{
+			m_pvNumBeamMonitorsBandwidth =
+				boost::shared_ptr<smsUint32PV>(new
+					smsUint32PV(prefix
+						+ ":Control:NumBeamMonitorsBandwidth"));
+			m_pvNumChoppersBandwidth =
+				boost::shared_ptr<smsUint32PV>(new
+					smsUint32PV(prefix
+						+ ":Control:NumChoppersBandwidth"));
+			m_pvNumDigitalTriggersBandwidth =
+				boost::shared_ptr<smsUint32PV>(new
+					smsUint32PV(prefix
+						+ ":Control:NumDigitalTriggersBandwidth"));
+			m_pvNumAnalogSignalsBandwidth =
+				boost::shared_ptr<smsUint32PV>(new
+					smsUint32PV(prefix
+						+ ":Control:NumAnalogSignalsBandwidth"));
+
+			ctrl->addPV(m_pvNumBeamMonitorsBandwidth);
+			ctrl->addPV(m_pvNumChoppersBandwidth);
+			ctrl->addPV(m_pvNumDigitalTriggersBandwidth);
+			ctrl->addPV(m_pvNumAnalogSignalsBandwidth);
+
+			m_pvNumBeamMonitorsBandwidth->update( 0, &now );
+			m_pvNumChoppersBandwidth->update( 0, &now );
+			m_pvNumDigitalTriggersBandwidth->update( 0, &now );
+			m_pvNumAnalogSignalsBandwidth->update( 0, &now );
+		}
+
+		~OverallBandwidthStruct()
+		{
+			// Reset Data Sources Bandwidth Structs...
+			std::vector<DataSourceBandwidthStructPtr>::iterator DataSrcBWi;
+			for ( DataSrcBWi=m_dataSourcesBandwidth.begin() ;
+					DataSrcBWi != m_dataSourcesBandwidth.end() ;
+					++DataSrcBWi ) {
+				(*DataSrcBWi).reset();
+			}
+			m_dataSourcesBandwidth.clear();
+
+			// Reset Beam Monitors Bandwidth Structs...
+			std::vector<TriggerBandwidthStructPtr>::iterator BeamMonBWi;
+			for ( BeamMonBWi=m_beamMonitorsBandwidth.begin() ;
+					BeamMonBWi != m_beamMonitorsBandwidth.end() ;
+					++BeamMonBWi ) {
+				(*BeamMonBWi).reset();
+			}
+			m_beamMonitorsBandwidth.clear();
+
+			m_pvNumBeamMonitorsBandwidth.reset();
+
+			// Reset Choppers Bandwidth Structs...
+			std::vector<TriggerBandwidthStructPtr>::iterator ChopperBWi;
+			for ( ChopperBWi=m_choppersBandwidth.begin() ;
+					ChopperBWi != m_choppersBandwidth.end() ;
+					++ChopperBWi ) {
+				(*ChopperBWi).reset();
+			}
+			m_choppersBandwidth.clear();
+
+			m_pvNumChoppersBandwidth.reset();
+
+			// Reset Digital Triggers Bandwidth Structs...
+			std::vector<TriggerBandwidthStructPtr>::iterator DigTrigBWi;
+			for ( DigTrigBWi=m_digitalTriggersBandwidth.begin() ;
+					DigTrigBWi != m_digitalTriggersBandwidth.end() ;
+					++DigTrigBWi ) {
+				(*DigTrigBWi).reset();
+			}
+			m_digitalTriggersBandwidth.clear();
+
+			m_pvNumDigitalTriggersBandwidth.reset();
+
+			// Reset Analog Signals Bandwidth Structs...
+			std::vector<BandwidthStructPtr>::iterator AnalSigBWi;
+			for ( AnalSigBWi=m_analogSignalsBandwidth.begin() ;
+					AnalSigBWi != m_analogSignalsBandwidth.end() ;
+					++AnalSigBWi ) {
+				(*AnalSigBWi).reset();
+			}
+			m_analogSignalsBandwidth.clear();
+
+			m_pvNumAnalogSignalsBandwidth.reset();
+		}
+
+		// Events: 0x0XXXXXXX,
+		//    Meta-Data: 0x[567]0000000,
+		//    Errors: 0x8XXXXXXX
+		std::vector<DataSourceBandwidthStructPtr> m_dataSourcesBandwidth;
+		// Count of Number of DataSources Already Provided in:
+		//    ${SMS}:Control:NumDataSources
+
+		// Beam Monitors: 0x4DDD000[01]
+		std::vector<TriggerBandwidthStructPtr> m_beamMonitorsBandwidth;
+		boost::shared_ptr<smsUint32PV> m_pvNumBeamMonitorsBandwidth;
+
+		// Choppers: 0x7DDDXXXX
+		std::vector<TriggerBandwidthStructPtr> m_choppersBandwidth;
+		boost::shared_ptr<smsUint32PV> m_pvNumChoppersBandwidth;
+
+		// Digital Triggers: 0x5DDD000[01]
+		std::vector<TriggerBandwidthStructPtr> m_digitalTriggersBandwidth;
+		boost::shared_ptr<smsUint32PV> m_pvNumDigitalTriggersBandwidth;
+
+		// Analog Signals: 0x6DDDXXXX
+		std::vector<BandwidthStructPtr> m_analogSignalsBandwidth;
+		boost::shared_ptr<smsUint32PV> m_pvNumAnalogSignalsBandwidth;
+	};
+
+	typedef boost::shared_ptr<OverallBandwidthStruct>
+		OverallBandwidthStructPtr;
+
+	OverallBandwidthStructPtr m_BW;
 
 private:
 	SMSControl();
@@ -665,12 +989,17 @@ private:
 	static bool m_doPulseVetoCorrect;
 
 	static bool m_sendSampleInRunInfo;
+	static bool m_savePixelMap;
+
+	static bool m_useAncientRunStatusPkt;
 
 	static bool m_allowNonOneToOnePixelMapping;
 
 	static bool m_useOrigPixelMappingPkt;
 
-	static bool m_notesCommentAutoReset;
+	static bool m_notesCommentAutoReset; // Note: Live PV in Markers...!
+	static bool m_runNotesUpdatesEnabled;
+	boost::shared_ptr<smsBooleanPV> m_pvRunNotesUpdatesEnabled;
 
 	boost::shared_ptr<smsUint32PV> m_pvIntermittentDataThreshold;
 	static uint32_t m_intermittentDataThreshold;

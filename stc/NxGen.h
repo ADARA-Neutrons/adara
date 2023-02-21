@@ -21,6 +21,13 @@
 #define TIME_USEC_UNITS "microsecond"
 
 
+// Note: Rate-Limited Logging History Instance is Part of NxGen Class:
+//    RateLimitedLogging::History m_RLLHistory_NxGen;
+
+// Rate-Limited Logging IDs...
+#define RLL_NON_NORM_BUF_FULL     0
+
+
 /*! \brief ADARA Stream Adapter class that provides NeXus file generation
  *
  * The NxGen class is a stream adapter subclass that specializes the
@@ -97,6 +104,9 @@ private:
             m_histo_pid_path = m_instr_path + "/"
                 + m_nxgen.m_histo_pid_name;
 
+            m_histo_pid_path_raw = m_instr_path + "/"
+                + m_nxgen.m_histo_pid_name_raw;
+
             m_tofbin_path = m_instr_path + "/" + m_nxgen.m_tofbin_name;
         }
 
@@ -112,6 +122,7 @@ private:
         std::string             m_histo_path;       ///< Nexus path to histo "NXdata" group
         std::string             m_data_path;        ///< Nexus path to Histo data dataset
         std::string             m_histo_pid_path;   ///< Nexus path to Histo PID dataset
+        std::string             m_histo_pid_path_raw; ///< Nexus path to Histo Physical (Raw) PID dataset
         std::string             m_tofbin_path;      ///< Nexus path to Histo TOF Bin dataset
         bool                    m_nexus_bank_init;  ///< Are bank NeXus groups initialized?
         uint64_t                m_event_cur_size;   ///< Running size of TOF and PID datasets (same size)
@@ -818,16 +829,24 @@ private:
                     // (Tho Log Error About It, Lest We Swell Up & Pop!)
                     else
                     {
-                        // TODO Add Rate-Limiting...?
-                        syslog( LOG_ERR,
-                            "[%i] %s: %s %s %s %s, %s: %s",
-                            g_pid, "STC Error", "NxPVInfo::flushBuffers()",
-                            this->m_device_str.c_str(),
-                            "Non-Normalized PV Buffer Full",
-                            "With No First Pulse Time Yet",
-                            "Deferring For Now",
-                            this->m_pv_str.c_str() );
-                        give_syslog_a_chance;
+                        // Rate-Limiting logging of
+                        // Non-Normalized PV Buffer Full...
+                        std::string log_info;
+                        if ( RateLimitedLogging::checkLog(
+                                m_nxgen.m_RLLHistory_NxGen,
+                                RLL_NON_NORM_BUF_FULL, this->m_pv_str,
+                                60, 10, 100, log_info ) ) {
+                            syslog( LOG_ERR,
+                                "[%i] %s: %s%s %s %s %s, %s: %s",
+                                g_pid, "STC Error", log_info.c_str(),
+                                "NxPVInfo::flushBuffers()",
+                                this->m_device_str.c_str(),
+                                "Non-Normalized PV Buffer Full",
+                                "With No First Pulse Time Yet",
+                                "Deferring For Now",
+                                this->m_pv_str.c_str() );
+                            give_syslog_a_chance;
+                        }
 
                         return( -1 );
                     }
@@ -2909,6 +2928,8 @@ public:
         uint32_t a_verbose_level = 0 );
     ~NxGen();
 
+    RateLimitedLogging::History m_RLLHistory_NxGen;
+
     void dumpProcessingStatistics(void);
 
     uint32_t executePrePostCommands(void);
@@ -2962,7 +2983,8 @@ protected:
     void                monitorPulseGap( STC::MonitorInfo &a_monitor,
                             uint64_t a_count );
     void                monitorFinalize( STC::MonitorInfo &a_monitor );
-    void                runComment( const std::string &a_comment,
+    void                runComment( double a_time, uint64_t a_ts_nano,
+                            const std::string &a_comment,
                             bool a_force_init = false );
     void                writeDeviceEnums( STC::Identifier a_devId,
                             std::vector<STC::PVEnumeratedType>
@@ -3137,6 +3159,7 @@ private:
     std::string         m_pulse_time_name;      ///< Name of Pulse Time data in Nexus file
     std::string         m_data_name;            ///< Name of Histo data in Nexus file
     std::string         m_histo_pid_name;       ///< Name of Histo PixelId data in Nexus file
+    std::string         m_histo_pid_name_raw;   ///< Name of Histo Physical (Raw) PixelId data in Nexus file
     std::string         m_tofbin_name;          ///< Name of Histo TOF Bin data in Nexus file
     unsigned long       m_chunk_size;           ///< HDF5 chunk size for Nexus file (in Dataset Elements!)
     H5nx                m_h5nx;                 ///< HDF5 library object
@@ -3149,7 +3172,9 @@ private:
     uint64_t                    m_pulse_flags_cur_size; ///< Current size of pulse flags dataset
 
     std::set<std::string>       m_pv_name_history;      /// Name/version history of PVs written to Nexus file
-    std::string                 m_runComment;           /// Capture the Singular Run Comment for the Nexus file
+    std::string                 m_runComment;           /// Capture the "Singular" Run Comment for the Nexus file
+    double                      m_runComment_time;      /// Time for the "Singular" Run Comment
+    uint64_t                    m_runComment_ts_nano;   /// Nanoseconds for the "Singular" Run Comment
     bool                        m_nexus_run_comment_init; /// Has the Nexus Run Comment been Initialized yet or not?
     std::string                 m_geometryXml;          /// Capture the Geometry/IDF XML for the Nexus file
     bool                        m_nexus_geometry_init;  /// Has the Nexus Geometry/IDF been Initialized yet or not?

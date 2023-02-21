@@ -661,6 +661,7 @@ void Markers::addRunComment( struct timespec *ts, // Wallclock Time...!
 			? (m_commentPV->value()) : ("(No Comment)") );
 
 		// Run Notes Comments are One-Shot,
+		// (Unless Run Notes Updates is Enabled!)
 		// Reset once the packet is inserted.
 		m_commentPV->unset( false, ts );
 
@@ -675,13 +676,16 @@ void Markers::addRunComment( struct timespec *ts, // Wallclock Time...!
 		ss << "Run " << m_runNumber << ":";
 
 		// This Is It! :-D
-		if ( !m_notesCommentSet )
+		// Either Set the Run Notes Exactly Once,
+		// Or Else Allow Any Number of Run Notes Updates During the Run...
+		if ( !m_notesCommentSet || m_ctrl->getRunNotesUpdatesEnabled() )
 		{
 			ss << " Overall Run Notes - " << comment;
 			DEBUG("[DEPRECATED] addRunComment() " << ss.str()
 				<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
-				<< ts->tv_nsec);
+				<< ts->tv_nsec
+				<< " (m_notesCommentSet=" << m_notesCommentSet << ")");
 
 			emitPacket( *ts, ADARA::MarkerType::OVERALL_RUN_COMMENT,
 				scanIndex, "", comment );
@@ -720,7 +724,8 @@ void Markers::addRunComment( struct timespec *ts, // Wallclock Time...!
 
 		ss << comment;
 
-		DEBUG("[DEPRECATED] addRunComment() Save Run Notes for Next Run - "
+		DEBUG("[DEPRECATED] addRunComment() Save Run Notes "
+			<< " for Next Run (or When Unpaused) - "
 			<< ss.str() << " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 			<< "." << std::setfill('0') << std::setw(9)
 			<< ts->tv_nsec);
@@ -824,13 +829,16 @@ void Markers::addNotesComment( struct timespec *ts, // Wallclock Time...!
 		ss << "Run " << m_runNumber << ":";
 
 		// This Is It! :-D
-		if ( !m_notesCommentSet )
+		// Either Set the Run Notes Exactly Once,
+		// Or Else Allow Any Number of Run Notes Updates During the Run...
+		if ( !m_notesCommentSet || m_ctrl->getRunNotesUpdatesEnabled() )
 		{
 			ss << " Overall Run Notes - " << comment;
 			DEBUG("addNotesComment() " << ss.str()
 				<< " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 				<< "." << std::setfill('0') << std::setw(9)
-				<< ts->tv_nsec);
+				<< ts->tv_nsec
+				<< " (m_notesCommentSet=" << m_notesCommentSet << ")");
 
 			emitPacket( *ts, ADARA::MarkerType::OVERALL_RUN_COMMENT,
 				scanIndex, "", comment );
@@ -869,7 +877,8 @@ void Markers::addNotesComment( struct timespec *ts, // Wallclock Time...!
 
 		ss << comment;
 
-		DEBUG("addNotesComment() Save Run Notes for Next Run - "
+		DEBUG("addNotesComment() Save Run Notes"
+			<< " for Next Run (or When Unpaused) - "
 			<< ss.str() << " at " << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
 			<< "." << std::setfill('0') << std::setw(9)
 			<< ts->tv_nsec);
@@ -977,7 +986,8 @@ void Markers::dumpRunNotesComment( bool prologue )
 		return;
 
 	// Only Dump *One* Set of Official Run Notes for Any Given Run...
-	if ( !m_notesCommentSet )
+	// Or Else Allow Any Number of Run Notes Updates During the Run... :-D
+	if ( !m_notesCommentSet || m_ctrl->getRunNotesUpdatesEnabled() )
 	{
 		// Dump First Run Notes Comment Entered, If Any...
 		if ( m_useFirstNotesComment )
@@ -994,7 +1004,8 @@ void Markers::dumpRunNotesComment( bool prologue )
 						- ADARA::EPICS_EPOCH_OFFSET
 					<< "." << std::setfill('0') << std::setw(9)
 					<< first_notes_it->first.tv_nsec << std::setw(0)
-					<< ": " << first_notes_it->second);
+					<< ": " << first_notes_it->second
+					<< " (m_notesCommentSet=" << m_notesCommentSet << ")");
 
 				emitPacket( first_notes_it->first,
 					ADARA::MarkerType::OVERALL_RUN_COMMENT, m_scanIndex,
@@ -1021,7 +1032,8 @@ void Markers::dumpRunNotesComment( bool prologue )
 						- ADARA::EPICS_EPOCH_OFFSET
 					<< "." << std::setfill('0') << std::setw(9)
 					<< last_notes_it->first.tv_nsec << std::setw(0)
-					<< ": " << last_notes_it->second);
+					<< ": " << last_notes_it->second
+					<< " (m_notesCommentSet=" << m_notesCommentSet << ")");
 
 				emitPacket( last_notes_it->first,
 					ADARA::MarkerType::OVERALL_RUN_COMMENT, m_scanIndex,
@@ -1152,9 +1164,16 @@ void Markers::dumpQueuedComments( bool prologue, bool capture_last )
 		if ( notes_it != notesCommentQueue.end()
 				&& (t=timespec_to_nsec( notes_it->first )) < next ) {
 			next_it = notes_it;
+			// Note: These Comments Here are _Always_ those Extraneous
+			// Intervening Run Notes Entered Either Before a Run or
+			// While Paused. The "Chosen" Run Notes Comment, From the
+			// Start or End of This Queue, Has Already Been Extracted
+			// Via the Call to dumpRunNotesComment(). ;-D
+			// Anyway, Any Residual Run Notes Comments Queued Here
+			// Should Just Go Into the Generic Run Annotation Comments. :-D
 			markerType = ADARA::MarkerType::GENERIC;
 			prefix = "[DISCARDED RUN NOTES] ";
-			desc = "Discarding Intervening Pre-Run Notes";
+			desc = "Discarding Intervening Pre-Run or Paused Notes";
 			is_error = true;
 			is_scan = false;
 			next = t;

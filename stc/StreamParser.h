@@ -77,6 +77,10 @@ public:
         { return m_run_info.run_number; }
     bool getNoSampleInfo() const
         { return m_run_info.no_sample_info; }
+    bool getSavePixelMap() const
+        { return m_run_info.save_pixel_map; }
+    bool getRunNotesUpdatesEnabled() const
+        { return m_run_info.run_notes_updates_enabled; }
 
     bool infoReady() const
         { return (m_info_rcvd & INFO_SENT); }
@@ -91,6 +95,10 @@ public:
     std::string getWorkingDirectory(void) { return m_work_dir; }
 
     bool getDoRename(void) { return m_do_rename; }
+
+    // Needed by NxGen::runComment()... ;-D
+    void markerComment( double a_time, uint64_t a_ts_nano,
+        const std::string &a_comment );
 
     uint32_t verbose(void) { return m_verbose_level; }
 
@@ -226,8 +234,6 @@ private:
                     uint32_t a_scan_index, const std::string &a_comment );
     void        markerScanStop( double a_time, uint64_t a_ts_nano,
                     uint32_t a_scan_index, const std::string &a_comment  );
-    void        markerComment( double a_time, uint64_t a_ts_nano,
-                    const std::string &a_comment );
 
     int                                     m_fd;                       ///< Input ADARA stream file descriptor
     ProcessingState                         m_processing_state;         ///< Current (internal) processing state
