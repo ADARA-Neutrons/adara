@@ -1620,7 +1620,7 @@ if [[ "$command" == "status" \
 
 		echo
 
-		caget $WAIT ${PRE}:${SMS}:SavePixelMap
+		caget $WAIT ${PRE}:${SMS}:RunInfo:SavePixelMap
 
 		echo
 
