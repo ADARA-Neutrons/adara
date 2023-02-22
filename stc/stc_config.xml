@@ -806,6 +806,8 @@
 		<condition>
 			<name>Timepixe3 Imaging Mode</name>
 			<pattern>CG1D:CS:UE:Timepix3Mode$</pattern>
+			<pattern>BL3:Exp:IM:Timepix3Mode$</pattern>
+			<pattern>BL10:Exp:IM:Timepix3Mode$</pattern>
 			<value>1</value><!-- Timepix3 Imaging Mode Activated -->
 		</condition>
 		<element>
