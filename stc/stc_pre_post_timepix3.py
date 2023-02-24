@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Python Script for Archiving Image Files for Timepix3 at CG1D.
+Python Script for Archiving Image Files for Timepix3.
 
 Script is triggered by the ADARA/STC as a
 "Pre-Post Processing" Command Script,
@@ -65,9 +65,10 @@ def determine_subdirectories(file_path):
 	source_dir = file_path.replace('/data/','/data-cg1d/')
 	lead_dir_1, subdir_1 = split_leading_directory(source_dir)
 	lead_dir_2, subdir_2 = split_leading_directory(subdir_1)
-	ipts_dir, new_subdir = split_leading_directory(subdir_2)
+	lead_dir_3, subdir_3 = split_leading_directory(subdir_2)
+	ipts_dir, new_subdir = split_leading_directory(subdir_3)
 	print('\n\nsource_dir: {}\nlead_dir_2: {}\nsubdir_2: {}\nipts_dir: {}\n new_subdir: {}\n\n'.format(
-		source_dir, lead_dir_2, subdir_2, ipts_dir, new_subdir))
+		source_dir, lead_dir_3, subdir_3, ipts_dir, new_subdir))
 	return source_dir, ipts_dir, new_subdir
 
 
@@ -85,30 +86,37 @@ def determine_source_and_target_directories(source_dir, ipts_dir, target_dir, pr
 	if not ipts_dir == proposal:
 		print(f'\n\nWARNING: Unexpected input: ipts directory ({ipts_dir}) does not match current proposal ({proposal}).\n\n')
 	
-	initial_image_dir = source_dir
+	initial_image_dir = source_dir.replace('/mcp/', '/mcp-tpx3/', 1)
 	if target_dir is not None:
 		# expand away tilde if present.
 		target_dir = os.path.expanduser(target_dir)
 	else:
-		target_dir = '/HFIR/CG1D'
-	new_image_dir = "{}/{}/images/timepix3/{}/Run_{}".format(target_dir, proposal, new_subdir, run_number) 
+		target_dir = '/SNS/SNAP'
+	
+	# Proposal is already in path. Don't need it in subdir.
+	image_subdir = new_subdir.replace(proposal + '/', '')
+	print('\n\nIn determine_source_and_target_directories():new_subdir {} proposal: {} image_subdir: {}\n\n'.format(new_subdir, proposal, image_subdir))
+
+	new_image_dir = "{}/{}/images/mcp/Run_{}/{}".format(target_dir, proposal, run_number, image_subdir) 
 	
 	print('\n\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
 	return initial_image_dir, new_image_dir
 
-def determine_raw_tpx3_directories(target_dir, proposal, new_subdir, run_number):
+def determine_raw_tpx3_directories(target_dir, proposal, run_number):
 	"""
 	Determines source and target directories for copying.
 	"""
-	tpx3_base = '/mcp-cg1d/tpx3files'
+	# tpx3_base = '/mcp-cg1d/tpx3files'
+	tpx3_base = '/mcp-tpx3/tpx3files'
 	initial_tpx3_dir = "{}/{}/Run_{}".format(tpx3_base, proposal, run_number) 
 
 	if target_dir is not None:
 		# expand away tilde if present.
 		target_dir = os.path.expanduser(target_dir)
 	else:
-		target_dir = '/HFIR/CG1D'
-	new_tpx3_dir = "{}/{}/images/timepix3/{}/Run_{}/tpx3".format(target_dir, proposal, new_subdir, run_number) 
+		target_dir = '/SNS/SNAP'
+	# new_tpx3_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
+	new_tpx3_dir = "{}/{}/images/mcp/Run_{}/tpx3".format(target_dir, proposal, run_number) 
 	
 	print('\n\ninitial_tpx3_dir: {}\nnew_tpx3_dir: {}\n\n'.format(initial_tpx3_dir, new_tpx3_dir))
 	return initial_tpx3_dir, new_tpx3_dir
@@ -254,10 +262,10 @@ def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_p
 	for source_file in source_files:
 		head_tail = os.path.split(source_file)
 		target_files.append(os.path.join(target_dir, head_tail[1]))
-	return target_files
+	return source_files, target_files
 
 
-def copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name):
+def copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, include_tiff_files=True):
 	"""
 	Copies image files for the specified run.
 	"""
@@ -266,30 +274,39 @@ def copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, ti
 	# Determine proper subdirectories.
 	source_dir, ipts_dir, new_subdir = determine_subdirectories(tiff_file_path)
 
-	# Determine source and target directories.
-	initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, ipts_dir, target_dir, proposal, new_subdir, run_number)
-			
-	# Identify target files (for use in cataloging). Wait for file count to be stable for at least 60.0 seconds.
-	# target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
-	target_files = get_target_files_patiently(initial_image_dir, run_number, new_image_dir, wait_period_sec=60.0)
+	if include_tiff_files:
+		try:
+			# Determine source and target directories.
+			initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, ipts_dir, target_dir, proposal, new_subdir, run_number)
+					
+			# Identify target files (for use in cataloging). Wait for file count to be stable for at least 60.0 seconds.
+			# target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
+			source_files, target_files = get_target_files_patiently(initial_image_dir, run_number, new_image_dir, wait_period_sec=60.0)
 
-	print('\n\nIn copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
+			print('\n\nIn copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
 
-	# Assure target directory exists.
-	assure_directory_exists(new_image_dir)
-	copy_files_batch(initial_image_dir, new_image_dir, run_number)
+			# Assure target directory exists.
+			assure_directory_exists(new_image_dir)
+			copy_files_batch(initial_image_dir, new_image_dir, run_number)
+		except:
+			e = sys.exc_info()
+			print('\n\nERROR In copy_images(). Trying to write TIFF files: {}\n\n'.format(str(e)))
+			traceback.print_exc(limit=50, file=sys.stdout)
 
 	# ---------------------
 	# Handle raw tpx3 files
-	initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(target_dir, proposal, new_subdir, run_number)
+	initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(target_dir, proposal, run_number)
 	# Identify target tpx files. Wait for file count to be stable for at least 60.0 seconds.
-	target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=False)
+	source_files, target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=False)
 
 	print('\n\nIn copy_images(); raw tpx3 portion.\ninitial_tpx3_dir: {}\nnew_tpx3_dir: {}\n\n'.format(initial_tpx3_dir, new_tpx3_dir))
 
 	# Assure target directory exists.
+	print('\n\nIn copy_images(); Making sure directory exists: {}\n\n'.format(new_tpx3_dir))
 	assure_directory_exists(new_tpx3_dir)
-	copy_tpx3_files_batch(initial_tpx3_dir, new_tpx3_dir)
+	print('\n\nIn copy_images(); About to copy files: {} to target_dir: {}\n\n'.format(source_files, new_tpx3_dir))
+	copy_files_individually(source_files, new_tpx3_dir)
+	# copy_tpx3_files_batch(initial_tpx3_dir, new_tpx3_dir)
 
 	return target_files
 
@@ -352,6 +369,10 @@ def process_args(arg_list):
 	source_dir = None
 	target_dir = None
 
+	tiff_file_path = 'not_found_yet'
+	tiff_file_name = 'not_found_yet'
+	tpx_file_path = 'not_found_yet'
+
 	# Loop through Command Line Parameters...
 	for arg in arg_list:
 		print("\narg=%s" % arg)
@@ -375,24 +396,27 @@ def process_args(arg_list):
 			tiff_file_path = value
 		elif key == "TIFFFileName":
 			tiff_file_name = value
+		elif key == "TpxFilePath":
+			tpx_file_path = value
 
-	return proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name
+
+	return proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path
 
 
 def do_pre_post_timepix3(arg_list):
 	"""
-	Do pre-post-processing for CG1D Timepix3 Imaging.
+	Do pre-post-processing for Timepix3 Imaging.
 	"""
 	return_code = 0
 	try:
 		print('\n\nPre-Post-Processing for Timepix3.\n\n')
 
-		proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name = process_args(arg_list)
+		proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path = process_args(arg_list)
 
 		parms_present = all (p is not None for p in [proposal, run_number, tiff_file_path, tiff_file_name])
 
 		if parms_present is not None:
-			files_to_catalog = copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name)
+			files_to_catalog = copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, include_tiff_files=True)
 			catalog_images(files_to_catalog)
 		else:
 			print('\n\nERROR: Not all parameters present.\n\n')
