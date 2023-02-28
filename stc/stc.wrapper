@@ -1,0 +1,19 @@
+#!/bin/bash
+#
+# STC Wrapper Script
+#    - to be installed in "/usr/local/bin/stc" on stc[123].ornl.gov
+#    - invoked by the STC XInetD Script in /etc/xinetd.d/stc
+#
+# This wrapper calls:
+#    - "/usr/sbin/stc"
+#    - which points to "/home/controls/config/deploy/stc"
+#    - which points to the deployed binary in
+#      "/home/controls/prod/ADARA/<tag>/stc"...
+#
+
+CONFIG_FILE="--config /SNS/snfs1/stcdata/stc_config.xml"
+
+exec /usr/sbin/stc -s -m -w /SNS/snfs1/stcdata ${CONFIG_FILE} --no-adara \
+	--broker_uri tcp://amqbroker.sns.gov --broker_user wfclient \
+	--broker_pass w0rkfl0w
+

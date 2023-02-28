@@ -1,0 +1,22 @@
+# Do not edit, managed by Puppet.
+# Source: /etc/puppetlabs/code/environments/production/modules/neutron_sciences/epics/templates/logrotated/pvsd_log.erb
+
+# Place in /etc/logrotate.d/controls_var_log to run daily
+#
+# For test 'right away':
+#    sudo logrotate -v /etc/logrotate.d/controls_var_log
+#
+# Rotate all log files in controls/var.
+/var/log/pvsd.log {
+# to avoid the need for a SIGHUP
+   copytruncate
+   missingok
+   notifempty
+   rotate 7
+   weekly
+   dateext
+   size 100K
+   compress
+# 'create' isn't used with 'copytruncate', but in case we change the mechanism later:
+#   create 0664 root users
+}

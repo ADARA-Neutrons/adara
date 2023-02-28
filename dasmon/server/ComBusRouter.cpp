@@ -1,5 +1,6 @@
 #include <string.h>
 #include <syslog.h>
+#include <unistd.h>
 #include "ComBusRouter.h"
 #include "ComBusMessages.h"
 #include "DASMonMessages.h"
@@ -58,10 +59,10 @@ functions for the dasmond service, as follows:
   * behavior will result. This constructor causes the new ComBusRouter to attach itself
   * to the provided stream instances and initializes the ComBus interface.
   */
-ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer )
+ComBusRouter::ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer, uint16_t a_metrics_period )
     : m_monitor( a_monitor ), m_analyzer( a_analyzer ), m_combus( ADARA::ComBus::Connection::getInst() ),
-      m_resend_state(false), m_sms_connected(false), m_combus_connected(false), m_recording(false)
-
+      m_resend_state(false), m_sms_connected(false), m_combus_connected(false), m_recording(false),
+      m_metrics_period(a_metrics_period), m_beam_metrics_count(0), m_run_metrics_count(0), m_stream_metrics_count(0)
 {
     m_monitor.addListener( *this );
     m_analyzer.attach( *this );
@@ -94,21 +95,125 @@ ComBusRouter::run()
     unsigned short  count = 0;
     uint32_t        t;
     map<string,ProcInfo>::iterator ip;
+    uint32_t last_proc_ticker = 0;
+    uint32_t proc_stall = 0;
+    uint32_t last_metrics_ticker = 0;
+    uint32_t metrics_stall = 0;
+    uint32_t last_db_ticker = 0;
+    uint32_t db_stall = 0;
+
+    // Need Sufficient Time for Worst-Case Scenario
+    // With Latest ADARA/SMS Container/PauseMode Stack
+    // Timeout/Cleanup Delays...
+    uint32_t TIMEOUT = 300;
 
     while(1)
     {
+
         sleep(1);
 
         t = time(0);
+
+        if ( last_proc_ticker == m_monitor.getProcTicker() )
+        {
+            if ( ++proc_stall == TIMEOUT )
+            {
+                syslog( LOG_ERR, "StreamMonitor stream processing thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getProcState(), m_monitor.getNotifyState() );
+                usleep(30000); // give syslog a chance...
+            }
+        }
+        else
+        {
+            if ( proc_stall >= TIMEOUT )
+            {
+                syslog( LOG_ERR, "StreamMonitor stream processing thread appears to have recovered." );
+                usleep(30000); // give syslog a chance...
+            }
+
+            last_proc_ticker = m_monitor.getProcTicker();
+            proc_stall = 0;
+        }
+
+        if ( last_metrics_ticker == m_monitor.getMetricsTicker() )
+        {
+            if ( ++metrics_stall == TIMEOUT )
+            {
+                syslog( LOG_ERR, "StreamMonitor metrics thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getMetricsState(), m_monitor.getNotifyState() );
+                usleep(30000); // give syslog a chance...
+            }
+        }
+        else
+        {
+            if ( metrics_stall >= TIMEOUT )
+            {
+                syslog( LOG_ERR, "StreamMonitor metrics thread appears to have recovered." );
+                usleep(30000); // give syslog a chance...
+            }
+
+            last_metrics_ticker = m_monitor.getMetricsTicker();
+            metrics_stall = 0;
+        }
+
+#ifndef NO_DB
+        if ( m_monitor.getDbState() > 0 ) // Only monitor DB Thread if it has been started
+        {
+            if ( last_db_ticker == m_monitor.getDbTicker() )
+            {
+                if ( ++db_stall == TIMEOUT )
+                {
+                    syslog( LOG_ERR, "StreamMonitor DB thread appears to be hung. Thread state = %u, Notify state = %u", m_monitor.getDbState(), m_monitor.getNotifyState() );
+                    usleep(30000); // give syslog a chance...
+                }
+            }
+            else
+            {
+                if ( db_stall >= TIMEOUT )
+                {
+                    syslog( LOG_ERR, "StreamMonitor DB thread appears to have recovered." );
+                    usleep(30000); // give syslog a chance...
+                }
+
+                last_db_ticker = m_monitor.getDbTicker();
+                db_stall = 0;
+            }
+        }
+#endif
 
         // Test/send status every 5 seconds
 
         if ( !(count % COMBUS_STATUS_PERIOD ))
         {
-            if ( m_monitor.isOK() && m_analyzer.isOK() )
-                m_combus.status( ADARA::ComBus::STATUS_OK );
+            // Check to be sure all threads are running (i.e. ticker values should be changing)
+            // If a thread is stuck, set fault condition and log failed thread state
+
+            if ( proc_stall < TIMEOUT
+                    && metrics_stall < TIMEOUT
+                    && db_stall < TIMEOUT )
+            {
+                if ( !(m_combus.status( ADARA::ComBus::STATUS_OK )) )
+                {
+                    syslog( LOG_ERR, "%s - %s",
+                        "StreamMonitor Error",
+                        "Broadcasting DASMON ComBus Status OK Message" );
+                }
+            }
             else
-                m_combus.status( ADARA::ComBus::STATUS_FAULT );
+            {
+                syslog( LOG_ERR,
+                    "StreamMonitor %s - %s: %s=%u %s=%u %s=%u %s=%u",
+                    "SYSTEM STALLED", "STATUS FAULT",
+                    "proc_stall", proc_stall,
+                    "metrics_stall", metrics_stall,
+                    "db_stall", db_stall,
+                    "TIMEOUT", TIMEOUT);
+                usleep(30000); // give syslog a chance...
+                if ( !(m_combus.status( ADARA::ComBus::STATUS_FAULT )) )
+                {
+                    syslog( LOG_ERR, "%s - %s",
+                        "StreamMonitor Error",
+                        "Broadcasting DASMON ComBus Status FAULT Message" );
+                }
+            }
         }
 
         // Watch for unresponsive / inactive processes
@@ -119,6 +224,8 @@ ComBusRouter::run()
             if ( ip->second.status == ADARA::ComBus::STATUS_UNRESPONSIVE && t > ( ip->second.last_updated + PROC_TIMEOUT_INACTIVE ))
             {
                 syslog( LOG_INFO, "Process %s has become INACTIVE.", ip->first.c_str() );
+                usleep(30000); // give syslog a chance...
+
                 ip->second.status = ADARA::ComBus::STATUS_INACTIVE;
                 m_analyzer.retractFact( string("PROC_") + ip->first );
 
@@ -129,6 +236,8 @@ ComBusRouter::run()
                 if (( ip->second.status == ADARA::ComBus::STATUS_OK || ip->second.status == ADARA::ComBus::STATUS_FAULT ) && t > ( ip->second.last_updated + PROC_TIMEOUT_UNRESPONSIVE ))
                 {
                     syslog( LOG_INFO, "Process %s has become UNRESPONSIVE.", ip->first.c_str() );
+                    usleep(30000); // give syslog a chance...
+
                     ip->second.status = ADARA::ComBus::STATUS_UNRESPONSIVE;
                     m_analyzer.assertFact( string("PROC_") + ip->first, (int)ip->second.status );
                 }
@@ -242,26 +351,29 @@ ComBusRouter::sendPVs( const std::string &a_src_proc, const std::string &a_CID )
   * \param a_recording - When true, indicates system is recording
   * \param a_run_number - Run number of recording (0 when no recording)
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
   * This method is called by the StreamMonitor instance whenever the system
   * starts or stops recording a run. The received information is broadcast
   * in a RunStatusMessage on the APP.DASMON topic.
   */
 void
-ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
+ComBusRouter::runStatus( bool a_recording, uint32_t a_run_number,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
-    if ( a_recording != m_recording )
+    // Only respond if recording state has changed
+    //if ( a_recording != m_recording )
     {
-        // On run state transitions, clear PVs
         boost::unique_lock<boost::mutex> lock(m_mutex);
         m_pvs.clear();
         lock.unlock();
+
+        ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number,
+            a_timestamp, a_timestamp_nanosec );
+        m_combus.broadcast( msg );
+
+        m_recording = a_recording;
     }
-
-    ComBus::DASMON::RunStatusMessage msg( a_recording, a_run_number, a_timestamp );
-    m_combus.broadcast( msg );
-
-    m_recording = a_recording;
 }
 
 
@@ -336,8 +448,13 @@ ComBusRouter::runInfo( const RunInfo &a_info )
 void
 ComBusRouter::beamMetrics( const BeamMetrics &a_metrics )
 {
-    ComBus::DASMON::BeamMetricsMessage msg( a_metrics );
-    m_combus.broadcast( msg );
+    if ( ++m_beam_metrics_count >= m_metrics_period )
+    {
+        m_beam_metrics_count = 0;
+
+        ComBus::DASMON::BeamMetricsMessage msg( a_metrics );
+        m_combus.broadcast( msg );
+    }
 }
 
 
@@ -351,16 +468,26 @@ ComBusRouter::beamMetrics( const BeamMetrics &a_metrics )
 void
 ComBusRouter::runMetrics( const RunMetrics &a_metrics )
 {
-    ComBus::DASMON::RunMetricsMessage msg( a_metrics );
-    m_combus.broadcast( msg );
+    if ( ++m_run_metrics_count >= m_metrics_period )
+    {
+        m_run_metrics_count = 0;
+
+        ComBus::DASMON::RunMetricsMessage msg( a_metrics );
+        m_combus.broadcast( msg );
+    }
 }
 
 
 void
 ComBusRouter::streamMetrics( const StreamMetrics &a_metrics )
 {
-    ComBus::DASMON::StreamMetricsMessage msg( a_metrics );
-    m_combus.broadcast( msg );
+    if ( ++m_stream_metrics_count >= m_metrics_period )
+    {
+        m_stream_metrics_count = 0;
+
+        ComBus::DASMON::StreamMetricsMessage msg( a_metrics );
+        m_combus.broadcast( msg );
+    }
 }
 
 
@@ -396,16 +523,21 @@ ComBusRouter::pvUndefined( const std::string &a_name )
   * \param a_value - New value of process variable
   * \param a_status - New status of process variable
   * \param a_timestamp - Timestamp of change
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of change
   *
-  * This method is a callback from the StreamMonitor to indicate changes in the
-  * value or status of an unsigned integer process variable in the data stream.
+  * This method is a callback from the StreamMonitor to indicate changes
+  * in the value or status of an unsigned integer process variable in the
+  * data stream.
   * The ComBusRouter caches this information for subsequent client requests.
   */
 void
-ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+ComBusRouter::pvValue( const std::string &a_name,
+        uint32_t a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( (double)a_value, a_status, a_timestamp );
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
+        a_value, a_status, a_timestamp, a_timestamp_nanosec );
 }
 
 
@@ -413,16 +545,86 @@ ComBusRouter::pvValue( const std::string &a_name, uint32_t a_value, VariableStat
   * \param a_value - New value of process variable
   * \param a_status - New status of process variable
   * \param a_timestamp - Timestamp of change
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of change
   *
-  * This method is a callback from the StreamMonitor to indicate changes in the
-  * value or status of a double precision process variable in the data stream.
+  * This method is a callback from the StreamMonitor to indicate changes
+  * in the value or status of a double precision process variable in the
+  * data stream.
   * The ComBusRouter caches this information for subsequent client requests.
   */
 void
-ComBusRouter::pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+ComBusRouter::pvValue( const std::string &a_name,
+        double a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     boost::lock_guard<boost::mutex> lock(m_mutex);
-    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData( a_value, a_status, a_timestamp );
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
+        a_value, a_status, a_timestamp, a_timestamp_nanosec );
+}
+
+
+/** \param a_name - Name of process variable
+  * \param a_value - New value of process variable
+  * \param a_status - New status of process variable
+  * \param a_timestamp - Timestamp of change
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of change
+  *
+  * This method is a callback from the StreamMonitor to indicate changes
+  * in the value or status of a string process variable in the data stream.
+  * The ComBusRouter caches this information for subsequent client requests.
+  */
+void
+ComBusRouter::pvValue( const std::string &a_name,
+        string &a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+{
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
+        a_value, a_status, a_timestamp, a_timestamp_nanosec );
+}
+
+
+/** \param a_name - Name of process variable
+  * \param a_value - New value of process variable
+  * \param a_status - New status of process variable
+  * \param a_timestamp - Timestamp of change
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of change
+  *
+  * This method is a callback from the StreamMonitor to indicate changes
+  * in the value or status of an unsigned integer process variable in the
+  * data stream.
+  * The ComBusRouter caches this information for subsequent client requests.
+  */
+void
+ComBusRouter::pvValue( const std::string &a_name,
+        vector<uint32_t> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+{
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
+        a_value, a_status, a_timestamp, a_timestamp_nanosec );
+}
+
+
+/** \param a_name - Name of process variable
+  * \param a_value - New value of process variable
+  * \param a_status - New status of process variable
+  * \param a_timestamp - Timestamp of change
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of change
+  *
+  * This method is a callback from the StreamMonitor to indicate changes
+  * in the value or status of a double precision process variable in the
+  * data stream.
+  * The ComBusRouter caches this information for subsequent client requests.
+  */
+void
+ComBusRouter::pvValue( const std::string &a_name,
+        vector<double> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+{
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    m_pvs[a_name] = ComBus::DASMON::ProcessVariables::PVData(
+        a_value, a_status, a_timestamp, a_timestamp_nanosec );
 }
 
 
@@ -497,10 +699,12 @@ ComBusRouter::comBusConnectionStatus( bool a_connected )
         // On reconnect, resend all asserted signals in case some fired while disconnected
         m_resend_state = true;
         syslog( LOG_NOTICE, "ComBus connection active." );
+        usleep(30000); // give syslog a chance...
     }
     else if ( !a_connected && m_combus_connected )
     {
         syslog( LOG_ERR, "ComBus connection lost." );
+        usleep(30000); // give syslog a chance...
     }
 
     m_combus_connected = a_connected;
@@ -579,11 +783,13 @@ ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
 
         case ADARA::ComBus::MSG_DASMON_SET_RULES:
             syslog( LOG_INFO, "Received request to set rules" );
+            usleep(30000); // give syslog a chance...
             setRuleDefinitions( &a_msg );
             break;
 
         case ADARA::ComBus::MSG_DASMON_RESTORE_DEFAULT_RULES:
             syslog( LOG_INFO, "Received request to restore default rules" );
+            usleep(30000); // give syslog a chance...
             m_analyzer.restoreDefaultConfig();
             sendRuleDefinitions( a_msg.getSourceID(), a_msg.getCorrelationID() );
             break;
@@ -603,11 +809,16 @@ ComBusRouter::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
     catch ( exception &e )
     {
         syslog( LOG_ERR, "Exception while processing command: %s", e.what() );
+        usleep(30000); // give syslog a chance...
     }
     catch ( ... )
     {
         syslog( LOG_ERR, "Unkown exception while processing command" );
+        usleep(30000); // give syslog a chance...
     }
 }
 
 }}
+
+// vim: expandtab
+

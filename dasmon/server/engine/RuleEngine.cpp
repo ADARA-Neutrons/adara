@@ -118,8 +118,8 @@ RuleEngine::Fact::removeRuleDependency( Rule *a_rule )
   *
   * Constructs a new Rule. Throws if expression has errors.
   */
-RuleEngine::Rule::Rule( RuleEngine &a_engine, const std::string a_id, const std::string &a_expr )
-: m_engine(a_engine), m_id(a_id), m_expr(a_expr), m_rule_fact(0), m_rule_value(0.0), m_valid(false), m_tmp_count(0)
+RuleEngine::Rule::Rule( RuleEngine &a_engine, const std::string a_id, const std::string &a_expr, const std::string &a_desc )
+: m_engine(a_engine), m_id(a_id), m_expr(a_expr), m_desc(a_desc), m_rule_fact(0), m_rule_value(0.0), m_valid(false), m_tmp_count(0)
 {
     string id = boost::to_upper_copy( a_id );
     boost::algorithm::trim( id );
@@ -131,6 +131,7 @@ RuleEngine::Rule::Rule( RuleEngine &a_engine, const std::string a_id, const std:
     m_rule_fact->m_rule_output = true;
     m_rule_fact->m_implicit = false;
 
+    m_parser.DefineNameChars("0123456789_abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ:@");
     m_parser.SetVarFactory( parserVarFactory, this );
     m_parser.SetExpr( a_expr );
     m_parser.Eval(); // This call is to force compilation of the new expression and to throw any errors now
@@ -145,7 +146,9 @@ RuleEngine::Rule::Rule( RuleEngine &a_engine, const std::string a_id, const std:
   */
 RuleEngine::Rule::~Rule()
 {
-    for ( std::map<Fact*,FactInfo>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
+    for ( std::map<Fact*,double>::iterator f = m_inputs.begin(); f != m_inputs.end(); ++f )
+        f->first->removeRuleDependency( this );
+    for ( std::map<Fact*,double>::iterator f = m_asserts.begin(); f != m_asserts.end(); ++f )
         f->first->removeRuleDependency( this );
 }
 
@@ -167,6 +170,7 @@ RuleEngine::Rule::~Rule()
 double *
 RuleEngine::Rule::parserVarFactory( const char *a_var_name, void *a_data )
 {
+    double *result;
     RuleEngine::Rule *m_inst = (RuleEngine::Rule *)a_data;
 
     // Note: variable names may vary in case, but facts are always upper case
@@ -185,7 +189,9 @@ RuleEngine::Rule::parserVarFactory( const char *a_var_name, void *a_data )
         string var = &a_var_name[1];
         boost::to_upper( var );
         fact = m_inst->m_engine.getFact( var );
-        m_inst->m_facts[fact] = FactInfo( 0, true );
+        double &value = m_inst->m_asserts[fact];
+        value = 0;
+        result = &value;
     }
     else if ( strlen( a_var_name ) > 2 )
     {
@@ -193,7 +199,9 @@ RuleEngine::Rule::parserVarFactory( const char *a_var_name, void *a_data )
         string var = a_var_name;
         boost::to_upper( var );
         fact = m_inst->m_engine.getFact( var );
-        m_inst->m_facts[fact] = FactInfo( 0, false );
+        double &value = m_inst->m_inputs[fact];
+        value = 0;
+        result = &value;
     }
     else
     {
@@ -206,7 +214,7 @@ RuleEngine::Rule::parserVarFactory( const char *a_var_name, void *a_data )
     // Add this rule as a dependency on fact
     fact->addRuleDependency( m_inst );
 
-    return &(m_inst->m_facts[fact].m_value);
+    return result;
 }
 
 
@@ -221,37 +229,50 @@ RuleEngine::Rule::parserVarFactory( const char *a_var_name, void *a_data )
 void
 RuleEngine::Rule::evaluate( Fact *a_updated_fact )
 {
-    if ( a_updated_fact )
+    //cout << "eval " << m_id << "{" << m_expr << "}: ";
+
+    /*if ( a_updated_fact )
     {
-        map<Fact*,FactInfo>::iterator f = m_facts.find( a_updated_fact );
-        if ( f == m_facts.end())
-            return; // TODO Should probably throw an exception - this should NOT happen!
+        cout << "update fact {" << a_updated_fact->m_id << "} ";
 
         if ( a_updated_fact->m_asserted )
-        {
-            // Update fact info for changed fact
-            if ( f->second.m_assert_type )
-                f->second.m_value = 1;
-            else
-                f->second.m_value = (double)f->first->m_value;
-
-            // See if rule has become valid
-            if ( !m_valid )
-            {
-                m_valid = true;
-                for ( f = m_facts.begin(); f != m_facts.end(); ++f )
-                {
-                    if ( !f->second.m_assert_type && !f->first->m_asserted )
-                        m_valid = false;
-                }
-            }
-        }
+            cout << "asserted ";
         else
+            cout << "retracted ";
+    }*/
+
+    if ( a_updated_fact )
+    {
+        map<Fact*,double>::iterator f = m_asserts.find( a_updated_fact );
+        if ( f != m_asserts.end())
         {
-            if ( f->second.m_assert_type )
-                f->second.m_value = 0;
+            if ( a_updated_fact->m_asserted )
+                f->second = 1;
+            else
+                f->second = 0;
+        }
+
+        f = m_inputs.find( a_updated_fact );
+        if ( f != m_inputs.end())
+        {
+            if ( a_updated_fact->m_asserted )
+                f->second = (double)f->first->m_value;
             else
                 m_valid = false;
+        }
+
+        if ( a_updated_fact->m_asserted && !m_valid )
+        {
+            // See if rule has become valid
+            m_valid = true;
+            for ( f = m_inputs.begin(); f != m_inputs.end(); ++f )
+            {
+                if ( !f->first->m_asserted )
+                {
+                    m_valid = false;
+                    break;
+                }
+            }
         }
     }
     else
@@ -262,24 +283,27 @@ RuleEngine::Rule::evaluate( Fact *a_updated_fact )
 
         m_valid = true;
 
-        for ( map<Fact*,FactInfo>::iterator f = m_facts.begin(); f != m_facts.end(); ++f )
+        for ( map<Fact*,double>::iterator f = m_asserts.begin(); f != m_asserts.end(); ++f )
         {
-            if ( f->second.m_assert_type )
-            {
-                if ( f->first->m_asserted )
-                    f->second.m_value = 1;
-                else
-                    f->second.m_value = 0;
-            }
+            if ( f->first->m_asserted )
+                f->second = 1;
             else
-            {
-                if ( f->first->m_asserted )
-                    f->second.m_value = (double)f->first->m_value;
-                else
-                    m_valid = false;
-            }
+                f->second = 0;
+        }
+
+        for ( map<Fact*,double>::iterator f = m_inputs.begin(); f != m_inputs.end(); ++f )
+        {
+            if ( f->first->m_asserted )
+                f->second = (double)f->first->m_value;
+            else
+                m_valid = false;
         }
     }
+
+    /*if ( !m_valid )
+        cout << " expr is NOT valid." << endl;
+    else
+        cout << " expr is valid - ";*/
 
     if ( m_valid )
     {
@@ -287,17 +311,23 @@ RuleEngine::Rule::evaluate( Fact *a_updated_fact )
 
         if ( m_parser.Eval() > 0.5 )
         {
+            //cout << " TRIG" << endl;
+
             // Expression evaluated as "fired" (output is 1)
             if ( !m_rule_fact->m_asserted || m_rule_fact->m_value.m_real_value != m_rule_value )
                 m_engine.assert( m_rule_fact, m_rule_value );
         }
         else
         {
+            //cout << " DEAD" << endl;
+
             // Expression evaluated as "not fired" (output is 0)
             if ( m_rule_fact->m_asserted )
                 m_engine.retract( m_rule_fact );
         }
     }
+    else if ( m_rule_fact->m_asserted )
+        m_engine.retract( m_rule_fact );
 }
 
 /**
@@ -453,13 +483,13 @@ RuleEngine::sendAsserted( IFactListener &a_listener )
   * Defines a new rule. Throws if ID is in use or expression is invalid.
   */
 void
-RuleEngine::defineRule( const std::string &a_id, const std::string &a_expression )
+RuleEngine::defineRule( const string &a_id, const string &a_expression, const string a_description )
 {
     Rule *rule = 0;
 
     try
     {
-        rule = new Rule( *this, a_id, a_expression );
+        rule = new Rule( *this, a_id, a_expression, a_description );
 
         m_rules[rule->getID()] = rule;
 
@@ -532,8 +562,10 @@ RuleEngine::getDefinedRules( vector<RuleInfo> &a_rules ) const
     a_rules.clear();
     for ( map<string,Rule*>::const_iterator r = m_rules.begin(); r != m_rules.end(); ++r )
     {
+        info.enabled = true;
         info.fact = r->first;
         info.expr = r->second->getExpr();
+        info.desc = r->second->getDesc();
         a_rules.push_back( info );
     }
 }

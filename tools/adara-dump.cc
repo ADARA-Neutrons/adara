@@ -51,8 +51,10 @@ public:
 	}
 
         bool rxPacket(const ADARA::BankedEventPkt &pkt);
+        bool rxPacket(const ADARA::BankedEventStatePkt &pkt);
         bool rxPacket(const ADARA::BeamMonitorPkt &pkt);
         bool rxPacket(const ADARA::PixelMappingPkt &pkt);
+        bool rxPacket(const ADARA::PixelMappingAltPkt &pkt);
 
         using ADARA::POSIXParser::rxPacket;
 
@@ -149,6 +151,83 @@ bool Parser::rxPacket(const ADARA::BankedEventPkt &pkt)
 	return false;
 }
 
+bool Parser::rxPacket(const ADARA::BankedEventStatePkt &pkt)
+{
+	if (!m_hadMonitors) {
+		fprintf(stderr, "Missing monitors...\n");
+		m_nEvents = 0;
+		m_cycle = 999;
+	}
+
+	struct pevent *ev = m_ev + m_nEvents;
+	uint32_t len = pkt.payload_length();
+	uint32_t *p = (uint32_t *) pkt.payload();
+	uint32_t nBanks, nEvents, bank;
+
+	p += 4;
+	len -= 4 * sizeof(uint32_t);
+
+	while (len) {
+		nBanks = p[3];
+		p += 4;
+		len -= 16;
+
+		for (uint32_t i = 0; i < nBanks; i++) {
+			bank = p[0];
+			// state = p[1];
+			nEvents = p[2];
+			p += 3;
+			len -= 12;
+
+			for (uint32_t j = 0; j < nEvents; ev++, j++) {
+				ev->tof = p[0];
+				if (bank == 0xffffffff) {
+					/* Wasn't mapped */
+					ev->pixel = p[1] & ~(1U << 31);
+				} else if (bank == 0xfffffffe) {
+					/* Had an error */
+					ev->pixel = 0x80000000 | p[1];
+				} else {
+					/* Need to undo the mapping applied */
+					ev->pixel = m_unmap[p[1]];
+				}
+				p += 2;
+				len -= 8;
+			}
+
+			m_nEvents += nEvents;
+		}
+	}
+
+	dump_events(m_ev, m_nEvents, m_cycle);
+
+	return false;
+}
+
+bool Parser::rxPacket(const ADARA::PixelMappingAltPkt &pkt)
+{
+	if (!m_unmap.empty())
+		return false;
+
+	uint32_t len = pkt.payload_length();
+	uint32_t *p = (uint32_t *) pkt.payload();
+
+	while (len) {
+		uint32_t physical = p[0];
+		uint32_t count = p[1] & 0xffff;
+
+		p += 2;
+		len -= 8;
+
+		while (count--) {
+			m_unmap[*p++] = physical++;
+			len -= 4;
+		}
+	}
+
+	return false;
+}
+
 bool Parser::rxPacket(const ADARA::PixelMappingPkt &pkt)
 {
 	if (!m_unmap.empty())
@@ -176,7 +255,9 @@ bool Parser::rxPacket(const ADARA::PixelMappingPkt &pkt)
 int main(int, char **)
 {
 	Parser parser;
-	parser.read(0);
+	std::string log_info;
+
+	parser.read(0, log_info);
 
 	return 0;
 }

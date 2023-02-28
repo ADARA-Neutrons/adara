@@ -19,8 +19,8 @@ PKG_PROG_PKG_CONFIG()
 
 AC_ARG_ENABLE([sms],
     AS_HELP_STRING([--disable-sms], [Disable building SMS]))
-AC_ARG_ENABLE([sts],
-    AS_HELP_STRING([--disable-sts], [Disable building STS]))
+AC_ARG_ENABLE([stc],
+    AS_HELP_STRING([--disable-stc], [Disable building STC]))
 AC_ARG_ENABLE([dasmon_server],
     AS_HELP_STRING([--disable-dasmon-server], [Disable building DASMON server]))
 AC_ARG_ENABLE([adara_gen],
@@ -35,13 +35,13 @@ AS_IF([test "x$enable_sms" != "xno"], [
 	])
 ])
 
-AS_IF([test "x$enable_sts" != "xno" -o "x$enable_dasmon_server" != "xno"], [
+AS_IF([test "x$enable_stc" != "xno" -o "x$enable_dasmon_server" != "xno"], [
 	PKG_CHECK_EXISTS([activemq-cpp >= 3.4.0 apr-1 >= 1.3.9
 			  libxml-2.0 >= 2.7.6], [], [
 		dnl Missing package(s), so disable those that need it
-		AS_IF([test "x$enable_sts" != "xno"], [
-			enable_sts=no;
-			AC_WARN(Disabling STS due to missing dependencies)
+		AS_IF([test "x$enable_stc" != "xno"], [
+			enable_stc=no;
+			AC_WARN(Disabling STC due to missing dependencies)
 		])
 		AS_IF([test "x$enable_dasmon_server" != "xno"], [
 			enable_dasmon_server=no;
@@ -158,15 +158,15 @@ AS_IF([test "x$epics_disabled" != "xno"], [
 	])
 ])
 
-AS_IF([test "x$enable_sts" != "xno"], [
+AS_IF([test "x$enable_stc" != "xno"], [
 	AX_LIB_HDF5([serial])
 	AS_IF([test "x$with_hdf5" = "xno"], [
-		enable_sts=no
-		AC_WARN(Disabling STS due to missing HDF5)
+		enable_stc=no
+		AC_WARN(Disabling STC due to missing HDF5)
 	])
 ])
 
-AS_IF([test "x$enable_sts" != "xno" -o "x$enable_dasmon_server" != "xno"], [
+AS_IF([test "x$enable_stc" != "xno" -o "x$enable_dasmon_server" != "xno"], [
 	PKG_CHECK_MODULES([activemq], [activemq-cpp >= 3.4.0])
 	PKG_CHECK_MODULES([apr], [apr-1 >= 1.3.9])
 	PKG_CHECK_MODULES([libxml], [libxml-2.0 >= 2.7.6])
@@ -177,7 +177,7 @@ AS_IF([test "x$enable_sms" != "xno"], [
 ])
 
 AM_CONDITIONAL([BUILD_SMS], [test "x$enable_sms" != "xno"])
-AM_CONDITIONAL([BUILD_STS], [test "x$enable_sts" != "xno"])
+AM_CONDITIONAL([BUILD_STC], [test "x$enable_stc" != "xno"])
 AM_CONDITIONAL([BUILD_DASMON_SERVER], [test "x$enable_dasmon_server" != "xno"])
 AM_CONDITIONAL([BUILD_ADARA_GEN], [test "x$enable_adara_gen" != "xno"])
 AM_CONDITIONAL([BUILD_ADARA_PVGEN], [test "x$enable_adara_pvgen" != "xno"])

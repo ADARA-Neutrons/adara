@@ -1,19 +1,57 @@
+
+//
+// SNS ADARA SYSTEM - Stream Management Service (SMS)
+//
+// This repository contains the software for the next-generation Data
+// Acquisition System (DAS) at the Spallation Neutron Source (SNS) at
+// Oak Ridge National Laboratory (ORNL) -- "ADARA".
+//
+// Copyright (c) 2015, UT-Battelle LLC
+// All rights reserved.
+//
+// Redistribution and use in source and binary forms, with or without
+// modification, are permitted provided that the following conditions
+// are met:
+//
+// 1. Redistributions of source code must retain the above copyright
+// notice, this list of conditions and the following disclaimer.
+//
+// 2. Redistributions in binary form must reproduce the above copyright
+// notice, this list of conditions and the following disclaimer in the
+// documentation and/or other materials provided with the distribution.
+//
+// 3. Neither the name of the copyright holder nor the names of its
+// contributors may be used to endorse or promote products derived from
+// this software without specific prior written permission.
+//
+// THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+// IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+// THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+// PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+// CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+// EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+// PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+// PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+// LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+// NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+// SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+//
+
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS"));
+
 #include <iostream>
 #include <stdexcept>
+
 #include <signal.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/eventfd.h>
 #include <sys/types.h>
+#include <stdint.h>
 #include <grp.h>
 #include <pwd.h>
-
-#include "EPICS.h"
-#include "SMSControl.h"
-#include "StorageManager.h"
-#include "LiveServer.h"
-#include "STSClientMgr.h"
-#include "Logging.h"
 
 #include <log4cxx/propertyconfigurator.h>
 #include <log4cxx/consoleappender.h>
@@ -25,20 +63,30 @@
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>
 
+#include "EPICS.h"
+#include "SMSControl.h"
+#include "StorageManager.h"
+#include "ComBusSMSMon.h"
+#include "LiveServer.h"
+#include "STCClientMgr.h"
+
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-const std::string SMSD_VERSION = "1.0.0";
+std::string SMSD_VERSION = "1.8.1";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;
 
-static LoggerPtr logger(Logger::getLogger("SMS"));
-
 static std::string config_file("/SNSlocal/sms/conf/smsd.conf");
+
 static std::string log_conf("/SNSlocal/sms/conf/logging.conf");
+
+static bool become_daemon_sysv = false;
+static bool become_daemon_systemd = true;
+
 static Appender *console_appender;
-static bool become_daemon = true;
+static bool create_temp_logger = false;
 
 static int initCompleteFd = -1;
 
@@ -47,11 +95,15 @@ static void parse_options(int argc, char **argv)
 	po::options_description desc("Allowed options");
 	desc.add_options()
 		("help,h", "Show usage information")
+		("version", "Show software version(s) information")
 		("foreground,f", "Don't become a daemon")
+		("sysv", "Become a SysV daemon")
+		("systemd", "Become a SystemD daemon (Default)")
 		("conf,c", po::value<std::string>(),
 				"Path to configuration file")
 		("logconf,l", po::value<std::string>(),
-				"Path to log4cxx property file");
+				"Path to log4cxx property file")
+		("logtemp", "Create temporary console logger");
 
 	po::variables_map vm;
 	try {
@@ -67,12 +119,32 @@ static void parse_options(int argc, char **argv)
 		std::cerr << desc << std::endl;
 		exit(2);
 	}
-	if (vm.count("foreground"))
-		become_daemon = false;
+	if (vm.count("version")) {
+		std::cerr << "SMS Daemon Version " << SMSD_VERSION
+			<< " (ADARA Common Version " << ADARA::VERSION
+			<< ", ComBus Version " << ADARA::ComBus::VERSION
+			<< ", Tag " << ADARA::TAG_NAME << ")"
+			<< std::endl;
+		exit(2);
+	}
+	if (vm.count("foreground")) {
+		become_daemon_sysv = false;
+		become_daemon_systemd = false;
+	}
+	if (vm.count("sysv")) {
+		become_daemon_sysv = true;
+		become_daemon_systemd = false;
+	}
+	if (vm.count("systemd")) {
+		become_daemon_sysv = false;
+		become_daemon_systemd = true;
+	}
 	if (vm.count("conf"))
 		config_file = vm["conf"].as<std::string>();
 	if (vm.count("logconf"))
 		log_conf = vm["logconf"].as<std::string>();
+	if (vm.count("logtemp"))
+		create_temp_logger = true;
 }
 
 static void setcredentials(const char *pname, ptree::ptree &conf)
@@ -116,7 +188,8 @@ static void setcredentials(const char *pname, ptree::ptree &conf)
 	}
 }
 
-static void load_config(const char *pname, ptree::ptree &conf)
+static void load_config(const char *pname, ptree::ptree &conf,
+		std::string version_str)
 {
 	try {
 		ptree::read_ini(config_file, conf);
@@ -131,11 +204,14 @@ static void load_config(const char *pname, ptree::ptree &conf)
 	if (!t.length())
 		conf.put("sms.basedir", "/SNSlocal/sms");
 
+	conf.put("sms.version", version_str);
+
 	setcredentials(pname, conf);
 
 	StorageManager::config(conf);
+	ComBusSMSMon::config(conf);
 	SMSControl::config(conf);
-	STSClientMgr::config(conf);
+	STCClientMgr::config(conf);
 	LiveServer::config(conf);
 }
 
@@ -153,7 +229,7 @@ static void block_signals(void)
 	 * we handle them properly.
 	 */
 	sigset_t all;
-	sigfillset(&all);
+	sigfillset(&all); // includes SIGPIPE, for write()/sendfile()... Whew!
 	sigdelset(&all, SIGCONT);
 
 	/* Don't block error conditions */
@@ -189,7 +265,7 @@ static void verify_log4cxx_config(void)
 
 		if (a->getLayout() == NULL) {
 			std::cerr << "Appender " << a->getName()
-				  << " is missing its layout" << std::endl;
+				<< " is missing its layout" << std::endl;
 			missing_layout = true;
 		}
 
@@ -201,7 +277,7 @@ static void verify_log4cxx_config(void)
 
 	if (!had_appender) {
 		std::cerr << "No log appenders configured, aborting"
-			  << std::endl;
+			<< std::endl;
 		exit(1);
 	}
 
@@ -212,10 +288,12 @@ static void verify_log4cxx_config(void)
 		return;
 
 	/* No console present, add one temporarily */
-	static const LogString pattern(LOG4CXX_STR("%c %p: %m%n"));
-	LayoutPtr layout(new PatternLayout(pattern));
-	console_appender = new ConsoleAppender(layout);
-	root->addAppender(console_appender);
+	if (create_temp_logger) {
+		static const LogString pattern(LOG4CXX_STR("%c %p: %m%n"));
+		LayoutPtr layout(new PatternLayout(pattern));
+		console_appender = new ConsoleAppender(layout);
+		root->addAppender(console_appender);
+	}
 }
 
 static void remove_temp_logger(void)
@@ -223,6 +301,9 @@ static void remove_temp_logger(void)
 	/* If we added a temporary console logger for startup, remove it
 	 */
 	if (console_appender) {
+
+		DEBUG("remove_temp_logger()");
+
 		LoggerPtr root = Logger::getRootLogger();
 		root->removeAppender(console_appender);
 
@@ -252,7 +333,7 @@ static void release_parent(uint64_t val)
 	}
 }
 
-static void daemonize(const char *pname)
+static void daemonize_sysv(const char *pname)
 {
 	pid_t pid;
 
@@ -276,21 +357,22 @@ static void daemonize(const char *pname)
 		 * has finished initialization, successful or not.
 		 */
 		uint64_t ok;
+		// NOTE: This is Standard C Library read()... ;-o
 		if (read(initCompleteFd, &ok, sizeof(ok)) < 0) {
 			int e = errno;
 			ERROR("unable to receive child signal: "
-			      << strerror(e));
-			exit(1);
+				<< strerror(e));
+			_exit(1);
 		}
 
 		if (ok != CHILD_INIT_SUCCESS)
-			exit(1);
+			_exit(1);
 
-		exit(0);
+		_exit(0);
 	}
 
 	/* We're the child process, become a daemon.
-	 * Create a new session, then fokr and have the parent exit,
+	 * Create a new session, then fork and have the parent exit,
 	 * ensuring we are not the leader of the session -- we don't
 	 * want a controlling terminal. StorageManager::init() already
 	 * took care of our working directory and umask settings.
@@ -299,7 +381,7 @@ static void daemonize(const char *pname)
 		int e = errno;
 		ERROR("unable to setsid: " << strerror(e));
 		release_parent(CHILD_INIT_FAILED);
-		exit(1);
+		_exit(1);
 	}
 
 	pid = fork();
@@ -307,16 +389,22 @@ static void daemonize(const char *pname)
 		int e = errno;
 		ERROR("second fork failed: " << strerror(e));
 		release_parent(CHILD_INIT_FAILED);
-		exit(1);
+		_exit(1);
 	} else if (pid) {
 		/* Parent process just exits */
-		exit(0);
+		_exit(0);
 	}
 
 	/* We're the second child now; we are in our own session, but
 	 * are not the leader of it. Let initialization continue.
 	 */
-	DEBUG("daemonized");
+	DEBUG("SysV daemonized (" << pname << ")");
+}
+
+static void daemonize_systemd(const char *pname)
+{
+	DEBUG("SystemD daemonized pid=" << getpid() << " ppid=" << getppid()
+		<< " (" << pname << ")");
 }
 
 static void close_std_files(void)
@@ -359,11 +447,43 @@ int main(int argc, char **argv)
 	PropertyConfigurator::configure(log_conf);
 	verify_log4cxx_config();
 
-	load_config(argv[0], conf);
+	std::string version_str =
+		" SMSD Version " + SMSD_VERSION
+		+ " (ADARA Common Version " + ADARA::VERSION
+		+ ", ComBus Version " + ADARA::ComBus::VERSION
+		+ ", Tag " + ADARA::TAG_NAME + ")";
+
+	INFO("SMS Daemon Started, " << version_str);
 
 	block_signals();
 
-	/* Do all of the initialization we can before we become a daemon;
+	if (become_daemon_sysv) {
+		daemonize_sysv(argv[0]);
+		close_std_files();
+	}
+	else if (become_daemon_systemd) {
+		daemonize_systemd(argv[0]);
+	}
+	else {
+		DEBUG("Running SMS Daemon in Foreground");
+	}
+
+	// Seems like a good idea to check the EPICS Environment... ;-D
+	INFO("EPICS Environment Settings:");
+	system("printenv | grep -i EPICS");
+
+	/* Try to Configure the SMS Daemon... (Catch Exceptions Dagnabbit.) */
+	try {
+		load_config(argv[0], conf, version_str);
+	} catch (std::runtime_error e) {
+		ERROR("Failed to Start (Load Config): " << e.what());
+		exit(1);
+	} catch (...) {
+		ERROR("Failed to Start (Load Config) -- Unknown Exception");
+		exit(1);
+	}
+
+	/* Do all of the initialization we can AFTER we become a daemon;
 	 * we'll do a post-daemon round of init as well, so that creation
 	 * of threads get the right parent, and allow for tasks that need
 	 * to happen later.
@@ -372,30 +492,26 @@ int main(int argc, char **argv)
 		StorageManager::init();
 		SMSControl::init();
 		LiveServer::init();
-		STSClientMgr::init();
+		STCClientMgr::init();
 
 		SMSControl::late_config(conf);
 	} catch (std::runtime_error e) {
-		ERROR("failed to start: " << e.what());
+		ERROR("Failed to Start (Init): " << e.what());
 		exit(1);
 	} catch (...) {
-		ERROR("failed to start -- unknown exception");
+		ERROR("Failed to Start (Init) -- Unknown Exception");
 		exit(1);
 	}
 
-	if (become_daemon)
-		daemonize(argv[0]);
-
 	try {
 		StorageManager::lateInit();
-		close_std_files();
 		remove_temp_logger();
 	} catch (std::runtime_error e) {
-		ERROR("failed to start: " << e.what());
+		ERROR("Failed to Start (Late Init): " << e.what());
 		release_parent(CHILD_INIT_FAILED);
 		exit(1);
 	} catch (...) {
-		ERROR("failed to start; unknown exception");
+		ERROR("Failed to Start (Late Init) -- Unknown Exception");
 		release_parent(CHILD_INIT_FAILED);
 		throw;
 	}
@@ -403,12 +519,28 @@ int main(int argc, char **argv)
 	try {
 		release_parent(CHILD_INIT_SUCCESS);
 		for (;;) {
+			// Call File Descriptor Manager for Shared EPICS/Socket Select
+			// Reset Errno for this iteration...
+			errno = 0;
+			// Handle Callbacks on Open File Descriptors (Sockets, Files...)
 			fileDescriptorManager.process(1000.0);
+			// Check for Diabolical or Evil Errno Results...
+			// For now, Just Log 'Em... ;-D
+			if (errno && errno != EINPROGRESS && errno != EAGAIN) {
+				int e = errno;
+				ERROR("main(): fileDescriptorManager.process()"
+					<< " returned with errno=" << e << ": " << strerror(e));
+				errno = 0;
+			}
 		}
+	} catch (std::runtime_error e) {
+		ERROR("Dying on an Unexpected/Unhandled Exception: " << e.what());
+		exit(1);
 	} catch (...) {
-		ERROR("dying on an unexpected/unhandled exception");
+		ERROR("Dying on an Unexpected/Unhandled/Unknown Exception");
 		throw;
 	}
 
 	return 0;
 }
+

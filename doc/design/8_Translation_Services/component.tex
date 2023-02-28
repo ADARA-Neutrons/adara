@@ -3,7 +3,7 @@
 
 \subsection{Proposed Architecture}
 
-The purpose of the new Streaming Translation Service (STS) design is to enable
+The purpose of the new Streaming Translation Client (STC) design is to enable
 ``near real-time delivery'' of experimental data to analysis, in the form of
 both Event and Histogram NeXus files, within seconds or minutes of the
 completion of a run.
@@ -14,7 +14,7 @@ completion of a run.
 \caption{Initial ``Chunky'' Streaming Translation Architecture, Includes
 generation of ``Mini-NeXus'' files for preliminary analysis and transport to
 Central computing center.}
-\label{fig:chunky_sts}
+\label{fig:chunky_stc}
 \end{figure}
 
 
@@ -25,12 +25,12 @@ Central computing center.}
 Architecture, does Not include generation of ``Mini-NeXus'' files, only produces
 a Full NeXus file for ``soon after post-mortem'' analysis, via transport (or
 direct writing) to the Central computing center.}
-\label{fig:creamy_sts}
+\label{fig:creamy_stc}
 \end{figure}
 
 
-The basic proposed architecture for this STS design
-is illustrated in Figures~\ref{fig:chunky_sts} and \ref{fig:creamy_sts},
+The basic proposed architecture for this STC design
+is illustrated in Figures~\ref{fig:chunky_stc} and \ref{fig:creamy_stc},
 for two incremental configurations based on use of intermediate
 ``Mini-NeXus'' file generation. Note that the actual boundary/separation between
 the Data Acquisition System (DAS) and Central Computing Center is transient
@@ -66,17 +66,17 @@ CCSD.
 
 \subsubsection{Implementation Plan}
 
-The STS implementation relies heavily on completion of the
+The STC implementation relies heavily on completion of the
 Hybrid Streaming Network Protocol,
 as described in Section~\ref{network_protocol}.
-While some STS architectural re-organization and development can proceed
+While some STC architectural re-organization and development can proceed
 in unison with the design of the network protocol,
-some practical results will be required early in the STS development.
+some practical results will be required early in the STC development.
 Specifically, a ``Protocol Generator'' must be created to take existing
 historical SNS data (likely in the ``Pre-NeXus'' binary format and the
 associated XML meta-data files) and produce a network packet stream
 using the new hybrid network protocol,
-for proper design and testing of STS subsystems.
+for proper design and testing of STC subsystems.
 All specific packet types should be well defined,
 including accelerator pulses, neutron events, beam monitor events,
 chopper/special events, analog/pump probe sampling events,
@@ -87,16 +87,16 @@ eventually a full ``side-by-side'' testbed should be provided,
 in a real beamline hutch such as HYSPEC,
 for testing in a production experimental environment.
 
-The front-end of the new STS system will be derived from the
+The front-end of the new STC system will be derived from the
 existing SNS production ``Live Data Processing'' (LDP)
 Event Catcher software,
 which is utilized to snoop packets from the legacy DAS live event stream
 and incrementally produce transient ``Live'' histogram-based NeXus files
 while an experiment is running.
-An optional intermediate development step for STS would be to enable a
+An optional intermediate development step for STC would be to enable a
 preliminary extension of the existing LDP stand-alone subsystem to produce
 live {\em Event-based} ``Mini-NeXus'' files,
-in preparation for subsequent potential STS needs.
+in preparation for subsequent potential STC needs.
 These Mini-NeXus files {\em might} prove ``interesting'' or useful
 for early Live Analysis developments.
 
@@ -148,35 +148,35 @@ would be to provide a common technology basis for
 generating and merging ``partial'' Mini-NeXus files.
 Any existing knowledge base for creating and managing Mini-NeXus files,
 as generated in conjunction with the LDP Event Mini-NeXus option,
-could be incorporated as part of the ``Chunky'' STS design.
+could be incorporated as part of the ``Chunky'' STC design.
 A useful tool to create here, to aid development and testing,
 is a ``file merger'' application/library,
 for incrementally concatenating Mini-NeXus Files into
 single monolithic NeXus files.
 This tool development should include a full performance evaluation
 and code ``hot-spot'' optimization exploration
-to determine the feasibility of this approach in the STS overall design.
+to determine the feasibility of this approach in the STC overall design.
 For example, an optimal ``chunk size'' for Mini-NeXus files
 could be determined,
 based on the overheads involved in concatenating them, etc.
 
-The second key area of functionality in the STS back-end comes
+The second key area of functionality in the STC back-end comes
 from the existing production Translation Service (TS) Client software.
 This software handles the notification of experiment completion,
 and coordinates the execution of the HistoTools software applications
 to produce Histogram and Event-based NeXus files.
 The TS Client then archives and catalogs these files in ICAT and VFS,
 along with the original raw experiment data and associated meta-data.
-In the new STS design, many of these same tasks will still be required,
+In the new STC design, many of these same tasks will still be required,
 e.g. to properly archive and catalog the raw and processed experiment data.
-But in the STS, data processing and NeXus file creation will proceed
+But in the STC, data processing and NeXus file creation will proceed
 {\em concurrently} with experimental data collection,
 hence changing the nature of the completion notifications
 and their handling.
 The starting/stopping of data collection will now be handled
 via direct communication in the hybrid network protocol,
 using the ``Run Status'' packet type,
-as part of the modified STS LDP/HistoTools linkage.
+as part of the modified STC LDP/HistoTools linkage.
 Similarly, the HistoTools back-end libraries will be continuously engaged
 in data processing and creation of NeXus files,
 rather than being triggered monotonically by the TS Client.
@@ -188,7 +188,7 @@ which must also be written to local storage during processing.
 
 Several additional features will be explored for improving the
 capabilities, resilience and efficiency of the Translation Service Client
-in this new STS back-end context.
+in this new STC back-end context.
 New data products will be incorporated for ``Event Mode'' Beam Monitor data
 and other ``Fast'' Meta-Data,
 such as from Magnet Pulses on SEQUOIA
@@ -205,7 +205,7 @@ of data for SNS versus HFIR and other facilities.
 A new architecture for the Translation Service Client
 will be designed, with specialized workflow handling for SNS,
 while preserving the existing generic workflow for HFIR, LENS, etc.
-The new STS Translation Service will also need to be enhanced
+The new STC Translation Service will also need to be enhanced
 to interoperate with the impending ICAT3 database infrastructure,
 for extended analysis meta-data searching and retrieval capabilities.
 
@@ -245,14 +245,14 @@ and allow manual ``re-submission'' of failed pipeline stages.
 Such a system would represent a fundamental improvement
 over the existing ``all or nothing'' pass/fail TS Monitor reporting.
 
-Integral to this detailed STS development
+Integral to this detailed STC development
 is proper capturing, handling and reporting of
 System Status and Error conditions.
 To emphasize the importance of this information
 in the proper administration and maintenance
 of the experimental facility,
 consideration of Status/Error logging will be incorporated
-early in the design of the new STS system.
+early in the design of the new STC system.
 An architecture will be designed for culminating status/error information
 from across the DAS/Translation processing pipeline,
 including both hardware and software errors,

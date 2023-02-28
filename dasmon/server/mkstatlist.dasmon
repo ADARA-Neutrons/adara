@@ -1,0 +1,36 @@
+#!/bin/bash
+
+STAT_LIST="./stat_list"
+
+DASMOND_SYSTEM_FILES="/home/dasmon/dasmond.cfg \
+	/home/dasmon/dasmond_def.cfg \
+	/etc/init/dasmond.conf \
+	/etc/systemd/system/dasmond.service \
+	/usr/local/bin/dasmond \
+	/etc/init.d/pvsd \
+	/etc/crontab \
+	/etc/rsyslog.conf \
+	/etc/rsyslog.d/adaraMailer.conf \
+	/etc/rsyslog.d/dasmon.conf \
+	/etc/X11/xinit/xinitrc.dasmon \
+	/etc/init/dasmongui.conf \
+	/etc/systemd/system/dasmongui.service \
+	/etc/logrotate.d/dasmon_log"
+
+if [[ -f "${STAT_LIST}" ]]; then
+	echo -e "\nError: Stat List Already Exists... Bailing...\n"
+	ls -l ${STAT_LIST}
+	exit -1
+fi
+
+touch "${STAT_LIST}"
+
+for file in ${DASMOND_SYSTEM_FILES} ; do
+
+	echo "DASMOND System File: $file"
+
+	stat --printf='%A %F %U %G ' "${file}" >> "${STAT_LIST}"
+	echo "${file}" >> "${STAT_LIST}"
+
+done
+

@@ -1,0 +1,42 @@
+STC code issues
+----------------
+
+All issues have been moved to Jira under the STC project at itrack.sns.gov
+
+
+Design Notes / Ideas
+----------------------
+
+SFS Multiple Concurrent Outputs
+    It will be quite easy to support concurrent, in-process stream adapters from a single instance
+    of SFS. The IStreamAdapter abstraction layer can be used directly to plug an output format
+    into the StreamParser class (as current SFS is for NxGen) - OR - one could write a multi-
+    threaded output manager adapter that would plug-in between the StreamParser class and one or
+    more regular stream adapters. It would be essentially a transparent man-inthe-middle adapter
+    to patch the virtual calls from StreamParser into the methods of each adapter (on their own
+    thread).
+
+General Notes
+-------------
+
+* After a meeting with M. Hagen and B. Winn on 10/22/2012, it was decided that no metadata or derived
+  data structures (Nexus classes) will be placed in the Nexus files. The Nexus files will continue to
+  contain only "raw data". This decision made the creation of the Experiment Definition Schema moot.
+  It will remain the responsibility of the instrument scientists, users, and analysts to externally
+  document the content of Nexus files - specifically the meaning of process variables and any critical
+  properties of devices connected to a beam line.
+
+Version History
+---------------
+0.1.1 - First versioned release
+0.1.2 - Added start time and time offset attributes to DASlog time axes.
+0.1.3 - Changed time format to include ':' in timezone offset
+        Clean-up units strings in MxGen class
+        Many small changes based on Maries short diff document (some still outstanding)
+0.1.4 - Added base cataloging path option (for test harness/manual translation)
+0.1.5 - Added stream marker support
+0.1.6 - Fixed marker initial values, changed marker format in Nexus files
+0.1.7 - Fixed bugs for Misaligned event index, negative time offsets, veto
+        pulse class type in Nexus file.
+0.1.8 - Added time attributes to Veto_pulse log
+        Changed comments log to NXcollection

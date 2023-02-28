@@ -1,0 +1,533 @@
+#!/bin/bash
+#
+# ADARA Monitor
+#
+# Periodically Process & Display Summary Statistics for
+# Extracted ADARA "Critical ADARA Syslog Error" Log Messages.
+#
+
+ADARA_SUMMARY="$HOME/gitsrc/ADARA/adara_summary"
+
+CACHE_DIR="/SNSlocal/rsyslog.cache"
+
+ALTOPT="" # for Alternate/Secondary SMS Deployments... ;-D
+
+GREP="/usr/bin/grep"
+HEAD="/usr/bin/head"
+AWK="/usr/bin/awk"
+WC="/usr/bin/wc"
+CAT="/bin/cat"
+
+#
+# Dump Usage
+#
+
+USAGE()
+{
+	echo
+	echo "usage:  adara_monitor [--alt=\"-mon\"] \\"
+	echo "                      [--adara_summary=<path>] \\"
+	echo "                      [--cache_dir=<CACHE_DIR>] \\"
+	echo "                      [--connect] [--connect_pid=<PID>] \\"
+	echo "                      [--autoexit] [--oneshot] [--help|-h]"
+	echo
+
+	echo "where:"
+	echo
+
+	echo "    --alt=\"-mon\"          = run for Alternate SMS Suffix"
+	echo
+	echo " --adara_summary=<path>   = path to ADARA Summary script"
+	echo "                            [${ADARA_SUMMARY}]"
+	echo
+	echo " --cache_dir=<CACHE_DIR>  = location of local error cache files"
+	echo "                            [${CACHE_DIR}]"
+	echo
+	echo "      --connect           = \"connect\" to running ADARA Monitor"
+	echo
+	echo "   --connect_pid=<PID>    = connect to Specific ADARA Monitor PID"
+	echo
+	echo "      --autoexit          = automatically exit on NO FILES"
+	echo
+	echo "      --oneshot           = only execute summary once, then exit"
+	echo
+	echo "     --help | -h          = display this usage information"
+	echo
+}
+
+CONNECT_PID=""
+
+do_connect=0
+do_autoexit=0
+do_oneshot=0
+
+for arg in "$@" ; do
+	# echo "arg=$arg"
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+	# echo "key=$key"
+	# echo "value=$value"
+	if [[ "#$key#" == '#-h#' || "#$key#" == '#--help#' ]]; then
+		USAGE
+		exit 0
+	elif [[ "#$key#" == '#--alt#' ]]; then
+		ALTOPT="--alt=$value"
+		echo -e "\nUsing Alternate SMS Suffix: --alt=\"${value}\""
+	elif [[ "#$key#" == '#--adara_summary#' ]]; then
+		if [ -x "$value" ]; then
+			ADARA_SUMMARY="$value"
+			echo -e "\nUsing ADARA Summary Script in:\n\t[${CACHE_DIR}]"
+		else
+			echo -e "\nError: ADARA Summary Script Not Found/Executable!"
+			echo -e "\t[$value]"
+			/bin/ls -l "$value"
+			USAGE
+			exit -3
+		fi
+	elif [[ "#$key#" == '#--cache_dir#' ]]; then
+		if [ -d "$value" ]; then
+			CACHE_DIR="$value"
+			echo -e "\nUsing Syslog Error Cache in:\n\t[${CACHE_DIR}]"
+		else
+			echo -e "\nError: Cache Directory Not Found!\n\t[$value]"
+			/bin/ls -l "$value"
+			USAGE
+			exit -2
+		fi
+	elif [[ "#$key#" == '#--connect#' ]]; then
+		echo -e "\nConnecting to Existing ADARA Monitor..."
+		do_connect=1
+	elif [[ "#$key#" == '#--connect_pid#' ]]; then
+		if [[ -n "$value" ]]; then
+			CONNECT_PID="$value"
+			echo -e -n "\nConnecting to Existing ADARA Monitor"
+			echo -e " with PID ${CONNECT_PID}."
+			do_connect=1
+		else
+			echo -e "\nError: No Connect PID Specified!\n\t[$value]"
+			USAGE
+			exit -5
+		fi
+	elif [[ "#$key#" == '#--autoexit#' ]]; then
+		echo -e "\nExecuting ADARA Monitor in AutoExit Mode."
+		do_autoexit=1
+	elif [[ "#$key#" == '#--oneshot#' ]]; then
+		echo -e "\nExecuting ADARA Monitor in OneShot Mode."
+		do_oneshot=1
+	else
+		echo -e "\nError: Unknown Option/Unrecognized File:\n [${key}]"
+		USAGE
+		exit -1
+	fi
+done
+
+# Make Sure ADARA Summary is Present and Executable...
+if [[ ! -x ${ADARA_SUMMARY} ]]; then
+	echo -e "\nError: ADARA Summary Script Not Found/Executable!"
+	echo -e "\t[${ADARA_SUMMARY}]"
+	/bin/ls -l "${ADARA_SUMMARY}"
+	USAGE
+	exit -4
+fi
+
+#
+# Set Up ADARA Monitor Summary Log & Previous Summary Marker File...
+#
+
+SUMMARY="AdaraMonitorSummary.$$.log"
+
+PREVIOUS="AdaraMonitorPreviousMarker.$$.marker"
+
+##
+## Functions:
+##
+
+#
+# Generate an ADARA Summary File...
+#
+
+DO_SUMMARY()
+{
+	echo
+
+	echo -n "Starting Summary: "
+	date
+
+	/bin/rm "${CACHE_DIR}/${SUMMARY}" > /dev/null 2>&1
+
+	# Leave "Previous" Breadcrumb for Next ADARA Summary... ;-D
+	# Note: Touch Marker File *Before* Creating the Summary, So We
+	# Don't Clear Any New Error Logs from _During_ the Summary...! ;-D
+	touch "${CACHE_DIR}/${PREVIOUS}"
+
+	# Remove Globbed File List If None Found...
+	shopt -s nullglob
+
+	${ADARA_SUMMARY} --terse --nostdin ${ALTOPT} "${CACHE_DIR}"/*.txt \
+		> "${CACHE_DIR}/${SUMMARY}"
+
+	# Restore Normal Shell Globbing...
+	shopt -u nullglob
+
+	LAST_CACHE_STATE=`/bin/ls -ld "${CACHE_DIR}"`
+
+	${CAT} "${CACHE_DIR}/${SUMMARY}"
+
+	LAST_TIME=`date +"%s"`
+
+	# Check for Intervening User Input, Which Should Probably Be Ignored
+	# (Especially a "Clear Cache" Command, which probably referred to
+	# the Results of the _Previous_ ADARA Summary Output...! ;-D)
+	# (Now there's a new "Clear Previous" Command for that! ;-D)
+
+	local _cmd=""
+
+	while [[ true ]]; do
+
+		# Check for Input Already Waiting
+		# (Timeout = 0.1, as 0 works weirdly...)
+		IFS= read -t 0.1 -n 1 -s _cmd
+
+		# Got a Command, Optionally Ignore It...!
+		if [[ $? == 0 ]]; then
+			DO_CMD "${_cmd}" IGNORE
+		else
+			break
+		fi
+	
+	done
+
+	echo -n "Summary Done: "
+	date
+
+	if [[ $do_autoexit == 1 ]]; then
+
+		cknone=`${GREP} "NO ERRORS/FILES" "${CACHE_DIR}/${SUMMARY}" \
+			| ${WC} | ${AWK} '{print $1}'`
+
+		if [[ ${cknone} == 1 ]]; then
+			echo -e "\n*** Auto-Exit: NO ERROR/FILES Detected...!"
+			CLEAR_CACHE AutoExit
+		fi
+
+	fi
+}
+
+#
+# Clear Local Cache Directory...
+#
+
+CLEAR_CACHE()
+{
+	local _autoexit="$1"
+	shift
+
+	echo -e -n "\nRemoving Any Processed Local Cache Files "
+	echo -e "or Leftover Summaries:"
+
+	# Remove Any Older Files than the Current ADARA Summary File...
+	local _files=`find "${CACHE_DIR}/" \
+		-mindepth 1 -not -cnewer "${CACHE_DIR}/${SUMMARY}" \
+		-and -not -path "${CACHE_DIR}/${SUMMARY}" \
+		-print -exec /bin/rm -f {} \; `
+
+	if [[ -n "${_files}" ]]; then
+		echo -e "\n${_files}"
+	else
+		echo -e "\n[No Files]"
+	fi
+
+	# If in AutoExit Mode, Just Exit After Clearing the Latest Cache
+	if [[ "${_autoexit}" == "AutoExit" ]]; then
+		echo -e "\n*** AutoExit: Automatically Exiting ADARA Monitor.\n"
+		exit 0
+	fi
+
+	# Generate a New ADARA Summary Now...
+	echo -e "\nRefreshing ADARA Summary..."
+	DO_SUMMARY
+}
+
+#
+# Clear Previous Local Cache Directory...
+#
+
+CLEAR_PREVIOUS_CACHE()
+{
+	if [[ ! -f "${CACHE_DIR}/${PREVIOUS}" ]]; then
+		echo -e "\nNo Previous ADARA Summary Marker File Found..."
+		echo "Ignoring Command."
+	else
+
+		echo -e -n "\nRemoving Any Previously Processed Local Cache Files "
+		echo -e "or Leftover Summaries:\n"
+
+		# Remove Any Older Files than the Previous ADARA Summary Marker File
+		find "${CACHE_DIR}/" \
+			-mindepth 1 -not -cnewer "${CACHE_DIR}/${PREVIOUS}" \
+			-and -not -path "${CACHE_DIR}/${PREVIOUS}" \
+			-print -exec /bin/rm -f {} \;
+
+	fi
+
+	# Generate a New ADARA Summary Now...
+	echo -e "\nRefreshing ADARA Summary..."
+	DO_SUMMARY
+}
+
+#
+# "Connect" to an Existing ADARA Monitor/Local Cache Directory...
+#
+
+DO_CONNECT()
+{
+	# Flag Inconsistent Command Line Parameters...! ;-D
+
+	if [[ -n "${ALTOPT}" ]]; then
+		echo -e "\nError: Inconsistent Command Line Options Specified...!"
+		echo -e "\n\t-> Can't \"Connect\" with Alt Option [${ALTOPT}]..."
+		echo -e "\nADARA Summary Can Only Connect to Latest Summary Logs,"
+		echo "Using Whatever Alt Options Were Last Specified."
+		echo -e "\nExiting...\n"
+		exit -9
+	fi
+
+	local _summaryCk=""
+
+	# Find ADARA Log Analyzer Summary for Specific PID...
+
+	if [[ -n ${CONNECT_PID} ]]; then
+
+		_summaryCk="${CACHE_DIR}/AdaraMonitorSummary.${CONNECT_PID}.log"
+
+	# Find Most Recent ADARA Log Analyzer Summary...
+
+	else
+
+		_summaryCk=`/bin/ls -t "${CACHE_DIR}"/AdaraMonitorSummary.*.log \
+			| ${HEAD} -1`
+	
+	fi
+
+	if [[ $? != 0 || -z "${_summaryCk}" ]]; then
+		echo -e "\nError Connecting to Existing ADARA Monitor...!\n"
+		/bin/ls -lt "${CACHE_DIR}"
+		echo
+		exit -10
+	fi
+
+	SUMMARY=`basename ${_summaryCk}`
+
+	if [[ $? != 0 || -z "${SUMMARY}" ]]; then
+		echo -e "\nError Extracting ADARA Monitor Log Basename...!"
+		echo -e "\n   _summaryCk=[${_summaryCk}]\n"
+		/bin/ls -lt "${CACHE_DIR}"
+		echo
+		exit -11
+	fi
+
+	local _connPid=`echo "${SUMMARY}" | awk -F "." '{print $2}'`
+
+	if [[ ${_connPid} == 0 || ${_connPid} == "" ]]; then
+		echo -e "\nError Extracting PID for Existing ADARA Monitor...!"
+		echo -e "\n   SUMMARY=[${SUMMARY}]"
+		echo -e "\n   _connPid=[${_connPid}]"
+		echo
+		exit -12
+	fi
+
+	PREVIOUS="AdaraMonitorPreviousMarker.${_connPid}.marker"
+
+	echo -e "\nConnected to ADARA Monitor PID=[${_connPid}]:"
+	echo -e "\n   SUMMARY=[${SUMMARY}]"
+	echo -e "\n   PREVIOUS=[${PREVIOUS}]"
+	echo
+
+	echo -n "Displaying Connected Summary: "
+	date
+
+	echo
+
+	/bin/ls -l "${CACHE_DIR}/${SUMMARY}" | /usr/bin/sed -e "s@ /@\n    /@"
+
+	${CAT} "${CACHE_DIR}/${SUMMARY}"
+
+	cknone=`${GREP} "NO ERRORS/FILES" "${CACHE_DIR}/${SUMMARY}" \
+		| ${WC} | ${AWK} '{print $1}'`
+
+	ckdone=`${GREP} "Lines" "${CACHE_DIR}/${SUMMARY}" \
+		| ${WC} | ${AWK} '{print $1}'`
+
+	if [[ $do_autoexit == 1 && ${cknone} == 1 ]]; then
+
+		echo -e "*** Auto-Exit: NO ERROR/FILES Detected...!"
+		CLEAR_PREVIOUS_CACHE
+
+	elif [[ ${ckdone} == 0 ]]; then
+
+		echo -e "(*** Warning: ADARA Summary Incomplete...!)\n"
+
+	fi
+}
+
+#
+# Dump Interactive Command Usage...
+#
+
+CMD_USAGE()
+{
+	echo -e "\nADARA Monitor Interactive Command Usage:\n"
+
+	echo -e "<space> or <tab>  = Refresh the Latest ADARA Summary\n"
+	echo -e "     C or c       = Clear Current Local Syslog Error Cache\n"
+	echo -e "     P or p       = Clear Previous Local Syslog Error Cache\n"
+	echo -e "     Q or q       = Quit ADARA Monitor\n"
+	echo -e "   H or h or ?    = Display this Interactive Command Usage\n"
+}
+
+#
+# Interpret and Execute Interactive Commands...
+#
+
+DO_CMD()
+{
+	local _cmd="$1"
+	shift
+
+	local _ignore="$1"
+	shift
+
+	local _ignored=0
+
+	local _nl="\n"
+	if [[ ${_ignore} == "IGNORE" ]]; then _nl="" ; fi
+
+	if [[ "${_cmd}" == "Q" || "${_cmd}" == "q" ]]; then
+		echo -e "${_nl}Exiting ADARA Monitor at User's Request.\n"
+		exit 0
+	elif [[ "${_cmd}" == " " || "${_cmd}" == "	" ]]; then
+		if [[ ${_ignore} == "IGNORE" ]]; then
+			_ignored=1
+		elif [[ $do_connect == 1 ]]; then
+			echo -e -n "${_nl}Re-Displaying Connected ADARA Summary: "
+			date
+			echo
+			/bin/ls -l "${CACHE_DIR}/${SUMMARY}" \
+				| /usr/bin/sed -e "s@ /@\n    /@"
+			/bin/cat "${CACHE_DIR}/${SUMMARY}"
+		else
+			echo -e "${_nl}Refreshing ADARA Summary..."
+			DO_SUMMARY
+		fi
+	elif [[ "${_cmd}" == "C" || "${_cmd}" == "c" ]]; then
+		if [[ ${_ignore} == "IGNORE" ]]; then
+			_ignored=1
+		else
+			echo -e "${_nl}Clearing ADARA Summary Statistics..."
+			CLEAR_CACHE
+		fi
+	elif [[ "${_cmd}" == "P" || "${_cmd}" == "p" ]]; then
+		echo -e "${_nl}Clearing Previous ADARA Summary Statistics..."
+		CLEAR_PREVIOUS_CACHE
+		if [[ ${_ignore} == "IGNORE" ]]; then echo ; fi
+	elif [[ "${_cmd}" == "H" || "${_cmd}" == "h" \
+			|| "${_cmd}" == "?" ]]; then
+		CMD_USAGE
+	# Ignore Carriage Returns... ;-D
+	elif [[ "${_cmd}" != "" ]]; then
+		CMD_USAGE
+		echo "Error: Unknown Interactive Command [${_cmd}]...!"
+		if [[ ${_ignore} == "IGNORE" ]]; then echo ; fi
+	fi
+
+	# Log Any Ignored Commands...
+	if [[ ${_ignored} == 1 ]]; then
+		echo -e -n "${_nl}Warning: User Input Received "
+		echo "During ADARA Summary Update!"
+		echo "Ignoring User Command(s) [${_cmd}]..."
+		echo
+	fi
+}
+
+##
+## End of Functions.
+##
+
+#
+# Handle Any "Connection" to Existing ADARA Monitor...
+#
+
+if [[ $do_connect == 1 ]]; then
+
+	DO_CONNECT
+
+#
+# Else Generate Initial ADARA Summary...
+#
+
+else
+
+	LAST_CACHE_STATE=""
+	LAST_TIME=0
+
+	DO_SUMMARY
+
+fi
+
+#
+# OneShot Mode - We're Done Already, Just Exit...
+#
+
+if [[ $do_oneshot == 1 ]]; then
+	echo -e "\nExiting ADARA Monitor in OneShot Mode.\n"
+	exit 0
+fi
+
+#
+# Main Interactive Loop
+#
+
+while [[ true ]]; do
+
+	# Check for Interactive Command Input...
+	IFS= read -t 10 -n 1 -s cmd
+
+	# Got a Command, Execute It...
+	if [[ $? == 0 ]]; then
+		DO_CMD "$cmd"
+	fi
+
+	#
+	# Skip Periodic Refresh Checks in "Connected" Mode...
+	#
+
+	if [[ $do_connect == 1 ]]; then
+		continue
+	fi
+
+	#
+	# Check for Changes to Local Cache Directory...
+	#
+
+	cache_state=`/bin/ls -ld "${CACHE_DIR}"`
+
+	if [[ "${cache_state}" != "${LAST_CACHE_STATE}" ]]; then
+		echo -e "\nLocal Cache Directory Changed, Refreshing ADARA Summary."
+		DO_SUMMARY
+	fi
+
+	#
+	# Calculate Elapsed Time Since Last ADARA Summary...
+	#
+
+	now=`date +"%s"`
+
+	elapsed=$(( now - LAST_TIME ))
+
+	if [[ $elapsed -gt 180 ]]; then
+		echo -e "\nAuto-Refreshing Latest ADARA Summary."
+		DO_SUMMARY
+	fi
+
+done
+

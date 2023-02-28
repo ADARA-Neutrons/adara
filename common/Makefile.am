@@ -1,5 +1,5 @@
 
-noinst_PROGRAMS += common/test/parser-test
+EXTRA_PROGRAMS += common/test/parser-test
 
 COMMON_CPPFLAGS = -Icommon
 COMMON_PARSER = common/ADARAPackets.cc common/ADARAParser.cc

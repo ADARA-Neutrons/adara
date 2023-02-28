@@ -1,0 +1,81 @@
+
+Instructions for Installing and Configuring the RSyslog Mailer script!
+
+- to generate email notifications for ADARA SMS/STC rsyslog log entries
+that might be of interest to developers and maintainers of the system. :-)
+
+- this setup includes:
+   * creation of a named pipe for buffering critical rsyslog messages
+   * cron script to drain named pipe and construct an alarm email
+   * configuration rules for RSyslog on Linux platforms
+
+1. Create a Named Pipe for buffering critical ADARA rsyslog messages:
+
+   $ sudo mkdir /etc/rsyslog.pipes
+   $ sudo mknod /etc/rsyslog.pipes/criticalMessages p
+   $ sudo chgrp snswheel /etc/rsyslog.pipes/criticalMessages
+   $ sudo chmod 660 /etc/rsyslog.pipes/criticalMessages
+   $ cp ~/gitsrc/ADARA/big_err_pipe.c /tmp
+   $ cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+   $ /tmp/big_err_pipe
+
+2. Install "rsyslogMailer" cron script (from ADARA Git repository):
+
+   $ sudo cp ADARA/rsyslogMailer /usr/local/bin
+
+   -> add cron job to periodically run the script, every 10 minutes:
+
+   $ sudo crontab -e   (*** or edit /etc/crontab ***)
+
+   . . .
+
+   # Don't try to send crontab output to "root@ornl.gov" which doesn't exist
+   MAILTO="root@localhost"
+
+   . . .
+
+   */10 * * * * /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+
+   (*** Note: with /etc/crontab, the *User* must also be specified, i.e.:
+      */10 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+   Duh... ;-)
+
+   (Note: the named pipe "/etc/rsyslog.pipes/criticalMessages" is
+   now hard-coded as $namedPipeFile in the actual "rsyslogMailer" script!)
+
+3. Configure the local RSyslog system to capture copies of key
+ADARA SMS/STC syslog error messages:
+
+   -> in "/etc/rsyslog.conf" add the following lines,
+   *Before* any existing configuration to redirect ADARA logs
+   (or place these contents in "/etc/rsyslog.d/adaraMailer.conf"
+   for inclusion in the "/etc/rsyslog.conf" configuration):
+
+   . . .
+
+   # Critical ADARA SMS Messages - Email Notification
+   :msg, contains, "OversizePkt"   |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "ERROR SMS"     |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "STC failed"    |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "Unexpected input" |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "STC Error"     |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "PVSD ERROR"    |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "Subscription created" |/etc/rsyslog.pipes/criticalMessages
+
+   . . .
+
+   -> then *Restart* the "rsyslog" service:
+
+   $ sudo /sbin/service rsyslog restart
+
+   NOTE: It can be *VERY* Important to avoid _Typos_ in these config lines!
+   (I managed to generate an exponential email explosion once, it was bad.)
+
+Note: This arrangement is derived from a posting by "john & cailin":
+
+   http://www.johnandcailin.com/blog/john/
+      how-setup-real-time-email-notification-critical-syslog-events
+
+Thanks!
+   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+

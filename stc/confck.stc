@@ -1,0 +1,450 @@
+#!/bin/bash
+#
+# Script to Show the Differences Between the Deployed Configuration Files
+#    and the Git Repository Versions.
+#
+
+# For Cron Usage - Source Home Shell Environment:
+if [ -e $HOME/.bash_profile ] ; then
+    source $HOME/.bash_profile
+fi
+
+# Note: to ensure proper file permissions for captured system files,
+# please set your shell "umask" as follows before proceeding! ;-D
+umask 0002
+
+# Catch Errors Amidst Pipelines... ;-Q
+set -o pipefail
+
+# Handle "Quiet" Operation Option for Cron Usage...
+# (Only output on errors...)
+UPDATE=0
+QUIET=0
+if [ "$1" == "--quiet" ]; then
+	QUIET=1
+elif [[ "$1" == "--update" ]]; then
+	UPDATE=1
+elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
+	echo -e "\nusage: confck [--quiet|--update]\n"
+	exit 0
+fi
+
+# ADARA Git Repo
+if [[ -z "$ADARA_DIR" ]]; then
+	ADARA_DIR="/usr/local/src/ADARA"
+	#ADARA_DIR="/SNS/users/$USER/gitsrc/ADARA"
+elif [[ $QUIET == 0 ]]; then
+	echo "Inheriting ADARA_DIR Value from User Environment:"
+	echo -e "\t[${ADARA_DIR}]"
+fi
+
+# Default Update/Installation Target Definitions
+SYSTEMCTL="/usr/bin/systemctl"
+STC_LOG="/var/log/stc.log"
+MESSAGES_LOG="/var/log/messages"
+RSYSLOG_PIPES="/etc/rsyslog.pipes"
+MKNOD="/usr/bin/mknod"
+CRITICAL_MSGS="criticalMessages"
+SNSLOCAL="/SNSlocal"
+RSYSLOG_CACHE="${SNSLOCAL}/rsyslog.cache"
+STC_BINARIES="/home/controls/config/deploy"
+STC_LINKS="/usr/sbin"
+ACCEL_TIMING="/home/controls/Accelerator"
+ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
+CHMOD="/usr/bin/chmod"
+CHGRP="/usr/bin/chgrp"
+CHOWN="/usr/bin/chown"
+MKDIR="/usr/bin/mkdir"
+TOUCH="/usr/bin/touch"
+DIFF="/usr/bin/diff"
+SUDO="/usr/bin/sudo"
+TAIL="/usr/bin/tail"
+AWK="/usr/bin/awk"
+GREP="/bin/grep"
+LN="/usr/bin/ln"
+CP="/bin/cp"
+LS="/bin/ls"
+RM="/bin/rm"
+
+# Go to proper Git Config Repo Checkout, for easy checking systemwide.
+cd /home/controls/config/
+
+diff_cnt=0
+
+#
+# Search the Given Directory for Files...
+#
+
+STAT_LIST="./stat_list"
+
+CONFIG_DIFF_STAT()
+{
+	local _status=0
+
+	local _file="$1"
+	shift
+
+	local _statlist="$1"
+	shift
+
+	echo -e "\nDiff Stat for ${_file}"
+
+	stat --printf='%A %F %U %G ' "${_file}" > .tmp.A.$$
+	local _ckstat=$?
+	if [ ${_ckstat} != 0 ]; then
+		_status=${_ckstat}
+	fi
+	echo "${_file}" >> .tmp.A.$$
+
+	${GREP} "${_file}$" "${_statlist}" > .tmp.B.$$
+	local _ckgrep=$?
+	if [ ${_ckgrep} != 0 ]; then
+		_status=${_ckgrep}
+	fi
+
+	${DIFF} .tmp.A.$$ .tmp.B.$$
+	local _ckdiff=$?
+	if [ ${_ckdiff} != 0 ]; then
+		_status=${_ckdiff}
+	fi
+
+	${RM} .tmp.A.$$ .tmp.B.$$
+
+	return ${_status}
+}
+
+CONFIG_DIFF_DIR()
+{
+	local _file="$1"
+
+	if [[ -d ${_file} ]]; then
+
+		echo "[${_file}]:"
+
+		if [ "${_file}" == "deploy" ]; then
+			echo -e "Ignoring 'deploy' directory.\n"
+		else
+
+			for f in ${_file}/* ; do
+
+				CONFIG_DIFF_DIR $f
+
+			done
+
+		fi
+
+	elif [[ -e ${_file} ]]; then
+
+		if [ "${_file}" == "README" ]; then
+			echo -e "Ignoring README.\n"
+		elif [ "${_file}" == "confck" ]; then
+			echo -e "Ignoring confck.\n"
+		elif [ "${_file}" == "stc.deployment.history.txt" ]; then
+			echo -e "Ignoring stc.deployment.history.txt.\n"
+		elif [ "${_file}" == "stat_list" ]; then
+			echo -e "Ignoring Stat List File: stat_list.\n"
+		elif [ "${_file}" == "$USER.crontab" ]; then
+			echo -e "Ignoring ADARA Admin Crontab File: $USER.crontab\n"
+		else
+
+			# File Diff
+
+			echo "${DIFF} ${_file} /${_file}"
+			${DIFF} "${_file}" "/${_file}"
+
+			if [ $? != 0 ] ; then
+				diff_cnt=$(( $diff_cnt + 1 ))
+				# Update the Deployed System File or Git Repo File Version
+				if [[ $UPDATE == 1 ]]; then
+					echo -e "\nPush/Deploy the System File (\"sys\"),"
+					echo -e \
+						"   or Pull/Update the Git Repo File (\"repo\"),"
+					echo -n "   or Do Nothing (\"nothing\")?"
+					echo -n " [sys|repo|Nothing]: "
+					read ckUpdate
+					ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+					# Push Latest Git Repo Version to System
+					if [[ "$ckUpdate" == "s" \
+							|| "$ckUpdate" == "sys" ]]; then
+						echo "Deploying Latest Repo File to System:"
+						${SUDO} ${CP} -i "${_file}" "/${_file}"
+					# Pull Latest System Version into Git Repo
+					elif [[ "$ckUpdate" == "r" \
+							|| "$ckUpdate" == "repo" ]]; then
+						echo \
+						   "Updating Repo with Latest Deployed System File:"
+						${CP} -i "/${_file}" "${_file}"
+						git add "${_file}"
+						git commit \
+						   -m "Update Config Repo with Latest System File" \
+							"${_file}"
+					# Do Nothing.
+					else
+						echo "Doing Nothing, as Requested."
+					fi
+				fi
+			fi
+
+			# File Stat Diff
+
+			CONFIG_DIFF_STAT "/${_file}" "${STAT_LIST}"
+
+			if [ $? != 0 ] ; then
+				diff_cnt=$(( $diff_cnt + 1 ))
+			fi
+
+			echo
+
+		fi
+
+	fi
+}
+
+CONFCK()
+{
+    local _status=0
+
+	#
+	# Start the Search from the Top Level (Current) Directory...
+	#
+
+	echo
+	echo -n "Comparing Deployed Configuration"
+	echo " to Current Git Repository Versions:"
+	echo
+
+	for f in * ; do
+
+		CONFIG_DIFF_DIR $f
+
+	done
+
+	echo "Comparing Saved ADARA Admin Crontab to System:"
+	echo
+
+	local _check_update=0
+	crontab -l > /tmp/$USER.crontab.$$ 2>&1
+	if [[ $? != 0 || ! -s /tmp/$USER.crontab.$$ ]]; then
+		echo "Failure Retrieving ADARA Admin Crontab for STC...!"
+		_check_update=1
+		diff_cnt=$(( $diff_cnt + 1 ))
+	else
+		echo "${DIFF} ./$USER.crontab /tmp/$USER.crontab.$$"
+		${DIFF} ./$USER.crontab /tmp/$USER.crontab.$$
+		if [ $? != 0 ]; then
+			echo "ADARA Admin Crontab for STC Differed...!"
+			_check_update=1
+			diff_cnt=$(( $diff_cnt + 1 ))
+		else
+			echo "ADARA Admin Crontab for STC is the Same."
+		fi
+	fi
+	# Defer STC Admin Crontab to Below...
+	if [[ ${_check_update} == 1 ]]; then
+		echo "Defer Fixing of STC Admin Crontab..."
+		echo "(See Admin Crontab Create Below, or Fix Manually.)"
+	fi
+	${RM} -f /tmp/$USER.crontab.$$
+	if [ $? != 0 ]; then
+		echo "Failure Deleting Temporary Admin Crontab File for STC...!"
+		diff_cnt=$(( $diff_cnt + 1 ))
+	fi
+	echo
+
+	#
+	# Done.
+	#
+
+	echo "$diff_cnt Files Differed."
+	echo
+
+	return $diff_cnt
+}
+
+if [[ $UPDATE == 1 ]]; then
+	CONFCK
+	_ckconfck=$?
+else
+	doConfCk=`CONFCK 2>&1`
+	_ckconfck=$?
+	if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doConfCk\n"
+	fi
+fi
+
+# In Update Mode, Perform Other Assorted Install Operations, As Needed...
+if [[ $UPDATE == 1 ]]; then
+
+	echo -e "Checking Other Assorted Install Operations, As Needed...\n"
+
+	# Check/Create STC RSyslog Log File...
+	${LS} -l "${STC_LOG}"
+	log_perms=`${LS} -l "${STC_LOG}" | ${AWK} '{print $1}'`
+	log_group=`${LS} -l "${STC_LOG}" | ${AWK} '{print $4}'`
+	if [[ ! -f "${STC_LOG}"
+			|| "$log_perms" != "-rw-rw----"
+			|| "$log_group" != "users" ]]; then
+		echo -n "Create/Setup STC RSyslog Log File? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			${SUDO} ${TOUCH} "${STC_LOG}"
+			${SUDO} ${CHGRP} users "${STC_LOG}"
+			${SUDO} ${CHMOD} g+rw "${STC_LOG}"
+			${LS} -l "${STC_LOG}"
+			# Restart RSyslog Service...?
+			${SUDO} ${SYSTEMCTL} status rsyslog
+			echo -n "Restart RSyslog Service? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				${SUDO} ${SYSTEMCTL} restart rsyslog
+				${SUDO} ${TAIL} "${MESSAGES_LOG}"
+			fi
+		fi
+	fi
+	echo
+
+	# Check/Create RSyslog Pipes...
+	${LS} -l "${RSYSLOG_PIPES}"
+	if [[ ! -d "${RSYSLOG_PIPES}" ]]; then
+		echo -n "Create RSyslog Pipes? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			${SUDO} ${MKDIR} "${RSYSLOG_PIPES}"
+			${SUDO} "${MKNOD}" "${RSYSLOG_PIPES}/${CRITICAL_MSGS}" p
+			${SUDO} ${CHGRP} snswheel "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
+			${SUDO} ${CHMOD} 660 "${RSYSLOG_PIPES}/${CRITICAL_MSGS}"
+			${LS} -l "${RSYSLOG_PIPES}"
+			# Set Big Error Pipe...
+			echo "Set Big Error Pipe..."
+			${CP} ${ADARA_DIR}/big_err_pipe.c /tmp
+			cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+			/tmp/big_err_pipe
+		fi
+	fi
+	echo
+
+	# Check/Create RSyslog Cache...
+	${LS} -ld "${RSYSLOG_CACHE}"
+	if [[ ! -d "${RSYSLOG_CACHE}" ]]; then
+		echo -n "Create RSyslog Cache? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			if [[ ! -d "${SNSLOCAL}" ]]; then
+				${SUDO} ${MKDIR} "${SNSLOCAL}"
+			fi
+			${SUDO} ${MKDIR} "${RSYSLOG_CACHE}"
+			${SUDO} ${CHOWN} snsdata "${RSYSLOG_CACHE}"
+			${SUDO} ${CHGRP} adara "${RSYSLOG_CACHE}"
+			${SUDO} ${CHMOD} g+ws "${RSYSLOG_CACHE}"
+			${LS} -ld "${RSYSLOG_CACHE}"
+		fi
+	fi
+	echo
+
+	# Check/Create STC Administrator Crontab...
+	crontab -l
+	crontab_check=`crontab -l |& ${AWK} '{ print $1 " " $2 }'`
+	if [[ "$crontab_check" == "no crontab" ]]; then
+		echo -n "Create STC Administrator Crontab? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			cron_file=`mktemp ./.confck.stc.crontab.edit.file.XXXXXX`
+
+			echo "MAILTO=idac_adara_notify@email.ornl.gov" >> $cron_file
+			echo "0 8,17 * * * /home/controls/config/confck --quiet" \
+				>> $cron_file
+			echo -n "0 8,17 * * * /home/controls/config-stc-config/confck" \
+				>> $cron_file
+			echo " --quiet" >> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-stc-config-test/confck --quiet" \
+				>> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-stc-config-hfir/confck --quiet" \
+				>> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo -n " /home/controls/config-stc-config-hfir-test/confck" \
+				>> $cron_file
+			echo " --quiet" >> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-stc-config-dummy/confck --quiet" \
+				>> $cron_file
+			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
+			echo -n "0 8 * * *" >> $cron_file
+			echo -n " ${ADARA_DIR}/adara_monitor" \
+				>> $cron_file
+			echo " --oneshot" >> $cron_file
+			echo >> $cron_file
+			echo -n "*/10 * * * * /usr/local/bin/rsyslogMailer" \
+				>> $cron_file
+			echo " > /dev/null 2>&1" >> $cron_file
+
+			# Install Administrator Crontab
+			crontab $cron_file
+			if [[ $? != 0 ]]; then
+				echo -e "\nError Creating STC Administrator Crontab:\n"
+				/bin/cat $cron_file
+			fi
+
+			# Clean Up Temp Crontab File
+			${RM} $cron_file
+
+			# Check for Manual Crontab Edit
+			crontab -l
+			echo -e -n "\nDo you need to Manually Edit the Crontab?"
+			echo -n " [yes|No] "
+			read ck_edit
+			ck_edit=`echo "$ck_edit" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ck_edit" == "y" || "$ck_edit" == "yes" ]]; then
+				crontab -e
+			fi
+		fi
+	fi
+	echo
+
+	# Check/Create STC User System Bin Soft Links...
+	for i in stc stc_test stc_dummy stc_hfir stc_hfir_test ; do
+
+		echo "Checking ADARA/STC User System Bin Soft Links for: [$i]"
+
+		${LS} -l "${STC_LINKS}/$i"
+		if [[ ! -x "${STC_LINKS}/$i" ]]; then
+			echo -n "Create ADARA/STC User System Bin Soft Link for [$i]?"
+			echo -n " [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				${SUDO} ${LN} -s "${STC_BINARIES}/$i" "${STC_LINKS}/$i"
+				${LS} -l "${STC_LINKS}/$i"
+			fi
+		fi
+		echo
+	
+	done
+
+	# Check/Create Clone of SNS Accelerator Timing Git Repo...
+	${LS} -ld "${ACCEL_TIMING}"
+	if [[ ! -d "${ACCEL_TIMING}" ]]; then
+		echo -n "Create Clone of SNS Accelerator Timing Git Repo? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			git clone "${ACCEL_TIMING_REPO}" "${ACCEL_TIMING}"
+			${LS} -l "${ACCEL_TIMING}"
+		fi
+	fi
+	echo
+
+fi
+
+if [[ ${_ckconfck} != 0 ]]; then
+	echo -e "*** ConfCk FAILED...!\n"
+fi
+
+exit ${_ckconfck}
+

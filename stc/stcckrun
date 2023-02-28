@@ -1,0 +1,227 @@
+#!/bin/bash
+#
+# STC Check Run Script
+#
+# Search STC Log Entries and Check Completion of the Run
+# for a Specific STC Process ID... ;-D
+#
+
+CHECK_PROCEED()
+{
+	local _do_exit=1
+
+	if [[ -n "$1" ]]; then
+		echo -e "\n$1"
+		_do_exit=0
+	fi
+
+	echo -e -n "\nOk to Proceed (yes/No/quit) "
+
+	read proceed_ck
+	proceed_ck=`echo "$proceed_ck" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ "$proceed_ck" == ""
+			|| "$proceed_ck" == "n" || "$proceed_ck" == "no" ]]; then
+		if [[ ${_do_exit} == 1 ]]; then
+			echo -e "\nExiting STC ITEMS Script at User's Request.\n"
+			exit 0
+		else
+			return 1
+		fi
+
+	elif [[ "$proceed_ck" == "q" || "$proceed_ck" == "quit" ]]; then
+		echo -e "\nExiting STC ITEMS Script at User's Request.\n"
+		exit 0
+	fi
+
+	return 0
+}
+
+num_files=5
+
+do_run=0
+
+if [[ "$1" == "--run" ]]; then
+	do_run=1
+	shift
+fi
+
+if [[ $# < 1 ]]; then
+	echo "usage: stcckrun [--run] <pid/run>"
+	exit -1
+fi
+
+if [[ $do_run == 1 ]]; then
+	run="$1"
+	pid=`stcrun --pid $run | tail -1`
+	if [[ -z "$pid" ]]; then
+		echo -e "\nRun Number ${run} Not Found on This Server.\n"
+		exit -1
+	else
+		echo -e "\nResolved Run Number ${run} as Process Id ${pid}.\n"
+	fi
+else
+	pid="$1"
+fi
+
+SEARCH_STC_LOGS()
+{
+	local _pid="$1"
+
+	files=`/bin/ls -t -r /var/log/stc.log* | tail -${num_files}`
+
+	for log in $files ; do
+
+		gzck=`echo $log | grep '.gz$' | wc | awk '{print $1}'`
+
+		if [[ $gzck == 1 ]]; then
+			zcat "$log" | grep "\[${_pid}\]"
+		else
+			grep "\[${_pid}\]" "$log"
+		fi
+
+	done
+}
+
+# Search Log Files
+
+log_lines=`SEARCH_STC_LOGS ${pid}`
+
+if [[ $log_lines == "" ]]; then
+	echo -e "\nError: No STC Logs Found...!\n"
+	exit -1
+fi
+
+# Extract "Target Station" Info Log...
+
+info=`echo "$log_lines" | grep "Target Station"`
+
+nts=`echo "$info" | wc | awk '{print $1}'`
+
+# Check for Missing "Target Station" Log...
+if [[ ${info} == "" || $nts == 0 ]]; then
+
+	echo -e "\nError: No Target Station Logs Found...!"
+
+	# Try for "STC failed: Translation of..." Log Message...
+
+	txof=`echo "$log_lines" | grep "Translation of"`
+
+	ntxof=`echo "$txof" | wc | awk '{print $1}'`
+
+	# Check for Missing "Target Station" Log...
+	if [[ ${txof} == "" || $ntxof == 0 ]]; then
+
+		echo -e "\nError: No \"Translation Of\" Logs Found...!"
+
+		CHECK_PROCEED "Displaying STC Logs..."
+
+		# Dump STC Logs...
+		if [[ $? == 0 ]]; then
+
+			# Determine Whether Pager Required...
+			nlines=`echo "$log_lines" | wc | awk '{print $1}'`
+			if [[ $nlines -gt 48 ]]; then
+				echo "${log_lines}" | /usr/bin/less -x4
+			else
+				echo "${log_lines}"
+			fi
+		fi
+
+		# That's All We Can Do...
+		echo
+		exit 0
+
+	# Check for Multiple "Target Station" Logs...
+	elif [[ $ntxof -gt 1 ]]; then
+
+		echo -e "\nError: Multiple \"Translation Of\" Logs Found...!"
+
+		echo -e "\n$txof"
+
+		CHECK_PROCEED "Using Last \"Translation Of\" Log Line..."
+
+		if [[ $? == 0 ]]; then
+			txof=`echo "$txof" | tail -1`
+		else
+			echo -e "\nExiting STC Check Run at User's Request.\n"
+			exit 0
+		fi
+
+	fi
+
+	# Extract Run Meta-Data from Target Station Log Info...
+
+	echo -e "\nUsing \"Translation Of\" Log:"
+
+	echo -e "\n   ${txof}"
+
+	fac=`echo "$txof" | awk '{ print $11 }'`
+
+	blrun=`echo "$txof" | awk '{ print $12 }'`
+	# Handle REF_L/M Weirdness... ;-b
+	bl=`echo "$blrun" | awk -F "_" \
+		'{for (i=1; i<NF; i++) {if (i>1) printf("_"); printf("%s",$i); } }'`
+	run=`echo "$blrun" | awk -F "_" '{ print $NF }'`
+
+	ipts=`echo "$txof" | awk '{ print $13 }'`
+	ipts=`echo "$ipts" | sed 's/[()]//g'`
+
+	# Assemble NeXus File Path...
+
+	nexus="/${fac}/${bl}/${ipts}/nexus/${bl}_${run}.nxs.h5"
+
+	echo -e "\nExpected NeXus File Path:"
+
+	echo -e "\n   ${nexus}\n"
+
+	/bin/ls -l "${nexus}"
+
+	echo
+	exit 0
+
+# Check for Multiple "Target Station" Logs...
+elif [[ $nts -gt 1 ]]; then
+
+	echo -e "\nError: Multiple Target Station Logs Found...!"
+
+	echo -e "\n$info"
+
+	CHECK_PROCEED "Using Last Target Station Log Line..."
+
+	if [[ $? == 0 ]]; then
+		info=`echo "$info" | tail -1`
+	else
+		echo -e "\nExiting STC Check Run at User's Request.\n"
+		exit 0
+	fi
+
+fi
+
+# Extract Run Meta-Data from Target Station Log Info...
+
+echo -e "\nUsing Target Station Log:"
+
+echo -e "\n   ${info}"
+
+fbl=`echo "$info" | awk '{ print $11 }'`
+fac=`echo "$fbl" | awk -F "[:,]" '{ print $1 }'`
+bl=`echo "$fbl" | awk -F "[:,]" '{ print $2 }'`
+
+ipts=`echo "$info" | awk '{ print $13 }'`
+ipts=`echo "$ipts" | awk -F "," '{ print $1 }'`
+
+run=`echo "$info" | awk '{ print $15 }'`
+
+# Assemble NeXus File Path...
+
+nexus="/${fac}/${bl}/${ipts}/nexus/${bl}_${run}.nxs.h5"
+
+echo -e "\nExpected NeXus File Path:"
+
+echo -e "\n   ${nexus}\n"
+
+/bin/ls -l "${nexus}"
+
+echo
+

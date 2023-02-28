@@ -1,6 +1,7 @@
+#include <sstream>
 #include <string.h>
-
 #include "ADARAParser.h"
+#include "ADARAPackets.h"
 
 using namespace ADARA;
 
@@ -11,6 +12,44 @@ Parser::Parser(unsigned int initial_buffer_size, unsigned int max_pkt_size) :
 		m_restart_offset(0), m_oversize_len(0)
 {
 	m_buffer = new uint8_t[initial_buffer_size];
+
+	last_start_read_time.tv_sec = -1;
+	last_start_read_time.tv_nsec = -1;
+	last_last_start_read_time.tv_sec = -1;
+	last_last_start_read_time.tv_nsec = -1;
+
+	last_end_read_time.tv_sec = -1;
+	last_end_read_time.tv_nsec = -1;
+	last_last_end_read_time.tv_sec = -1;
+	last_last_end_read_time.tv_nsec = -1;
+
+	last_bytes_read = -1;
+	last_last_bytes_read = -1;
+	last_read_errno = -1;
+	last_last_read_errno = -1;
+	last_pkts_parsed = -1;
+	last_last_pkts_parsed = -1;
+	last_total_bytes = -1;
+	last_last_total_bytes = -1;
+	last_total_packets = -1;
+	last_last_total_packets = -1;
+	last_read_count = -1;
+	last_last_read_count = -1;
+	last_loop_count = -1;
+	last_last_loop_count = -1;
+
+	last_parse_elapsed_total = -1.0;
+	last_last_parse_elapsed_total = -1.0;
+	last_read_elapsed_total = -1.0;
+	last_last_read_elapsed_total = -1.0;
+	last_parse_elapsed = -1.0;
+	last_last_parse_elapsed = -1.0;
+	last_read_elapsed = -1.0;
+	last_last_read_elapsed = -1.0;
+	last_elapsed = -1.0;
+	last_last_elapsed = -1.0;
+
+	m_discarded_packets.clear();
 }
 
 Parser::~Parser()
@@ -23,9 +62,11 @@ void Parser::reset(void)
 	m_len = 0;
 	m_oversize_len = 0;
 	m_restart_offset = 0;
+
+	m_discarded_packets.clear();
 }
 
-int Parser::bufferParse(unsigned int max_packets)
+int Parser::bufferParse(std::string & log_info, unsigned int max_packets)
 {
 	unsigned int valid_len = m_len - m_restart_offset;
 	uint8_t *p = m_buffer + m_restart_offset;
@@ -33,8 +74,10 @@ int Parser::bufferParse(unsigned int max_packets)
 	bool stopped = false;
 
 	/* Is there anything to do? */
-	if (!valid_len)
+	if (!valid_len) {
+		log_info.append("bufferParse() nothing to do; ");
 		return 0;
+	}
 
 	/* If we don't care how many packets we process, then set the limit
 	 * above the range of possibility to avoid needing to check for zero
@@ -67,11 +110,19 @@ int Parser::bufferParse(unsigned int max_packets)
 
 	while (valid_len >= PacketHeader::header_length() &&
 					processed < max_packets && !stopped) {
+
 		PacketHeader hdr(p);
 
-		if (hdr.payload_length() % 4)
-			throw invalid_packet("Payload length not "
-					     "multiple of 4");
+		if (hdr.payload_length() % 4) {
+			std::stringstream ss;
+			ss << "Payload length ";
+			ss << hdr.payload_length();
+			ss << " not multiple of 4";
+			ss << " (Packet Type 0x";
+			ss << std::hex << hdr.type() << std::dec;
+			ss << ")";
+			throw invalid_packet( ss.str() );
+		}
 
 		if (m_max_size < hdr.packet_length()) {
 			/* This packet is over the maximum limit; we'll
@@ -79,7 +130,7 @@ int Parser::bufferParse(unsigned int max_packets)
 			 * chunk, consuming our entire buffer.
 			 */
 			stopped = rxOversizePkt(&hdr, p, 0, valid_len);
-			m_oversize_len = hdr.payload_length() - valid_len;
+			m_oversize_len = hdr.packet_length() - valid_len;
 			m_oversize_offset = valid_len;
 			valid_len = 0;
 			break;
@@ -113,6 +164,14 @@ int Parser::bufferParse(unsigned int max_packets)
 			 */
 			m_restart_offset = 0;
 			m_len = valid_len;
+
+			// log what we did...
+			std::stringstream ss;
+			ss << processed;
+			log_info.append("bufferParse(): resized, processed ");
+			log_info.append(ss.str());
+			log_info.append(" packets; ");
+
 			return processed;
 		}
 
@@ -126,6 +185,16 @@ int Parser::bufferParse(unsigned int max_packets)
 
 		stopped = rxPacket(pkt);
 		processed++;
+
+		// log failed packet parsing...!
+		if ( stopped ) {
+			std::stringstream ss;
+			log_info.append(
+				"bufferParse(): rxPacket() returned error for type=");
+			ss << pkt.type();
+			log_info.append(ss.str());
+			log_info.append(", stopped; ");
+		}
 	}
 
 	/* We're done processing for this round. Update our position and/or
@@ -161,7 +230,28 @@ int Parser::bufferParse(unsigned int max_packets)
 	/* We need an 32 GB buffer before we can fit 2^31 packets, so
 	 * casting to int is safe here.
 	 */
-	return stopped ? - (int) processed : (int) processed;
+
+	std::stringstream ss;
+	int rc;
+	
+	if ( stopped ) {
+		rc = - (int) processed;
+		// add to "stopped" log info...
+		ss << processed;
+		log_info.append("had parsed ");
+		log_info.append(ss.str());
+		log_info.append(" packets; ");
+	}
+	else {
+		rc = (int) processed;
+		// create log info...
+		ss << rc;
+		log_info.append("bufferParse(): Done. Parsed ");
+		log_info.append(ss.str());
+		log_info.append(" packets; ");
+	}
+
+	return rc;
 }
 
 bool Parser::rxPacket(const Packet &pkt)
@@ -172,26 +262,45 @@ bool Parser::rxPacket(const Packet &pkt)
 		return rxPacket(raw);					\
 	}
 
-	switch (pkt.type()) {
-		MAP_TYPE(PacketType::RAW_EVENT_V0, RawDataPkt);
-		MAP_TYPE(PacketType::RTDL_V0, RTDLPkt);
-		MAP_TYPE(PacketType::SOURCE_LIST_V0, SourceListPkt);
-		MAP_TYPE(PacketType::BANKED_EVENT_V0, BankedEventPkt);
-		MAP_TYPE(PacketType::BEAM_MONITOR_EVENT_V0, BeamMonitorPkt);
-		MAP_TYPE(PacketType::PIXEL_MAPPING_V0, PixelMappingPkt);
-		MAP_TYPE(PacketType::RUN_STATUS_V0, RunStatusPkt);
-		MAP_TYPE(PacketType::RUN_INFO_V0, RunInfoPkt);
-		MAP_TYPE(PacketType::TRANS_COMPLETE_V0, TransCompletePkt);
-		MAP_TYPE(PacketType::CLIENT_HELLO_V0, ClientHelloPkt);
-		MAP_TYPE(PacketType::STREAM_ANNOTATION_V0, AnnotationPkt);
-		MAP_TYPE(PacketType::SYNC_V0, SyncPkt);
-		MAP_TYPE(PacketType::HEARTBEAT_V0, HeartbeatPkt);
-		MAP_TYPE(PacketType::GEOMETRY_V0, GeometryPkt);
-		MAP_TYPE(PacketType::BEAMLINE_INFO_V0, BeamlineInfoPkt);
-		MAP_TYPE(PacketType::DEVICE_DESC_V0, DeviceDescriptorPkt);
-		MAP_TYPE(PacketType::VAR_VALUE_U32_V0, VariableU32Pkt);
-		MAP_TYPE(PacketType::VAR_VALUE_DOUBLE_V0, VariableDoublePkt);
-		MAP_TYPE(PacketType::VAR_VALUE_STRING_V0, VariableStringPkt);
+	switch (pkt.base_type()) {
+		MAP_TYPE(PacketType::RAW_EVENT_TYPE, RawDataPkt);
+		MAP_TYPE(PacketType::MAPPED_EVENT_TYPE, MappedDataPkt);
+		MAP_TYPE(PacketType::RTDL_TYPE, RTDLPkt);
+		MAP_TYPE(PacketType::SOURCE_LIST_TYPE, SourceListPkt);
+		MAP_TYPE(PacketType::BANKED_EVENT_TYPE, BankedEventPkt);
+		MAP_TYPE(PacketType::BANKED_EVENT_STATE_TYPE, BankedEventStatePkt);
+		MAP_TYPE(PacketType::BEAM_MONITOR_EVENT_TYPE, BeamMonitorPkt);
+		MAP_TYPE(PacketType::PIXEL_MAPPING_TYPE, PixelMappingPkt);
+		MAP_TYPE(PacketType::PIXEL_MAPPING_ALT_TYPE, PixelMappingAltPkt);
+		MAP_TYPE(PacketType::RUN_STATUS_TYPE, RunStatusPkt);
+		MAP_TYPE(PacketType::RUN_INFO_TYPE, RunInfoPkt);
+		MAP_TYPE(PacketType::TRANS_COMPLETE_TYPE, TransCompletePkt);
+		MAP_TYPE(PacketType::CLIENT_HELLO_TYPE, ClientHelloPkt);
+		MAP_TYPE(PacketType::STREAM_ANNOTATION_TYPE, AnnotationPkt);
+		MAP_TYPE(PacketType::SYNC_TYPE, SyncPkt);
+		MAP_TYPE(PacketType::HEARTBEAT_TYPE, HeartbeatPkt);
+		MAP_TYPE(PacketType::GEOMETRY_TYPE, GeometryPkt);
+		MAP_TYPE(PacketType::BEAMLINE_INFO_TYPE, BeamlineInfoPkt);
+		MAP_TYPE(PacketType::BEAM_MONITOR_CONFIG_TYPE,
+			BeamMonitorConfigPkt);
+		MAP_TYPE(PacketType::DETECTOR_BANK_SETS_TYPE, DetectorBankSetsPkt);
+		MAP_TYPE(PacketType::DATA_DONE_TYPE, DataDonePkt);
+		MAP_TYPE(PacketType::DEVICE_DESC_TYPE, DeviceDescriptorPkt);
+		MAP_TYPE(PacketType::VAR_VALUE_U32_TYPE, VariableU32Pkt);
+		MAP_TYPE(PacketType::VAR_VALUE_DOUBLE_TYPE, VariableDoublePkt);
+		MAP_TYPE(PacketType::VAR_VALUE_STRING_TYPE, VariableStringPkt);
+		MAP_TYPE(PacketType::VAR_VALUE_U32_ARRAY_TYPE, VariableU32ArrayPkt);
+		MAP_TYPE(PacketType::VAR_VALUE_DOUBLE_ARRAY_TYPE,
+			VariableDoubleArrayPkt);
+		MAP_TYPE(PacketType::MULT_VAR_VALUE_U32_TYPE, MultVariableU32Pkt);
+		MAP_TYPE(PacketType::MULT_VAR_VALUE_DOUBLE_TYPE,
+			MultVariableDoublePkt);
+		MAP_TYPE(PacketType::MULT_VAR_VALUE_STRING_TYPE,
+			MultVariableStringPkt);
+		MAP_TYPE(PacketType::MULT_VAR_VALUE_U32_ARRAY_TYPE,
+			MultVariableU32ArrayPkt);
+		MAP_TYPE(PacketType::MULT_VAR_VALUE_DOUBLE_ARRAY_TYPE,
+			MultVariableDoubleArrayPkt);
 
 		/* No default handler; we want the compiler to warn about
 		 * the unhandled PacketType values when we add new packets.
@@ -202,28 +311,36 @@ bool Parser::rxPacket(const Packet &pkt)
 #undef MAP_TYPE
 }
 
-bool Parser::rxUnknownPkt(const Packet &)
+bool Parser::rxUnknownPkt(const Packet &pkt)
 {
 	/* Default is to discard the data */
+	(m_discarded_packets[pkt.base_type()])++;
 	return false;
 }
 
-bool Parser::rxOversizePkt(const PacketHeader *, const uint8_t *,
-			   unsigned int, unsigned int)
+bool Parser::rxOversizePkt(const PacketHeader *hdr, const uint8_t *,
+				unsigned int, unsigned int)
 {
+	// NOTE: ADARA::PacketHeader *hdr can be NULL...! ;-o
 	/* Default is to discard the data */
+	if (hdr != NULL)
+		(m_discarded_packets[hdr->base_type()])++;
 	return false;
 }
 
-#define EXPAND_HANDLER(type) \
-bool Parser::rxPacket(const type &) { return false; }
+#define EXPAND_HANDLER(_class) \
+bool Parser::rxPacket(const _class &pkt) \
+	{ (m_discarded_packets[pkt.base_type()])++; return false; }
 
 EXPAND_HANDLER(RawDataPkt)
+EXPAND_HANDLER(MappedDataPkt)
 EXPAND_HANDLER(RTDLPkt)
 EXPAND_HANDLER(SourceListPkt)
 EXPAND_HANDLER(BankedEventPkt)
+EXPAND_HANDLER(BankedEventStatePkt)
 EXPAND_HANDLER(BeamMonitorPkt)
 EXPAND_HANDLER(PixelMappingPkt)
+EXPAND_HANDLER(PixelMappingAltPkt)
 EXPAND_HANDLER(RunStatusPkt)
 EXPAND_HANDLER(RunInfoPkt)
 EXPAND_HANDLER(TransCompletePkt)
@@ -233,7 +350,49 @@ EXPAND_HANDLER(SyncPkt)
 EXPAND_HANDLER(HeartbeatPkt)
 EXPAND_HANDLER(GeometryPkt)
 EXPAND_HANDLER(BeamlineInfoPkt)
+EXPAND_HANDLER(BeamMonitorConfigPkt)
+EXPAND_HANDLER(DetectorBankSetsPkt)
+EXPAND_HANDLER(DataDonePkt)
 EXPAND_HANDLER(DeviceDescriptorPkt)
 EXPAND_HANDLER(VariableU32Pkt)
 EXPAND_HANDLER(VariableDoublePkt)
 EXPAND_HANDLER(VariableStringPkt)
+EXPAND_HANDLER(VariableU32ArrayPkt)
+EXPAND_HANDLER(VariableDoubleArrayPkt)
+EXPAND_HANDLER(MultVariableU32Pkt)
+EXPAND_HANDLER(MultVariableDoublePkt)
+EXPAND_HANDLER(MultVariableStringPkt)
+EXPAND_HANDLER(MultVariableU32ArrayPkt)
+EXPAND_HANDLER(MultVariableDoubleArrayPkt)
+
+void Parser::getDiscardedPacketsLogString(std::string & log_info)
+{
+	log_info = "Discarded ADARA Packet/Counts: ";
+
+	uint64_t total_discarded = 0;
+
+	// Append Each Discarded Packet Type Count...
+	for (std::map<PacketType::Type, uint64_t>::iterator
+			it = m_discarded_packets.begin();
+			it != m_discarded_packets.end(); it++)
+	{
+		std::stringstream ss;
+		ss << std::hex << "0x" << it->first << std::dec
+			<< "=" << it->second << "; ";
+		log_info.append(ss.str());
+
+		total_discarded += it->second;
+	}
+
+	// Append Total Discarded Packet Count
+	std::stringstream ss;
+	ss << "Total=" << total_discarded;
+	log_info.append(ss.str());
+}
+
+void Parser::resetDiscardedPacketsStats(void)
+{
+	// Reset Associative Map, Start Clean Stats...
+	m_discarded_packets.clear();
+}
+

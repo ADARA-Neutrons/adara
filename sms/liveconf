@@ -1,0 +1,3094 @@
+#!/bin/bash
+#
+# ADARA SMS LiveConf - Live Configuration and Status Script
+#
+
+# For Cron Usage - Source Home Shell Environment:
+if [ -e $HOME/.bash_profile ] ; then
+	source $HOME/.bash_profile
+fi
+
+# default settings
+SMSD_CONFIG="/SNSlocal/sms/conf/smsd.conf"
+REPO_CONFIG="./sms/conf/smsd.conf"
+CONFIG_REPO="/home/controls/config"
+CONFIG_USER="snsdata"
+TMP_DIR="/tmp"
+WAIT="-w 9"
+
+#
+# Option Configurations
+#
+
+# Option Types/Indexing...
+
+declare -A is_indexed
+declare -A index_pv
+declare -A idName
+
+is_indexed["sms"]=0
+index_pv["sms"]=""
+idName["sms"]="SMS"
+
+is_indexed["runinfo"]=0
+index_pv["runinfo"]=""
+idName["runinfo"]="RunInfo"
+
+is_indexed["marker"]=0
+index_pv["marker"]=""
+idName["marker"]="Marker"
+
+is_indexed["source"]=1
+index_pv["source"]="Control:NumDataSources"
+idName["source"]="Source"
+
+is_indexed["ctrl"]=0
+index_pv["ctrl"]=""
+idName["ctrl"]="Control"
+
+is_indexed["monitor"]=1
+index_pv["monitor"]="Control:NumBeamMonitors"
+idName["monitor"]="BeamMonitor"
+
+is_indexed["bankset"]=1
+index_pv["bankset"]="Control:NumDetBankSets"
+idName["bankset"]="DetectorBankSet"
+
+is_indexed["combus"]=0
+index_pv["combus"]=""
+idName["combus"]="ComBus"
+
+is_indexed["storage"]=0
+index_pv["storage"]=""
+idName["storage"]="Storage"
+
+is_indexed["stc"]=0
+index_pv["stc"]=""
+idName["stc"]="STC"
+
+is_indexed["livestream"]=0
+index_pv["livestream"]=""
+idName["livestream"]="LiveServer"
+
+
+# Options...
+
+num_options=0
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="uri"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:DataURI"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="IP_ADDR:IP_PORT(data)"
+option_label[$num_options]="[Data Source URI]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="enabled"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:Enabled"
+option_value_type[$num_options]="BOOL_VALUE(Enabled/Disabled)"
+option_label[$num_options]="[Enable/Disable Data Source]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="required"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:Required"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Data Source is Required for Data Collection]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="connect_timeout"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:ConnectTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_default[$num_options]="5"
+option_label[$num_options]="[Data Source Connection Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="connect_retry"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:ConnectRetryTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_default[$num_options]="15"
+option_label[$num_options]="[Data Source Disconnect Retry Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="data_timeout"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:DataTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_default[$num_options]="3"
+option_label[$num_options]="[Data Source Data Delivery Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="data_timeout_retry"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:DataTimeoutRetry"
+option_value_type[$num_options]="UINT32_VALUE(nretries)"
+option_default[$num_options]="3"
+option_label[$num_options]="[Data Source Data Delivery Timeout Retries]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="ignore_eop"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:IgnoreEoP"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Ignore End-of-Pulse]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="ignore_local_sawtooth"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:IgnoreLocalSAWTOOTH"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Ignore Local SAWTOOTH Times]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="ignore_annotation_pkts"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:IgnoreAnnotationPkts"
+option_value_type[$num_options]="ENUM(Ignore=0|PassThru=1|Execute=2)"
+option_default[$num_options]="Ignore"
+option_label[$num_options]="[Ignore External/Replay ADARA Markers/Annotns]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="mixed_data_packets"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:MixedDataPackets"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Mixed Data Packets (Neutron and Meta-Data)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="check_source_sequence"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:CheckSourceSequence"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Check Pkt Source Sequence Numbers (No Reset)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="check_pulse_sequence"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:CheckPulseSequence"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Check Pkt Pulse Sequence Numbers (Resets)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="max_pulse_seq_list"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:MaxPulseSeqList"
+option_value_type[$num_options]="UINT32_VALUE(buffer_size)"
+option_default[$num_options]="32"
+option_label[$num_options]="[Max Pulse Sequence List (Buffer) Size]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="readsize"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:MaxReadChunk"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="UINT32_VALUE+[M|K](bytes)"
+option_default[$num_options]="4194304"   # "4M" = 4 * 1024 * 1024
+option_label[$num_options]="[Max Read Chunk]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="rtdl_no_data_thresh"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:RTDLNoDataThresh"
+option_value_type[$num_options]="UINT32_VALUE(packets)"
+option_default[$num_options]="100"
+option_label[$num_options]="[RTDL No Data Threshold]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="source"
+option_name[$num_options]="save_input_stream"
+option_pv[$num_options]="DataSource:XXX_INDEX_XXX:SaveInputStream"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Save Input Stream]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="alt_primary_pv_prefix"
+option_pv[$num_options]="AltPrimaryPVPrefix"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(Alternate Primary SMS PV Prefix.)"
+option_label[$num_options]="[Alternate Primary PV Prefix]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="no_eop_pulse_buffer_size"
+option_pv[$num_options]="Control:NoEoPPulseBufferSize"
+option_value_type[$num_options]="UINT32_VALUE(pulses)"
+option_default[$num_options]="0"
+option_label[$num_options]="[No EoP Pulse Buffer Size]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="max_pulse_buffer_size"
+option_pv[$num_options]="Control:MaxPulseBufferSize"
+option_value_type[$num_options]="UINT32_VALUE(max_pulses)"
+option_default[$num_options]="1000"
+option_label[$num_options]="[Max Pulse Buffer Size]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="pop_pulse_buffer"
+option_no_config[$num_options]=1
+option_pv[$num_options]="Control:PopPulseBuffer"
+option_value_type[$num_options]="INT32_VALUE(pulse_index)"
+option_label[$num_options]="[Pop (Erase) Pulse from Buffer By Index (+/-)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="no_rtdl_pulses"
+option_pv[$num_options]="Control:NoRTDLPulses"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[No RTDL Pulses on This Beamline]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="do_pulse_pcharge_correction"
+option_pv[$num_options]="Control:DoPulsePchgCorrect"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Do Pulse Proton Charge Correction]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="do_pulse_veto_correction"
+option_pv[$num_options]="Control:DoPulseVetoCorrect"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Do Pulse Veto Flags Correction]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="send_sample_in_run_info"
+option_pv[$num_options]="RunInfo:SendSampleInRunInfo"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Send Sample In Run Info]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="save_pixel_map"
+option_pv[$num_options]="RunInfo:SavePixelMap"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Save Pixel Map in NeXus Data File]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="run_notes_auto_reset"
+option_pv[$num_options]="Marker:NotesCommentAutoReset"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Auto-Reset the Run Notes Between Runs]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="run_notes_updates_enabled"
+option_pv[$num_options]="RunNotesUpdatesEnabled"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Enable Run Notes Updates During the Run]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="intermittent_data_threshold"
+option_pv[$num_options]="Control:IntermittentDataThreshold"
+option_value_type[$num_options]="UINT32_VALUE(number_of_missing_pulses)"
+option_default[$num_options]="9"
+option_label[$num_options]="[Intermittent Data Source Threshold]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="neutron_event_state_bits"
+option_pv[$num_options]="Control:NeutronEventStateBits"
+option_value_type[$num_options]="UINT32_VALUE(number_of_state_bits)"
+option_default[$num_options]="0"
+option_label[$num_options]="[Number of Neutron Event State Bits]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="neutron_event_sort_by_state"
+option_pv[$num_options]="Control:NeutronEventSortByState"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Whether to Sort Neutron Events By State]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="ignore_interleaved_sawtooth"
+option_pv[$num_options]="Control:IgnoreInterleavedGlobalSAWTOOTH"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Ignore Interleaved Global SAWTOOTH Times]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="beam_monitor_tof_bits"
+option_pv[$num_options]="Control:BeamMonitorTOFBits"
+option_value_type[$num_options]="UINT32_VALUE(number_of_tof_bits)"
+option_default[$num_options]="21"
+option_label[$num_options]="[Number of Beam Monitor TOF Bits]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="chopper_tof_bits"
+option_pv[$num_options]="Control:ChopperTOFBits"
+option_value_type[$num_options]="UINT32_VALUE(number_of_tof_bits)"
+option_default[$num_options]="21"
+option_label[$num_options]="[Number of Chopper TOF Bits]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="verbose"
+option_pv[$num_options]="Control:Verbose"
+option_value_type[$num_options]="UINT32_VALUE(verbose_logging_level)"
+option_default[$num_options]="0"
+option_label[$num_options]="[SMS Verbose Logging Level Value]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
+option_name[$num_options]="always_send_bmon_config"
+option_pv[$num_options]="Control:AlwaysSendBMConfig"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Always Send Beam Monitor Config Packets]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="id"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:Id"
+option_value_type[$num_options]="UINT32_VALUE(Never Use This :-)"
+option_label[$num_options]="[Manually Override Beam Monitor Id in Config]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="format"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:Format"
+option_value_type[$num_options]="BOOL_VALUE(event/histo)"
+option_default[$num_options]="event"
+option_label[$num_options]="[Switch Beam Monitor Output Formatting]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="offset"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:TofOffset"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_default[$num_options]="0"
+option_label[$num_options]="[TOF Offset for Beam Monitor Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="max"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:MaxTof"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_default[$num_options]="4294967295"   # ((uint32_t) -1)
+option_label[$num_options]="[Max TOF for Beam Monitor Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="bin"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:TofBin"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_default[$num_options]="1"
+option_label[$num_options]="[Linear TOF Bin Size for Beam Mon Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="monitor"
+option_name[$num_options]="distance"
+option_pv[$num_options]="BeamMonitor:XXX_INDEX_XXX:Distance"
+option_value_type[$num_options]="FLOAT64_VALUE(meters)"
+option_default[$num_options]="0"
+option_label[$num_options]="[Beam Monitor Distance from Sample]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="name"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:Name"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING16(human-readable description)"
+option_default[$num_options]="NoName"   # Never happens... :-D
+option_label[$num_options]="[Name of Given Detector Bank Set]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="banklist"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:Banklist"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="[UINT32_VALUE, ...](detector bank ids)"
+option_default[$num_options]="[]"
+option_label[$num_options]="[List of Detector Bank Ids in the Set]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="format"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:Format"
+option_value_type[$num_options]="ENUM_VALUE(event/histo/both)"
+option_default[$num_options]="event"
+option_label[$num_options]="[Set Detector Bank Set Output Formatting]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="offset"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:TofOffset"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_default[$num_options]="0"
+option_label[$num_options]="[TOF Offset for Neutron Detector Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="max"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:MaxTof"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_default[$num_options]="4294967295"   # ((uint32_t) -1)
+option_label[$num_options]="[Max TOF for Neutron Detector Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="bin"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:TofBin"
+option_value_type[$num_options]="UINT32_VALUE(microseconds)"
+option_default[$num_options]="1"
+option_label[$num_options]="[Linear TOF Bin Size for Detector Histogram]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="throttle"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:Throttle"
+option_value_type[$num_options]="FLOAT64_VALUE(Hz)"
+option_default[$num_options]="0"
+option_label[$num_options]="[Detector Set Throttled Event Sampling Rate]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="bankset"
+option_name[$num_options]="suffix"
+option_pv[$num_options]="DetectorBankSet:XXX_INDEX_XXX:Suffix"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING16(throttled toplevel name suffix)"
+option_default[$num_options]="throttled"
+option_label[$num_options]="[NeXus File NXentry Suffix for Detector Set]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="restart"
+option_no_config[$num_options]=1
+option_pv[$num_options]="Combus:Restart"
+option_value_type[$num_options]="BOOL_VALUE(Trigger ComBus Restart)"
+option_label[$num_options]="[Trigger ComBus Restart & Reconnect]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="domain"
+option_pv[$num_options]="Combus:Domain"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(ComBus Domain Name.)"
+option_default[$num_options]="SNS.TEST."
+option_default_suffix[$num_options]="\."
+option_label[$num_options]="[ComBus Domain]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="broker_uri"
+option_pv[$num_options]="Combus:BrokerURI"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(ComBus Broker URI tcp://host:port)"
+option_default[$num_options]="localhost"
+option_default_suffix[$num_options]=":61616"
+option_label[$num_options]="[ComBus Broker URI]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="broker_user"
+option_pv[$num_options]="Combus:BrokerUser"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="STRING(ComBus Broker User)"
+option_default[$num_options]="DAS"
+option_label[$num_options]="[ComBus Broker User]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="combus"
+option_name[$num_options]="broker_pass"
+option_pv[$num_options]="Combus:BrokerPass"
+option_value_type[$num_options]="STRING(ComBus Broker Password)"
+option_default[$num_options]="fish"   # Lol...! ;-D
+option_pv_opt[$num_options]="-S"
+option_label[$num_options]="[ComBus Broker Password]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="poolsize"
+option_pv[$num_options]="StorageManager:Poolsize"
+option_pv_opt[$num_options]="-S"
+option_config_supercede[$num_options]="max_blocks_allowed"
+option_value_type[$num_options]="UINT32_VALUE+[G|M]"
+option_label[$num_options]="[Storage Poolsize (Max Blocks Allowed)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="percent"
+option_pv[$num_options]="StorageManager:Percent"
+option_config_supercede[$num_options]="poolsize max_blocks_allowed"
+option_value_type[$num_options]="UINT32_VALUE(percent)"
+option_default[$num_options]="80"
+option_label[$num_options]="[Percent of Storage (Max Blocks Allowed)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="max_blocks_allowed"
+option_pv[$num_options]="StorageManager:MaxBlocksAllowed"
+option_value_type[$num_options]="UINT32_VALUE(blocks)"
+option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
+option_label[$num_options]=\
+"[Max Storage Blocks Allowed (*Uint32* Base Limit!)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="max_blocks_allowed_multiplier"
+option_no_config[$num_options]=1
+option_pv[$num_options]="StorageManager:MaxBlocksAllowedMultiplier"
+option_value_type[$num_options]="UINT32_VALUE(blocks)"
+option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
+option_label[$num_options]=\
+"[Max Storage Blocks Allowed (*Uint32* _Multiplier_ Limit!)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="block_size"
+option_no_config[$num_options]=1
+option_pv[$num_options]="StorageManager:BlockSize"
+option_value_type[$num_options]="UINT32_VALUE(blocksize)"
+option_default[$num_options]="XXX_IGNORE_IF_NOT_SET_XXX"
+option_label[$num_options]="[Storage Block Size (Read-Only!)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="rescan_run_dir"
+option_no_config[$num_options]=1
+option_pv[$num_options]="StorageManager:RescanRunDir"
+option_value_type[$num_options]="STRING(Full Path to Run Directory)"
+option_label[$num_options]="[Rescan Given Run Directory for Processing]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="combus_verbose"
+option_pv[$num_options]="StorageManager:ComBusVerbose"
+option_value_type[$num_options]="BOOL_VALUE(ComBus is Verbose)"
+option_default[$num_options]="true"
+option_label[$num_options]="[ComBus Verbosity (for Run Pause/Resume)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="storage"
+option_name[$num_options]="container_cleanup_timeout"
+option_pv[$num_options]="StorageManager:ContainerCleanupTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_default[$num_options]="1"
+option_label[$num_options]="[Storage Container Cleanup Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="stc"
+option_name[$num_options]="connect_timeout"
+option_pv[$num_options]="STCClient:ConnectTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_default[$num_options]="15"
+option_label[$num_options]="[STC Client Connection Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="stc"
+option_name[$num_options]="connect_retry"
+option_pv[$num_options]="STCClient:ConnectRetryTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_default[$num_options]="15"
+option_label[$num_options]="[STC Client Timeout for Re-Connection Attempt]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="stc"
+option_name[$num_options]="transient_timeout"
+option_pv[$num_options]="STCClient:TransientTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_default[$num_options]="60"
+option_label[$num_options]="[STC Client Transient Error Retry Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="stc"
+option_name[$num_options]="max_connections"
+option_pv[$num_options]="STCClient:MaxConnections"
+option_value_type[$num_options]="UINT32_VALUE(connections)"
+option_default[$num_options]="3"
+option_label[$num_options]="[Max Simultaneous STC Client Connections]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="stc"
+option_name[$num_options]="max_requeue_count"
+option_pv[$num_options]="STCClient:MaxRequeueCount"
+option_value_type[$num_options]="UINT32_VALUE(requeues)"
+option_default[$num_options]="5"
+option_label[$num_options]="[Max STC Client Error Re-Queue Attempts]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="stc"
+option_name[$num_options]="send_paused_data"
+option_pv[$num_options]="STCClient:SendPausedData"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Send STC Client Paused Mode Data (Or Not)]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="stc"
+option_name[$num_options]="uri"
+option_pv[$num_options]="STCClient:ServiceURI"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="IP_ADDR:IP_PORT(service)"
+option_default[$num_options]="localhost"
+option_label[$num_options]="[STC Client Service URI]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="listen_retry"
+option_pv[$num_options]="LiveServer:ListenRetryTimeout"
+option_value_type[$num_options]="FLOAT64_VALUE(seconds)"
+option_default[$num_options]="5"
+option_label[$num_options]="[Live Server Listener Retry Timeout]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="uri"
+option_pv[$num_options]="LiveServer:ListenerURI"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="IP_ADDR(ip_addr or ANY)"
+option_default[$num_options]="ANY"
+option_label[$num_options]="[Live Server Listener Service IP Address]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="service"
+option_pv[$num_options]="LiveServer:ListenerService"
+option_pv_opt[$num_options]="-S"
+option_value_type[$num_options]="IP_PORT(service)"
+option_default[$num_options]="31415"
+option_label[$num_options]="[Live Server Listener Service Port]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="livestream"
+option_name[$num_options]="send_paused_data"
+option_pv[$num_options]="LiveServer:SendPausedData"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="false"
+option_label[$num_options]="[Send Live Client Paused Mode Data (Or Not)]"
+num_options=$(( num_options + 1 ))
+
+#
+# Dump Usage
+#
+
+USAGE()
+{
+	echo "usage:  liveconf \\"
+	echo "            [--beamline=BL14B] [--instance_id=0123] \\"
+	echo "            [--config=./smsd.conf] \\"
+	echo "            [--repo=/home/controls/config] [--alt=\"-mon\"] \\"
+	echo "            [status] [run_status] [sample_status] \\"
+	echo "            [data_status] [sys_status] \\"
+	echo "            [bmon_status] [detset_status] [combus_status] \\"
+	echo "            [live_status] [bandwidth] [confck] \\"
+	echo "            [--option=\"id:name<value>\"] \\"
+	echo "            [--skiplive] [--testonly] \\"
+	echo "            [--terse] [--quiet] [--help|-h]"
+	echo
+
+	echo "where:"
+	echo
+
+	echo "   --beamline=BL14B      = explicitly set Beamline PV Prefix"
+	echo "   --instance_id=0123    = explicitly set SMS Instance Id"
+	echo "   --config=./smsd.conf  = specify custom SMSD Config file"
+	echo "   --repo=.../config...  = specify custom Git Config Repo dir"
+	echo "   --skiplive            = *don't* set live config option"
+	echo "   --testonly            = *don't* actually change anything!"
+	echo "   --terse               = display minimal output details"
+	echo "   --quiet               = display NO ConfCk output unless error"
+	echo "   --help | -h           = display this help/usage information"
+	echo
+
+	echo "Available Commands:"
+	echo
+	echo "   status                = display overall SMS beamline status"
+	echo "   run_status            = display SMS run status"
+	echo "   sample_status         = display SMS sample status"
+	echo "   data_status           = display SMS data source status"
+	echo "   sys_status            = display SMS internal system status"
+	echo "   bmon_status           = display SMS BeamMonitorConfig status"
+	echo "   detset_status         = display SMS DetectorBankSet status"
+	echo "   combus_status         = display SMS ComBus status"
+	echo "   live_status           = display SMS live client status"
+	echo "   bandwidth             = display SMS data bandwidth stats"
+	echo "   confck                = compare SMS live vs. file config"
+	echo
+
+	echo "Available Options:"
+
+	last_option_id_type=""
+	for i in $( seq 0 $(( num_options - 1 )) ) ; do
+		if [[ $last_option_id_type != ${option_id_type[$i]} ]]; then
+			echo
+			echo -n "   [${option_id_type[$i]}"
+			if [ ${is_indexed[${option_id_type[$i]}]} == 1 ]; then
+				echo -n "<N>"
+			fi
+			echo "]"
+		fi
+		last_option_id_type="${option_id_type[$i]}"
+		echo -n "   --option=\"${option_id_type[$i]}"
+		if [ ${is_indexed[${option_id_type[$i]}]} == 1 ]; then
+			echo -n "<N>"
+		fi
+		echo ":${option_name[$i]}<${option_value_type[$i]}>\""
+		echo "      ${option_label[$i]}"
+	done
+
+	echo
+}
+
+# Check for any of possible required command line options (else 'usage')
+if [ $# == 0 ]; then
+	echo
+	USAGE
+	exit -1
+fi
+
+# Function to Collect Intro Output (for Quiet Mode)
+addToIntroOutput()
+{
+	for arg in "$@" ; do
+		introOutput="${introOutput}$arg";
+	done
+}
+introOutput=""
+
+addToIntroOutput "\n"
+
+# Make Sure we found the EPICS utilities... ;-b
+epicsck=`which caget 2>&1`
+if [ $? != 0 ]; then
+	echo -e -n "$introOutput"
+	echo "Error: EPICS Utilities Not Found...! Check EPICS Path..."
+	exit -999
+fi
+
+# Check for settings customization...
+skiplive=0
+testonly=0
+terse=0
+quiet=0
+PRE="[NotSet]"
+SMS_ID="[NotSet]"
+SMS="SMS"
+ALT="" # for Alternate/Secondary SMS Deployments... ;-D
+for arg in "$@" ; do
+	# echo "arg=$arg"
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+	# echo "key=$key"
+    # echo "value=$value"
+	if [[ "#$key#" == '#--beamline#' ]]; then
+		PRE="$value"
+		addToIntroOutput "Setting EPICS PV Prefix to: $PRE\n\n"
+	elif [[ "#$key#" == '#--instance_id#' ]]; then
+		SMS_ID="$value"
+		addToIntroOutput "Setting SMS Instance Id to: $SMS_ID\n\n"
+	elif [[ "#$key#" == '#--config#' ]]; then
+		SMSD_CONFIG="$value"
+		addToIntroOutput "Using SMS Daemon Config File in:\n" \
+			"   $SMSD_CONFIG\n\n"
+	elif [[ "#$key#" == '#--repo#' ]]; then
+		CONFIG_REPO="$value"
+		addToIntroOutput "Using Git Config Repository in:\n" \
+			"   $CONFIG_REPO\n\n"
+	elif [[ "#$key#" == '#--alt#' ]]; then
+		ALT="$value"
+		addToIntroOutput "Setting Alternate SMS Suffix to:\n" \
+			"   $ALT\n\n"
+		SMSD_CONFIG="/SNSlocal/sms${ALT}/conf/smsd.conf"
+		addToIntroOutput "Using SMS Alternate Daemon Config File in:\n" \
+			"   $SMSD_CONFIG\n\n"
+		REPO_CONFIG="./sms${ALT}/conf/smsd.conf"
+		addToIntroOutput "Using SMS Alternate Repo Config File in:\n" \
+			"   $REPO_CONFIG\n\n"
+		# Note: Append $ALT to $CONFIG_REPO Below...!
+	elif [[ "#$key#" == '#--option#' ]]; then
+		command="option"
+		opt_arg="$value"
+		addToIntroOutput "Setting Command to:\n" \
+			"   $command $opt_arg\n\n"
+	elif [[ "#$key#" == '#--skiplive#' ]]; then
+		skiplive=1
+		addToIntroOutput \
+			"*** Skipping Live Config - Update Config File Only!\n\n"
+	elif [[ "#$key#" == '#--testonly#' ]]; then
+		testonly=1
+		addToIntroOutput \
+			"*** TEST RUN ONLY! ***\n\nNothing will change/commit!\n\n"
+	elif [[ "#$key#" == '#--terse#' ]]; then
+		terse=1
+		addToIntroOutput "Setting for Terse Operation.\n\n"
+	elif [[ "#$key#" == '#--quiet#' ]]; then
+		quiet=1
+		addToIntroOutput "Setting for Quiet Operation.\n\n"
+	elif [[ "#$key#" == '#-h#' || "#$key#" == '#--help#' ]]; then
+		echo -e -n "$introOutput"
+		USAGE
+		exit -1
+	else
+		command="$key"
+		addToIntroOutput "Setting Command to:\n   $command\n\n"
+	fi
+done
+
+# Determine if Running on SNS or HFIR facility computer system...
+HOST_PREFIX=""
+IS_HFIR=0
+IS_SNS=0
+
+hfir_hb_ck=`hostname -A | sed 's/ /\n/g' | grep '^hb' \
+	| wc | awk '{print $1}'`
+hfir_cg_ck=`hostname -A | sed 's/ /\n/g' | grep '^cg' \
+	| wc | awk '{print $1}'`
+
+if [[ $hfir_hb_ck != 0 ]]; then
+	addToIntroOutput \
+		"HFIR (HB) Facility Computer System.\n\n"
+	IS_HFIR=1
+	HOST_PREFIX="hb"
+elif [[ $hfir_cg_ck != 0 ]]; then
+	addToIntroOutput \
+		"HFIR (CG) Facility Computer System.\n\n"
+	IS_HFIR=1
+	HOST_PREFIX="cg"
+else
+	addToIntroOutput \
+		"Assuming SNS Facility Computer System.\n\n"
+	IS_SNS=1
+	HOST_PREFIX="bl"
+fi
+
+#
+# Determine the Beamline Host, and thereby
+# the EPICS PV Prefix and Git Config Repo Branch...
+#
+
+not_a_beamline_computer=0
+do_git_config=1
+do_config=1
+
+config_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
+	| head -1`
+config_blnum=`echo "$config_host" | sed 's/-.*//'`
+
+if [[ "$config_host" == "" || "$config_blnum" == "" ]]; then
+	addToIntroOutput \
+		"Warning: This is _Not_ a Beamline SMS Computer!\n\n"
+	not_a_beamline_computer=1
+	config_host=`hostname`
+	config_blnum="bl99"
+	do_git_config=0
+fi
+
+addToIntroOutput "Changing/Checking Configuration on " \
+	"Host ${config_host} [$config_blnum].\n\n"
+
+if [ ${PRE} == "[NotSet]" ]; then
+
+	if [ ! -f $SMSD_CONFIG ]; then
+		echo -e -n "$introOutput"
+		echo -e "Error: Invalid SMSD Config File Does Not Exist!\n"
+		echo -e "   $SMSD_CONFIG\n"
+		exit -90
+	fi
+
+	bid_ck=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+		| wc | awk '{print $1}'`
+	if [[ "#$bid_ck#" != '#1#' ]]; then
+		echo -e -n "$introOutput"
+		echo -e "Error: Invalid Beamline Id in SMSD Config File!\n"
+		ls -l $SMSD_CONFIG
+		echo
+		grep -e "beamline_id" $SMSD_CONFIG | grep -v ';'
+		exit -91
+	fi
+
+	bid_clean=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+		| awk '{print $1$2$3}'`
+
+	bid_key=`echo "$bid_clean" | awk -F '=' '{print $1}'`
+	bid_value=`echo "$bid_clean" | awk -F '=' '{print $2}'`
+
+	if [[ "#$bid_key#" != '#beamline_id#' ]]; then
+		echo -e -n "$introOutput"
+		echo -e "Error Parsing Beamline Id in SMSD Config File!\n"
+		ls -l $SMSD_CONFIG
+		echo -e "\n   $bid_clean\n"
+		exit -92
+	fi
+
+	PRE="$bid_value"
+
+	addToIntroOutput "Setting EPICS PV Prefix from SMSD Config File:\n" \
+		"   $SMSD_CONFIG\n" \
+		"      -> $bid_key = $bid_value\n" \
+		"         => [${PRE}].\n" \
+		"\n"
+
+fi
+
+# Check for "ParADARA" SMS Instance Id in SMSD Config File...
+if [ ${SMS_ID} == "[NotSet]" ]; then
+
+	if [ ! -f $SMSD_CONFIG ]; then
+		echo -e -n "$introOutput"
+		echo -e "Error: Invalid SMSD Config File Does Not Exist!\n"
+		echo -e "   $SMSD_CONFIG\n"
+		exit -93
+	fi
+
+	iid_ck=`grep "instance_id" $SMSD_CONFIG | grep -v ';' \
+		| wc | awk '{print $1}'`
+
+	# If Instance Id is _Not_ Specified, Assume "Primary" SMS...
+	if [[ "#$iid_ck#" == '#0#' ]]; then
+
+		SMS_ID="0"
+
+		addToIntroOutput \
+			"Assuming Primary SMS Instance, No Id in SMSD Config File:\n" \
+			"   $SMSD_CONFIG\n" \
+			"      -> No \"instance_id\" Key.\n" \
+			"         => [${SMS_ID}].\n" \
+			"\n"
+	
+	# Extract SMS Instance Id from SMSD Config File...
+	else
+
+		iid_clean=`grep "instance_id" $SMSD_CONFIG | grep -v ';' \
+			| awk '{print $1$2$3}'`
+
+		iid_key=`echo "$iid_clean" | awk -F '=' '{print $1}'`
+		iid_value=`echo "$iid_clean" | awk -F '=' '{print $2}'`
+
+		if [[ "#$iid_key#" != '#instance_id#' ]]; then
+			echo -e -n "$introOutput"
+			echo -e "Error Parsing SMS Instance Id in SMSD Config File!\n"
+			ls -l $SMSD_CONFIG
+			echo -e "\n   $iid_clean\n"
+			exit -95
+		fi
+
+		SMS_ID="$iid_value"
+
+		addToIntroOutput \
+			"Setting SMS Instance Id from SMSD Config File:\n" \
+			"   $SMSD_CONFIG\n" \
+			"      -> $iid_key = $iid_value\n" \
+			"         => [${SMS_ID}].\n" \
+			"\n"
+
+	fi
+
+fi
+
+# Set the "SMS" Portion of the PV Prefix Based on the SMS Instance Id...
+# Note: SMS Instance Id = 0 for *Primary*, Non-Zero for *Secondary*...
+if [[ ${SMS_ID} != "[NotSet]" && ${SMS_ID} != 0 ]]; then
+	SMS="${SMS}:${SMS_ID}"
+	addToIntroOutput "Setting SMS PV Prefix from Instance Id: ${SMS}\n\n"
+fi
+
+daq_ck=`echo "$config_host" | grep "daq" | wc | awk '{print $1}'`
+now_ck=`echo "$config_host" | grep "now" | wc | awk '{print $1}'`
+if [ "#$daq_ck#" == '#1#' ]; then
+	addToIntroOutput "[DAQ Beamline Host.]\n\n"
+	CONFIG_REPO="${CONFIG_REPO}-daq1${ALT}"
+	config_branch=`echo "$config_host" | sed 's/\..*//'`
+elif [ "#$now_ck#" == '#1#' ]; then
+	addToIntroOutput "[nED-on-Wheels Beamline Host.]\n\n"
+	config_branch=`echo "$config_host" | sed 's/\..*//'`
+	now_num=`echo "$config_branch" | awk -F "-" '{print $2}'`
+	CONFIG_REPO="${CONFIG_REPO}-${now_num}${ALT}"
+else
+	CONFIG_REPO="${CONFIG_REPO}${ALT}"
+	config_branch="$config_blnum"
+fi
+config_branch="${config_branch}${ALT}"
+
+addToIntroOutput "Git Config Repository: [${CONFIG_REPO}].\n\n"
+
+addToIntroOutput "Git Config Repository Branch: [${config_branch}].\n\n"
+
+awkLineBreak=" \
+	{ \
+		printf(\"%s\n   \", \$1); \
+		for (i=2; i<NF; i++) \
+			printf(\"%s \", \$(i)); \
+		printf(\"%s\n\", \$NF); \
+	}"
+
+# Dump Any Non-Zero PV Value
+#    - with optional "prefix" output line(s)...
+#       -> sets/uses Global "GOT_NON_ZERO_VALUE" for Prefix Control...
+Dump_Non_Zero_PV()
+{
+	local _pv="$1"
+	shift
+
+	local _prefix=""
+	if [[ $# > 0 ]]; then
+		_prefix="$1"
+		shift
+	fi
+
+	local _value=`caget $WAIT -a ${_pv} \
+		| sed -e "/ 0[[:space:]]*$/d" -e "s/ /\n   /"`
+
+	if [[ "#${_value}#" != '##' ]]; then
+		if [[ "#${_prefix}#" != '##' && $GOT_NON_ZERO_VALUE == 0 ]]; then
+			echo -e "${_prefix}"
+		fi
+		echo "${_value}"
+		GOT_NON_ZERO_VALUE=1
+	fi
+}
+
+#
+# Get Current Live SMS Daemon Option Setting
+#
+# Uses:
+#    $optId $opt_label
+#    $PRE $SMS $PV $opt_pv_opt
+#
+# Sets:
+#    $live_value
+#
+
+GET_LIVE_SETTING()
+{
+	local _truncPrec=""
+	if [[ "$1" == "--truncatePrecision" ]]; then
+		_truncPrec="-g 16"
+	fi
+	if [[ $terse == 0 ]]; then
+		echo "Getting Current Live SMS Daemon Setting (PV) for:"
+		echo "   ${optId}:${opt_label}"
+		echo "   ${PRE}:${SMS}:${PV}"
+		if [[ "${_truncPrec}" != "" ]]; then
+			echo "   [Truncating Precision]"
+		fi
+		echo
+	fi
+	local _live_current=""
+	local _live_pv="${PRE}:${SMS}:${PV}"
+	local _live_ok=""
+	_live_current=`caget $opt_pv_opt $WAIT $_truncPrec ${_live_pv} 2>&1`
+	_live_ok=$?
+	if [ ${_live_ok} != 0 ]; then
+		echo -e "\n***Error Contacting SMS Daemon/Option PV...!\n"
+	else
+		live_value=`echo ${_live_current} \
+			| awk '{ $1=""; print substr($0,2) }'`
+			# wipe out 1st word (PV connection string),
+			# and intervening space... ;-b
+		if [[ $terse == 0 ]]; then
+			echo "   ${_live_current} ($live_value)"
+		fi
+	fi
+	return ${_live_ok}
+}
+
+#
+# Get Current SMS Daemon Config File Setting
+#
+# Uses:
+#    $SMSD_CONFIG
+#    $opt_id_type $opt_id_num
+#
+# Sets:
+#    $WS
+#    $end_of_section_line_num
+#    $last_comment_line_num $last_comment_line
+#    $last_blank_line_num
+#    $config_line_num $config_value
+#    $opt_id_name
+#    $opt_str
+#    $config_end_of_section $config_use_comment
+#
+
+COMMENTED_VALUE="(commented out)"
+VALUE_NOT_FOUND="(not found)"
+UNSET_VALUE="(unset)"
+
+opt_id_name=""
+id_name_indent=""
+
+GET_CONFIG_SETTING()
+{
+	local _optId="$1"
+	local _opt_label="$2"
+	local _option="$3"
+	local _opt_config_str="$4"
+
+	if [[ $terse == 0 ]]; then
+		echo "Getting Current SMS Daemon Config File Setting for:"
+		echo "   ${_optId}:${_opt_label}"
+		echo "   (in $SMSD_CONFIG)"
+	fi
+
+	WS="^[[:space:]]*$"
+
+	local _config_list=""
+	local _config_size=""
+
+	_config_list=`grep -n -e '^\[' -e "${_option}" -e "$WS" $SMSD_CONFIG`
+	_config_size=`echo "${_config_list}" | wc | awk '{print $1}'`
+
+	end_of_section_line_num=""
+
+	last_comment_line_num=""
+	last_comment_line=""
+
+	last_blank_line_num=""
+
+	config_line_num=""
+	config_value=""
+
+	local _source_cnt=0
+
+	local _monitor_cnt=0
+
+	local _bankset_cnt=0
+
+	opt_id_name=""
+	id_name_indent=""
+
+	local _id_type=""
+	local _id_num=0
+
+	local _found=0
+
+	local _n=0
+
+	for (( _n=1 ; _n <= _config_size ; _n++ )); do
+
+		local _line=""
+		local _line_num=""
+		local _line_rest=""
+		local _line_type=""
+		local _line_id=""
+
+		local _is_comment=0
+		local _is_blank=0
+		local _nbytes=0
+
+		# Note: Just strip off _First_ ':' from Line Number -> '|'...
+		# (This preserves the ':' in URI values: "ip_addr:port".)
+		_line=`echo "${_config_list}" | sed -n "${_n}p" | sed "s/:/|/"`
+		# echo "config line ${_n} = [${_line}]"
+
+		_line_num=`echo "${_line}" | awk -F '|' '{print $1}'`
+		# echo "line_num=${_line_num}"
+
+		# Make Sure We Don't Interpret Any _Subsequent '|'s in Line...!
+		#_line_rest=`echo "${_line}" | awk -F '|' '{print $2}'`
+		_line_rest="${_line:$(expr index "${_line}" "|")}"
+		# echo "line_rest=${_line_rest}"
+
+		# Authoritatively Determine "Line Type" Prior to
+		# Deducing Other Schtuff, like:
+		#    - "${_line_id}" which is only for Section Headings
+		#    - "${_is_comment}" which should only be for _Leading_ ';'s
+		_line_type=`echo "${_line_rest}" | sed "s/^[ \t]//"`
+
+		# Section Heading...
+		if [ "${_line_type:0:1}" == "[" ]; then
+			# echo "SECTION"
+			_line_id=`echo "${_line_rest}" | awk -F '[][]' '{print $2}'`
+			# echo "line_id=${_line_id}"
+			_is_comment=0
+		# Comment...
+		elif [ "${_line_type:0:1}" == ";" ]; then
+			# echo "COMMENT"
+			_line_id=""
+			_is_comment=`echo "${_line_rest}" | grep ';' | wc \
+				| awk '{print $1}'`
+		# Config or Blank Line... (i.e. Everything Else... :-)
+		else
+			# echo "CONFIG or BLANK"
+			_line_id=""
+			_is_comment=0
+		fi
+
+		_nbytes=`echo "${_line_rest}" | awk '{print $1}' | wc \
+			| awk '{print $2}'`
+		if [ ${_nbytes} == 0 ]; then
+			_is_blank=1
+		else
+			_is_blank=0
+		fi
+
+		# Option Line
+		if [ "${_line_id}" == "" ]; then
+
+			# echo "Config Option Line..."
+			# echo "   id_type=${_id_type} id_num=${_id_num}"
+
+			if [ "#${_is_blank}#" == '#1#' ]; then
+				# echo "Blank Line at line ${_line_num} [${_line_rest}]"
+				last_blank_line_num="${_line_num}"
+				continue;
+			fi
+
+			if [[ "${_id_type}" == "$opt_id_type" \
+					&& "${_id_num}" == "$opt_id_num" ]]; then
+
+				if [ "#${_is_comment}#" == '#1#' ]; then
+					# echo "Comment: (line ${_line_num}) [${_line_rest}]"
+					last_comment_line="${_line_rest}"
+					last_comment_line_num="${_line_num}"
+					continue;
+				fi
+
+				# echo "Match!"
+
+				config_current_line="${_line_rest}"
+				# echo "Config File Line = ${config_current_line}."
+
+				config_line_num="${_line_num}"
+				# echo "Config File Line Number = ${config_line_num}."
+
+				config_value=`echo "${_line_rest}" \
+					| awk -F '=' '{print $2}'`
+
+				# Strip Only _Preceding_ White Space from Value...!
+				# (some options could be Character Strings now...! ;-D)
+				config_value=`echo "$config_value" | sed "s/^[ ]*//"`
+
+				# echo -n "Config File Option "
+				# echo "${_optId}:${_opt_label} = ${config_value}."
+
+				_found=$(( _found + 1 ))
+
+			fi
+
+		# SMS or Source Line
+		else
+
+			# echo "id_type=${_id_type} opt_id_type=$opt_id_type"
+			# echo "id_num=${_id_num} opt_id_num=$opt_id_num"
+
+			# Mark End of Previous Section, If It's What We Want...
+			if [[ "${_id_type}" == "$opt_id_type" \
+					&& "${_id_num}" == "$opt_id_num" ]]; then
+				#echo -n "Marking End of Requested Section "
+				#echo "at Line $last_blank_line_num."
+				# Use "Last Blank Line" Number,
+				# as Section may be Preceded by Comment lines...
+				end_of_section_line_num="$last_blank_line_num"
+			fi
+
+			# Set Up for New Section...
+			_id_type=`echo "${_line_id}" | awk '{print $1}'`
+			if [ "${_id_type}" == "source" ]; then
+				local _source_name=`echo "${_line_id}" \
+					| sed "s/^source //"`
+				_source_cnt=$(( _source_cnt + 1 ))
+				_id_num="$_source_cnt"
+				if [[ "${_id_type}" == "$opt_id_type" \
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					opt_id_name="(${_source_name})"
+					id_name_indent="   "
+				fi
+				# echo "Source #${_source_cnt}: ${_source_name} Section."
+			elif [ "${_id_type}" == "monitor" ]; then
+				local _monitor_id=`echo "${_line_id}" \
+					| sed "s/^monitor //"`
+				_monitor_cnt=$(( _monitor_cnt + 1 ))
+				_id_num="$_monitor_cnt"
+				if [[ "${_id_type}" == "$opt_id_type" \
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					opt_id_name="(Monitor${_monitor_id})"
+					id_name_indent="   "
+				fi
+				# echo "Monitor #${_monitor_cnt}: Id ${_monitor_id} Sect"
+				# Special Case: Monitor Id Stored in Section Id...!
+				if [[ "${_option}" == "id"
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					# echo "Special Case: Monitor Id in Section Id!"
+					config_current_line=`echo "${_line_rest}" \
+						| sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g'`
+					# echo "Config File Line = ${config_current_line}."
+					config_line_num="${_line_num}"
+					# echo "Config File Line Number = ${config_line_num}."
+					config_value="${_monitor_id}"
+					# echo -n "Config File Option "
+					# echo "${_optId}:${_opt_label} = ${config_value}."
+					_found=$(( _found + 1 ))
+				fi
+			elif [ "${_id_type}" == "bankset" ]; then
+				local _bankset_name=`echo "${_line_id}" \
+					| sed "s/^bankset //"`
+				_bankset_cnt=$(( _bankset_cnt + 1 ))
+				_id_num="$_bankset_cnt"
+				if [[ "${_id_type}" == "$opt_id_type" \
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					opt_id_name="(BankSet ${_bankset_name})"
+					id_name_indent="   "
+				fi
+				# echo "BankSet #${_bankset_cnt}: Name ${_bankset_name}"
+				# Special Case: BankSet Name Stored in Section Id...!
+				if [[ "${_option}" == "name"
+						&& "${_id_num}" == "$opt_id_num" ]]; then
+					# echo "Special Case: BankSet Name in Section Id!"
+					config_current_line=`echo "${_line_rest}" \
+						| sed -e 's/\[/\\\[/g' -e 's/\]/\\\]/g'`
+					# echo "Config File Line = ${config_current_line}."
+					config_line_num="${_line_num}"
+					# echo "Config File Line Number = ${config_line_num}."
+					config_value="${_bankset_name}"
+					# echo -n "Config File Option "
+					# echo "${_optId}:${_opt_label} = ${config_value}."
+					_found=$(( _found + 1 ))
+				fi
+			elif [ "${_id_type}" == "sms" ]; then
+				_id_num="-1"
+				# echo "SMS Section."
+			elif [ "${_id_type}" == "storage" ]; then
+				_id_num="-1"
+				# echo "Storage Section."
+			elif [ "${_id_type}" == "livestream" ]; then
+				_id_num="-1"
+				# echo "Live Streaming Section."
+			elif [ "${_id_type}" == "stcclient" ]; then
+				# Abbreviate STC Client Id Type...
+				_id_type="stc"
+				_id_num="-1"
+				# echo "STC Client Section."
+			fi
+		fi
+
+	done
+
+	opt_str="${_optId}:${_opt_label}"
+
+	config_end_of_section=0
+	config_use_comment=0
+
+	if [[ ${_found} == 0 ]]; then
+		if [[ $terse == 0 ]]; then echo; fi
+		echo -e -n "WARNING: Active \"${_option}\" Option "
+		echo "Setting Not Found!"
+		if [[ "#$last_comment_line_num#" != '##' ]]; then
+			echo -n "   Using Last Comment: (line $last_comment_line_num) "
+			echo "[$last_comment_line]"
+			config_value="$COMMENTED_VALUE"
+			config_use_comment=1
+		elif [[ "#$end_of_section_line_num#" != '##' ]]; then
+			echo "   End of Section at line $end_of_section_line_num."
+			config_value="$VALUE_NOT_FOUND"
+			config_end_of_section=1
+		elif [[ "${_id_type}" == "$opt_id_type" \
+				&& "${_id_num}" == "$opt_id_num" ]]; then
+			echo "   End of File at Last Section... ;-)"
+			end_of_section_line_num=`wc $SMSD_CONFIG | awk '{print $1}'`
+			echo "   End of Section at line $end_of_section_line_num."
+			config_value="$VALUE_NOT_FOUND"
+			config_end_of_section=1
+		else
+			echo "Cannot Automatically Update Configuration File... ;-Q"
+			echo "   ${opt_str}"
+			if [[ ${opt_id_name} != "" ]]; then
+				echo "      ${opt_id_name}"
+			fi
+			echo "      ${id_name_indent}to ${_opt_config_str}"
+			do_config=0
+			do_git_config=0
+		fi
+	elif [[ ${_found} > 1 ]]; then
+		if [[ $terse == 0 ]]; then echo; fi
+		echo -e -n "WARNING: *Multiple* Active Non-Source "
+		echo "\"${_option}\" Option Settings!"
+		echo "Cannot Automatically Update Configuration File... ;-Q"
+		echo "   ${opt_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}to ${_opt_config_str}"
+		do_config=0
+		do_git_config=0
+	fi
+
+	if [[ "$do_config" == 1 && $terse == 0 ]]; then
+		echo -e "\nCurrent Config File Option at Line ${config_line_num}:"
+		echo "   ${opt_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "   ${_option} = ${config_value}"
+	fi
+}
+
+# Dump All Known SMS EPICS PVs...
+if [[ "$command" == "status" \
+		|| "$command" == "run_status" \
+		|| "$command" == "sample_status" \
+		|| "$command" == "data_status" \
+		|| "$command" == "sys_status" \
+		|| "$command" == "bmon_status" \
+		|| "$command" == "detset_status" \
+		|| "$command" == "combus_status" \
+		|| "$command" == "live_status" \
+		|| "$command" == "bandwidth" ]]; then
+
+	# Dump Intro Output Now, No "Quiet" Mode in Status Commands... ;-D
+	echo -e -n "$introOutput"
+
+	# Check to see if SMS is Up & Running and has Initialized EPICS PVs...
+	# (Give SMS plenty of time to reply, since it's Not multi-threaded.)
+	caget $WAIT ${PRE}:${SMS}:Recording > /dev/null 2>&1
+	if [ $? != 0 ]; then
+		echo -n "Error: $PRE ${SMS} EPICS PVs Not Initialized..."
+		echo " Is 'smsd' running?"
+		exit -2
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "run_status" \
+			|| "$command" == "sys_status" ]]; then
+
+		caget -a -S $WAIT ${PRE}:${SMS}:Version \
+			| sed -e "s/ 2/   2/" -e "s/SMSD/ SMSD/" -e "s/ (/\n   (/" \
+				-e "s/[[:space:]]*$//"
+
+		echo
+
+		caget $WAIT ${PRE}:${SMS}:InstanceId
+
+		caget -a -S $WAIT ${PRE}:${SMS}:AltPrimaryPVPrefix
+
+		echo
+
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "run_status" ]]; then
+
+		caget $WAIT -a ${PRE}:${SMS}:Recording
+
+		caget $WAIT ${PRE}:${SMS}:RunNumber
+
+		caget $WAIT ${PRE}:${SMS}:Summary
+		sr="${PRE}:${SMS}:SummaryReason"
+		caget $WAIT -S $sr | grep $sr | awk "$awkLineBreak"
+
+		echo
+
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:ProposalId
+		pt="${PRE}:${SMS}:RunInfo:ProposalTitle"
+		caget $WAIT -S $pt | grep $pt | awk "$awkLineBreak"
+		rt="${PRE}:${SMS}:RunInfo:RunTitle"
+		caget $WAIT -S $rt | grep $rt | awk "$awkLineBreak"
+
+		echo
+
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "run_status"
+			|| "$command" == "sample_status" ]]; then
+
+		ssiri="${PRE}:${SMS}:RunInfo:SendSampleInRunInfo"
+		sendSampleInRunInfoOut=`caget $WAIT $ssiri`
+		echo "$sendSampleInRunInfoOut"
+
+		sendSampleInRunInfo=`echo "$sendSampleInRunInfoOut" \
+			| grep $ssiri | awk '{print $2}'`
+
+		# Omit Sample Meta-Data for Run Status If Not Actually Using... :-D
+		if [[ "$command" != "run_status"
+				|| "$sendSampleInRunInfo" != "false" ]]; then
+
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Id
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Name
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Nature
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Formula
+			caget $WAIT ${PRE}:${SMS}:RunInfo:Sample:Mass
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:MassString
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:MassUnits
+			caget $WAIT ${PRE}:${SMS}:RunInfo:Sample:Density
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:DensityString
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:DensityUnits
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:ContainerId
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:ContainerName
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Component
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:CanIndicator
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:CanBarcode
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:CanName
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:CanMaterials
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Description
+			caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:Comments
+
+			echo
+
+		fi
+
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "sample_status" ]]; then
+
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:HeightInContainer
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:HeightInContainerString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:HeightInContainerUnits
+
+		echo
+
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDiameter
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDiameterString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDiameterUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorHeight
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorHeightString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorHeightUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorWidth
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorWidthString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorWidthUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDepth
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDepthString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:InteriorDepthUnits
+
+		echo
+
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDiameter
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDiameterString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDiameterUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterHeight
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterHeightString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterHeightUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterWidth
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterWidthString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterWidthUnits
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDepth
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDepthString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:OuterDepthUnits
+
+		echo
+
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:VolumeCubic
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:VolumeCubicString
+		caget $WAIT -S ${PRE}:${SMS}:RunInfo:Sample:VolumeCubicUnits
+
+		echo
+
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "run_status" ]]; then
+
+		ui="${PRE}:${SMS}:RunInfo:UserInfo"
+		caget $WAIT -S $ui | grep $ui | awk "$awkLineBreak"
+
+		echo
+
+		caget $WAIT ${PRE}:${SMS}:Marker:ScanIndex
+		caget $WAIT ${PRE}:${SMS}:Marker:StartScan
+		caget $WAIT ${PRE}:${SMS}:Marker:StopScan
+		caget $WAIT -S ${PRE}:${SMS}:Marker:Comment
+		caget $WAIT ${PRE}:${SMS}:Marker:Annotate
+		caget $WAIT ${PRE}:${SMS}:Marker:RunComment
+		caget $WAIT -S ${PRE}:${SMS}:Marker:ScanComment
+		caget $WAIT -S ${PRE}:${SMS}:Marker:NotesComment
+		caget $WAIT ${PRE}:${SMS}:Marker:NotesCommentAutoReset
+		caget $WAIT -S ${PRE}:${SMS}:Marker:AnnotationComment
+
+		caget $WAIT ${PRE}:${SMS}:RunNotesUpdatesEnabled
+
+		echo
+
+		caget $WAIT ${PRE}:${SMS}:Paused
+
+		echo
+
+		caget $WAIT ${PRE}:${SMS}:RunInfo:SavePixelMap
+
+		echo
+
+		caget $WAIT -S ${PRE}:${SMS}:LogLevel
+
+		echo
+
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "data_status" \
+			|| "$command" == "bandwidth" ]]; then
+
+		ndsvar="${PRE}:${SMS}:Control:NumDataSources"
+
+		caget $WAIT $ndsvar
+
+		if [ $? == 0 ]; then
+
+			echo
+
+			numDataSources=`caget $WAIT $ndsvar | grep $ndsvar \
+				| awk '{print $2}'`
+
+			# Count from 1...!
+			for (( ds=1 ; ds <= numDataSources ; ds++ )); do
+
+				echo "Data Source id=${ds}:"
+
+				dsprefix="${PRE}:${SMS}:DataSource:${ds}"
+
+				caget $WAIT -S ${dsprefix}:Name
+				caget $WAIT -S ${dsprefix}:BaseName
+				caget $WAIT -S ${dsprefix}:DataURI
+				caget $WAIT ${dsprefix}:Enabled
+				caget $WAIT ${dsprefix}:Required
+				caget $WAIT -a ${dsprefix}:Connected
+
+				if [[ "$command" == "status" \
+						|| "$command" == "data_status" ]]; then
+
+					caget $WAIT ${dsprefix}:ConnectTimeout
+					caget $WAIT ${dsprefix}:ConnectRetryTimeout
+					caget $WAIT ${dsprefix}:DataTimeout
+					caget $WAIT ${dsprefix}:DataTimeoutRetry
+					caget $WAIT ${dsprefix}:IgnoreEoP
+					caget $WAIT ${dsprefix}:IgnoreLocalSAWTOOTH
+					caget $WAIT ${dsprefix}:IgnoreAnnotationPkts
+					caget $WAIT ${dsprefix}:MixedDataPackets
+					caget $WAIT ${dsprefix}:CheckSourceSequence
+					caget $WAIT ${dsprefix}:CheckPulseSequence
+					caget $WAIT ${dsprefix}:MaxPulseSeqList
+					caget $WAIT -S ${dsprefix}:MaxReadChunk
+					caget $WAIT ${dsprefix}:RTDLNoDataThresh
+					caget $WAIT ${dsprefix}:SaveInputStream
+
+				fi
+
+				if [[ "$command" == "bandwidth" ]]; then
+
+					# Reset Non-Zero Prefix Global...
+					GOT_NON_ZERO_VALUE=0
+
+					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthSecond "---"
+					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthSecond "---"
+					Dump_Non_Zero_PV ${dsprefix}:MetaBandwidthSecond "---"
+					Dump_Non_Zero_PV ${dsprefix}:ErrBandwidthSecond "---"
+
+					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthMinute "---"
+					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthMinute "---"
+					Dump_Non_Zero_PV ${dsprefix}:MetaBandwidthMinute "---"
+					Dump_Non_Zero_PV ${dsprefix}:ErrBandwidthMinute "---"
+
+					Dump_Non_Zero_PV ${dsprefix}:PulseBandwidthTenMin "---"
+					Dump_Non_Zero_PV ${dsprefix}:EventBandwidthTenMin "---"
+					Dump_Non_Zero_PV ${dsprefix}:MetaBandwidthTenMin "---"
+					Dump_Non_Zero_PV ${dsprefix}:ErrBandwidthTenMin "---"
+
+				fi
+
+				echo "---"
+
+				nhwsvar="${PRE}:${SMS}:DataSource:${ds}:NumHWSources"
+
+				caget $WAIT $nhwsvar
+
+				numHWSources=`caget $WAIT $nhwsvar | grep $nhwsvar \
+					| awk '{print $2}'`
+
+				# Make Sure We Got Something...
+				if [ $numHWSources == "" ]; then
+					echo -e -n "\nWarning: Unable to Obtain"
+					echo " Number of HWSources Instances!"
+					echo "Setting numHWSources to 1 for Default Check."
+					numHWSources=1
+				fi
+
+				# Count from 1...!
+				for (( hws=1 ; hws <= numHWSources ; hws++ )); do
+
+					echo "---"
+
+					echo "HW Source index=${hws}:"
+
+					hwsprefix="${PRE}:${SMS}:DataSource:${ds}:HWSource:${hws}"
+
+					caget $WAIT ${hwsprefix}:HwId
+					caget $WAIT ${hwsprefix}:SmsId
+
+					if [[ "$command" == "bandwidth" ]]; then
+
+						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthSecond
+						Dump_Non_Zero_PV ${hwsprefix}:MetaBandwidthSecond
+						Dump_Non_Zero_PV ${hwsprefix}:ErrBandwidthSecond
+
+						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthMinute
+						Dump_Non_Zero_PV ${hwsprefix}:MetaBandwidthMinute
+						Dump_Non_Zero_PV ${hwsprefix}:ErrBandwidthMinute
+
+						Dump_Non_Zero_PV ${hwsprefix}:EventBandwidthTenMin
+						Dump_Non_Zero_PV ${hwsprefix}:MetaBandwidthTenMin
+						Dump_Non_Zero_PV ${hwsprefix}:ErrBandwidthTenMin
+
+					fi
+
+				done
+
+				echo
+
+			done
+		fi
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "sys_status" ]]; then
+
+		caget $WAIT ${PRE}:${SMS}:Control:NoEoPPulseBufferSize
+		caget $WAIT ${PRE}:${SMS}:Control:MaxPulseBufferSize
+		caget $WAIT ${PRE}:${SMS}:Control:NoRTDLPulses
+		caget $WAIT ${PRE}:${SMS}:Control:DoPulsePchgCorrect
+		caget $WAIT ${PRE}:${SMS}:Control:DoPulseVetoCorrect
+		caget $WAIT ${PRE}:${SMS}:Control:IntermittentDataThreshold
+		caget $WAIT ${PRE}:${SMS}:Control:NeutronEventStateBits
+		caget $WAIT ${PRE}:${SMS}:Control:NeutronEventSortByState
+		caget $WAIT ${PRE}:${SMS}:Control:IgnoreInterleavedGlobalSAWTOOTH
+		caget $WAIT ${PRE}:${SMS}:Control:BeamMonitorTOFBits
+		caget $WAIT ${PRE}:${SMS}:Control:ChopperTOFBits
+		caget $WAIT ${PRE}:${SMS}:Control:AlwaysSendBMConfig
+		caget $WAIT ${PRE}:${SMS}:Control:Verbose
+
+		echo
+
+		caget $WAIT ${PRE}:${SMS}:Control:PopPulseBuffer
+
+		echo
+
+		caget $WAIT -S ${PRE}:${SMS}:StorageManager:Poolsize
+		caget $WAIT ${PRE}:${SMS}:StorageManager:Percent
+		caget $WAIT ${PRE}:${SMS}:StorageManager:MaxBlocksAllowed
+		caget $WAIT ${PRE}:${SMS}:StorageManager:MaxBlocksAllowedMultiplier
+		caget $WAIT ${PRE}:${SMS}:StorageManager:BlockSize
+		caget $WAIT -S ${PRE}:${SMS}:StorageManager:RescanRunDir
+		caget $WAIT ${PRE}:${SMS}:StorageManager:ComBusVerbose
+		caget $WAIT ${PRE}:${SMS}:StorageManager:ContainerCleanupTimeout
+
+		echo
+
+		caget $WAIT ${PRE}:${SMS}:STCClient:ConnectTimeout
+		caget $WAIT ${PRE}:${SMS}:STCClient:ConnectRetryTimeout
+		caget $WAIT ${PRE}:${SMS}:STCClient:TransientTimeout
+		caget $WAIT ${PRE}:${SMS}:STCClient:MaxConnections
+		caget $WAIT ${PRE}:${SMS}:STCClient:MaxRequeueCount
+		caget $WAIT ${PRE}:${SMS}:STCClient:SendPausedData
+		caget $WAIT -S ${PRE}:${SMS}:STCClient:ServiceURI
+
+		echo
+
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "bmon_status" ]]; then
+
+		nbmvar="${PRE}:${SMS}:Control:NumBeamMonitors"
+		caget $WAIT $nbmvar
+		if [ $? == 0 ]; then
+			echo
+			numBeamMonitors=`caget $WAIT $nbmvar | grep $nbmvar \
+				| awk '{print $2}'`
+			# Count from 1...!
+			for (( bm=1 ; bm <= numBeamMonitors ; bm++ )); do
+				echo "Beam Monitor index=${bm}:"
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:Id
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:Format
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:TofOffset
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:MaxTof
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:TofBin
+				caget $WAIT ${PRE}:${SMS}:BeamMonitor:${bm}:Distance
+				echo
+			done
+		fi
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "detset_status" ]]; then
+
+		ndbsvar="${PRE}:${SMS}:Control:NumDetBankSets"
+		caget $WAIT $ndbsvar
+		if [ $? == 0 ]; then
+			echo
+			numDetBankSets=`caget $WAIT $ndbsvar | grep $ndbsvar \
+				| awk '{print $2}'`
+			# Count from 1...!
+			for (( dbs=1 ; dbs <= numDetBankSets ; dbs++ )); do
+				echo "Detector Bank Set index=${dbs}:"
+				caget $WAIT -S ${PRE}:${SMS}:DetectorBankSet:${dbs}:Name
+				bl="${PRE}:${SMS}:DetectorBankSet:${dbs}:Banklist"
+				caget $WAIT -S $bl | grep $bl | awk "$awkLineBreak"
+				caget $WAIT ${PRE}:${SMS}:DetectorBankSet:${dbs}:Format
+				caget $WAIT ${PRE}:${SMS}:DetectorBankSet:${dbs}:TofOffset
+				caget $WAIT ${PRE}:${SMS}:DetectorBankSet:${dbs}:MaxTof
+				caget $WAIT ${PRE}:${SMS}:DetectorBankSet:${dbs}:TofBin
+				caget $WAIT ${PRE}:${SMS}:DetectorBankSet:${dbs}:Throttle
+				caget $WAIT -S ${PRE}:${SMS}:DetectorBankSet:${dbs}:Suffix
+				echo
+			done
+		fi
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "combus_status" ]]; then
+
+		caget $WAIT -S ${PRE}:${SMS}:Combus:Restart
+
+		echo
+
+		caget $WAIT -S ${PRE}:${SMS}:Combus:Domain
+		caget $WAIT -S ${PRE}:${SMS}:Combus:BrokerURI
+		caget $WAIT -S ${PRE}:${SMS}:Combus:BrokerUser
+		caget $WAIT -S ${PRE}:${SMS}:Combus:BrokerPass
+
+		echo
+
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "live_status" ]]; then
+
+		caget $WAIT -a ${PRE}:${SMS}:LiveServer:ListenStatus
+		caget $WAIT ${PRE}:${SMS}:LiveServer:ListenRetryTimeout
+		caget $WAIT ${PRE}:${SMS}:LiveServer:SendPausedData
+		caget $WAIT -S ${PRE}:${SMS}:LiveServer:ListenerURI
+		caget $WAIT -S ${PRE}:${SMS}:LiveServer:ListenerService
+
+		echo
+
+		nlcvar="${PRE}:${SMS}:Control:NumLiveClients"
+		caget $WAIT -S $nlcvar
+		if [ $? == 0 ]; then
+			echo
+			numLiveClients=`caget $WAIT $nlcvar | grep $nlcvar \
+				| awk '{print $2}'`
+			# Count from 1...!
+			for (( lc=1 ; lc <= numLiveClients ; lc++ )); do
+				echo "Live Client id=${lc}:"
+				caget $WAIT -S ${PRE}:${SMS}:LiveClient:${lc}:Name
+				caget $WAIT \
+					${PRE}:${SMS}:LiveClient:${lc}:RequestedStartTime
+				cfp="${PRE}:${SMS}:LiveClient:${lc}:CurrentFilePath"
+				caget $WAIT -S $cfp | grep $cfp | awk "$awkLineBreak"
+				caget $WAIT -a ${PRE}:${SMS}:LiveClient:${lc}:Status
+				echo
+			done
+		fi
+	fi
+
+# Set No End-of-Pulse Internal Pulse Buffer Size...
+elif [[ "$command" == "option" ]]; then
+
+	# Dump Intro Output Now, No "Quiet" Mode in Option Commands... ;-D
+	echo -e -n "$introOutput"
+
+	#
+	# Parse Option Arg String into Pieces... ;-D
+	#
+
+	opt_id_str=`echo "$opt_arg" | awk -F ':' '{print $1}'`
+	opt_id_type=`echo "$opt_id_str" | awk -F '[0-9]' '{print $1}'`
+	# echo "opt_id_str=$opt_id_str opt_id_type=$opt_id_type"
+
+	opt_rest=`echo "$opt_arg" | awk -F ':' '{print $2}'`
+	option=`echo "$opt_rest" | awk -F '[<>]' '{print $1}'`
+	opt_value=`echo "$opt_arg" | awk -F '[<>]' '{print $2}'`
+	# echo "option=$option opt_value=$opt_value"
+
+	# echo "is_indexed=${is_indexed[$opt_id_type]}"
+	if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+		opt_id_num=`echo "$opt_id_str" | sed "s/$opt_id_type//"`
+		optId="${idName[$opt_id_type]}${opt_id_num}"
+	else
+		opt_id_num="-1"
+		optId="${idName[$opt_id_type]}"
+	fi
+	# echo "opt_id_num=$opt_id_num optId=$optId"
+
+#
+# Identify Option, Set Option-Specific Parameters and Information...
+#
+# Uses:
+#    $opt_id_type $option $opt_value
+#    $option_id_type[] $option_name[] $option_pv[]
+#    $opt_id_num $is_indexed[]
+#
+# Sets:
+#    $opt_id_type
+#    $opt_pv_opt $opt_config_supercede $opt_value_type $opt_label
+#    $opt_config_value $opt_config_str
+#    $option
+#
+
+GET_OPTION_INFO()
+{
+	for i in $( seq 0 $(( num_options - 1 )) ) ; do
+
+		if [[ "$opt_id_type" == "${option_id_type[$i]}"
+				&& "$option" == "${option_name[$i]}" ]]; then
+
+			# Handle Indexed PV's, Substitute Option Id Number...
+			if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+				PV=`echo ${option_pv[$i]} \
+					| sed "s/XXX_INDEX_XXX/${opt_id_num}/"`
+			else
+				PV="${option_pv[$i]}"
+			fi
+
+			# Map "Control" Options to "SMS" for rest of handling...
+			# (There's no separate "SMSControl" config section.)
+			if [ "$opt_id_type" == "ctrl" ]; then
+				opt_id_type="sms"
+			fi
+
+			opt_pv_opt="${option_pv_opt[$i]}"
+
+			opt_config_supercede="${option_config_supercede[$i]}"
+
+			opt_value_type="${option_value_type[$i]}"
+
+			opt_label="${option_label[$i]}"
+
+			if [[ ${option_no_config[$i]} == 1 ]]; then
+				do_config=0
+				do_git_config=0
+			fi
+
+			break;
+		fi
+
+	done
+
+	#
+	# Special Case:
+	#    - "enabled" PV really refers to "disabled" in the Config File...
+	#    (reverse bogus option value... ;-b)
+	#
+
+	opt_config_value="$opt_value"
+	opt_config_str="$opt_config_value"
+	if [ "$option" == "enabled" ]; then
+		option="disabled"
+		if [[ "#$opt_config_value#" == '#Enabled#'
+				|| "#$opt_config_value#" == "#TRUE#"
+				|| "#$opt_config_value#" == "#True#"
+				|| "#$opt_config_value#" == "#true#" ]]; then
+			echo -e "*** ENABLING Data Source $opt_id_num.\n"
+			opt_config_value="XXX_DELETE_XXX"
+			opt_config_str="[Enabled: DELETE $option Option]"
+		elif [[ "#$opt_config_value#" == '#Disabled#'
+				|| "#$opt_config_value#" == "#FALSE#"
+				|| "#$opt_config_value#" == "#False#"
+				|| "#$opt_config_value#" == "#false#" ]]; then
+			echo -e "*** DISABLING Data Source $opt_id_num.\n"
+			opt_config_value="true"
+			opt_config_str="[Disabled: $option = $opt_config_value]"
+		else
+			echo -e -n "\nError: Unknown Enabled/Disabled "
+			echo -e "Option Value [${option}]...! Bailing...\n"
+			exit -1
+		fi
+	fi
+}
+
+	#
+	# Identify Option, Set Option-Specific Parameters and Information...
+	#
+
+	PV=""
+
+	GET_OPTION_INFO
+
+	# echo "PV=$PV opt_label=$opt_label"
+
+	if [ "#$PV#" == '##' ]; then
+		echo -e "\nError: Unknown Option [$option]...! Bailing...\n"
+		exit -1
+	fi
+
+	echo "Setting Option:"
+	echo "   ${optId}:${opt_label}"
+	echo -e "      to ${opt_value}.\n"
+
+	#
+	# Prompt for Live/Config Option Change Log Description Text [Required!]
+	#
+
+	echo "Please Enter Option Change Log Text for:"
+	echo -e "   ${optId}:${opt_label}\n"
+	echo -e "(Enter a Blank Line to Finish.)\n"
+
+	LOG="$TMP_DIR/LiveConfig-${opt_id_str}-${option}-$$.txt"
+
+	log_desc=""
+	empty=1
+	done=0
+
+	while [ $done != 1 ]; do
+
+		echo -n " > "
+		read text_line
+
+		if [ "$text_line" == "" ]; then
+			if [ $empty != 1 ]; then
+				done=1
+			else
+				echo \
+				"(Option Change Log Must Be Non-Empty! Please Enter Log.)"
+			fi
+		else
+			if [ $empty != 1 ]; then
+				log_desc="$log_desc\n$text_line"
+			else
+				log_desc="$text_line"
+			fi
+			empty=0
+		fi
+
+	done
+
+	echo -e "\nOption Change Log Description Text:\n" | tee -a $LOG
+
+	echo -e "$log_desc\n" | tee -a $LOG
+
+	any_change=0
+
+	#
+	# Get Current Live SMS Daemon Option Setting
+	#
+
+	echo
+
+	do_live=1
+
+	if [ $skiplive == 0 ]; then
+		GET_LIVE_SETTING
+		if [ $? != 0 ]; then
+			echo "Proceed with Live Config of:"
+			echo -n "   ${optId}:${opt_label} (yes/No)? "
+			read ckcont
+			ckcont=`echo "$ckcont" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckcont" == "" || "$ckcont" == "n" \
+					|| "$ckcont" == "no" ]]; then
+				echo -e "\nExiting LiveConf at User's Request.\n"
+				/bin/ls -l $LOG
+				/bin/cat $LOG
+				exit -3
+			fi
+			echo
+			# Continue, But Skip Live Option Setting...
+			do_live=0
+		fi
+
+	else
+		echo "Skipping Live Configuration as Requested for:"
+		echo -e "   ${optId}:${opt_label}\n"
+		do_live=0
+	fi
+
+	#
+	# Get Current SMS Daemon Config File Setting
+	#
+
+	echo
+
+	if [ "$do_config" == 1 ]; then
+		GET_CONFIG_SETTING "$optId" "$opt_label" \
+			"$option" "$opt_config_str"
+	fi
+
+	#
+	# Update Live SMS Daemon Option Setting
+	#
+
+	echo
+
+	if [ $do_live != 1 ]; then
+		echo "Skipping Live SMS Daemon Option Setting, At User's Request."
+	elif [ "$opt_value" == "$live_value" ]; then
+		echo "Live SMS Daemon _Already Has_ Option Set! :-)"
+		echo "   ${optId}:${opt_label}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}= ${opt_value}"
+		echo -e "\nDone."
+	else
+
+		echo "Proceed to Set Live Option:"
+		echo "   ${opt_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo -n "      ${id_name_indent}to ${opt_value} (yes/No)? "
+		read ckset
+		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckset" == "" \
+				|| "$ckset" == "n" || "$ckset" == "no" ]]; then
+			echo -e "\nExiting LiveConf at User's Request.\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -3
+		fi
+		echo
+
+		echo "Setting Live SMS Daemon Option:"
+		echo "   ${opt_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}to ${opt_value}."
+		if [ $testonly == 1 ]; then
+			echo -n "[TESTONLY] caput $opt_pv_opt"
+			echo " ${PRE}:${SMS}:${PV} $opt_value"
+		else
+			caput $opt_pv_opt ${PRE}:${SMS}:${PV} "$opt_value"
+		fi
+		if [ $? != 0 ]; then
+			echo "Error Setting Live SMS Daemon Option:"
+			echo "   ${optId}:${opt_label}"
+			if [[ ${opt_id_name} != "" ]]; then
+				echo "      ${opt_id_name}"
+			fi
+			echo "      ${id_name_indent}to ${opt_value}...!"
+			echo "Bailing..."
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -99
+		fi
+
+		any_change=$(( any_change + 1 ))
+
+	fi
+
+#
+# Sanitize Original Config File Value String (for Sed)
+#
+
+SANITIZE_ORIGINAL_CONFIG_VALUE()
+{
+	local _orig_config_value="$1"
+
+	echo "${_orig_config_value}" | sed -e 's/[]\/$*.^|[]/\\&/g'
+}
+
+#
+# Sanitize New Config File Value String (for Sed)
+#
+
+SANITIZE_NEW_CONFIG_VALUE()
+{
+	local _new_config_value="$1"
+
+	echo "${_new_config_value}" | sed -e 's/[\/&]/\\&/g'
+}
+
+#
+# Update Current SMS Daemon Config File Setting
+#
+# Uses:
+#    $option $opt_config_value
+#    $optId $opt_label $opt_id_name
+#    $config_use_comment $last_comment_line_num
+#    $config_end_of_section $end_of_section_line_num
+#    $config_current_line $config_line_num $config_value
+#
+# Sets:
+#    $changed
+#
+
+UPDATE_CONFIG_FILE()
+{
+	local _src_config="$1"
+	local _dst_config="$2"
+
+	local _no_change=0
+
+	# Append New Config Option Reference After Last Comment...
+	if [ $config_use_comment == 1 ]; then
+
+		if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
+			echo -e "\n[DELETE $option Option]: Ignore, Commented Only"
+			_no_change=1
+		else
+			# Sanitize Any Special Characters in New Config Value
+			local _config_value=$(SANITIZE_NEW_CONFIG_VALUE \
+				"$opt_config_value")
+			# Use preceding '\' and Literal Tab to insert at
+			# Start of Line via Sed... ;-D
+			sed ${last_comment_line_num}a"\	$option = ${_config_value}" \
+				${_src_config} > ${_dst_config}
+			changed=$(( changed + 1 ))
+		fi
+
+	# Append New Config Option Reference at End of Section...
+	elif [ $config_end_of_section == 1 ]; then
+
+		if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
+			echo -e "\n[DELETE $option Option]: Ignore, Not in Section"
+			_no_change=1
+		else
+			# Sanitize Any Special Characters in New Config Value
+			local _config_value=$(SANITIZE_NEW_CONFIG_VALUE \
+				"$opt_config_value")
+
+			# Construct New Comment and Option Setting...
+			# (Use preceding '\' and Literal Tab to insert at
+			# Start of Line via Sed... ;-D)
+			local _new_opt=""
+			_new_opt="\	; Option Auto-Added by LiveConf!\n"
+			_new_opt="${_new_opt}	; ${optId}:${opt_label}\n"
+			if [[ ${opt_id_name} != "" ]]; then
+				_new_opt="${_new_opt}	;    ${opt_id_name}\n"
+			fi
+			_new_opt="${_new_opt}	;\n"
+			_new_opt="${_new_opt}	; $option = ${_config_value}\n"
+			_new_opt="${_new_opt}	$option = ${_config_value}\n"
+
+			sed ${end_of_section_line_num}a"${_new_opt}" \
+				${_src_config} > ${_dst_config}
+			changed=$(( changed + 1 ))
+		fi
+
+	# Straight Substitution...
+	else
+
+		if [ "$opt_config_value" == "XXX_DELETE_XXX" ]; then
+
+			echo -e "\n[DELETING $option Option]."
+
+			sed "${config_line_num}d" ${_src_config} > ${_dst_config}
+			changed=$(( changed + 1 ))
+
+		else
+
+			# Sanitize Any Special Characters in Original Config Value
+			local _old_config_value=$(SANITIZE_ORIGINAL_CONFIG_VALUE \
+				"$config_value")
+
+			# Sanitize Any Special Characters in New Config Value
+			local _new_config_value=$(SANITIZE_NEW_CONFIG_VALUE \
+				"$opt_config_value")
+
+			# Construct New Config File Line...
+			local _new_config_line=`echo "$config_current_line" \
+				| sed "s/${_old_config_value}/${_new_config_value}/"`
+
+			# Sanitize Any Special Characters in Original Config Line
+			local _old_config_line=$(SANITIZE_ORIGINAL_CONFIG_VALUE \
+				"$config_current_line")
+
+			# Sanitize Any Special Characters in New Config Line
+			_new_config_line=$(SANITIZE_NEW_CONFIG_VALUE \
+				"${_new_config_line}")
+
+			# Replace the Original Config Line with New one...
+			sed \
+		"${config_line_num}s/^${_old_config_line}/${_new_config_line}/" \
+				${_src_config} > ${_dst_config}
+			changed=$(( changed + 1 ))
+
+		fi
+
+	fi
+
+	# Force temporary output file creation, even if no changes...
+	if [[ ${_no_change} == 1 ]]; then
+		cp ${_src_config} ${_dst_config}
+		if [ $? != 0 ]; then
+			echo -e \
+			"\nError Copying Unchanged Config File into Temp Config!\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -111
+		fi
+	fi
+}
+
+	#
+	# Update Current SMS Daemon Config File Setting
+	#
+
+	echo
+
+	if [ $do_config != 1 ]; then
+		echo "Skipping Config File Option Set."
+	elif [ "$opt_config_value" == "$config_value" ]; then
+		echo "SMS Daemon Config _Already Has_ Option Set! :-)"
+		echo "   ${optId}:${opt_label}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}= ${opt_config_value}"
+		echo -e "\nDone."
+	else
+
+		echo "Proceed to Set Config File Option:"
+		echo "   ${opt_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo -n "      ${id_name_indent}to ${opt_config_str} (yes/No)? "
+		read ckset
+		ckset=`echo "$ckset" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckset" == "" \
+				|| "$ckset" == "n" || "$ckset" == "no" ]]; then
+			echo -e "\nExiting LiveConf at User's Request.\n"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -3
+		fi
+		echo
+
+		echo "Setting SMS Daemon Config File Option:"
+		echo "   ${opt_str}"
+		if [[ ${opt_id_name} != "" ]]; then
+			echo "      ${opt_id_name}"
+		fi
+		echo "      ${id_name_indent}to ${opt_config_str}."
+
+		tmpconfig="$TMP_DIR/smsd.conf-liveconf.$$"
+
+		changed=0
+
+		UPDATE_CONFIG_FILE $SMSD_CONFIG $tmpconfig
+
+		# Construct Preliminary Config Repo Commit Log...
+		# (with _Original_ option name/value, before we muck with them...!)
+		commit_str="Set SMS Live/Config Option:\n"
+		commit_str="$commit_str   ${opt_str}\n"
+		if [[ ${opt_id_name} != "" ]]; then
+			commit_str="$commit_str      ${opt_id_name}\n"
+		fi
+		commit_str="$commit_str      ${id_name_indent}to"
+		commit_str="$commit_str ${opt_config_str}\n"
+		commit_str="$commit_str   (Live PV set to ${opt_value})\n\n"
+
+		# Handle Any Higher Precedence Config File Options...!
+
+		for sup_opt in $opt_config_supercede ; do
+
+			echo
+			echo "*** Deactivating Higher Precedence Config File Option!"
+			echo -e "\n   $sup_opt\n"
+
+			# Get Superceding Option Settings
+
+			option="$sup_opt"
+			opt_value="XXX_DELETE_XXX"
+
+			GET_OPTION_INFO
+
+			# Get Superceding Option Details from Config File...
+
+			GET_CONFIG_SETTING \
+				"$optId" "$opt_label" "$option" "$opt_config_str"
+
+			# Deactivate Option in Config File...
+
+			newtmpconfig="$TMP_DIR/smsd.conf-liveconf.$option.$$"
+
+			UPDATE_CONFIG_FILE $tmpconfig $newtmpconfig
+
+			# Append Superceded Option Change to Config Repo Commit Log...
+			temp="Also Disabled Superceding Config File Option"
+			commit_str="${commit_str}${temp}:\n"
+			commit_str="$commit_str   ${opt_str}\n"
+			if [[ ${opt_id_name} != "" ]]; then
+				commit_str="$commit_str      ${opt_id_name}\n"
+			fi
+			commit_str="$commit_str      ${id_name_indent}set to"
+			commit_str="$commit_str ${opt_config_str}\n\n"
+
+			# Switch to New Temp Config...
+
+			/bin/rm $tmpconfig
+
+			tmpconfig="$newtmpconfig"
+
+		done
+
+		# Actually Replace Current Config with Any Modified Config File
+
+		newconfig="$tmpconfig"
+
+		if [[ $changed > 0 ]]; then
+
+			echo -e "\nModified Config File Differences:"
+			diff -c $SMSD_CONFIG $newconfig
+			echo
+
+			echo -n "Replace Current Config File (yes/No)? "
+			read ckrepl
+			ckrepl=`echo "$ckrepl" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckrepl" == "" || "$ckrepl" == "n" \
+					|| "$ckrepl" == "no" ]]; then
+				echo -e \
+					"\nSkipping Config File Update at User's Request!"
+				do_git_config=0
+			else
+
+				if [ $testonly == 1 ]; then
+					echo -n "[TESTONLY] "
+					echo "sudo -u $CONFIG_USER cp $newconfig $SMSD_CONFIG"
+				else
+					sudo -u $CONFIG_USER cp $newconfig $SMSD_CONFIG
+				fi
+				if [ $? != 0 ]; then
+					echo -e \
+						"\nError Copying New Config File to Production:\n"
+					/bin/ls -l $newconfig
+					echo
+					/bin/ls -l $SMSD_CONFIG
+					echo
+					echo -e "$commit_str"
+					echo
+					/bin/ls -l $LOG
+					/bin/cat $LOG
+					exit -5
+				fi
+
+				any_change=$(( any_change + 1 ))
+
+			fi
+
+		else
+			echo -e "\nNo Changes Required to Config File."
+		fi
+
+		# Temporary (Possibly-Modified) Config File Now _Always Created.
+		/bin/rm $tmpconfig
+
+	fi
+
+OPEN_CONFIG_REPO()
+{
+	echo "Committing Change to Git Config Repository in:"
+	echo -e "   $CONFIG_REPO\n"
+
+	# Go to the Git Config Repo Directory... (if it exists ;-)
+	cd $CONFIG_REPO
+	if [ $? != 0 ]; then
+		echo -e "\nError: Git Config Repository Path Invalid!\n"
+		echo -e "$commit_str"
+		/bin/ls -l $LOG
+		/bin/cat $LOG
+		exit -4
+	fi
+
+	# Make sure we're in the "right" repo...? ;-)
+	config_repo=`git config --get remote.origin.url`
+	repo_ck=`echo "$config_repo" | grep 'config$' \
+		| wc | awk '{print $1}'`
+	if [ "$repo_ck" != 1 ]; then
+		echo -e "\nError: This is _Not_ the Git Config Repository!\n"
+		echo -e "$commit_str"
+		/bin/ls -l $LOG
+		/bin/cat $LOG
+		exit -5
+	fi
+
+	# Check Out Beamline Git Config Branch...
+	echo "Checking Out Beamline Git Config Branch: ${config_branch}."
+	git checkout $config_branch
+	if [ $? != 0 ]; then
+		echo -e "\nError Checking Out Git Config Branch $config_branch!\n"
+		echo -e "$commit_str"
+		/bin/ls -l $LOG
+		/bin/cat $LOG
+		exit -7
+	fi
+
+	# "Freshen Up" the Local Config Repo Copy... ;-)
+	git pull
+	git diff
+	git status
+
+	echo
+}
+
+	#
+	# Commit Config File Change to Git Repository
+	#
+
+	echo
+
+	if [ $do_git_config != 1 ]; then
+		echo "Skipping Git Config Repository Update."
+	elif [ $any_change == 0 ]; then
+		echo "No Live/Config Options Changed; Nothing to Commit/Log."
+	else
+
+		OPEN_CONFIG_REPO
+
+		# Prompt for Actually Updating the Git Config Repo...
+		echo -n "Proceed to Update Git Config Repository (yes/No)? "
+		read ckupdate
+		ckupdate=`echo "$ckupdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckupdate" == "" || "$ckupdate" == "n" \
+				|| "$ckupdate" == "no" ]]; then
+			echo -e \
+			"\nSkipping Git Config Repository Update at User's Request!\n"
+			echo -e "$commit_str"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -3
+		fi
+		echo
+
+		# Update the SMS Daemon Config File in the Git Config Repo...
+		if [ $testonly == 1 ]; then
+			echo "[TESTONLY] cp -i $SMSD_CONFIG $REPO_CONFIG"
+		else
+			cp -i $SMSD_CONFIG $REPO_CONFIG
+		fi
+		if [ $? != 0 ]; then
+			echo -e \
+			"\nError Copying Latest Config File into Git Config Repo!\n"
+			echo -e "$commit_str"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -8
+		fi
+
+		# Show what changed...
+		echo -e "\nGit Repo Config File Differences:"
+		git diff
+		echo
+
+		# Prompt for Committing the Config File Change...
+		echo -n "Proceed with Git Config Commit (yes/No)? "
+		read ckcommit
+		ckcommit=`echo "$ckcommit" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckcommit" == "" || "$ckcommit" == "n" \
+				|| "$ckcommit" == "no" ]]; then
+			echo -e "\nSkipping Config File Commit at User's Request!\n"
+			echo -e "$commit_str"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -3
+		fi
+		echo
+
+		# Finally Append Required User Log Description...
+		commit_str="$commit_str$log_desc\n"
+
+		# Commit the Config File Change...
+		if [ $testonly == 1 ]; then echo -n "[TESTONLY] "; fi
+		echo -e "$commit_str"
+		echo "git commit -F - ."
+
+		if [ $testonly != 1 ]; then
+			echo -e "$commit_str" | git commit -F - .
+		fi
+		commit_ok=$?
+
+		if [ $commit_ok != 0 ]; then
+			echo -e "\nError Committing Config Update! ($commit_ok)\n"
+		fi
+
+		# Now Push All the Config Commits to Origin
+
+		echo -e "\nPushing Config Commits to Origin:"
+		echo "git push"
+		git push
+		push_ok=$?
+
+		if [ $push_ok != 0 ]; then
+			echo -e "\nError Pushing Config Update to Origin! ($push_ok)\n"
+		fi
+
+	fi
+
+	#
+	# At Least Log the System Change Somewhere... ;-D
+	#
+
+	if [[ $do_git_config == 0 && $any_change != 0 ]]; then
+
+		OPEN_CONFIG_REPO
+
+		# Prompt for Actually Updating the Git Config Repo...
+		echo -n "Log Changes to Git Config Repository (yes/No)? "
+		read cklog
+		cklog=`echo "$cklog" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$cklog" == "" || "$cklog" == "n" \
+				|| "$cklog" == "no" ]]; then
+			echo -e \
+			"\nSkipping Git Config Repository Logging at User's Request!\n"
+			echo -e "$commit_str"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -3
+		fi
+
+		# Create the Config Logging file, if it doesn't exist...
+
+		CONFIG_LINE="------------------------------------------------"
+
+		config_log="./sms/config_log.txt"
+
+		if [[ ! -e "$config_log" ]]; then
+
+			echo -e -n "\nCreating Config Logging File "
+			echo "for branch $config_branch."
+			echo "\n   $config_log\n"
+
+			echo "\nADARA SMS Configuration Log ($config_branch)" \
+				> "$config_log"
+
+			create_ok=$?
+
+			if [[ $create_ok != 0 ]]; then
+				echo -e \
+					"\nError Creating Config Logging File! ($create_ok)\n"
+				echo "Bailing Out..."
+				exit -9
+			fi
+
+			echo -e "$CONFIG_LINE\n" >> "$config_log"
+
+			echo "git add $config_log"
+			git add "$config_log"
+
+			add_ok=$?
+
+			if [[ $add_ok != 0 ]]; then
+				echo -e \
+				  "\nError Adding Config Logging File to Git! ($add_ok)\n"
+				echo "Bailing Out..."
+				exit -10
+			fi
+
+			echo "git commit -m 'Initial Config Log Creation' $config_log"
+			git commit -m 'Initial Config Log Creation' "$config_log"
+
+			commit_ok=$?
+
+			if [[ $commit_ok != 0 ]]; then
+				echo -e \
+				  "\nError Committing Config Logging File! ($commit_ok)\n"
+				echo "Bailing Out..."
+				exit -11
+			fi
+
+		fi
+
+		# Append to the SMS Config Change to Log File in Git Config Repo...
+
+		if [ -z $commit_str ]; then
+			commit_str="Set SMS Live/Config Option:\n"
+			commit_str="$commit_str   Live PV ${opt_str}\n"
+			if [[ ${opt_id_name} != "" ]]; then
+				commit_str="$commit_str      ${opt_id_name}\n"
+			fi
+			commit_str="$commit_str      ${id_name_indent}set to"
+			commit_str="$commit_str ${opt_value})\n\n"
+		fi
+
+		# Finally Append Required User Log Description...
+		commit_str="$commit_str$log_desc\n"
+
+		if [ $testonly == 1 ]; then
+			echo -n "[TESTONLY]" ; date 
+			echo -n "[TESTONLY]" ; echo -e \
+				"Config Change on Host ${config_host} [$config_blnum]\n"
+			echo -n "[TESTONLY]" ; echo -e "$commit_str"
+		else
+			date >> "$config_log"
+			echo -e \
+				"Config Change on Host ${config_host} [$config_blnum]\n" \
+				>> "$config_log"
+			echo -e "$commit_str" >> "$config_log"
+			echo -e "$CONFIG_LINE\n" >> "$config_log"
+		fi
+
+		if [ $? != 0 ]; then
+			echo -e \
+				"\nError Recording Config Change to Git Config Repo!\n"
+			echo -e "$commit_str"
+			/bin/ls -l $LOG
+			/bin/cat $LOG
+			exit -12
+		fi
+
+		# Commit the Config Log Addition...
+		if [ $testonly == 1 ]; then echo -n "[TESTONLY] "; fi
+		echo -e "$commit_str"
+		echo "git commit -F - $config_log"
+
+		if [ $testonly != 1 ]; then
+			echo -e "$commit_str" | git commit -F - "$config_log"
+		fi
+		commit_ok=$?
+
+		if [ $commit_ok != 0 ]; then
+			echo -e "\nError Committing Config Log! ($commit_ok)\n"
+		fi
+
+		# Now Push All the Config Commits to Origin
+
+		echo -e "\nPushing Config Commits to Origin:"
+		echo "git push"
+		git push
+		push_ok=$?
+
+		if [ $push_ok != 0 ]; then
+			echo -e "\nError Pushing Config Log to Origin! ($push_ok)\n"
+		fi
+
+	fi
+
+	#
+	# Cleanup Temporary Log File...
+	#
+
+	echo 
+
+	/bin/rm $LOG
+
+# Check/Compare SMS Live Configuration Settings vs. Config File Settings!
+elif [[ "$command" == "confck" ]]; then
+
+# Make ConfCk a Function, so we can Capture It's Output
+# and Choose Whether to Spew It when in a Cron Job... ;-D
+CONFCK()
+{
+	# Dump Intro Output Now, "Quiet" Mode is Handled by Function Caller...
+	echo -e -n "$introOutput"
+
+	echo -e "ADARA SMS LiveConf Configuration Check - Live vs. File:\n"
+
+	# Function to Collect Error Summary Output
+	addToErrSummary()
+	{
+		for arg in "$@" ; do
+			error_summary="${error_summary}$arg";
+		done
+	}
+	error_summary=""
+
+	num_mismatch=0
+
+	for i in $( seq 0 $(( num_options - 1 )) ) ; do
+
+		echo "${option_label[$i]}:"
+		if [[ $terse == 0 ]]; then
+			echo "   ${option_value_type[$i]}"
+			echo "   [${option_id_type[$i]}/${option_name[$i]}]"
+		fi
+
+		if [[ ${option_no_config[$i]} == 1 ]]; then
+			if [[ $terse == 0 ]]; then echo; fi
+			echo -e "No Config for Option - Skipping...\n"
+			continue
+		fi
+
+		opt_id_type="${option_id_type[$i]}"
+
+		opt_pv_opt="${option_pv_opt[$i]}"
+
+		opt_label="${option_label[$i]}"
+
+		opt_default="${option_default[$i]}"
+
+		opt_default_suffix="${option_default_suffix[$i]}"
+
+		option="${option_name[$i]}"
+
+		# Get Number of Instances for Indexed Option
+		if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+			echo "   Indexed Option."
+			numVarsPV="${PRE}:${SMS}:${index_pv[$opt_id_type]}"
+			numIndexedVars=`caget $WAIT $numVarsPV | grep $numVarsPV | awk '{print $2}'`
+			# Make Sure We Got Something...
+			if [[ $numIndexedVars == "" ]]; then
+				echo -e -n "\nWarning: Unable to Obtain"
+				echo -e " Number of $option Instances!\n"
+				echo "Setting numIndexedVars to 1 for Default Check."
+				addToErrSummary "\nWarning: Unable to Obtain" \
+					" Number of $option Instances!\n" \
+					"Setting numIndexedVars to 1 for Default Check.\n"
+				numIndexedVars=1
+				# Count This Error as a Mismatch...!
+				num_mismatch=$(( num_mismatch + 1 ))
+			fi
+			echo "      -> Comparing $numIndexedVars Instances."
+		else
+			numIndexedVars=1
+		fi
+
+		for (( id=1 ; id <= numIndexedVars ; id++ )); do
+
+			if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+				opt_id_num="$id"
+				optId="${idName[$opt_id_type]}${opt_id_num}"
+				subscript="[$id]"
+			else
+				opt_id_num="-1"
+				optId="${idName[$opt_id_type]}"
+				subscript=""
+			fi
+
+			# Handle Indexed PV's, Substitute Option Id Number...
+			if [ ${is_indexed[$opt_id_type]} == 1 ]; then
+				PV=`echo ${option_pv[$i]} \
+					| sed "s/XXX_INDEX_XXX/${opt_id_num}/"`
+			else
+				PV="${option_pv[$i]}"
+			fi
+
+			# Map "Control" Options to "SMS" for rest of handling...
+			# (There's no separate "SMSControl" config section.)
+			save_opt_id_type="$opt_id_type"
+			if [ "$opt_id_type" == "ctrl" ]; then
+				if [[ $terse == 0 ]]; then
+					echo -n "   Mapping Control Options to SMS"
+					echo " for Config File Handling."
+				fi
+				opt_id_type="sms"
+			fi
+
+			if [ "$option" == "enabled" ]; then
+				if [[ $terse == 0 ]]; then
+					echo "   Special Handling for 'Enabled' Option..."
+				fi
+				option="disabled"
+			fi
+
+			echo
+
+			GET_LIVE_SETTING --truncatePrecision
+			if [ $? != 0 ]; then
+				echo -n \
+					"Proceed with Live vs. File Config Check (yes/No)? "
+				read ckcont
+				ckcont=`echo "$ckcont" | tr '[:upper:]' '[:lower:]'`
+				if [[ "$ckcont" == "" || "$ckcont" == "n" \
+						|| "$ckcont" == "no" ]]; then
+					echo -e "\nExiting LiveConf at User's Request.\n"
+					echo -e "Note: $num_mismatch Mismatches Found...!\n"
+					exit -3
+				fi
+				echo
+			fi
+
+			# Check for "Unset" Live PVs...
+			if [[ $live_value == $UNSET_VALUE ]]; then
+
+				if [[ $terse == 0 ]]; then
+					echo -e "\nlive_value = [$live_value]\n"
+				fi
+
+				echo "Warning: Live Option PV Not Set..."
+				live_value="XXX_NO_VALUE_SPECIFIED_XXX"
+
+			fi
+
+			if [[ $terse == 0 ]]; then echo; fi
+			echo "live_value = [$live_value]"
+			if [[ $terse == 0 ]]; then echo; fi
+
+			GET_CONFIG_SETTING "$optId" "$opt_label" \
+				"$option" "$opt_config_str"
+
+			config_value_strip=`echo "$config_value" \
+				| sed -e 's/^"//' -e 's/"$//' -e 's/\.0$//'`
+			if [[ "$config_value_strip" != "$config_value" ]]; then
+				if [[ $terse == 0 ]]; then
+					echo -e -n "\nStripped Quotes/Trailing Decimal"
+					echo "from Config Value."
+				fi
+				config_value="$config_value_strip"
+			fi
+
+			if [[ "$opt_default_suffix" != "" ]]; then
+				cksuffix=`echo "$config_value" \
+					| grep "${opt_default_suffix}\$" \
+					| wc | awk '{print $1}'`
+				if [[ $cksuffix == 0 ]]; then
+					# Strip Off Any Regex Escapes for Append...
+					sfx=`echo "$opt_default_suffix" | sed -e 's/\\\\//g'`
+					if [[ $terse == 0 ]]; then
+						echo -e -n "\nAppending Default Config Suffix"
+						echo -e "\"${sfx}\"."
+					fi
+					config_value="$config_value$sfx"
+				fi
+			fi
+
+			# Check for Shorthand Numerical Suffixes...
+			chkKMG=`echo "$config_value" \
+				| grep -e "^[0-9]\+[KMG]$" | wc | awk '{print $1}'`
+			if [[ $chkKMG == 1 ]]; then
+				digits=`echo "$config_value" | sed 's/[KMG]//g'`
+				suffix=`echo "$config_value" | sed 's/[0-9]//g'`
+				if [[ $terse == 0 ]]; then
+					echo -n "Found Shorthand Numerical Suffix"
+					echo -n " in Config Value!"
+					echo " [$digits] [$suffix]"
+				fi
+				if [[ $suffix == "K" ]]; then
+					config_value=$(( digits * 1024 ))
+				elif [[ $suffix == "M" ]]; then
+					config_value=$(( digits * 1024 * 1024 ))
+				elif [[ $suffix == "G" ]]; then
+					config_value=$(( digits * 1024 * 1024 * 1024 ))
+				else
+					echo "***Unknown Numerical Shorthand Suffix... Ignore!"
+				fi
+			fi
+
+			if [[ $config_value == $COMMENTED_VALUE \
+					|| $config_value == $VALUE_NOT_FOUND ]]; then
+
+				if [ "$option" == "disabled" ]; then
+
+					if [[ $terse == 0 ]]; then
+						echo -e -n \
+							"\n'Disabled' Option Commented/Not Found"
+						echo " -> Enabled"
+					fi
+
+					config_value="Enabled"
+
+				else
+
+					if [[ $terse == 0 ]]; then
+						echo -e "\nconfig_value = [$config_value]\n"
+					fi
+
+					echo -n "Warning: Config File Option Value"
+					echo " Not Found or Commented Out..."
+
+					if [[ "$opt_default" != "" ]]; then
+						echo -n "   -> Using Default SMS Value: "
+						echo "$opt_default"
+						config_value="$opt_default"
+					else
+						echo "   -> *** No Default SMS Value Specified...!"
+						config_value="XXX_NO_VALUE_SPECIFIED_XXX"
+					fi
+
+				fi
+
+			elif [[ "$option" == "disabled" \
+					&& $config_value="true" ]]; then
+
+				if [[ $terse == 0 ]]; then
+					echo -e "\n'Disabled' Option Set to True -> Disabled"
+				fi
+
+				config_value="Disabled"
+
+			fi
+
+			if [[ $terse == 0 ]]; then echo; fi
+			echo "config_value = [$config_value]"
+			if [[ $terse == 0 ]]; then echo; fi
+
+			if [[ "$live_value" != "$config_value" ]]; then
+
+				if [[ "$config_value" == "XXX_IGNORE_IF_NOT_SET_XXX" ]]; \
+				then
+
+					echo "*** Warning: Ignore File Config If Not Set! ***"
+
+					echo "   ${option_label[$i]}${subscript}:"
+					echo "      Live:[$live_value]"
+
+				else
+
+					echo "*** ERROR! Mismatch in Live vs. File Config! ***"
+
+					echo "   ${option_label[$i]}${subscript}:"
+					echo "      Config:[$config_value]"
+					echo "         != Live:[$live_value]"
+
+					addToErrSummary "\n" \
+						"*** ERROR! Mismatch in " \
+						"Live vs. File Config! ***\n" \
+						"   ${option_label[$i]}${subscript}:\n" \
+						"      Config:[$config_value]\n" \
+						"         != Live:[$live_value]\n"
+
+					num_mismatch=$(( num_mismatch + 1 ))
+
+				fi
+
+			else
+				echo "Live Config Matches File Config:"
+				echo "   ${option_label[$i]}${subscript}."
+			fi
+
+			# Restore Any Option ID Type Mapping...
+			opt_id_type="$save_opt_id_type"
+
+		done
+
+		echo
+
+	done
+
+	if [[ $num_mismatch != 0 ]]; then
+
+		echo -e "********* ERROR SUMMARY *********"
+
+		# Don't Resolve All the '*'s as Full Local File Listings! ;-Q
+		set -o noglob
+
+		# Preserve Whitespace! Munge Field Separator!
+		saveIFS="$IFS"
+		IFS="%"
+
+		echo -e $error_summary
+
+		# Restore Whitespace Field Separator...
+		IFS="$saveIFS"
+
+		# Restore Globbing...
+		set +o noglob
+
+		echo -e "*** ERROR: $num_mismatch Total Mismatches Found...!\n"
+
+	else
+		echo -e "Config OK - All Options Matched Between Live and File.\n"
+	fi
+
+	return $num_mismatch
+}
+
+	if [[ $quiet == 1 ]]; then
+		doConfCk=`CONFCK`
+		_ckconfck=$?
+		if [[ ${_ckconfck} != 0 ]]; then
+			echo -e "$doConfCk\n"
+			exit ${_ckconfck}
+		fi
+	else
+		CONFCK
+	fi
+
+# Done
+fi
+

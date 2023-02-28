@@ -1,0 +1,98 @@
+#!/bin/bash
+
+ADARA_PREFIX="adara_"
+
+ADARA_MONITOR="${ADARA_PREFIX}monitor"
+ADARA_SUMMARY="${ADARA_PREFIX}summary"
+
+USERS="/SNS/users/$USER"
+
+ADARA="gitsrc/ADARA"
+
+TMP="/tmp"
+
+echo -e "\n${USERS}/${ADARA_MONITOR}:"
+diff ${ADARA_MONITOR} ${USERS}/${ADARA_MONITOR}
+if [[ $? != 0 ]]; then
+	/bin/cp -i ${ADARA_MONITOR} ${USERS}/
+fi
+
+echo -e "\n${USERS}/${ADARA}/${ADARA_MONITOR}:"
+diff ${ADARA_MONITOR} ${USERS}/${ADARA}/${ADARA_MONITOR}
+if [[ $? != 0 ]]; then
+	/bin/cp -i ${ADARA_MONITOR} ${USERS}/${ADARA}/
+fi
+
+echo -e "\n${USERS}/${ADARA_SUMMARY}:"
+diff ${ADARA_SUMMARY} ${USERS}/${ADARA_SUMMARY}
+if [[ $? != 0 ]]; then
+	/bin/cp -i ${ADARA_SUMMARY} ${USERS}/
+fi
+
+echo -e "\n${USERS}/${ADARA}/${ADARA_SUMMARY}:"
+diff ${ADARA_SUMMARY} ${USERS}/${ADARA}/${ADARA_SUMMARY}
+if [[ $? != 0 ]]; then
+	/bin/cp -i ${ADARA_SUMMARY} ${USERS}/${ADARA}/
+fi
+
+nED_ON_WHEELS="bl0b-now1.sns.gov bl0d-now1.sns.gov"
+	# Note: bl0g-now1 and bl0n-now1 mount /SNS/users/$USER/... ;-D
+
+for i in ${nED_ON_WHEELS} ; do
+
+	# Home Area...
+
+	echo -e "\n${i}: Home"
+
+	scp ${i}:"${ADARA_PREFIX}*" ${TMP}
+
+	need_scp=""
+
+	echo -e "\n${ADARA_MONITOR}:"
+	diff ${ADARA_MONITOR} ${TMP}/${ADARA_MONITOR}
+	if [[ $? != 0 ]]; then
+		need_scp="${need_scp} ${ADARA_MONITOR}"
+	fi
+
+	echo -e "\n${ADARA_SUMMARY}:"
+	diff ${ADARA_SUMMARY} ${TMP}/${ADARA_SUMMARY}
+	if [[ $? != 0 ]]; then
+		need_scp="${need_scp} ${ADARA_SUMMARY}"
+	fi
+
+	if [[ -n "${need_scp}" ]]; then
+		scp ${need_scp} ${i}:
+	fi
+
+	/bin/rm -f "${TMP}/${ADARA_MONITOR}" "${TMP}/${ADARA_SUMMARY}"
+
+	# ADARA Area...
+
+	echo -e "\n${i}: ADARA"
+
+	scp ${i}:"${ADARA}/${ADARA_PREFIX}*" ${TMP}
+
+	need_scp=""
+
+	echo -e "\n${ADARA_MONITOR}:"
+	diff ${ADARA_MONITOR} ${TMP}/${ADARA_MONITOR}
+	if [[ $? != 0 ]]; then
+		need_scp="${need_scp} ${ADARA_MONITOR}"
+	fi
+
+	echo -e "\n${ADARA_SUMMARY}:"
+	diff ${ADARA_SUMMARY} ${TMP}/${ADARA_SUMMARY}
+	if [[ $? != 0 ]]; then
+		need_scp="${need_scp} ${ADARA_SUMMARY}"
+	fi
+
+	if [[ -n "${need_scp}" ]]; then
+		scp ${need_scp} ${i}:"${ADARA}/"
+	fi
+
+	/bin/rm -f "${TMP}/${ADARA_MONITOR}" "${TMP}/${ADARA_SUMMARY}"
+
+done
+
+echo -e "\nDone.\n"
+

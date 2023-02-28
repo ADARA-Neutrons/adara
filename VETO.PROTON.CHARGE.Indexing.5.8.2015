@@ -1,0 +1,402 @@
+CORELLI SMS corelli-sms:
+------------------------
+   Flavor Index = 0
+   Veto Index = -1
+   Proton Charge Index = -1
+
+   799955763.976363666 RTDL
+       cycle 0 veto 0x4 timing 0x1e flavor 0 (No Beam)
+       intrapulse 16666200ns tofOffset 0ns
+       charge 10192860pC period 955005ps
+   799955763.993030666 RTDL
+       cycle 1 veto 0x1 timing 0x1e flavor 1 (Target 1 Normal)
+       intrapulse 16666200ns tofOffset 0ns
+       charge 0pC period 955005ps
+
+HYSPEC SMS hyspec-sms1:
+-----------------------
+   Flavor Index = 0
+   Veto Index = -1
+   Proton Charge Index = -1
+
+   799943944.173200666 RTDL
+       cycle 0 veto 0x4 timing 0x1e flavor 0 (No Beam)
+       intrapulse 16666300ns tofOffset 12377200ns
+       charge 18535700pC period 955005ps
+   799943944.189867666 RTDL
+       cycle 1 veto 0x1 timing 0x1e flavor 1 (Target 1 Normal)
+       intrapulse 16666200ns tofOffset 12377200ns
+       charge 0pC period 955005ps
+
+SEQUOIA SMS sequoia-sms:
+------------------------
+   Flavor Index = 0
+   Veto Index = -1
+   Proton Charge Index = -1
+
+   799913874.673953666 RTDL
+       cycle 0 veto 0x4 timing 0x1e flavor 0 (No Beam)
+       intrapulse 16666200ns tofOffset 0ns
+       charge 17358100pC period 955005ps
+   799913874.690620666 RTDL
+       cycle 1 veto 0x1 timing 0x1e flavor 1 (Target 1 Normal)
+       intrapulse 16666300ns tofOffset 0ns
+       charge 0pC period 955005ps
+
+USANS SMS usans-sms:
+--------------------
+   Flavor Index = 0
+   Veto Index = -1
+   Proton Charge Index = -1
+
+   797016892.917903666 RTDL
+       cycle 0 veto 0x4 timing 0x1e flavor 0 (No Beam)
+       intrapulse 16666200ns tofOffset 0ns
+       charge 15027070pC period 955005ps
+   797016892.934569666 RTDL
+       cycle 1 veto 0x1 timing 0x1e flavor 1 (Target 1 Normal)
+       intrapulse 16666200ns tofOffset 0ns
+       charge 0pC period 955005ps
+
+
+USANS SMS bl1a-daq1:
+--------------------
+   Flavor Index = 0
+   Veto Index = -1
+   Proton Charge Index = -1
+
+   799958903.924073666 RTDL
+       cycle 0 veto 0x4 timing 0x1e flavor 0 (No Beam)
+       intrapulse 16666200ns tofOffset 0ns
+       charge 10735990pC period 955005ps
+   799958903.940739666 RTDL
+       cycle 1 veto 0x1 timing 0x1e flavor 1 (Target 1 Normal)
+       intrapulse 16666100ns tofOffset 0ns
+       charge 0pC period 955005ps
+
+VISION SMS bl16b-daq1:
+----------------------
+   Flavor Index = 0
+   Veto Index = -1
+   Proton Charge Index = -1
+
+   799936974.289271666 RTDL
+       cycle 0 veto 0x4 timing 0x1e flavor 0 (No Beam)
+       intrapulse 16666200ns tofOffset 0ns
+       charge 18485050pC period 955005ps
+   799936974.305938666 RTDL
+       cycle 1 veto 0x1 timing 0x1e flavor 1 (Target 1 Normal)
+       intrapulse 16666200ns tofOffset 0ns
+       charge 0pC period 955005ps
+
+
+Legacy NOMAD:
+-------------
+   *** All 600th Pulse Vetoes Ignored...
+
+Legacy BASIS:
+-------------
+   *** All 600th Pulse Vetoes Ignored...
+
+Legacy SNAP:   [Consistent]
+------------
+   Veto Index = -1
+   Proton Charge Index = -1
+
+Legacy REF_L:   [*** Inconsistent]
+-------------
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+Legacy CNCS:
+------------
+   *** ALL Pulse Vetoes Ignored...
+
+Legacy VULCAN:   [*** Inconsistent]
+--------------
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+Legacy POWGEN:   [*** Inconsistent]
+--------------
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+Legacy TOPAZ:   [*** Inconsistent]
+--------------
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+Legacy ARCS:
+------------
+   *** All 600th Pulse Vetoes Ignored...
+
+Legacy MANDI:   [*** Inconsistent]
+-------------
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+
+HYS_10601 ADARA Test Harness:
+-----------------------------
+   Flavor Index = 0*
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+   *********** PulseId #3 (707779821/790710666, 19099180.000000) ***********
+   sent RTDL counter=2 (cycle=2) veto=0x0 cnt=136 pC=1909918
+   Src #0: header cnt=40 length=72 type=0 sec=707779821 nano=790710666
+      pulseCharge=1909918 with events=6 cnt=88
+   Offset[0] -> 14 (total_events=14)
+   *********** PulseId #4 (707779821/807376666, 19082300.000000) ***********
+   VETO 0xc0 eventIndex=0xe
+   sent RTDL counter=3 (cycle=3) veto=0xc0 cnt=136 pC=1908230
+   Src #0: header cnt=40 length=72 type=0 sec=707779821 nano=807376666
+      pulseCharge=1908230 with events=6 cnt=88
+   Offset[0] -> 20 (total_events=20)
+   *********** PulseId #5 (707779821/824042666, 0.000000) ***********
+   sent RTDL counter=4 (cycle=4) veto=0x0 cnt=136 pC=0
+   Src #0: header cnt=40 length=64 type=0 sec=707779821 nano=824042666
+      pulseCharge=0 with events=5 cnt=80
+   Offset[0] -> 25 (total_events=25)
+
+   [Note: Pulse Veto every *15* Pulses, 0.249995000 seconds... ;-o]
+
+HYS_10609 ADARA Test Harness:
+-----------------------------
+   Flavor Index = 0*
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+   *********** PulseId #390 (707962802/334649666, 18622230.000000) *********
+   sent RTDL counter=389 (cycle=389) veto=0x0 cnt=136 pC=1862223
+   Src #0: header cnt=40 length=184 type=0 sec=707962802 nano=334649666
+      pulseCharge=1862223 with events=20 cnt=200
+   Offset[0] -> 7715 (total_events=7715)
+   *********** PulseId #391 (707962802/351315666, 18586350.000000) *********
+   VETO 0xc0 eventIndex=0x1e23
+   sent RTDL counter=390 (cycle=390) veto=0xc0 cnt=136 pC=1858635
+   Src #0: header cnt=40 length=72 type=0 sec=707962802 nano=351315666
+      pulseCharge=1858635 with events=6 cnt=88
+   Offset[0] -> 7721 (total_events=7721)
+   *********** PulseId #392 (707962802/367982666, 0.000000) ***********
+   sent RTDL counter=391 (cycle=391) veto=0x0 cnt=136 pC=0
+   Src #0: header cnt=40 length=176 type=0 sec=707962802 nano=367982666
+      pulseCharge=0 with events=19 cnt=192
+   Offset[0] -> 7740 (total_events=7740)
+
+   [Note: VETO at 707963621.984715666 has Proton Charge = 0.000000?!]
+      -> sequence of several Vetoes follow...
+   [Note: VETO at 707964043.376180666 has Proton Charge = 0.000000?!]
+      -> sequence of several Vetoes follow...
+   [Note: VETO at 707964052.392664666 has Proton Charge = 0.000000?!]
+      -> sequence of several Vetoes follow...
+   [Note: VETO at 707964061.409148666 has Proton Charge = 0.000000?!]
+      -> sequence of several Vetoes follow...
+      -> embedded Non-VETO at 707964061.575811666...?
+   [Note: VETO at 707964146.657421666 has Proton Charge = 0.000000?!]
+      -> sequence of several Vetoes follow...
+   [Note: VETO at 707964155.673906666 has Proton Charge = 0.000000?!]
+      -> sequence of several Vetoes follow...
+   [Note: VETO at 707964164.690390666 has Proton Charge = 0.000000?!]
+      -> sequence of several Vetoes follow...
+   [Note: VETO at 707964173.723540666 has Proton Charge = 0.000000?!]
+      -> sequence of several Vetoes follow...
+      -> embedded Non-VETO at 707964173.890203666...?
+   [Note: VETO at 707964196.56421666 has Proton Charge = 0.000000?!]
+      -> sequence of several Vetoes follow...
+
+HYS_11087 ADARA Test Harness:
+-----------------------------
+   Flavor Index = 0*
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+   ********** PulseId #389 (709134889/395376666, 0.000000) ***********
+   VETO 0xc0 eventIndex=0x400
+   sent RTDL counter=388 (cycle=388) veto=0xc0 cnt=136 pC=0
+   Src #0: header cnt=40 length=56 type=0 sec=709134889 nano=395376666
+      pulseCharge=0 with events=4 cnt=72
+   Offset[0] -> 1028 (total_events=1028)
+   *********** PulseId #390 (709134889/412042666, 0.000000) ***********
+   VETO 0xc0 eventIndex=0x404
+   sent RTDL counter=389 (cycle=389) veto=0xc0 cnt=136 pC=0
+   Src #0: header cnt=40 length=56 type=0 sec=709134889 nano=412042666
+      pulseCharge=0 with events=4 cnt=72
+   Offset[0] -> 1032 (total_events=1032)
+   *********** PulseId #391 (709134889/428708666, 0.000000) ***********
+   VETO 0xc0 eventIndex=0x408
+   sent RTDL counter=390 (cycle=390) veto=0xc0 cnt=136 pC=0
+   Src #0: header cnt=40 length=24 type=0 sec=709134889 nano=428708666
+      pulseCharge=0 with events=0 cnt=40
+   Offset[0] -> 1032 (total_events=1032)
+
+   [Note: *ALL* Pulses Vetoed!! ;-]
+   [Note: *ALL* Pulses Zero Proton Charge!! ;-]
+
+HYS_32396 ADARA Test Harness:
+-----------------------------
+   Flavor Index = 0*
+   Veto Index = 0
+   Proton Charge Index = -1
+
+   [Note: NO VETOES AT ALL!]
+   [Note: *ALL* Pulses Zero Proton Charge!! ;-]
+
+SEQ_44091 ADARA Test Harness:
+-----------------------------
+   Flavor Index = 0*
+   Veto Index = 0
+   Proton Charge Index = -1
+
+   [Note: NO VETOES AT ALL!]
+
+SEQ_37652 ADARA Test Harness:
+-----------------------------
+   Flavor Index = 0*
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+   [Note: VETO At Start, Non-Zero Proton Charge...]
+
+   *********** PulseId #42 (733818313/680759666, 9261480.000000) ***********
+   sent RTDL counter=41 (cycle=41) veto=0x0 cnt=136 pC=926148
+   Src #0: header cnt=40 length=72 type=0 sec=733818313 nano=680759666
+      pulseCharge=926148 with events=6 cnt=88
+   Offset[0] -> 310 (total_events=310)
+   *********** PulseId #43 (733818313/697425666, 9214480.000000) ***********
+   VETO 0xc8 eventIndex=0x136
+   sent RTDL counter=42 (cycle=42) veto=0xc8 cnt=136 pC=921448
+   Src #0: header cnt=40 length=136 type=0 sec=733818313 nano=697425666
+      pulseCharge=921448 with events=14 cnt=152
+   Offset[0] -> 324 (total_events=324)
+   *********** PulseId #44 (733818313/714092666, 10.000000) ***********
+   sent RTDL counter=43 (cycle=43) veto=0x0 cnt=136 pC=1
+   Src #0: header cnt=40 length=24 type=0 sec=733818313 nano=714092666
+      pulseCharge=1 with events=0 cnt=40
+   Offset[0] -> 324 (total_events=324)
+
+   [NOTE: Vetoed Proton Charge = 10.000000...!]
+
+VIS_936 ADARA Test Harness:
+---------------------------
+   Flavor Index = 0*
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+   *********** PulseId #95 (714338140/538473666, 11218770.000000) **********
+   sent RTDL counter=94 (cycle=94) veto=0x0 cnt=136 pC=1121877
+   *** Premature EOF EventFile Src #1!
+      Truncating ende=12352245 -> 12350857 (file size)
+   Src #1: header cnt=40 length=24 type=0 sec=714338140 nano=538473666
+      pulseCharge=1121877 with events=0 cnt=40
+   Offset[1] -> 12350857 (total_events=12350857)
+   Src #2: header cnt=40 length=24 type=0 sec=714338140 nano=538473666
+      pulseCharge=1121877 with events=0 cnt=40
+   Offset[2] -> 0 (total_events=0)
+   *********** PulseId #96 (714338140/555140666, 11218770.000000) **********
+   VETO 0xc8 eventIndex=0x2fb98df
+   sent RTDL counter=95 (cycle=95) veto=0xc8 cnt=136 pC=1121877
+   *** Premature EOF EventFile Src #1!
+      Truncating ende=12352195 -> 12350857 (file size)
+   Src #1: header cnt=40 length=24 type=0 sec=714338140 nano=555140666
+      pulseCharge=1121877 with events=0 cnt=40
+   Offset[1] -> 12350857 (total_events=12350857)
+   Src #2: header cnt=40 length=24 type=0 sec=714338140 nano=555140666
+      pulseCharge=1121877 with events=0 cnt=40
+   Offset[2] -> 0 (total_events=0)
+   *********** PulseId #97 (714338140/571806666, 0.000000) ***********
+   sent RTDL counter=96 (cycle=96) veto=0x0 cnt=136 pC=0
+   *** Premature EOF EventFile Src #1!
+      Truncating ende=12350879 -> 12350857 (file size)
+   Src #1: header cnt=40 length=24 type=0 sec=714338140 nano=571806666
+      pulseCharge=0 with events=0 cnt=40
+   Offset[1] -> 12350857 (total_events=12350857)
+   Src #2: header cnt=40 length=24 type=0 sec=714338140 nano=571806666
+      pulseCharge=0 with events=0 cnt=40
+   Offset[2] -> 0 (total_events=0)
+
+VIS_1328 ADARA Test Harness:
+----------------------------
+   Flavor Index = 0*
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+   [Note: NO VETOES AT ALL!]
+
+VIS_1389 ADARA Test Harness:
+----------------------------
+   Flavor Index = 0*
+-> Veto Index = 0
+-> Proton Charge Index = 0
+
+   *********** PulseId #13916 (746740376/222237666, 15462950.000000) *******
+   sent RTDL counter=13915 (cycle=115) veto=0x0 cnt=136 pC=1546295
+   Src #0: header cnt=40 length=24 type=0 sec=746740376 nano=222237666
+      pulseCharge=1546295 with events=0 cnt=40
+   Offset[0] -> 19 (total_events=19)
+   Src #1: header cnt=40 length=24 type=0 sec=746740376 nano=222237666
+      pulseCharge=1546295 with events=0 cnt=40
+   Offset[1] -> 15 (total_events=15)
+   Src #2: header cnt=40 length=24 type=0 sec=746740376 nano=222237666
+      pulseCharge=1546295 with events=0 cnt=40
+   Offset[2] -> 3053 (total_events=3053)
+   *********** PulseId #13917 (746740376/222237666, 0.000000) ***********
+   VETO 0x10 eventIndex=0xbed
+   sent RTDL counter=13916 (cycle=116) veto=0x10 cnt=136 pC=0
+   Src #2: header cnt=40 length=24 type=0 sec=746740376 nano=222237666
+      pulseCharge=0 with events=0 cnt=40
+   Offset[2] -> 3053 (total_events=3053)
+   *********** PulseId #13918 (746740376/222237666, 0.000000) ***********
+   VETO 0x10 eventIndex=0xbed
+   sent RTDL counter=13917 (cycle=117) veto=0x10 cnt=136 pC=0
+   Src #2: header cnt=40 length=32 type=0 sec=746740376 nano=222237666
+      pulseCharge=0 with events=1 cnt=48
+   Offset[2] -> 3054 (total_events=3054)
+   *********** PulseId #13919 (746740376/222237666, 0.000000) ***********
+   VETO 0x10 eventIndex=0xbee
+   sent RTDL counter=13918 (cycle=118) veto=0x10 cnt=136 pC=0
+   Src #2: header cnt=40 length=24 type=0 sec=746740376 nano=222237666
+      pulseCharge=0 with events=0 cnt=40
+   Offset[2] -> 3054 (total_events=3054)
+
+   [Note: TRUE DUPLICATE PULSE TIMES, Not Traditional Veto...?!]
+   [Note: NO (Real) VETOES AT ALL!]
+
+VIS_1404 ADARA Test Harness:
+----------------------------
+   Flavor Index = 0*
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+   [Note: NO VETOES AT ALL!]
+
+VIS_2014 ADARA Test Harness:
+----------------------------
+   Flavor Index = 0*
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+   [Note: NO VETOES AT ALL!]
+
+VIS_2039 ADARA Test Harness:
+----------------------------
+   Flavor Index = 0*
+-> Veto Index = 0
+   Proton Charge Index = -1
+
+   [Note: NO VETOES AT ALL!]
+
+VIS_9999 (Fake, Bandwidth) ADARA Test Harness:
+----------------------------------------------
+   Flavor Index = 0*
+-> Veto Index = 0*
+-> Proton Charge Index = -1*
+
+   [Note: FAKE VETOES, No Zeroed-Out Proton Charge...]
+
+---
+
+NOTE: the "flavor" value in RawDataPkt and RTDLPkt is *Never Used*!
+	- it is only compared between RawDataPkt's for Pulse Invariants...
+

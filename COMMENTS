@@ -1,0 +1,84 @@
+
+ADARA Comments, Notes and Annotations
+-------------------------------------
+
+I've completely overhauled how all this stuff works. :-D
+
+* You can set:
+
+   - Annotation Comments (BLXXX:SMS:Marker:AnnotationComment)
+      -> can add as many comments as you'd like...
+      -> all show up in the NeXus under "/entry/DASlogs/comments"
+      -> comments are prefixed with "[PRE-RUN]" or "[PAUSED]" as appropriate
+
+   - Scan Comments (BLXXX:SMS:Marker:ScanComment)
+      -> can add as many comments as you'd like...
+      -> all show up in the NeXus under "/entry/DASlogs/comments"
+      -> each comment is automatically prefixed with "Scan <number>: "
+      -> comments are also prefixed with "[PRE-RUN]" or "[PAUSED]",
+      as appropriate
+
+   - Run "Notes" (BLXXX:SMS:Marker:NotesComment)
+      -> shows up in the NeXus under "/entry/notes"
+      -> can only be set *Exactly Once* per run...
+         => Unless New "RunNotesUpdatesEnabled" Option is Set to True,
+         and then the Run Notes can be Updated Multiple Times During a Run!
+         Any Former Run Notes are appended to the set of Annotation comments
+         in "/entry/DASlogs/comments" with the string prefix
+         "[OVERWRITTEN RUN NOTES]"... (we don't throw anything away... :-)
+         => Otherwise, any "additional" Run Notes are ignored, but
+         automatically appended to the set of Annotation comments in
+         "/entry/DASlogs/comments" with the string prefix
+         "[DISCARDED RUN NOTES]"... (we don't throw anything away... :-)
+
+These various annotations can be set at any time _Before_ the Run Starts
+or _During_ the Run... (Everything gets reset on Run Stop... :-)
+
+* Run Notes Auto Reset Option:
+
+There is a "NotesCommentAutoReset" option in ADARA (set via the
+"BLXXX:SMS:Marker:NotesCommentAutoReset" PV), which controls whether or
+not the Run Notes are cleared out/reset at the End of each Run.
+
+If NotesCommentAutoReset is *Enabled* (true), then the Run Notes will
+be emptied/unset at the End of the Previous Run, and then can be set
+Exactly Once before the End of the Next Run. (NOTE: This is unless the
+new option "RunNotesUpdatesEnabled" is set to True. Otherwise, the
+Run Notes can be set multiple times *Before* the Next Run has actually
+started, but once the Next Run Starts, it gets "locked in".)
+
+But if NotesCommentAutoReset is *Disabled* (false), then the "Last Value"
+of the Run Notes at the end of the Previous Run will be *Preserved* and
+used for the Next Run...! In this case, the Run Notes can still be
+Changed/Overwritten at Any Time after the End of that Last Run, right up
+until the Start of the Next Run, at which time those Run Notes are
+"locked in" (unless the "RunNotesUpdatesEnabled" is set to True).
+
+Therefore, with NotesCommentAutoReset *Disabled*, and also with
+RunNotesUpdatesEnabled *Disabled*, this means that the Run Notes PV
+can be set "again and again" to a different value, in the middle of
+a given Run, and these settings will be *Ignored* and simply "queued up"
+as the New Run Notes being saved ahead for the *Next Run*. ;-D
+But if the RunNotesUpdatesEnabled option is True (Enabled) then
+Any Changes to the Run Notes During a Run will be Applied to THAT RUN! :-)
+
+* Backwards Compatibility:
+
+Fyi, the "BLXXX::SMS:Marker:Comment" PV, with associated Trigger PVs
+"BLXXX:SMS:Marker:Annotate" and "BLXXX:SMS:Marker:RunComment", will
+still work, but it's the old gruesome "trigger-based" commenting approach,
+which is now deprecated... :-)
+
+* Summary:
+
+It's possible that the CSS screens for your beamline don't yet provide
+access/entries to all these annotation types, but they are "available",
+if you want them.
+
+Please let us know! :-)
+
+Enjoy!
+   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+ 
+[Last Updated: January 4, 2023]
+

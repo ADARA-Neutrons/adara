@@ -1,0 +1,16 @@
+# Do not edit, managed by Puppet.
+# Source: /etc/puppetlabs/code/environments/production/modules/neutron_sciences/dasmon_server/templates/systemd/dasmond.service.erb
+
+[Unit]
+Description=dasmond
+After=getty.target
+[Service]
+Type=simple
+User=root
+Group=root
+Restart=always
+ExecStart=/usr/bin/su - dasmon -s /bin/bash -c "/usr/local/bin/dasmond"
+
+TimeoutSec=0
+[Install]
+WantedBy=multi-user.target

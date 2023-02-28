@@ -7,61 +7,61 @@ Jenkins Build Server Information (adara-tester.sns.gov)
 
 Service Ports in /etc/services:
 
-   (Regular STS test ports)
-   sts-test        41417/tcp               # sts-test service
-   sts-test        41417/udp               # sts-test service
+   (Regular STC test ports)
+   stc-test        41417/tcp               # stc-test service
+   stc-test        41417/udp               # stc-test service
 
-   (Jenkins STS test ports)
-   sts-jenkins     51417/tcp               # sts-jenkins service
-   sts-jenkins     51417/udp               # sts-jenkins service
+   (Jenkins STC test ports)
+   stc-jenkins     51417/tcp               # stc-jenkins service
+   stc-jenkins     51417/udp               # stc-jenkins service
 
 
-Service script in /etc/xinetd.d/sts-jenkins:
+Service script in /etc/xinetd.d/stc-jenkins:
 
-   # This is the configuration for the tcp/stream STS Jenkins Testing
+   # This is the configuration for the tcp/stream STC Jenkins Testing
    # service.
 
-   service sts-jenkins
+   service stc-jenkins
    {
-       id              = sts-jenkins-stream
+       id              = stc-jenkins-stream
        wait            = no
        socket_type     = stream
        user            = snsdata 
        group           = adara
-       server          = /usr/local/sbin/sts-jenkins
+       server          = /usr/local/sbin/stc-jenkins
        port            = 51417
    }
 
 
-Server script in /usr/local/sbin/sts-jenkins:
+Server script in /usr/local/sbin/stc-jenkins:
 
    #!/bin/bash
 
    JENKINS_WORKSPACE="/SNSlocal/jenkins/workspace/ADARA_Software_Build"
 
-   logfile="/var/log/ADARA/xinetd-sts-jenkins.log"
+   logfile="/var/log/ADARA/xinetd-stc-jenkins.log"
    ### Note! Don't put log file in $JENKINS_WORKSPACE, likely unwritable
    ### (for whatever goofy reason) and the script crashes... :-b
 
    touch $logfile
    date >> $logfile
-   echo "Entry /usr/local/sbin/sts-jenkins." >> $logfile
+   echo "Entry /usr/local/sbin/stc-jenkins." >> $logfile
    echo "Command Line Args: $*" >> $logfile
 
-   ### Note! For Jenkins/Testing we set the STS Workspace to .../SNS/stsdata
+   ### Note! For Jenkins/Testing we set the STC Workspace to .../SNS/stcdata
    ### whereas for Production it needs to be Hard-Coded to a Specific Beamline
    ### (working directory needs to be set _Before_ BeamlineInfo available,
    ### but it's Ok wherever it is, as long as Same Filesystem as Archive
    ### for the final NeXus file "rename"... ;-D Whew!)
 
-   echo "Running: $JENKINS_WORKSPACE/INSTALL/bin/sts -s -m -w /TESTING/JENKINS/SNS/stsdata -b /TESTING/JENKINS/" >> $logfile
-   $JENKINS_WORKSPACE/INSTALL/bin/sts -s -m -w /TESTING/JENKINS/SNS/stsdata -b /TESTING/JENKINS/
-   ### NOTE! *Don't* Redirect STS's stdout to the log file...! :-b
+   echo "Running: $JENKINS_WORKSPACE/INSTALL/bin/stc -s -m -w /TESTING/JENKINS/SNS/stcdata -b /TESTING/JENKINS/" >> $logfile
+   $JENKINS_WORKSPACE/INSTALL/bin/stc -s -m -w /TESTING/JENKINS/SNS/stcdata -b /TESTING/JENKINS/
+   ### NOTE! *Don't* Redirect STC's stdout to the log file...! :-b
    ### The SMS needs to get that response...! :-D
 
-   echo "After $JENKINS_WORKSPACE/INSTALL/bin/sts, return status = $?" >> $logfile
+   echo "After $JENKINS_WORKSPACE/INSTALL/bin/stc, return status = $?" >> $logfile
 
-   echo "Exit /usr/local/sbin/sts-jenkins." >> $logfile
+   echo "Exit /usr/local/sbin/stc-jenkins." >> $logfile
    date >> $logfile
 
 
@@ -95,7 +95,7 @@ Jenkins Build Node Configuration:
 
       Host: adara-tester.sns.gov
 
-      Username: y8y
+      Username: $USER
 
       Password: XXXXXXXX  (probably need to set up an SSH key, ahem... :)
 
@@ -108,10 +108,10 @@ Jenkins Project Information:
 
    Project: ADARA_Software_Build
 
-   (Display Name: ADARA Software (SMS and STS) Build)
+   (Display Name: ADARA Software (SMS and STC) Build)
 
    Description:
-      Build the basic SMS and STS software for Jenkins testing
+      Build the basic SMS and STC software for Jenkins testing
       (by the ADARA Test Suite, supposedly... :-).
       (This version of the test uses the new "configfile" API,
       now merged back into master... :-D)
@@ -152,7 +152,7 @@ Jenkins Project Information:
       X Trigger only if build succeeds
 
       Editable Email Notification
-         Project Recipient List: y8y@ornl.gov
+         Project Recipient List: $USER@ornl.gov
          Content Type: "Default Content Type"
          Default Subject: $DEFAULT_SUBJECT
          Default Content: $DEFAULT_CONTENT

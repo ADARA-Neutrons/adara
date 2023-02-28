@@ -5,7 +5,7 @@
 #include "DASMonDefs.h"
 #include "SubClient.h"
 #include "DASMonMessages.h"
-#include "STSMessages.h"
+#include "STCMessages.h"
 
 #include <map>
 #include <list>
@@ -17,7 +17,7 @@
 #include <QMutex>
 #include <QLineEdit>
 
-#define DASMON_GUI_VERSION "1.2.1"
+#define DASMON_GUI_VERSION "1.5.5"
 
 
 namespace Ui {
@@ -81,10 +81,11 @@ private:
     struct TransStatus
     {
         unsigned long               run_num;
-        std::string                 sts_pid;
+        std::string                 stc_pid;
+        std::string                 stc_host;
         bool                        running;
         ADARA::ComBus::StatusCode   run_status;
-        STS::TranslationStatusCode  trans_status;
+        STC::TranslationStatusCode  trans_status;
         unsigned long               last_updated;
     };
 
@@ -150,7 +151,7 @@ private:
     void        writeLog( ADARA::Level a_level, const std::string &a_msg );
     void        updateHighestSignal();
     const char *getStatusText( int a_status );
-    const char *getTransStatusText( STS::TranslationStatusCode &a_status );
+    const char *getTransStatusText( STC::TranslationStatusCode &a_status );
 
     // Methods to support SubClient command routing
     void        attach( SubClient &a_sub_client );

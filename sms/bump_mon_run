@@ -1,0 +1,125 @@
+#!/bin/bash
+
+# For Cron Usage - Source Home Shell Environment:
+if [ -e $HOME/.bash_profile ] ; then
+	source $HOME/.bash_profile
+fi
+
+#
+# Parse Command Line Options... ;-)
+#
+
+USAGE()
+{
+	echo -e "\nusage:  bump_mon_run [--beamline=\"BL12MON\"]"
+	echo -e "\t[--config=\"/SNSlocal/sms-mon/conf/smsd.conf\"]\n"
+}
+
+CONFIG="/SNSlocal/sms-mon/conf/smsd.conf"
+BL=""
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+
+	if [ "#$key#" == '#--beamline#' ]; then
+		BL="$value"
+	elif [ "#$key#" == '#--config#' ]; then
+		CONFIG="$value"
+	elif [ "#$key#" == '#--help#' ]; then
+		USAGE
+		exit 0
+	fi
+
+done
+
+if [[ -z "${BL}" && ! -z "${CONFIG}" ]]; then
+	BL=`grep beamline_id ${CONFIG} | awk '{print $3}'`
+fi
+
+if [[ -z "${BL}" ]]; then
+	echo -e "\nError: No Beamline Prefix Specified...!"
+	USAGE
+	exit -1
+fi
+
+# Are We In A Monitor Run, As Expected...?
+ckrun=`caget ${BL}:SMS:Recording`
+inrun=`echo "${ckrun}" | grep "^${BL}:SMS:Recording" | awk '{print $2}'`
+
+do_log=0
+
+# Yep, We're In A Run...
+if [[ "$inrun" == "true" ]]; then
+
+	# Stop Any Previous Run...
+	# Try 3 Times, as Needed...
+	cnt=0
+	while [[ $cnt -lt 3 ]]; do
+		stopout=`caput ${BL}:SMS:Recording false`
+		stopck=`echo "${stopout}" | grep '^New' | awk '{print $4}'`
+		if [[ "$stopck" != "false" ]]; then
+			echo -e "\nError Stopping Previous Run...! (stopck=[$stopck])\n"
+			echo -e -n "\nOutput from "
+			echo -e "\"caput ${BL}:SMS:Recording false\" command:"
+			echo -e "\n${stopout}\n"
+			caget -S -a ${BL}:SMS:Recording ${BL}:SMS:RunNumber \
+				${BL}:SMS:Summary ${BL}:SMS:SummaryReason
+			echo -e "\nRetrying, cnt=$cnt/3..."
+			cnt=$(( $cnt + 1 ))
+			do_log=1
+			echo
+		else
+			break
+		fi
+	done
+	# Did It Eventually Work...?
+	if [[ $cnt -ge 3 ]]; then
+		echo -e -n "\nERROR: Failed to Stop Previous Run "
+		echo -e "After $cnt Attempts..."
+		echo -e "\nBailing..."
+		exit -2
+	elif [[ $do_log == 1 ]]; then
+		echo -e "\nRun Eventually Stopped:\n"
+		caget -a ${BL}:SMS:Recording
+		echo
+	fi
+
+else
+	echo -e "\nMonitor SMSD-MON Not Currently In A Run...!"
+	echo -e "\n-> Go Ahead and Start One Now..."
+	do_log=1
+fi
+
+# Start A New Run...
+# Try 3 Times, as Needed...
+cnt=0
+while [[ $cnt -lt 3 ]]; do
+	startout=`caput ${BL}:SMS:Recording true`
+	startck=`echo "${startout}" | grep '^New' | awk '{print $4}'`
+	if [[ "$startck" != "true" ]]; then
+		echo -e "\nError Starting New Run...! (startck=[$startck])\n"
+		echo -e "\nOutput from \"caput ${BL}:SMS:Recording true\" command:"
+		echo -e "\n${startout}\n"
+		caget -S -a ${BL}:SMS:Recording ${BL}:SMS:RunNumber \
+			${BL}:SMS:Summary ${BL}:SMS:SummaryReason
+		echo -e "\nRetrying, cnt=$cnt/3..."
+		cnt=$(( $cnt + 1 ))
+		do_log=1
+		echo
+	else
+		break
+	fi
+done
+# Did It Eventually Work...?
+if [[ $cnt -ge 3 ]]; then
+	echo -e "\nERROR: Failed to Start New Run After $cnt Attempts..."
+	echo -e "\nBailing..."
+	exit -3
+elif [[ $do_log == 1 ]]; then
+	echo -e "\nRun Started:\n"
+	caget -a ${BL}:SMS:Recording
+	echo
+fi
+

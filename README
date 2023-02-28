@@ -3,7 +3,7 @@ ADARA:
 	Requires autoconf, automake, and boost-devel
 
 	SMS requires log4cxx-devel and EPICS
-	STS requires hdf5-devel, libxml2-devel, activemq-cpp-devel, apr-devel,
+	STC requires hdf5-devel, libxml2-devel, activemq-cpp-devel, apr-devel,
 		and nexus-devel (third-party)
 	DASMON server requires libxml2-devel, activemq-cpp-devel, apr-devel
 
@@ -14,12 +14,11 @@ ADARA:
 	You can disable components using --disable-NAME; for more information,
 	see ./configure --help.
 
-EPCIS:
+EPICS:
 	http://www.aps.anl.gov/epics/download/base/baseR3.14.12.3.tar.gz
 
 	Requires readline-devel and perl-ExtUtils-ParseXS, perhaps others
 
 	Building is basically running make in the top-level directory.
 	No need to do make install
-
 

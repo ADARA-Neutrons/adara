@@ -1,0 +1,52 @@
+#!/bin/bash
+
+STAT_LIST="./stat_list"
+
+NOW_SYSTEM_FILES="/SNSlocal/sms/conf/* \
+	/etc/init.d/smsd \
+	/etc/init.d/smsd.XXX \
+	/etc/systemd/system/smsd.service \
+	/etc/rsyslog.conf \
+	/etc/rsyslog.d/adaraMailer.conf \
+	/etc/rsyslog.d/smsd_syslog.conf \
+	/usr/local/bin/rsyslogMailer \
+	/etc/crontab \
+	/etc/cron.d/epics_rsyslog_mailer \
+	/etc/logrotate.d/smsd_log \
+	/usr/local/bin/pvsd \
+	/etc/init.d/pvsd \
+	/etc/rsyslog.d/pvsd_syslog.conf \
+	/etc/logrotate.d/pvsd_log \
+	/etc/rsyslog.d/stclog.conf \
+	/etc/services \
+	/etc/xinetd.d/stc* \
+	/usr/local/bin/stc* \
+	/etc/logrotate.d/stc_log \
+	/home/dasmon/dasmond.cfg \
+	/home/dasmon/dasmond_def.cfg \
+	/etc/init/dasmond.conf \
+	/etc/systemd/system/dasmond.service \
+	/usr/local/bin/dasmond \
+	/etc/rsyslog.d/dasmon.conf \
+	/etc/X11/xinit/xinitrc.dasmon \
+	/etc/init/dasmongui.conf \
+	/etc/systemd/system/dasmongui.service \
+	/etc/logrotate.d/dasmon_log"
+
+if [[ -f "${STAT_LIST}" ]]; then
+	echo -e "\nError: Stat List Already Exists... Bailing...\n"
+	ls -l ${STAT_LIST}
+	exit -1
+fi
+
+touch "${STAT_LIST}"
+
+for file in ${NOW_SYSTEM_FILES} ; do
+
+	echo "NOW System File: $file"
+
+	stat --printf='%A %F %U %G ' "${file}" >> "${STAT_LIST}"
+	echo "${file}" >> "${STAT_LIST}"
+
+done
+

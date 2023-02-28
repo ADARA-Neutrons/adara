@@ -38,7 +38,7 @@ enum AppCategory
     APP_NONE        = 0x00000000,
     APP_SAS         = 0x00100000,
     APP_SMS         = 0x00200000,
-    APP_STS         = 0x00300000,
+    APP_STC         = 0x00300000,
     APP_SRS         = 0x00400000,
     APP_WFM         = 0x00500000,
     APP_CATALOG     = 0x00600000,
@@ -73,9 +73,10 @@ enum MessageType
     MSG_CONFIG_LOGGING,
     MSG_ACK,
     MSG_NACK,
-    MSG_STS_TRANS_STARTED      = CAT_APP | APP_STS,
-    MSG_STS_TRANS_FINISHED,
-    MSG_STS_TRANS_FAILED,
+    MSG_STC_TRANS_STARTED       = CAT_APP | APP_STC,
+    MSG_STC_TRANS_FINISHED,
+    MSG_STC_TRANS_FAILED,
+    MSG_SMS_RUN_STATUSUPDATE    = CAT_APP | APP_SMS,
     MSG_DASMON_GET_RULES        = CAT_INPUT | APP_DASMON,
     MSG_DASMON_SET_RULES,
     MSG_DASMON_RULE_DEFINITIONS,
@@ -196,7 +197,8 @@ public:
 class MessageBase
 {
 public:
-    MessageBase() : m_timestamp(0)
+    MessageBase() :
+        m_src_id(""), m_dest_id(""), m_correlation_id(""), m_timestamp(0)
     { }
 
     virtual ~MessageBase()
@@ -437,3 +439,6 @@ const unsigned long TemplMessageBase<MT,T>::MSG_TYPE = Factory::Inst().registerC
 }}
 
 #endif // COMBUSDEFS_H
+
+// vim: expandtab
+

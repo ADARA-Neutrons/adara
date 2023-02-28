@@ -264,6 +264,7 @@ public:
     virtual void                configurationLoaded( Protocol a_protocol, const std::string &a_source ) = 0;
     virtual void                configurationInvalid( Protocol a_protocol, const std::string &a_source ) = 0;
     virtual PVInfo*             getWriteablePV( const std::string & a_name ) const = 0;
+    virtual Identifier          getDeviceIdentifier( const std::string &a_device_name ) = 0;
 };
 
 
@@ -363,7 +364,7 @@ public:
             std::stringstream sstr;
             sstr << m_context << std::endl;
             sstr << "(source: " << m_file << ":" << m_line << " code:" << m_error_code << ")" << std::endl;
-        
+
             return sstr.str();
         }
         else

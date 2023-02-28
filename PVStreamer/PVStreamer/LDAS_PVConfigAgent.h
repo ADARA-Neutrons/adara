@@ -20,8 +20,8 @@
 #include "LDAS_XmlParser.h"
 
 namespace SNS { namespace PVS {
-    
-class PVStreamer;    
+
+class PVStreamer;
 
 namespace LDAS {
 
@@ -41,7 +41,7 @@ class LDAS_PVConfigMgr;
  * can be access by other interested classes. This class uses legacy XML parsing
  * code extracted from the ListenerLib library.
  *
- * Currently device and process variable as assigned numeric identifers on a first-com
+ * Currently device and process variable are assigned numeric identifers on a first-com
  * first-serve basis. This approach will yeild varying identifiers in downstream
  * work products from run-to-run and may need to be changed to static allocation of
  * device identifiers.

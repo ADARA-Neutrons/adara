@@ -1,0 +1,189 @@
+
+ADARA Fat Meta-Data Performance Tests (HYSPEC Laser, Starting 1/5/2022)
+
+1/5/2022:
+    - first HYS_330089 Test Harness run:
+        -> started run: Wed Jan  5 14:39:00 EST 2022
+        -> data input ended: Wed Jan  5 15:14:21 EST 2022
+        -> SMS finished processing: Wed Jan  5 15:15:28 EST 2022
+            => Total Time = 2188 sec (36 minutes 28 sec)
+        -> STC finished processing: Wed Jan  5 15:15:29 EST 2022
+            => Total STC Processing Time = 2187.820068 seconds
+            => STC Overhead Ratio = 2.216727 (relative event bandwidth)
+            => Total Input Stream Byte Count of ADARA packets = 1214047824
+            => Average Stream Bandwidth = 554912.097918 bytes/sec
+    - Note: similar data scenario to long-running REF_M_927800 test case!!
+        -> started run: Wed Jan  5 16:32:53 EST 2022
+        -> data input ended: Wed Jan  5 18:25:22 EST 2022
+        -> SMS finished processing: Wed Jan  5 18:26:06 EST 2022
+            => Total Time = 6793 sec (113 minutes 13 sec)
+        -> STC finished processing: Wed Jan  5 18:26:46 EST 2022
+            => Total STC Processing Time = 6831.863281 seconds
+            => STC Overhead Ratio = 5.776595 (relative event bandwidth)
+            => Total Input Stream Byte Count of ADARA packets = 3837149624
+            => Average Stream Bandwidth = 561654.919900 bytes/sec
+
+ADARA Performance Tests for NOMAD 25 Million Events/Second Bandwidth 2021
+
+12/2/2021:
+    - on NOMAD DAQ1 (bl1b-daq1.sns.gov) with 80TB SSD /SNSlocal...! ;-D
+        - driving production SMS via preprocessor_test (41416) by
+        local "spewfast" script (NOM_8888 Fast Event Generation).
+        - with DASMON Connected, Not in a Run...
+           -> 43944622.977466 events/sec (43.944623 M events/sec)
+           -> 42958371.984955 events/sec (42.958372 M events/sec)
+        - _Without_ DASMON Connected, Not in a Run...
+           -> 45146110.480963 events/sec (45.146110 M events/sec)
+           -> 44847917.528260 events/sec (44.847918 M events/sec)
+           -> 45493087.394031 events/sec (45.493087 M events/sec)
+        - _Without_ DASMON Connected, IN a Run,
+        sending data to STC2 "stc_dummy", Unoptimized 20210804/stc-1.12.9:
+           -> 42928156.711712 events/sec (42.928157 M events/sec)
+              => Overall STC Bandwidth = 11720693.160830 events/sec
+              => STC Overhead Ratio = 1.792201
+           -> 40832169.568926 events/sec (40.832170 M events/sec)
+              => Overall STC Bandwidth = 11572255.157479 events/sec
+              => STC Overhead Ratio = 1.815189
+           -> 43510911.728731 events/sec (43.510912 M events/sec)
+              => Overall STC Bandwidth = 11343039.303134 events/sec
+              => STC Overhead Ratio = 1.851870
+           -> 42586818.538437 events/sec (42.586819 M events/sec)
+              => Overall STC Bandwidth = 10738702.466087 events/sec
+              => STC Overhead Ratio = 1.956087
+        - _Without_ DASMON Connected, IN a Run,
+        sending data to STC2 "stc_dummy",
+        Optimized stc.DEVEL.STC.TESTING.Winter.2021 = 16786032 Nov 29 15:31
+           -> 45170108.924230 events/sec (45.170109 M events/sec)
+              => Overall STC Bandwidth = 9244836.805878 events/sec
+              => STC Overhead Ratio = 2.272169
+           -> 44339738.188534 events/sec (44.339738 M events/sec)
+              => Overall STC Bandwidth = 10048626.663254 events/sec
+              => STC Overhead Ratio = 2.090418
+           -> 44907418.663866 events/sec (44.907419 M events/sec)
+              => Overall STC Bandwidth = 11451548.454319 events/sec
+              => STC Overhead Ratio = 1.834323
+           -> 44893172.131438 events/sec (44.893172 M events/sec)
+              => Overall STC Bandwidth = 9451709.026367 events/sec
+              => STC Overhead Ratio = 2.222438
+           -> 45059965.231776 events/sec (45.059965 M events/sec)
+              => Overall STC Bandwidth = 10695442.740180 events/sec
+              => STC Overhead Ratio = 1.963999
+
+11/29/2021:
+   - STC Tests
+      - <sns-stc1.sns.gov-1099>$ stcview 21950 | grep Overhead
+         Nov 29 18:03:29 sns-stc1.sns.gov stc:
+         [21950] STC Overhead Ratio = 3.661207
+         (SMSD Source, writing to /TESTING/ mount)
+      - <sns-stc1.sns.gov-1101>$ stcview 24121 | grep Overhead
+         Nov 29 18:08:11 sns-stc1.sns.gov stc:
+         [24121] STC Overhead Ratio = 2.992245
+         (/bin/cat Source, writing to /TESTING/ mount)
+      - <jeeem.ornl.gov-1222>$ stcview 16021 | grep Overhead
+         Nov 29 18:15:26 jeeem stc: [16021] STC Overhead Ratio = 2.880466
+         (/bin/cat Source, writing to /TESTING/ mount)
+      - <jeeem.ornl.gov-1223>$ stcview 18558 | grep Overhead
+         Nov 29 18:18:52 jeeem stc: [18558] STC Overhead Ratio = 1.868519
+         (/bin/cat Source, writing to local /data/ disk)
+      -rw-rw-r-- 1 y8y users 12G Nov 29 18:18
+         /data/SNS/NOM/IPTS-0000/nexus/NOM_8888.nxs.h5
+      -rw-rw-r-- 1 y8y users 12G Nov 29 18:15
+         /TESTING/SNS/NOM/IPTS-0000/nexus/NOM_8888.nxs.h5
+
+7/13/2021:
+   - added "--fastMode" to ADARA Test Harness "NOM 8888" Test Case, with:
+      -> --fakeBase 400000 --fakeEvents 1
+      -> --fakeBMBase 20000 --fakeBMEvents 1 
+      -> uint32_t maxpulses = 60 * 60 * 1 /*5*/; // "1 minutes" worth... :-D
+      -> MAX_DATA_PKT_SIZE ( 48 * 1024 * 1024 ) [No Partial Packets Tho?]
+   - sending straight to "nc localhost 41416 > /dev/null"
+      -> 73.717723 M events/sec
+         => 589.772678 M bytes/sec
+      -> 72.487260 M events/sec
+         => 579.928454 M bytes/sec
+   - sending to "nc localhost 41416 | adara-parser > /dev/null"
+      -> 53.917330 M events/sec
+         => 431.361235 M bytes/sec
+      -> 52.714576 M events/sec
+         => 421.738695 M bytes/sec
+   - running NOM 8888 test with latest ADARA SMS/STC Devel:
+      -> commit eb33d0908390733633c78961aea0313b16303ce7
+         Author: Jeeem Kohl <kohlja@ornl.gov>
+         Date:   Tue Jun 22 15:30:48 2021 -0400
+      -> SMSD Devel pegs out 100% CPU the whole time...
+         => test-harness _Not_ heavily loaded
+         => stc_devel _Not_ heavily loaded, Until test-harness completes...?
+            -- because SMSD is too slow sending data to STC when it's
+            super busy receiving data from the test-harness...??
+         => 7.645244 M events/sec received by SMSD from test-harness...
+      -> STC Devel reports:
+         => Run Total Counts = 1512000000 in 71.980003 seconds
+         => Overall Run Bandwidth = 21005833.974504 events/sec (21 M ev/sec)
+         => Total STC Processing Time = 419.591980 seconds
+         => Overall STC Bandwidth = 3603500.715315 events/sec (3.6 M ev/sec)
+         => STC Overhead Ratio = 5.829285
+         => Total Input Stream Byte Count of ADARA packets = 11829309900
+         => Average Stream Bandwidth = 28192411.829584 bytes/sec (28 MB/sec)
+      -> why the Additional Slow-Down from SMSD (7.6 M) to STC (3.6 M)...??
+      -> running full-out STC Replay via:
+         => "/bin/cat m00000001-f000000* | /usr/local/bin/stc_devel"
+            -- 38 ADARA Stream Files, 301 MB each, 12 GB Total...
+            -- time /bin/cat m00000001-f000000* > /dev/null = 31.18 seconds
+               -> 384.862 MB/sec...
+      -> yields:
+         => Total STC Processing Time = 336.937134 seconds
+         => Overall STC Bandwidth = 4487484.009247 events/sec (4.5 M)
+         => STC Overhead Ratio = 4.680982
+         => Average Stream Bandwidth = 35108359.138016 bytes/sec (35 MB/sec)
+         => *** STC is ALSO TOO SLOW for NOMAD... ;-o
+      *** Maybe Need to Exclude STC Pre- and Post-Processing Times,
+      For More Accurate Events/Second Bandwidth Calculations... ;-D
+         => e.g. "last data packet"-ish arrives 17:39:50...
+         => Stream processing completed 17:40:41 [51 Seconds...! ;-D]
+
+7/14/2021:
+   - running NOM 8888 test with latest ADARA SMS/STC Devel:
+      -> commit 1e58afc3badb24fb5963a9d1ab6ed4e78be5fb0b
+         Author: Jeeem Kohl <kohlja@ornl.gov>
+         Date:   Wed Jul 14 14:00:13 2021 -0400
+         (Minor Fix, Less Frequent Live Control PV Update in getPulse()...)
+      -> Updated STC Wrapper Script /usr/local/bin/stc_devel
+         => use local jeeem.ornl.gov:/data directories for Test Harness,
+         to avoid perturbations by external networking & /TESTING mount:
+            # NOMAD Bandwidth Testing Setup (July 2021)
+            STC_WORK_DIR="/data/SNS/stcdata_devel"
+            STC_WORK_ROOT="/data"
+            STC_WORK_BASE="stcdata_devel"
+            STC_BASE_PATH="/data"
+            NO_ADARA="--no-adara"
+      -> SMSD Devel pegs out 100% CPU the whole time...
+         => 7.241225 M events/sec received by SMSD from test-harness...
+         => 7.081947 M events/sec received by SMSD from test-harness...
+      -> STC Devel reports:
+         => Run Total Counts = 1512000000 in 71.980003 seconds
+         => Overall Run Bandwidth = 21005833.974504 events/sec (21 M ev/sec)
+         => Total STC Processing Time = 296.652435 seconds
+         => Total STC Processing Time = 293.133331 seconds
+         => Overall STC Bandwidth = 5096873.715050 events/sec (5.1 M ev/sec)
+         => Overall STC Bandwidth = 5158062.351015 events/sec (5.2 M ev/sec)
+         => STC Overhead Ratio = 4.121317
+         => STC Overhead Ratio = 4.072427
+         => Total Input Stream Byte Count of ADARA packets = 11829309900
+         => Average Stream Bandwidth = 39875991.201381 bytes/sec (40 MB/sec)
+         => Average Stream Bandwidth = 40354707.694230 bytes/sec (40 MB/sec)
+
+7/16-19/2021:
+   - running NOM 8888 test with latest ADARA SMS/STC Devel:
+      -> commit 5e62d49db6337b8cd837f07368896a6d0d958cab
+         Author: Jeeem Kohl <kohlja@ornl.gov>
+         Date:   Fri Jul 16 18:00:16 2021 -0400
+         (Add Caching of Last Time Stamp Lookup in findContainerByTime().)
+   - inconsistent results from same exact setup, diff random seeds:
+      -> 8.615234 M events/sec received by SMSD from test-harness...
+      -> 8.602449 M events/sec received by SMSD from test-harness...
+      -> 9.336361 M events/sec received by SMSD from test-harness...
+      -> 8.570404 M events/sec received by SMSD from test-harness...
+      -> 9.147572 M events/sec received by SMSD from test-harness...
+      (Note: No VirtualBox VM running, no other system load, using:
+         ./testsuite.sh --devel --stc-base-path=/data 8888)
+

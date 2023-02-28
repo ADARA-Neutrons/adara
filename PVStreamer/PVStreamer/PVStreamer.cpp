@@ -690,6 +690,79 @@ PVStreamer::getWriteablePV( const string & a_name ) const
     return 0;
 }
 
+
+/** \brief Get or allocate a device ID for a named device
+  * \param a_protocol - Protocol of device
+  * \param a_device_name - Name of device
+  *
+  * This method is used by protocol handlers that do not use numeric Identifiers
+  * for devices. This method allocates a new ID or finds the currently assigned
+  * ID for the named device on the specified protocol. Device names must be
+  * unique within a protocol.
+  */
+Identifier
+PVStreamer::getDeviceIdentifier( Protocol a_protocol, const std::string &a_device_name )
+{
+    // Device key is protocol:device name
+    string key = boost::lexical_cast<string>(a_protocol) + ":" + a_device_name;
+
+    map<string,Identifier>::iterator d = m_dev_id.find( key );
+    if ( d != m_dev_id.end())
+        return d->second;
+
+    // Device name not found, allocate a new one
+    // ID range 1 - 999 are reserved for dynamic allocation
+    // Look for the lowest ID value not in use
+
+    Identifier id = 1;
+
+    for ( map<Identifier,string>::iterator i = m_id_dev.begin(); i != m_id_dev.end(); ++i )
+    {
+        if ( id < i->first )
+            break;
+        id = i->first + 1;
+    }
+
+    if ( id > 999 )
+        EXC( EC_INVALID_OPERATION, "Too many devices active." );
+
+    // Update indexes
+    m_dev_id[key] = id;
+    m_id_dev[id] = key;
+
+    return id;
+}
+
+
+/** \brief Release a device ID for a named device
+  * \param a_protocol - Protocol of device
+  * \param a_device_name - Name of device
+  *
+  * This method is used by protocol handlers that do not use numeric Identifiers
+  * for devices. This method release a previously reserved ID for the named
+  * device on the specified protocol.
+  */
+void
+PVStreamer::releaseDeviceIdentifier( Protocol a_protocol, const std::string &a_device_name )
+{
+    // Device key is protocol:device name
+    string key = boost::lexical_cast<string>(a_protocol) + ":" + a_device_name;
+
+    map<string,Identifier>::iterator d = m_dev_id.find( key );
+    if ( d != m_dev_id.end())
+    {
+        Identifier id = d->second;
+        m_dev_id.erase( d );
+
+        map<Identifier,string>::iterator i = m_id_dev.find( id );
+        if ( i != m_id_dev.end())
+        {
+            m_id_dev.erase( i );
+        }
+    }
+}
+
+
 // ---------- IPVReaderServices methods ---------------------------------------
 
 /**

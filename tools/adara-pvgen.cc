@@ -1,3 +1,12 @@
+
+#include "../sms/Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("ADARA-PVGen"));
+
+#include <iostream>
+#include <vector>
+#include <list>
+
 #include <sys/socket.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -6,9 +15,6 @@
 #include <netdb.h>
 #include <signal.h>
 
-#include <iostream>
-#include <vector>
-#include <list>
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
@@ -18,6 +24,7 @@
 
 #include "ADARA.h"
 #include "ReadyAdapter.h"
+#include "ADARAUtils.h"
 
 #include <fdManager.h>
 #include <epicsTimer.h>
@@ -100,7 +107,8 @@ public:
 	void wantWrite(void) {
 		if (!ready)
 			ready = new ReadyAdapter(fd, fdrWrite,
-					boost::bind(&Client::writable, this));
+					boost::bind(&Client::writable, this),
+					1 /* verbose */);
 	}
 
 	void idle(void) {
@@ -118,7 +126,9 @@ public:
 		uint32_t *field = (uint32_t *) packet;
 
 		*field++ = 8 + ((strlen(desc) + 3) & ~3);
-		*field++ = ADARA::PacketType::DEVICE_DESC_V0;
+		*field++ = ADARA_PKT_TYPE(
+			ADARA::PacketType::DEVICE_DESC_TYPE,
+			ADARA::PacketType::DEVICE_DESC_VERSION );
 		*field++ = time(NULL) - ADARA::EPICS_EPOCH_OFFSET;
 		*field++ = 0;
 
@@ -135,7 +145,9 @@ public:
 		uint32_t *field = (uint32_t *) packet;
 
 		*field++ = 16;
-		*field++ = ADARA::PacketType::VAR_VALUE_U32_V0;
+		*field++ = ADARA_PKT_TYPE(
+			ADARA::PacketType::VAR_VALUE_U32_TYPE,
+			ADARA::PacketType::VAR_VALUE_U32_VERSION );
 		*field++ = u.ts.tv_sec;
 		*field++ = u.ts.tv_nsec;
 
@@ -267,8 +279,8 @@ Listener::Listener()
 
 	try {
 		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
-					boost::bind(&Listener::newConnection,
-						    this));
+					boost::bind(&Listener::newConnection, this),
+					1 /* verbose */);
 	} catch(...) {
 		close(m_fd);
 		freeaddrinfo(ai);
@@ -326,7 +338,7 @@ public:
 		timer.start(*this, update_interval + timer_fudge);
 	}
 
-	expireStatus expire(const epicsTime &currentTime) {
+	expireStatus expire(const epicsTime &UNUSED(currentTime)) {
 		struct timespec now;
 		clock_gettime(CLOCK_REALTIME, &now);
 

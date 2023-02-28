@@ -1,0 +1,129 @@
+#!/bin/bash
+# Do not edit, managed by Puppet.
+# Source: /etc/puppetlabs/code/environments/production/modules/neutron_sciences/rsyslog/templates/scripts/rsyslogMailer.erb
+#
+# rsyslogMailer
+#
+# A script to read stdin (typically redirected from a named-pipe that
+# is written to by an RSyslog filter) and collect any "critical" log lines,
+# to be processed later by system analyzers and/or saved for posterity.
+#
+#   example usage: rsyslogMailer < /etc/rsyslog.pipes/criticalMessages
+#
+# Note: Derived from original script proposed by "john & cailin":
+#   http://www.johnandcailin.com/blog/john/
+#       how-setup-real-time-email-notification-critical-syslog-events
+# Thanks!
+#   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+#
+
+namedPipeFile="/etc/rsyslog.pipes/criticalMessages"
+
+localCacheDir="/SNSlocal/rsyslog.cache"
+
+archiveDir="/SNS/users/$USER/RSyslogErrors"
+
+altArchiveDir="/home/$USER/RSyslogErrors"
+
+fileGroup="adara"
+
+alertRecipient="$USER@ornl.gov"      # the mail recipient for alerts
+
+hostName=`hostname`                # the host are we logging from
+
+# Archive Log Errors (or Not)...?
+deactivateFile="/usr/local/bin/deactivateRsyslogMailer"
+archiveErrors=1
+if [ -f $deactivateFile ]; then
+   archiveErrors=0
+fi
+
+criticalMessages=""
+
+SAVE_ERRORS()
+{
+   if [[ "#${criticalMessages}#" != '##' ]]; then
+
+      emailLogErrors=0
+
+      # Cache Log Errors Locally for ADARA Monitor to Hand-Inspect...
+      if [[ -d ${localCacheDir} ]]; then
+         dateStr=`date +"%Y%m%d-%H%M"`
+         cacheFile="${localCacheDir}/${dateStr}.txt"
+         touch "${cacheFile}"
+         chgrp ${fileGroup} "${cacheFile}"
+         chmod ugo+w "${cacheFile}"
+         if [[ $? == 0 ]]; then
+            echo -e "${criticalMessages}" >> "${cacheFile}"
+         else
+            echo "Error Writing to Cache File: [${cacheFile}]"
+            emailLogErrors=1
+         fi
+      fi
+
+      # Archive Captured Log Errors for Posterity...
+      if [[ archiveErrors -eq 1 ]]; then
+
+         archiveFile=""
+
+         # Is the Proper Archive Directory Available...?
+         if [[ -d ${archiveDir} ]]; then
+            archiveFile="${archiveDir}/${hostName}.log.txt"
+         # Else Is the Alternate Archive Directory Available...?
+         elif [[ -d ${altArchiveDir} ]]; then
+            archiveFile="${altArchiveDir}/${hostName}.log.txt"
+         fi
+
+         # If there's an Archive File, Save Log Errors Into It...
+         if [[ -n ${archiveFile} ]]; then
+            touch "${archiveFile}"
+            chgrp ${fileGroup} "${archiveFile}"
+            chmod ugo+w "${archiveFile}"
+            if [[ $? == 0 ]]; then
+               echo -e "${criticalMessages}" >> "${archiveFile}"
+            else
+               echo "Error Writing to Archive File: [${archiveFile}]"
+               emailLogErrors=1
+            fi
+         else
+            echo "Error: No Archive File Available for Writing...!"
+            emailLogErrors=1
+         fi
+
+      fi
+
+      # On Issues with Caching or Archiving the Log Errors,
+      # Revert to Email to Ensure Critical Log Errors are Not Lost...! ;-O
+      if [[ ${emailLogErrors} != 0 ]]; then
+         # echo -e "criticalMessages:\n${criticalMessages}"
+         # send the alert email
+         echo -e "${criticalMessages}" \
+            | mailx -s "*** Critical ADARA Syslog Error $hostName ***" \
+               ${alertRecipient}
+      fi
+
+   fi
+
+   exit 0
+}
+
+trap "SAVE_ERRORS" SIGTERM
+
+# kill myself if I wait around for too long... :-b
+KILL_ME_LATER()
+(
+   sleep 300
+   # echo "Checking Signal to $$..."
+   kill -0 $$ || exit 0
+   # echo "Killing $$."
+   kill -s SIGTERM $$
+)
+
+KILL_ME_LATER &
+
+# process each line of input and capture the error log lines...
+while read line
+do
+   criticalMessages="${criticalMessages}\n${line}"
+done < $namedPipeFile
+# note: loop never exits... :)

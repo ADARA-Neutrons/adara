@@ -1,0 +1,490 @@
+#!/bin/bash
+#
+# ADARA Retranslate "Manual Processing Needed" Runs at a Beamline...
+#
+# (as so often happens hysterically, with old leftover runs that didn't
+# complete or properly translate in the past... ;-D)
+#
+
+#
+# Defaults:
+#
+
+ADARA_ADD_RUN_END="/usr/local/bin/adara_add_run_end"
+
+ADARA_PARSER="/usr/local/bin/adara-parser"
+
+DEFAULT_STC_HOST_DOMAIN="ornl.gov"
+DEFAULT_STC_HOST="stc1.${DEFAULT_STC_HOST_DOMAIN}"
+
+XINETD_DIR="/etc/xinetd.d"
+
+STC_PORT_HFIR="31420"
+STC_PORT_SNS="31417"
+
+SMS_DATA="/SNSlocal/sms/data"
+
+SMS_LOG="/var/log/smsd.log"
+
+BASENAME="/usr/bin/basename"
+DIRNAME="/usr/bin/dirname"
+HEAD="/usr/bin/head"
+TAIL="/usr/bin/tail"
+AWK="/usr/bin/awk"
+SSH="/usr/bin/ssh"
+GREP="/bin/grep"
+SED="/bin/sed"
+LS="/bin/ls"
+
+USAGE()
+{
+	echo -e "\nusage: adara_retranslate_manual \\"
+	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc_host=<STC_HOST>] \\"
+	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
+	echo "    [--stc_devel|--stc_master] (ADARA Test Harness Use Only) \\"
+	echo "    [--stc_port=<STCPort>] \\"
+	echo "    [--adara_add_run_end=<${ADARA_ADD_RUN_END}>] \\"
+	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
+	echo "    [--alt=\"-mon\"] \\"
+	echo "    [--sms_data=<${SMS_DATA}>] \\"
+	echo "    [--sms_log=<${SMS_LOG}>] \\"
+	echo "    [--run=<RunNumber1>] \\"
+	echo "    [--run=<RunNumber2,RunNumber3,...>] \\"
+	echo "    [--run=<RunNumber4-RunNumber5>] \\"
+	echo "    [--help|-h]"
+	echo
+}
+
+PARSE_RUN_NUMBERS()
+{
+	local _runlist="$1"
+
+	echo -e "\nParsing Run Numbers: [${_runlist}]"
+
+	# Strip Off Any Comma Separators...
+	_runlist=`echo "${_runlist}" | ${SED} 's/,/ /g'`
+	cksed=$?
+
+	if [[ ${cksed} != 0 ]]; then
+		echo -e "\nERROR Parsing Comma-Separated Run Number List...!"
+		echo -e "\nBailing..."
+		exit 111
+	fi
+
+	# Step Through Run Numbers Looking for Any Run Number Ranges
+	local _runlistall
+	local _run
+	for _run in ${_runlist} ; do
+		# Run Number Range
+		if [[ "${_run}" =~ - ]]; then
+			local _start
+			local _end
+			_start=`echo "${_run}" | ${AWK} -F "-" '{print $1}'`
+			_end=`echo "${_run}" | ${AWK} -F "-" '{print $2}'`
+			for (( i = _start ; i <= _end ; ++i )); do
+				if [[ -z "${_runlistall}" ]]; then
+					_runlistall="$i"
+				else
+					_runlistall="${_runlistall} $i"
+				fi
+			done
+		# Plain Run Number
+		else
+			if [[ -z "${_runlistall}" ]]; then
+				_runlistall="${_run}"
+			else
+				_runlistall="${_runlistall} ${_run}"
+			fi
+		fi
+	done
+
+	# Now Append Parsed Run Number List to Overall Run List
+	if [[ -z "${RUN_NUMBERS}" ]]; then
+		RUN_NUMBERS="${_runlistall}"
+	else
+		RUN_NUMBERS="${RUN_NUMBERS} ${_runlistall}"
+	fi
+	echo -e "\nAdding Run Number(s) ${_runlistall} to Run List."
+}
+
+ERROR_ONLY_PROMPTING=0
+
+CHECK_PROCEED()
+{
+	local _proceed_query="Proceed"
+
+	if [[ "#$1#" != '##' ]]; then
+		_proceed_query="$1"
+	fi
+
+	local _proceed_ck=""
+
+	echo -e -n "\n${_proceed_query} (yes/No)[YES/NO]? "
+	read _proceed_ck
+
+	# Activate/Deactivate "Error-Only Prompting"...
+	if [[ "${_proceed_ck}" == "YES" ]]; then
+		ERROR_ONLY_PROMPTING=1
+		echo -e "\n[Error-Only Prompting ACTIVATED!]"
+	elif [[ "${_proceed_ck}" == "NO" ]]; then
+		ERROR_ONLY_PROMPTING=0
+		echo -e "\n[Error-Only Prompting Deactivated.]"
+	fi
+
+	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ -z ${_proceed_ck} || ${_proceed_ck} == "n" \
+			|| ${_proceed_ck} == "no" ]]; then
+		return 1
+	fi
+
+	return 0
+}
+
+# Parse Command Line Options...
+
+FACILITY=""
+INST=""
+ALT=""
+
+SMS_DATA_OPT=""
+
+STC_SERVICE=""
+STC_HOST=""
+
+STC_PORT=""
+
+PRE="${BL}"
+
+RUN_NUMBERS=""
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | ${AWK} -F = '{print $1}'`
+	value=`echo "$arg" | ${AWK} -F = '{print $2}'`
+
+	if [[ "#$key#" == '#--inst#' ]]; then
+		INST="$value"
+		echo -e "\nSetting Beamline Short Name to: ${INST}"
+	elif [[ "#$key#" == '#--facility#' ]]; then
+		FACILITY="$value"
+		echo -e "\nSetting Facility Name to: ${FACILITY}"
+		if [[ ${FACILITY} == "SNS" ]]; then
+			STC_PORT="${STC_PORT_SNS}"
+			echo -e "\nSetting STC Port to: ${STC_PORT}"
+		elif [[ ${FACILITY} == "HFIR" ]]; then
+			STC_PORT="${STC_PORT_HFIR}"
+			echo -e "\nSetting STC Port to: ${STC_PORT}"
+		else
+			echo -e "\nERROR: Unknown Facility Keyword \"${FACILITY}\"...!"
+			echo -e "\nCannot Deduce STC Port...!"
+		fi
+	elif [[ "#$key#" == '#--stc1#' \
+			|| "#$key#" == '#--stc2#' \
+			|| "#$key#" == '#--stc3#' ]]; then
+		STC_HOST="${key}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+		STC_HOST_NAME=`echo "${STC_HOST}" | ${SED} 's/^--//'`
+		DEFAULT_STC_HOST="${STC_HOST_NAME}.${DEFAULT_STC_HOST_DOMAIN}"
+	elif [[ "#$key#" == '#--stc_host#' ]]; then
+		STC_HOST="${key}=${value}"
+		STC_HOST_NAME="$value"
+		echo -e "\nSetting STC Host to: ${STC_HOST_NAME}"
+		DEFAULT_STC_HOST="${STC_HOST_NAME}"
+	elif [[ "#$key#" == '#--stc#' || "#$key#" == '#--stc_test#'
+			|| "#$key#" == '#--stc_dummy#'
+			|| "#$key#" == '#--stc_hfir#'
+			|| "#$key#" == '#--stc_hfir_test#'
+			|| "#$key#" == '#--stc_devel#'
+			|| "#$key#" == '#--stc_master#' ]]; then
+		STC_SERVICE="${key}"
+		STC_SERVICE_NAME=`echo "${STC_SERVICE}" | ${SED} 's/^--//'`
+		echo -e "\nSetting STC Service to: ${STC_SERVICE_NAME}"
+		echo -e "\nContacting STC Host \"${DEFAULT_STC_HOST}\" via SSH"
+		echo "   to Get Port for STC \"${STC_SERVICE_NAME}\" Service..."
+		echo -e -n "\n${SSH} ${DEFAULT_STC_HOST}"
+		echo -e " ${GREP} port ${XINETD_DIR}/${STC_SERVICE_NAME}"
+		STC_PORT=`${SSH} ${DEFAULT_STC_HOST} \
+			${GREP} "port" ${XINETD_DIR}/${STC_SERVICE_NAME} \
+			| ${AWK} '{print $3}'`
+		echo -e -n "\nGot STC Port ${STC_PORT}"
+		echo -e " for STC \"${STC_SERVICE_NAME}\" Service."
+	elif [[ "#$key#" == '#--stc_port#' ]]; then
+		STC_PORT="$value"
+		echo -e "\nSetting STC Port to: ${STC_PORT}"
+	elif [[ "#$key#" == '#--adara_add_run_end#' ]]; then
+		ADARA_ADD_RUN_END="${value}"
+		echo -e "\nSetting ADARA Add Run End Path to:"
+		echo -e "\t[${ADARA_ADD_RUN_END}]"
+	elif [[ "#$key#" == '#--adara_parser#' ]]; then
+		ADARA_PARSER="${value}"
+		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
+	elif [[ "#$key#" == '#--alt#' ]]; then
+		ALT="$value"
+		echo -e "\nSetting Alternate SMS Suffix to: [$ALT]"
+		SMS_DATA="/SNSlocal/sms${ALT}/data"
+		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+		SMS_DATA_OPT="--sms_data=${SMS_DATA}"
+		echo -e "\nSetting SMS Data Option to:\n\t[${SMS_DATA_OPT}]"
+		SMS_LOG="/var/log/smsd${ALT}.log"
+		echo -e "\nSetting SMS Log File to:\n\t[${SMS_LOG}]"
+		# Construct SMS Live Control PV Prefix from ALT Suffix...
+		pre="${ALT}"
+		if [[ ${pre} =~ ^- ]]; then pre="${pre/-/}" ; fi # Strip Leading '-'
+		PRE=`echo "${BL}${pre}" | tr '[:lower:]' '[:upper:]'`
+		echo -e "\nSetting SMS Live Control PV Prefix to:\n\t[${PRE}]"
+	elif [[ "#$key#" == '#--sms_data#' ]]; then
+		SMS_DATA="${value%/}"
+		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+	elif [[ "#$key#" == '#--sms_log#' ]]; then
+		SMS_LOG="${value}"
+		echo -e "\nSetting SMS Log File to:\n\t[${SMS_LOG}]"
+	elif [[ "#$key#" == '#--run#' ]]; then
+		PARSE_RUN_NUMBERS "${value}"
+	elif [[ "#$key#" == '#--help#' || "#$key#" == '#-h#' ]]; then
+		USAGE
+		exit 0
+	else
+		echo -e "\nERROR: Unknown Command Line Option [${arg}]"
+		USAGE
+		exit 1
+	fi
+
+done
+
+if [[ -z "${INST}" ]]; then
+	echo -e "\nERROR: No Beamline Short Name Specified!"
+	USAGE
+	exit 2
+fi
+
+# Generate List of Raw Data Directories...
+
+DIRS=""
+
+# Generate Raw Data Directories from Run Number List...
+
+if [[ -n "${RUN_NUMBERS}" ]]; then
+
+	echo -e "\nGenerating Raw Data Directories from Run Number List..."
+
+	echo -e "\n   [${RUN_NUMBERS}]"
+
+	CHECK_PROCEED
+
+	if [[ $? != 0 ]]; then
+		echo -e "\nExiting ADARA Retranslate Manual at User's Request.\n"
+		exit 0
+	fi
+
+	for run in ${RUN_NUMBERS} ; do
+
+		echo -e "\nLooking for Run ${run}:"
+
+		dir=`${LS} -d ${SMS_DATA}/2*/*run*${run}/`
+
+		if [[ $? != 0 ]]; then
+			echo -e "\nError Finding Raw Data Directory for Run ${run}!"
+			CHECK_PROCEED
+			if [[ $? != 0 ]]; then
+				echo -e \
+				"\nExiting ADARA Retranslate Manual at User's Request.\n"
+				exit 0
+			fi
+		else
+			echo -e "\nFound Raw Data Directory for Run ${run}:"
+			echo -e "\n   [${dir}]"
+			DIRS="${DIRS} ${dir}"
+		fi
+
+	done
+
+# Check for "Manual Processing Required" Token Files...
+
+else
+
+	echo -e "\nChecking for \"Manual Processing Required\" Token Files..."
+
+	MANS=`${LS} ${SMS_DATA}/2*/*run*/man*`
+
+	for man in ${MANS} ; do
+
+		echo -e "\n$man"
+
+		dir=`${DIRNAME} ${man}`
+
+		echo -e "\ndir=[$dir]"
+
+		DIRS="${DIRS} ${dir}"
+
+	done
+
+fi
+
+# Process Raw Data Directories...
+
+LAST_RUN_ADD_END=0
+
+if [[ -n "${DIRS}" ]]; then
+	echo -e "\nProcessing Collected Raw Data Directories in Turn:"
+else
+	echo -e "\nWarning: No Raw Data Directories Found!"
+	echo -e "\nBailing...\n"
+	exit -1
+fi
+
+for dir in ${DIRS} ; do
+
+	# Get Basic Raw Data (Run Directory) Information...
+
+	echo -e "\n$dir"
+
+	echo
+	${LS} -lt $dir | ${HEAD}
+
+	run=`${BASENAME} $dir | ${AWK} -F "-" '{print $4}'`
+
+	echo -e "\nrun=[$run]"
+
+	echo
+	file=`${LS} -r ${dir}/m*.adara ${dir}/f*.adara | ${HEAD} -1`
+
+	basefile=`${BASENAME} ${file}`
+
+	echo -e "\nfile=[$basefile]"
+
+	# Decide Whether to Process This Run...
+
+	do_process_run=0
+
+	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+
+		CHECK_PROCEED "Continue with This Run..."
+
+		if [[ $? == 0 ]]; then
+			do_process_run=1
+		fi
+
+	elif [[ -n ${run} && -n ${file} && -n ${basefile} ]]; then
+
+		echo -e "\nAutomatically Continuing with This Run..."
+
+		do_process_run=1
+
+	else
+
+		echo -e "\nSomething Seems Awry...!"
+
+		CHECK_PROCEED "Continue with This Run..."
+
+		if [[ $? == 0 ]]; then
+			do_process_run=1
+		fi
+
+	fi
+
+	if [[ ${do_process_run} == 1 ]]; then
+
+		# Check Whether ADARA Add Run End is Required...
+
+		do_add_run_end=0
+
+		${ADARA_PARSER} $file | ${TAIL}
+
+		if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+
+			CHECK_PROCEED "Continue with ADARA Add Run End..."
+
+			if [[ $? == 0 ]]; then
+				do_add_run_end=1
+			fi
+
+		else
+
+			if [[ ${LAST_RUN_ADD_END} == 1 ]]; then
+				echo -e "\nAutomatically Proceeding with ADARA Add Run End."
+			else
+				echo -e "\nSkipping ADARA Add Run End Just Like Last Time."
+			fi
+
+			do_add_run_end=${LAST_RUN_ADD_END}
+
+		fi
+
+		# Do the ADARA Add Run End...
+		if [[ ${do_add_run_end} == 1 ]]; then
+
+			LAST_RUN_ADD_END=1
+
+			${ADARA_ADD_RUN_END} --inst=$INST --facility=${FACILITY} \
+				${STC_HOST} ${STC_SERVICE} \
+				--stc_port=${STC_PORT} \
+				${SMS_DATA_OPT} --run=${run}
+
+			${LS} -lt ${dir} | ${HEAD}
+
+		else
+
+			LAST_RUN_ADD_END=0
+
+			do_rescan_run_dir=0
+
+			if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+
+				CHECK_PROCEED "Continue with SMS Rescan Run Dir..."
+
+				if [[ $? == 0 ]]; then
+					do_rescan_run_dir=1
+				fi
+
+			else
+
+				echo -e "\nAutomatically Proceeding with Rescan Run Dir."
+
+				do_rescan_run_dir=1
+
+			fi
+
+			if [[ ${do_rescan_run_dir} == 1 ]]; then
+
+				pushd $dir
+
+				if [[ -f manual_processing_needed ]]; then
+					echo -e "\nRemoving manual_processing_needed Marker."
+					/bin/rm manual_processing_needed
+				fi
+
+				if [[ -f translation_completed ]]; then
+					echo -e "\nRemoving translation_completed Marker."
+					/bin/rm translation_completed
+				fi
+
+				caput -S ${PRE}:SMS:StorageManager:RescanRunDir `pwd`
+
+				sleep 3
+
+				grep "${run}" ${SMS_LOG} | ${TAIL}
+
+				echo
+
+				${LS} -lt | ${HEAD}
+
+				if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+					CHECK_PROCEED "Continue"
+				else
+					echo -e "\nContinuing with Next Run."
+				fi
+
+				popd
+
+			fi
+
+		fi
+
+	fi
+
+done
+
+echo -e "\nDone.\n"
+

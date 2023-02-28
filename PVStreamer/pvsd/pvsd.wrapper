@@ -1,0 +1,17 @@
+#!/bin/bash
+#
+# PVSD Wrapper Script
+#    - to be installed in "/usr/local/bin/pvsd" on blN-dassrv1.sns.gov
+#    - invoked by the PVSD Init Script in /etc/init.d/pvsd
+#
+# This wrapper calls:
+#    - "/usr/sbin/pvsd"
+#    - which points to "/home/controls/config-dassrv1/deploy/pvsd"
+#    - which points to the deployed binary in
+#      "/home/controls/prod/ADARA/<tag>/pvsd"...
+#
+
+exec /usr/sbin/pvsd -c /home/controls/bl999/beamline.xml --domain SNS.XXX \
+	--broker_uri tcp://amqbroker.sns.gov --broker_user wfclient \
+	--broker_pw w0rkfl0w --daemon
+

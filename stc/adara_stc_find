@@ -1,0 +1,337 @@
+#!/bin/bash
+#
+# ADARA "STC Find" Script...! ;-D
+#
+# Script to Automate the Searching for and Status Checking
+# of the STC Translation Instances for a Given Run on
+# Any or All of the Specific STC Hosts (VM or Physical).
+#
+
+#
+# Defaults:
+#
+
+STC1="stc1.ornl.gov"
+STC2="stc2.ornl.gov"
+STC3="stc3.ornl.gov"
+
+STC_NEW="${STC1} ${STC2} ${STC3}"
+
+STC1_OLD="sns-stc1.sns.gov"
+STC2_OLD="sns-stc2.sns.gov"
+
+STC_OLD="${STC1_OLD} ${STC2_OLD}"
+
+STC_ALL="${STC_NEW}"
+# Removed ${STC_OLD}, They're Gone... 5/5/2022
+
+STCVIEW="/SNS/users/$USER/stuff/exec/stcview"
+
+STCRUN="/SNS/users/$USER/stuff/exec/stcrun"
+
+SORT="/usr/bin/sort"
+TAIL="/usr/bin/tail"
+Less="/usr/bin/less"
+AWK="/usr/bin/awk"
+GREP="/bin/grep"
+SED="/bin/sed"
+WC="/usr/bin/wc"
+
+USAGE()
+{
+	echo -e "\nusage: adara_stc_find <RunNumber> \\"
+	echo "    [--stc1|--stc2|--stc3|--stc] \\"
+	echo "    [--stc1-old|--stc2-old|--stc-old] \\"
+	echo "    [--stc-all (default)] \\"
+	echo "    [--all][--last (default)] \\"
+	echo "    [--start][--status (default)][--end][--any] \\"
+	echo "    [--terse] \\"
+	echo "    [--help|-h]"
+	echo
+}
+
+CHECK_PROCEED()
+{
+	local _proceed_query="Proceed"
+	local _alt_query=0
+
+	if [[ "#$1#" != '##' ]]; then
+		_proceed_query="$1"
+		_alt_query=1
+	fi
+
+	local _proceed_ck=""
+
+	echo -e -n "\n${_proceed_query} (yes/No)? "
+	read _proceed_ck
+
+	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ -z ${_proceed_ck} || ${_proceed_ck} == "n" \
+			|| ${_proceed_ck} == "no" ]]; then
+		# Alternate Query? Just Return...
+		if [[ ${_alt_query} == 1 ]]; then
+			return 99
+		# Else Actually Exit Script...
+		else
+			echo -e "\nExiting ADARA Latest Data at User's Request.\n"
+			exit 99
+		fi
+	fi
+
+	return 0
+}
+
+#
+# Parse Command Line Arguments
+#
+
+RUN_NUMBER=""
+
+STC_HOSTS=""
+
+DO_ALL_LOGS=0
+
+DO_START=0
+DO_STATUS=1
+DO_END=0
+
+TERSE=0
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | ${AWK} -F = '{print $1}'`
+	value=`echo "$arg" | ${AWK} -F = '{print $2}'`
+
+	if [[ "#$key#" == '#--stc1#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC1}"
+		echo -e "\nAdding STC1 Host to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--stc2#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC2}"
+		echo -e "\nAdding STC2 Host to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--stc3#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC3}"
+		echo -e "\nAdding STC3 Host to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--stc#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC_NEW}"
+		echo -e "\nAdding STC VMs to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--stc1-old#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC1_OLD}"
+		echo -e "\nAdding Old STC1 Host to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--stc2-old#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC2_OLD}"
+		echo -e "\nAdding Old STC2 Host to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--stc-old#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC_OLD}"
+		echo -e "\nAdding All Old STCs to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--stc-all#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC_ALL}"
+		echo -e "\nAdding All STCs to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--all#' ]]; then
+		DO_ALL_LOGS=1
+		echo -e "\nCapturing All STC Instance Logs."
+	elif [[ "#$key#" == '#--last#' ]]; then
+		DO_ALL_LOGS=0
+		echo -e "\nCapturing Only \"Last\" STC Instance Logs."
+	elif [[ "#$key#" == '#--start#' ]]; then
+		DO_START=1
+		echo -e "\nCapturing STC \"Start\" Logs."
+	elif [[ "#$key#" == '#--status#' ]]; then
+		DO_STATUS=1
+		echo -e "\nCapturing STC \"Status\" Logs."
+	elif [[ "#$key#" == '#--end#' ]]; then
+		DO_END=1
+		echo -e "\nCapturing STC \"End\" Logs."
+	elif [[ "#$key#" == '#--any#' ]]; then
+		DO_START=1
+		DO_STATUS=1
+		DO_END=1
+		echo -e "\nCapturing Any STC Log: \"Start\", \"Status\" or \"End\"."
+	elif [[ "#$key#" == '#--terse#' ]]; then
+		TERSE=1
+		# Don't Log that Terse Mode Requested - It's Terse Mode! :-D
+	elif [[ "#$key#" == '#--help#' || "#$key#" == '#-h#' ]]; then
+		USAGE
+		exit 0
+	elif [[ $key =~ ^-- ]]; then
+		echo -e "\nError: Unknown Command Line Option [${arg}]"
+		USAGE
+		exit 1
+	else
+		RUN_NUMBER="$key"
+		echo -e "\nSetting Run Number to:  ${RUN_NUMBER}"
+	fi
+
+done
+
+if [[ -z ${STC_HOSTS} ]]; then
+	STC_HOSTS="${STC_HOSTS} ${STC_ALL}"
+	echo -e "\nDefaulting to All STCs in Hosts List:\n\n[${STC_HOSTS} ]"
+fi
+
+if [[ -z ${RUN_NUMBER} ]]; then
+	echo -e "\nError: Run Number Not Specified...!"
+	USAGE
+	exit 2
+elif [[ ${TERSE} == 0 ]]; then
+	echo -e "\nSearching for STC Instances for Run Number = ${RUN_NUMBER}."
+fi
+
+# Construct Log Grep Command
+
+GREP_CMD=""
+
+# Start ("Target Station") Log
+if [[ ${DO_START} == 1 ]]; then
+	if [[ -z ${GREP_CMD} ]]; then
+		GREP_CMD="| grep"
+	fi
+	GREP_CMD="${GREP_CMD} -e \"Target Station\""
+fi
+
+# Status ("Translation") Log
+if [[ ${DO_STATUS} == 1 ]]; then
+	if [[ -z ${GREP_CMD} ]]; then
+		GREP_CMD="| grep"
+	fi
+	GREP_CMD="${GREP_CMD} -e \"Translation\""
+fi
+
+# End ("Terminal") Log
+if [[ ${DO_END} == 1 ]]; then
+	if [[ -z ${GREP_CMD} ]]; then
+		GREP_CMD="| grep"
+	fi
+	GREP_CMD="${GREP_CMD} -e \"Terminal\""
+fi
+
+#
+# Capture STC Logs for Given Run Number on Selected STC Hosts
+#
+
+LOGS=""
+
+for host in ${STC_HOSTS} ; do
+
+	echo -e "\n${host}:"
+
+	logs=`ssh -AY ${USER}@${host} ${STCRUN} ${RUN_NUMBER} ${GREP_CMD}`
+
+	# Only Process Non-Empty Log Results... ;-D
+	if [[ -n "${logs}" ]] ; then
+
+		if [[ ${TERSE} == 0 ]]; then
+			echo "${logs}"
+		else
+			nout=`echo "${logs}" | ${WC} | ${AWK} '{print $1}'`
+			echo "[${nout} Logs]"
+		fi
+
+		# Capture *All* STC Instance Logs...
+		if [[ $DO_ALL_LOGS == 1 ]]; then
+
+			if [[ -z "${LOGS}" ]]; then
+				LOGS="${logs}"
+			else
+				LOGS="${LOGS}\n${logs}"
+			fi
+
+		# Capture Just *Last* STC Instance Logs...
+		else
+
+			last_log=`echo "${logs}" | $TAIL -1`
+
+			#echo -e "\nlast_log:\n${last_log}"
+
+			pid=`echo "${last_log}" \
+				| ${AWK} '{print $6}' | ${SED} 's/[][]//g'`
+
+			#echo -e "\npid=${pid}"
+
+			last_logs=`echo "${logs}" | ${GREP} "\[${pid}\]"`
+
+			#echo -e "\nlast_logs:\n${last_logs}"
+
+			if [[ -z "${LOGS}" ]]; then
+				LOGS="${last_logs}"
+			else
+				LOGS="${LOGS}\n${last_logs}"
+			fi
+
+		fi
+
+	fi
+
+done
+
+#echo -e "\nLOGS=[${LOGS}]"
+
+#
+# Sort Logs in Time...
+#
+
+SORT_LOGS=`echo -e "${LOGS}" | ${SORT}`
+
+#echo -e "\nSORT_LOGS=[${SORT_LOGS}]"
+
+#
+# Dump Selected STC Logs...
+#
+
+# Dump *All* STC Instance Logs...
+if [[ $DO_ALL_LOGS == 1 ]]; then
+
+	FINAL_LOGS="All STC Instances for Run: ${RUN_NUMBER}\n\n${SORT_LOGS}"
+
+# Dump Just *Last* STC Instance Logs...
+else
+
+	last_log=`echo "${SORT_LOGS}" | $TAIL -1`
+
+	#echo -e "\nlast_log:\n${last_log}"
+
+	PID=`echo "${last_log}" | ${AWK} '{print $6}' | ${SED} 's/[][]//g'`
+	#echo -e "\nPID=${PID}"
+
+	HOST=`echo "${last_log}" | ${AWK} '{print $4}'`
+	#echo -e "\nHOST=${HOST}"
+
+	last_logs=`echo "${SORT_LOGS}" | ${GREP} "\[${PID}\]"`
+
+	#echo -e "\nlast_logs:\n${last_logs}"
+
+	FINAL_LOGS="Last STC Instance for Run: ${RUN_NUMBER}\n\n${last_logs}"
+
+fi
+
+#echo -e "\nFINAL_LOGS=[${FINAL_LOGS}]"
+
+# _Always_ Spew the Final Logs for Posterity...
+
+echo -e "\n${FINAL_LOGS}"
+
+# Check for Pager Need - Re-Spew Final Logs with Pager if Long Output...
+
+nout=`echo -e "${FINAL_LOGS}" | ${WC} | ${AWK} '{print $1}'`
+
+if [[ $nout -gt 20 ]]; then
+	echo -e "\n${FINAL_LOGS}" | ${Less} +/"Run: ${RUN_NUMBER}"
+fi
+
+#
+# Prompt for STC View on Last STC Instance...
+#
+
+if [[ $DO_ALL_LOGS == 0 ]]; then
+
+	CHECK_PROCEED "Run STC View on Final Instance PID=${PID} on ${HOST}"
+
+	if [[ $? == 0 ]]; then
+		ssh -AY ${USER}@${HOST} ${STCVIEW} ${PID} \
+			| ${Less} +/"Run: ${RUN_NUMBER}"
+	fi
+
+fi
+
+echo
+

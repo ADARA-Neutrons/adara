@@ -1,0 +1,70 @@
+#!/bin/bash
+#
+# STC View Script
+#
+# Search STC Log Entries to Track the Progress of a Specific STC Process ID
+#
+
+num_files=5
+
+do_run=0
+
+if [[ "$1" == "--run" ]]; then
+	do_run=1
+	shift
+fi
+
+if [[ $# < 1 ]]; then
+	echo "usage: stcview [--run] <pid/run>"
+	exit -1
+fi
+
+if [[ $do_run == 1 ]]; then
+	run="$1"
+	pid=`stcrun --pid $run | tail -1`
+	if [[ -z "$pid" ]]; then
+		echo -e "\nRun Number ${run} Not Found on This Server.\n"
+		exit -1
+	else
+		echo -e "\nResolved Run Number ${run} as Process Id ${pid}.\n"
+	fi
+else
+	pid="$1"
+fi
+
+SEARCH_STC_LOGS()
+{
+	local _pid="$1"
+
+	files=`/bin/ls -t -r /var/log/stc.log* | tail -${num_files}`
+
+	for log in $files ; do
+
+		gzck=`echo $log | grep '.gz$' | wc | awk '{print $1}'`
+
+		if [[ $gzck == 1 ]]; then
+			zcat "$log" | grep "\[${_pid}\]"
+		else
+			grep "\[${_pid}\]" "$log"
+		fi
+
+	done
+}
+
+# Search Log Files
+log_lines=`SEARCH_STC_LOGS ${pid}`
+
+# Determine Whether Pager Required...
+
+nlines=`echo "$log_lines" | wc | awk '{print $1}'`
+
+if [[ $nlines -gt 48 ]]; then
+
+	echo "${log_lines}" | /usr/bin/less -x4
+
+else
+
+	echo "${log_lines}"
+
+fi
+

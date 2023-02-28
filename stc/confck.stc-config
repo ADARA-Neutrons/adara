@@ -1,0 +1,144 @@
+#!/bin/bash
+#
+# Script to Show the Differences Between the Deployed Configuration Files
+#    and the Git Repository Versions.
+#
+
+# Handle "Quiet" Operation Option for Cron Usage...
+# (Only output on errors...)
+UPDATE=0
+QUIET=0
+if [ "$1" == "--quiet" ]; then
+	QUIET=1
+elif [[ "$1" == "--update" ]]; then
+	UPDATE=1
+elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
+	echo -e "\nusage: confck [--quiet|--update]\n"
+	exit 0
+fi
+
+# Default Update/Installation Target Definitions
+DIFF="/usr/bin/diff"
+SUDO="/usr/bin/sudo"
+CP="/bin/cp"
+
+# Go to proper Git Config Repo Checkout, for easy checking systemwide.
+cd /home/controls/config-stc-config/
+
+diff_cnt=0
+
+#
+# Search the Given Directory for Files...
+#
+
+CONFIG_DIFF_DIR()
+{
+	file="$1"
+
+	if [[ -d $file ]]; then
+
+		echo "[$file]:"
+
+		for f in $file/* ; do
+
+			CONFIG_DIFF_DIR $f
+
+		done
+
+	elif [[ -e $file ]]; then
+
+		if [ "$file" == "README" ]; then
+			echo -e "Ignoring README.\n"
+		elif [ "$file" == "confck" ]; then
+			echo -e "Ignoring confck.\n"
+		else
+
+			echo "${DIFF} $file ${LOCAL_DATA}/$file"
+			${DIFF} "$file" "${LOCAL_DATA}/$file"
+
+			if [ $? != 0 ] ; then
+				diff_cnt=$(( $diff_cnt + 1 ))
+				# Update the Deployed System File or Git Repo File Version
+				if [[ $UPDATE == 1 ]]; then
+					echo -e "\nPush/Deploy the System File (\"sys\"),"
+					echo -e \
+						"   or Pull/Update the Git Repo File (\"repo\"),"
+					echo -n "   or Do Nothing (\"nothing\")?"
+					echo -n " [sys|repo|Nothing]: "
+					read ckUpdate
+					ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+					# Push Latest Git Repo Version to System
+					if [[ "$ckUpdate" == "s" \
+							|| "$ckUpdate" == "sys" ]]; then
+						echo "Deploying Latest Repo File to System:"
+						${SUDO} ${CP} -i "$file" "${LOCAL_DATA}/$file"
+					# Pull Latest System Version into Git Repo
+					elif [[ "$ckUpdate" == "r" \
+							|| "$ckUpdate" == "repo" ]]; then
+						echo \
+						   "Updating Repo with Latest Deployed System File:"
+						${CP} -i "${LOCAL_DATA}/$file" "$file"
+						git add "$file"
+						git commit \
+						   -m "Update Config Repo with Latest System File" \
+						   "$file"
+					# Do Nothing.
+					else
+						echo "Doing Nothing, as Requested."
+					fi
+				fi
+			fi
+
+			echo
+
+		fi
+
+	fi
+}
+
+CONFCK()
+{
+    local _status=0
+
+	#
+	# Start the Search from the Top Level (Current) Directory...
+	#
+
+	echo
+	echo -n "Comparing Deployed Configuration"
+	echo " to Current Git Repository Versions:"
+	echo
+
+	for f in * ; do
+
+		CONFIG_DIFF_DIR $f
+
+	done
+
+	#
+	# Done.
+	#
+
+	echo "$diff_cnt Files Differed."
+	echo
+
+	return $diff_cnt
+}
+
+if [[ $UPDATE == 1 ]]; then
+	CONFCK
+	_ckconfck=$?
+else
+	doConfCk=`CONFCK 2>&1`
+	_ckconfck=$?
+	if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doConfCk\n"
+	fi
+fi
+
+if [[ ${_ckconfck} != 0 ]]; then
+	echo -e "*** ConfCk FAILED...!\n"
+fi
+
+exit ${_ckconfck}
+

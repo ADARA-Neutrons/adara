@@ -23,11 +23,13 @@ enum PVState
 
 struct SignalInfo
 {
+    bool            enabled;
     std::string     name;
     std::string     fact;
     std::string     source;
     ADARA::Level    level;
     std::string     msg;
+    std::string     desc;
 };
 
 
@@ -39,12 +41,18 @@ public:
     void clear()
     {
         m_facility.clear();
+
+        m_target_station_number = 1;
+
         m_beam_id.clear();
         m_beam_sname.clear();
         m_beam_lname.clear();
     }
 
     std::string             m_facility;
+
+    uint32_t                m_target_station_number;
+
     std::string             m_beam_id;
     std::string             m_beam_sname;
     std::string             m_beam_lname;
@@ -104,6 +112,26 @@ public:
         m_stream_bps            = 0;
     }
 
+    void print( std::ostream &a_out )
+    {
+        a_out << "BeamMetrics:";
+        a_out << " Count Rate: " << m_count_rate;
+        a_out << ", Monitor Count Rate: [";
+        std::map<uint32_t,double>::iterator it;
+        for ( it = m_monitor_count_rate.begin() ;
+                it != m_monitor_count_rate.end() ; ++it )
+        {
+            if ( it != m_monitor_count_rate.begin() )
+                a_out << ",";
+            a_out << " ID " << it->first << " = " << it->second;
+        }
+        a_out << "]";
+        a_out << ", Pulse Charge: " << m_pulse_charge;
+        a_out << ", Pulse Freq: " << m_pulse_freq;
+        a_out << ", Pixel Error Rate: " << m_pixel_error_rate;
+        a_out << ", Stream BPS: " << m_stream_bps;
+    }
+
     double                      m_count_rate;
     std::map<uint32_t,double>   m_monitor_count_rate;
     double                      m_pulse_charge;
@@ -120,14 +148,40 @@ public:
 
     void clear()
     {
-        m_time                  = 0.0;
-        m_total_counts          = 0;
-        m_total_charge          = 0.0;
-        m_pixel_error_count     = 0;
-        m_dup_pulse_count       = 0;
-        m_pulse_veto_count      = 0;
-        m_mapping_error_count   = 0;
-        m_missing_rtdl_count    = 0;
+        m_time                      = 0.0;
+        m_total_counts              = 0;
+        m_total_charge              = 0.0;
+        m_pixel_error_count         = 0;
+        m_dup_pulse_count           = 0;
+        m_pulse_veto_count          = 0;
+        m_mapping_error_count       = 0;
+        m_missing_rtdl_count        = 0;
+        m_pulse_pcharge_uncorrected = 0;
+        m_got_metadata_count        = 0;
+        m_got_neutrons_count        = 0;
+        m_has_states_count          = 0;
+        m_total_pulses_count        = 0;
+        m_total_bytes_count         = 0;
+    }
+
+    void print( std::ostream &a_out )
+    {
+        a_out << "RunMetrics:";
+        a_out << " Run Time: " << m_time;
+        a_out << ", Total Bank Counts: " << m_total_counts;
+        a_out << ", Total Charge: " << m_total_charge;
+        a_out << ", Pixel Errors: " << m_pixel_error_count;
+        a_out << ", Dup Pulses: " << m_dup_pulse_count;
+        a_out << ", Pulse Vetoes: " << m_pulse_veto_count;
+        a_out << ", Mapping Errors: " << m_mapping_error_count;
+        a_out << ", Missing RTDLs: " << m_missing_rtdl_count;
+        a_out << ", Pulse PCharge Uncorrected: "
+            << m_pulse_pcharge_uncorrected;
+        a_out << ", Got MetaData: " << m_got_metadata_count;
+        a_out << ", Got Neutrons: " << m_got_neutrons_count;
+        a_out << ", Has States: " << m_has_states_count;
+        a_out << ", Total Pulses: " << m_total_pulses_count;
+        a_out << ", Total Bytes: " << m_total_bytes_count;
     }
 
     double          m_time;                 ///< Run time (seconds)
@@ -138,6 +192,12 @@ public:
     uint32_t        m_pulse_veto_count;
     uint32_t        m_mapping_error_count;
     uint32_t        m_missing_rtdl_count;
+    uint32_t        m_pulse_pcharge_uncorrected;
+    uint32_t        m_got_metadata_count;
+    uint32_t        m_got_neutrons_count;
+    uint32_t        m_has_states_count;
+    uint32_t        m_total_pulses_count;
+    uint32_t        m_total_bytes_count;
 };
 
 
@@ -170,24 +230,24 @@ public:
 
     void print( std::ostream &a_out )
     {
-        a_out << "StreamMetrics:" << std::endl;
-        a_out << "  UPT: " << m_invalid_pkt_type << std::endl;
-        a_out << "  INP: " << m_invalid_pkt << std::endl;
-        a_out << "  IPT: " << m_invalid_pkt_time << std::endl;
-        a_out << "  DUP: " << m_duplicate_packet << std::endl;
-        a_out << "  PFT: " << m_pulse_freq_tol << std::endl;
-        a_out << "  CYE: " << m_cycle_err << std::endl;
-        a_out << "  IBI: " << m_invalid_bank_id << std::endl;
-        a_out << "  BSM: " << m_bank_source_mismatch << std::endl;
-        a_out << "  DUS: " << m_duplicate_source << std::endl;
-        a_out << "  DUB: " << m_duplicate_bank << std::endl;
-        a_out << "  PME: " << m_pixel_map_err << std::endl;
-        a_out << "  PBM: " << m_pixel_bank_mismatch << std::endl;
-        a_out << "  PTF: " << m_pixel_invalid_tof << std::endl;
-        a_out << "  PUI: " << m_pixel_unknown_id << std::endl;
-        a_out << "  PER: " << m_pixel_errors << std::endl;
-        a_out << "  DDX: " << m_bad_ddp_xml << std::endl;
-        a_out << "  RIX: " << m_bad_runinfo_xml << std::endl;
+        a_out << "StreamMetrics:";
+        a_out << " Bad Pkt Type: " << m_invalid_pkt_type;
+        a_out << ", Bad Pkt: " << m_invalid_pkt;
+        a_out << ", Bad Pkt Time: " << m_invalid_pkt_time;
+        a_out << ", Dup Pkt: " << m_duplicate_packet;
+        a_out << ", Bad Intra Pulse: " << m_pulse_freq_tol;
+        a_out << ", Cycle Error: " << m_cycle_err;
+        a_out << ", Bad Bank ID: " << m_invalid_bank_id;
+        a_out << ", Bank Src Mismatch: " << m_bank_source_mismatch;
+        a_out << ", Dup Src: " << m_duplicate_source;
+        a_out << ", Dup Bank: " << m_duplicate_bank;
+        a_out << ", Pixel Map Error: " << m_pixel_map_err;
+        a_out << ", Pixel Bank Mismatch: " << m_pixel_bank_mismatch;
+        a_out << ", Bad Pixel TOF: " << m_pixel_invalid_tof;
+        a_out << ", Unknown Pixel ID: " << m_pixel_unknown_id;
+        a_out << ", Pixel Error: " << m_pixel_errors;
+        a_out << ", Bad DDP XML: " << m_bad_ddp_xml;
+        a_out << ", Bad RunInfo XML: " << m_bad_runinfo_xml;
     }
 
     uint32_t        m_invalid_pkt_type;     ///< Not a defined ADARA Packet type
@@ -210,5 +270,7 @@ public:
 };
 
 }}
+
+// vim: expandtab
 
 #endif // DASMONDEFS_H

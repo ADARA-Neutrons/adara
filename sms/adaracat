@@ -1,0 +1,541 @@
+#!/bin/bash
+#
+# ADARACat - SMS Raw Data File Concatenator Utility
+#
+
+# For Cron Usage - Source Home Shell Environment:
+if [ -e $HOME/.bash_profile ] ; then
+	source $HOME/.bash_profile
+fi
+
+# default settings
+SMSD_CONFIG="/SNSlocal/sms/conf/smsd.conf"
+SMSD_DATA="/SNSlocal/sms/data"
+SMSD_LOG="/var/log/smsd.log"
+PRE="[NotSet]"
+WAIT="-w 9"
+
+# Make Sure we found the EPICS utilities... ;-b
+epicsck=`which caget 2>&1`
+if [ $? != 0 ]; then
+    echo "Error: EPICS Utilities Not Found...! Check EPICS Path..." 1>&2
+    exit -999
+fi
+
+#
+# Determine the Beamline Host, and thereby the EPICS PV Prefix...
+#
+
+not_a_beamline_computer=0
+
+sms_host=`hostname -A | sed 's/ /\n/g' | grep '^bl'`
+sms_blnum=`echo "$sms_host" | sed 's/-.*//'`
+
+if [[ "$sms_host" == "" || "$sms_blnum" == "" ]]; then
+	echo -e "\nWarning: This is _Not_ a Beamline SMS Computer!" 1>&2
+	not_a_beamline_computer=1
+	sms_host=`hostname`
+	sms_blnum="bl99"
+fi
+
+echo -e "\nConcatenating SMS Data on Host ${sms_host} [$sms_blnum].\n" 1>&2
+
+if [ ${PRE} == "[NotSet]" ]; then
+
+	if [ ! -f $SMSD_CONFIG ]; then
+		echo -e "Error: Invalid SMSD Config File Does Not Exist!\n" 1>&2
+		echo -e "   $SMSD_CONFIG\n" 1>&2
+		exit -90
+	fi
+
+	bid_ck=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+		| wc | awk '{print $1}'`
+	if [[ "#$bid_ck#" != '#1#' ]]; then
+		echo -e "Error: Invalid Beamline Id in SMSD Config File!\n" 1>&2
+		ls -l $SMSD_CONFIG 1>&2
+		echo 1>&2
+		grep -e "beamline_id" $SMSD_CONFIG | grep -v ';' 1>&2
+		exit -91
+	fi
+
+	bid_clean=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+		| awk '{print $1$2$3}'`
+
+	bid_key=`echo "$bid_clean" | awk -F '=' '{print $1}'`
+	bid_value=`echo "$bid_clean" | awk -F '=' '{print $2}'`
+
+	if [[ "#$bid_key#" != '#beamline_id#' ]]; then
+		echo -e "Error Parsing Beamline Id in SMSD Config File!\n" 1>&2
+		ls -l $SMSD_CONFIG 1>&2
+		echo -e "\n   $bid_clean\n" 1>&2
+		exit -92
+	fi
+
+	PRE="$bid_value"
+
+	echo -e "Setting EPICS PV Prefix from SMSD Config File:\n" \
+		"   $SMSD_CONFIG\n" \
+		"      -> $bid_key = $bid_value\n" \
+		"         => [${PRE}].\n" 1>&2
+
+fi
+
+daq_ck=`echo "$sms_host" | grep "daq" | wc | awk '{print $1}'`
+if [ "#$daq_ck#" == '#1#' ]; then
+	echo -e "[DAQ Beamline Host.]\n\n" 1>&2
+fi
+
+#
+# Dump Usage
+#
+
+USAGE()
+{
+	echo "usage:  adaracat \\"
+	echo "           [--run=<RunNumber>] \\"
+	echo "           [--dir=<RunDirectory>] \\"
+	echo "           [--beamline=[${PRE}]] \\"
+	echo "           [--config=[${SMSD_CONFIG}]] \\"
+	echo "           [--sms-data=[${SMSD_DATA}]] \\"
+	echo "           [--sms-log=[${SMSD_LOG}]] \\"
+	echo "           [--send-paused-data] \\"
+	echo "           [--no-send-paused-data] \\"
+	echo "           [--help]"
+	echo
+
+	echo "where:"
+	echo
+
+	echo "   --run=<RunNumber>       = concatenate SMS files for RunNumber"
+	echo "   --dir=<RunDirectory>    = concatenate SMS RunDirectory files"
+	echo "   --beamline=BLXXX        = explicitly set Beamline PV Prefix"
+	echo "   --config=.../smsd.conf  = specify custom SMSD Config file"
+	echo "   --sms-data=.../data     = specify custom SMSD Data directory"
+	echo "   --sms-log=.../smsd.log  = specify custom SMSD Log file"
+	echo "   --send-paused-data      = force sending of paused data"
+	echo "   --no-send-paused-data   = force NOT sending of paused data"
+	echo "   --help                  = display this help/usage information"
+	echo
+}
+
+# Check for required command line option (else 'usage')
+if [ $# == 0 ]; then
+	USAGE 1>&2
+	exit -1
+fi
+
+# Send Paused Data Options:
+NeverSendPausedData=0
+AlwaysSendPausedData=1
+AutoSendPausedData=2
+
+# Parse Command Line Options...
+SendPausedData=$AutoSendPausedData
+RunDirectory=""
+RunNumber=-1
+for arg in "$@" ; do
+	# echo "arg=$arg" 1>&2
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+	# echo "key=$key" 1>&2
+    # echo "value=$value" 1>&2
+	if [ "#$key#" == '#--run#' ]; then
+		RunNumber="$value"
+		echo -e "Setting Run Number to [${RunNumber}]\n" 1>&2
+	elif [ "#$key#" == '#--dir#' ]; then
+		RunDirectory="$value"
+		echo -e "Setting Run Directory to:\n" \
+			"    [${RunDirectory}]\n" 1>&2
+	elif [ "#$key#" == '#--beamline#' ]; then
+		PRE="$value"
+		echo -e "Setting EPICS PV Prefix to [${PRE}]\n" 1>&2
+	elif [ "#$key#" == '#--config#' ]; then
+		SMSD_CONFIG="$value"
+		echo -e "Using SMS Daemon Config File in:\n" \
+			"   [${SMSD_CONFIG}]\n" 1>&2
+	elif [ "#$key#" == '#--sms-data#' ]; then
+		SMSD_DATA="$value"
+		echo -e "Using SMS Data Files in:\n" \
+			"   [${SMSD_DATA}]\n" 1>&2
+	elif [ "#$key#" == '#--sms-log#' ]; then
+		SMSD_LOG="$value"
+		echo -e "Using SMS Log File in:\n" \
+			"   [${SMSD_LOG}]\n" 1>&2
+	elif [ "#$key#" == '#--send-paused-data#' ]; then
+		SendPausedData=$AlwaysSendPausedData
+		echo -e "Manually Forcing *Always* Sending Paused Data.\n" 1>&2
+	elif [ "#$key#" == '#--no-send-paused-data#' ]; then
+		SendPausedData=$NeverSendPausedData
+		echo -e "Manually Forcing *Never* Sending Paused Data.\n" 1>&2
+	else # --help or nothing...
+		USAGE 1>&2
+		exit -1
+	fi
+done
+
+# Make Sure Some Run Information is Set...! ;-D
+if [[ $RunNumber == -1 && $RunDirectory == "" ]]; then
+
+	echo -e "Error: No Run Information Specified...!\n" 1>&2
+	echo -e "Please use the \"--run=<RunNumber>\"" \
+		"or \"--dir=<RunDirectory>\" options:\n" 1>&2
+	USAGE
+	exit -11
+
+# Determine Run Directory from Run Number...
+elif [[ $RunNumber != -1 && $RunDirectory == "" ]]; then
+
+	findDirCmd="/bin/ls -d ${SMSD_DATA}/*/*-run-${RunNumber}"
+
+	ckDir=`eval $findDirCmd 2>/dev/null | wc | awk '{print $1}'`
+
+	if [[ $ckDir != 1 ]]; then
+		echo -e \
+		"Error Finding Run Directory from Run Number ${RunNumber}!\n" 1>&2
+		eval $findDirCmd 1>&2
+		echo 1>&2
+		exit -10
+	fi
+
+	RunDirectory=`eval $findDirCmd`
+
+# Determine Run Number from Run Directory...
+elif [[ $RunDirectory != "" && $RunNumber == -1 ]]; then
+
+	if [ ! -d $RunDirectory ]; then
+		echo -e "Error: Run Directory Does Not Exist!\n" 1>&2
+		echo -e "   [$RunDirectory]\n" 1>&2
+		/bin/ls -ld "$RunDirectory" 1>&2
+		echo 1>&2
+		exit -13
+	fi
+
+	baseDir=`/bin/basename ${RunDirectory}`
+
+	RunNumber=`echo "${baseDir}" | awk -F "-" '{print $4}'`
+
+	if [[ $RunNumber == "" || ! $RunNumber =~ [0-9]+ ]]; then
+		echo -e "Error Parsing Run Number" \
+			"from Run Directory ${RunDirectory}!\n" 1>&2
+		echo -e "   RunNumber = [${RunNumber}]\n" 1>&2
+		exit -12
+	fi
+
+fi
+
+echo "Run Directory: ${RunDirectory}" 1>&2
+echo "Run Number: ${RunNumber}" 1>&2
+echo 1>&2
+
+# If Automatically Determining Whether to Send Paused Data, Determine It!
+if [[ $SendPausedData == $AutoSendPausedData ]]; then
+
+	# Note: an SMS "STCClient" reads the "SendPausedData" settings
+	# _Exactly Once_ at the Beginning of a New Translation...! ;-D
+	# So we only need to check that one "Initiating Translation" log msg!
+
+	echo -e "Checking Send Paused Data Setting for ${RunNumber} in:\n" 1>&2
+	echo -e "   [$SMSD_LOG]\n" 1>&2
+
+	stcInitLog="Initiating Translation of ${RunNumber} SendPausedData="
+
+	ckSendPaused=`grep "$stcInitLog" $SMSD_LOG`
+
+	if [[ $ckSendPaused == "" ]]; then
+
+		echo -e \
+		"Error Finding Translation Initiation Log for ${RunNumber} in:\n" \
+			1>&2
+		echo -e "   [$SMSD_LOG]\n" 1>&2
+
+		echo -e "Trying Live SMS PV Setting...\n" 1>&2
+
+		# Try Latest Live PV Settings...
+		liveSendPausedCmd="caget $WAIT ${PRE}:SMS:STCClient:SendPausedData"
+		liveSendPaused=`eval $liveSendPausedCmd | awk '{print $2}'`
+
+		if [[ $liveSendPaused == "true" ]]; then
+
+			echo -e "Using Live SMS PV" \
+				"- Sending Paused Data!\n" 1>&2
+
+			eval $liveSendPausedCmd 1>&2
+
+			SendPausedData=$AlwaysSendPausedData
+
+		elif [[ $liveSendPaused == "false" ]]; then
+
+			echo -e "Using Live SMS PV" \
+				"- NOT Sending Paused Data!\n" 1>&2
+
+			eval $liveSendPausedCmd 1>&2
+
+			SendPausedData=$NeverSendPausedData
+
+		else
+
+			echo -e "\nError Accessing Live SMS PV...!\n" 1>&2
+			echo -e "Erring on the Side of Caution" \
+				"- Sending Paused Data!\n" 1>&2
+
+			SendPausedData=$AlwaysSendPausedData
+
+		fi
+
+		echo -e "(Override with \"--send-paused-data\"" \
+			"or \"--no-send-paused-data\" options...)\n" 1>&2
+
+	else
+
+		# Parse Translation Initiation Log Message for SendPausedData...
+
+		ckSendPausedTrim=`echo $ckSendPaused | awk -F : '{print $4}' \
+			| sed "s/^ //g"`
+		echo -e "$ckSendPausedTrim\n" 1>&2
+
+		sendPaused=`echo "$ckSendPaused" | awk -F = '{print $2}'`
+
+		if [[ $sendPaused == $AlwaysSendPausedData ]]; then
+
+			echo -e "Run ${RunNumber} Set to *Send Paused Data*...!\n" 1>&2
+
+			SendPausedData=$AlwaysSendPausedData
+
+		elif [[ $sendPaused == $NeverSendPausedData ]]; then
+
+			echo -e "Run ${RunNumber} Set to *Not Send Paused Data*...!\n" \
+				1>&2
+
+			SendPausedData=$NeverSendPausedData
+
+		else
+
+			echo -e \
+			"Error: Unknown SendPausedData Value [${sendPaused}]...!\n" 1>&2
+			echo -e "Erring on the Side of Caution" \
+				"- Sending Paused Data!\n" 1>&2
+			echo -e "(Override with \"--send-paused-data\"" \
+				"or \"--no-send-paused-data\" options...)\n" 1>&2
+
+			SendPausedData=$AlwaysSendPausedData
+
+		fi
+
+	fi
+
+fi
+
+if [ $SendPausedData == $AlwaysSendPausedData ]; then
+	echo -e "Set to Send Paused Data for Run ${RunNumber}.\n" 1>&2
+elif [ $SendPausedData == $NeverSendPausedData ]; then
+	echo -e "Set to Not Send Paused Data for Run ${RunNumber}.\n" 1>&2
+else
+	echo -e "Internal Error: Unknown Send Paused Data Setting...!\n" 1>&2
+	echo -e "   SendPausedData = [${SendPausedData}]\n" 1>&2
+	exit -20
+fi
+
+# Turn On ExtGlob (as Needed) for Extended Globbing Syntax
+# (to surgically _Exclude_ the Paused Data Files, as needed... :-)
+saveExtGlob=`shopt extglob | awk '{print $2}'`
+if [[ $saveExtGlob == "off" ]]; then
+	echo -e "Setting Shell for Extended Globbing Syntax..." 1>&2
+	shopt -s extglob
+	shopt extglob 1>&2
+	echo 1>&2
+fi
+
+DUMP_ARRAY()
+{
+	local _label="$1"
+	shift
+
+	echo "${_label}:"
+
+	for i in $@ ; do
+		echo "   $i"
+	done
+
+	echo
+}
+
+# Collect the Set of Raw Data Files for the Run... (_Without_ Paused!)
+
+declare -a rawFiles
+
+# New Raw Data File Naming Convention...
+rawFilePattern="m+([0-9])-f+([0-9])-run-${RunNumber}.adara"
+
+# Old Raw Data File Naming Convention...
+rawFileOldPattern="f+([0-9])-run-${RunNumber}.adara"
+
+rawFilesCmd="/bin/ls \"${RunDirectory}\"/${rawFilePattern} \
+	\"${RunDirectory}\"/${rawFileOldPattern}"
+
+rawFiles=( `eval $rawFilesCmd 2>/dev/null` )
+
+if [[ ${#rawFiles[@]} -lt 1 ]]; then
+	echo -e \
+	"Error Finding Raw Data Files for Run Number ${RunNumber}!\n" 1>&2
+	eval $rawFilesCmd 1>&2
+	echo 1>&2
+	exit -30
+fi
+
+echo -e "Found ${#rawFiles[@]} Raw Data Files" \
+	"for Run Number ${RunNumber}.\n" 1>&2
+
+DUMP_ARRAY "rawFiles" ${rawFiles[@]} 1>&2
+
+# Now Collect Any Paused Data Files, As Needed, and Intermingle with Raw...
+
+declare -a dataFiles
+
+dataFiles=""
+
+if [ $SendPausedData == $AlwaysSendPausedData ]; then
+
+	declare -a pausedFiles
+
+	# New Raw Data File Naming Convention...
+	pausedFilePattern="m+([0-9])-f+([0-9])-p+([0-9])-run-${RunNumber}.adara"
+
+	# Old Raw Data File Naming Convention...
+	pausedFileOldPattern="f+([0-9])-p+([0-9])-run-${RunNumber}.adara"
+
+	pausedFilesCmd="/bin/ls \"${RunDirectory}\"/${pausedFilePattern} \
+		\"${RunDirectory}\"/${pausedFileOldPattern}"
+
+	pausedFiles=( `eval $pausedFilesCmd 2>/dev/null` )
+
+	echo -e "Found ${#pausedFiles[@]} Paused Data Files" \
+		"for Run Number ${RunNumber}.\n" 1>&2
+
+	DUMP_ARRAY "pausedFiles" ${pausedFiles[@]} 1>&2
+
+	#
+	# Intermingle/Sort Raw and Paused Data Files into Properly Ordered List
+	#
+	# Note: Alas, we _Can't_ just rely on the File Timestamps here, as we
+	# sometimes insert other "Addendum" files after the fact... ;-D
+	#
+	# So we have to _Manually_ sort the 2 Lists together:
+	#    -> For a Given Raw Data File, Its Paused Data Files Go *After* It!
+	#    (this is _Not_ in Alphabetical Order, unfortunately... ;-)
+	#
+
+	numPaused=${#pausedFiles[@]}
+	numRaw=${#rawFiles[@]}
+
+	p=0
+	r=0
+	d=0
+
+	# Prime the Pump! Get Next Paused Data File's File Number...
+	if [[ $p -lt $numPaused ]]; then
+		pausedFile=`basename ${pausedFiles[$p]}`
+		# New Raw Data File Naming Convention...
+		if [[ $pausedFile =~ ^m[0-9]+ ]]; then
+			pausedFileNo=`echo $pausedFile | awk -F - '{print $1"-"$2}'`
+		# Old Raw Data File Naming Convention...
+		else
+			pausedFileNo=`echo $pausedFile | awk -F - '{print $1}'`
+		fi
+		echo "pausedFile=[${pausedFile}]"
+		echo "pausedFileNo=[${pausedFileNo}]"
+	else
+		pausedFile=""
+		pausedFileNo="XXX_DONE_XXX"
+	fi
+
+	# Process Each Raw Data File...
+	while [[ $r -lt $numRaw ]]; do
+
+		# Go Ahead and Append This Next Raw Data File to Overall List...
+		# (Any Paused Data Files Go *After* Their Associated Raw Data... :-)
+		dataFiles[$d]="${rawFiles[$r]}"
+		d=$(( d + 1 ))
+
+		# Are there any Paused Data Files left to Insert...?
+		if [[ $p -lt $numPaused ]]; then
+
+			# Get This Raw Data File's File Number...
+			rawFile=`basename ${rawFiles[$r]}`
+			# New Raw Data File Naming Convention...
+			if [[ $rawFile =~ ^m[0-9]+ ]]; then
+				fileNo=`echo $rawFile | awk -F - '{print $1"-"$2}'`
+			# Old Raw Data File Naming Convention...
+			else
+				fileNo=`echo $rawFile | awk -F - '{print $1}'`
+			fi
+			echo "rawFile=[${rawFile}]"
+			echo "fileNo=[${fileNo}]"
+
+			# Is the Next Paused Data File Associated with This Raw File?
+			while [[ $pausedFileNo == $fileNo ]]; do
+
+				# Append This Associated Paused Data File to Overall List...
+				# (Paused Data Files Go *After* Their Associated Raw Data)
+				dataFiles[$d]="${pausedFiles[$p]}"
+				d=$(( d + 1 ))
+
+				# Next Raw Data File...
+				p=$(( p + 1 ))
+
+				# Get Next Paused Data File's File Number...
+				if [[ $p -lt $numPaused ]]; then
+					pausedFile=`basename ${pausedFiles[$p]}`
+					# New Raw Data File Naming Convention...
+					if [[ $pausedFile =~ ^m[0-9]+ ]]; then
+						pausedFileNo=`echo $pausedFile \
+							| awk -F - '{print $1"-"$2}'`
+					# Old Raw Data File Naming Convention...
+					else
+						pausedFileNo=`echo $pausedFile \
+							| awk -F - '{print $1}'`
+					fi
+					echo "pausedFile=[${pausedFile}]"
+					echo "pausedFileNo=[${pausedFileNo}]"
+				else
+					pausedFile=""
+					pausedFileNo="XXX_DONE_XXX"
+				fi
+
+			done
+
+		fi
+
+		# Next Raw Data File...
+		r=$(( r + 1 ))
+
+	done
+
+else
+
+	# _Not_ Using Paused Data Files, Just Pass Thru Regular Non-Paused Files
+	dataFiles=( ${rawFiles[@]} )
+
+fi
+
+# Turn ExtGlob Back Off Again, as Needed (Extended Globbing Syntax)
+if [[ $saveExtGlob == "off" ]]; then
+	echo -e "Resetting Shell to Deactivate Extended Globbing Syntax..." 1>&2
+	shopt -u extglob
+	shopt extglob 1>&2
+	echo 1>&2
+fi
+
+# NOW, Actually Go Through the Data File List and Dump them to Stdout...!
+
+DUMP_ARRAY "dataFiles" ${dataFiles[@]} 1>&2
+
+echo \
+"--------------------------- START OF DATA ---------------------------" \
+	1>&2
+
+for dataFile in ${dataFiles[@]} ; do
+
+	/bin/cat $dataFile
+
+done
+
