@@ -1,0 +1,32 @@
+record(ao,"a3"){
+    field(VAL,1)
+    field(UDF,1)
+    field(EGU,"kg")
+    field(PINI,"YES")
+}
+
+record(mbbo,"a2"){
+    field(SDEF,3)
+    field(VAL,0)
+    field(ZRVL,0)
+    field(ONVL,1)
+    field(TWVL,2)
+    field(ZRST,"Off")
+    field(ONST,"Low")
+    field(TWST,"High")
+    field(PINI,"YES")
+}
+
+record(longout,"a1"){
+    field(VAL,0)
+    field(EGU,"cps")
+    field(PINI,"YES")
+}
+
+record(ao,"a4"){
+    field(VAL,4.5)
+    field(UDF,1)
+    field(EGU,"mm")
+    field(PINI,"YES")
+}
+

@@ -1,0 +1,441 @@
+#!/bin/bash
+#
+# STC ITEMS Script
+#
+# Search STC Log Entries to Identify Runs with Potential Conflicts
+# in the specified ITEMS Sample Meta-Data, and Dump Any Inconsistencies
+#
+
+#NXLS="/SNS/users/$USER/stuff/exec/nxls"
+NXLS="$HOME/bin/nxls"
+
+CHECK_PROCEED()
+{
+	local _do_exit=1
+
+	if [[ -n "$1" ]]; then
+		echo -e "\n$1"
+		_do_exit=0
+	fi
+
+	echo -e -n "\nOk to Proceed (yes/No/quit) "
+
+	read proceed_ck
+	proceed_ck=`echo "$proceed_ck" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ "$proceed_ck" == ""
+			|| "$proceed_ck" == "n" || "$proceed_ck" == "no" ]]; then
+		if [[ ${_do_exit} == 1 ]]; then
+			echo -e "\nExiting STC ITEMS Script at User's Request.\n"
+			exit 0
+		else
+			return 1
+		fi
+
+	elif [[ "$proceed_ck" == "q" || "$proceed_ck" == "quit" ]]; then
+		echo -e "\nExiting STC ITEMS Script at User's Request.\n"
+		exit 0
+	fi
+
+	return 0
+}
+
+num_files=5
+
+if [[ $# < 1 ]]; then
+	echo "usage: stcitems [--verbose|-v] [--run] <pid/run>"
+	exit -1
+fi
+
+verbose=0
+if [[ "$1" == "--verbose" || "$1" == "-v" ]]; then
+	verbose=1
+	shift
+fi
+
+do_run=0
+if [[ "$1" == "--run" ]]; then
+	do_run=1
+	shift
+fi
+
+if [[ $do_run == 1 ]]; then
+	run="$1"
+	if [[ $verbose == 1 ]]; then
+		echo -e "\nSearching for Run Number ${run}."
+	fi
+	pid=`stcrun --pid $run | tail -1`
+	if [[ -z "$pid" ]]; then
+		echo -e "\nRun Number ${run} Not Found on This Server.\n"
+		exit -2
+	else
+		echo -e "\nResolved Run Number ${run} as Process Id ${pid}.\n"
+	fi
+else
+	pid="$1"
+	if [[ $verbose == 1 ]]; then
+		echo -e "\nSearching for Process ID ${pid}."
+	fi
+fi
+
+SEARCH_STC_LOGS()
+{
+	local _pid="$1"
+
+	files=`/bin/ls -t -r /var/log/stc.log* | tail -${num_files}`
+
+	for log in $files ; do
+
+		gzck=`echo $log | grep '.gz$' | wc | awk '{print $1}'`
+
+		if [[ $gzck == 1 ]]; then
+			zcat "$log" | grep "\[${_pid}\]"
+		else
+			grep "\[${_pid}\]" "$log"
+		fi
+
+	done
+}
+
+# Search Log Files
+log_lines=`SEARCH_STC_LOGS ${pid}`
+
+if [[ $verbose == 1 ]]; then
+	nl=`echo "${log_lines}" | wc | awk '{print $1}'`
+	echo -e "\nFound ${nl} Log Lines for Process ID ${pid}."
+fi
+
+# Try to Determine Beamline Prefix for This Run from STC Logs...
+
+morethan1=`echo "${log_lines}" | grep "More Than 1" | tail -1`
+#echo "morethan1=[$morethan1]"
+
+if [[ $verbose == 1 ]]; then
+	echo -e "\nLast \"More Than 1 PV\" Line Found:\n\n   [${morethan1}]"
+fi
+
+# Strip Off Daslogs PV Name... ;-b
+blprefix=`echo "${morethan1}" | awk -F " - Check " '{print $2}' \
+	| sed "s@/entry/DASlogs/@@" | awk -F ":" '{print $1}'`
+#echo "blprefix=[$blprefix]"
+
+if [[ $verbose == 1 ]]; then
+	echo -e "\nBeamline Prefix Found: [${blprefix}]"
+fi
+
+# Function to Dump Key Sample Meta-Data Datasets in a NeXus File
+DUMP_SAMPLE_DASLOGS()
+{
+	# Search for the Key Sample Meta-Data Datasets in the NeXus file...
+
+	# Good, We Have a NeXus File Path... ;-D
+	if [[ -n "${nexus_file_path}" ]]; then
+
+		# Dang, Don't Know Beamline Number/Prefix, Wing It... ;-Q
+		if [[ -z "${blprefix}" ]]; then
+
+			if [[ $verbose == 1 ]]; then
+				echo -e -n "\nNo Beamline PV Prefix - "
+				echo "Search for Sample Meta-Data."
+			fi
+
+			itemsgroups=`${NXLS} "${nexus_file_path}" -p /entry/DASlogs/ \
+				| grep -e "CS:ITEMS " \
+					-e "CS:ITEMS:Name " \
+					-e "CS:ITEMS:Formula " \
+				| sed -e 's/ //g' -e 's/Group//'`
+			#echo "itemsgroups=[${itemsgroups}]"
+
+			if [[ $verbose == 1 ]]; then
+				echo -e "\nDASLogs Sample Meta-Data Found:\n"
+				echo "   [${itemsgroups}]"
+			fi
+
+			itemspaths=""
+			for ig in ${itemsgroups} ; do
+				itemspaths="$itemspaths -p /entry/DASlogs/${ig}/time"
+				itemspaths="$itemspaths -p /entry/DASlogs/${ig}/value"
+			done
+			#echo "itemspaths=[$itemspaths]"
+
+			# Use ITEMS Groups to Dump Key ITEMS Sample Meta-Data PVs...
+			${NXLS} "${nexus_file_path}" ${itemspaths} -v -l
+
+		# Use Beamline Number/Prefix to Dump Key ITEMS Sample Meta-Data PVs
+		else
+
+			if [[ $verbose == 1 ]]; then
+				echo -e -n "\nDumping NeXus Sample Meta-Data PVs "
+				echo "for [${blprefix}]."
+			fi
+
+			${NXLS} "${nexus_file_path}" \
+				-p "/entry/DASlogs/${blprefix}:CS:ITEMS/time" \
+				-p "/entry/DASlogs/${blprefix}:CS:ITEMS/value" \
+				-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Name/time" \
+				-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Name/value" \
+				-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Formula/time" \
+				-p "/entry/DASlogs/${blprefix}:CS:ITEMS:Formula/value" \
+				-p "/entry/start_time" \
+				-p "/entry/end_time" \
+				-p "/entry/duration" \
+				-v -l
+		fi
+
+		# Dump NeXus File Path for Run, Might be handy... ;-D
+		echo -e "\n   ${nexus_file_path}"
+	
+	# Dang, We Don't Have a NeXus File Path... ;-Q
+	else
+
+		if [[ $verbose == 1 ]]; then
+			echo -e -n "\nNo NeXus File Path Gleaned - "
+			echo "Just Make a Sketch of the Sample Meta-Data."
+		fi
+
+		echo -e "\nThese are the Commands to be Executed:"
+
+		# Dang, Don't Even Know Beamline Number/Prefix... ;-Q
+		if [[ -z "${blprefix}" ]]; then
+
+			if [[ $verbose == 1 ]]; then
+				echo -e -n "\nNo Beamline PV Prefix Either - "
+				echo "Frankenstein a Manual Search Command..."
+			fi
+
+			echo -e "\nnexus_file_path=<NeXus_Path_Goes_Here>"
+			echo
+
+			echo "itemsgroups=\`${NXLS} \${nexus_file_path} \\"
+			echo "-p /entry/DASlogs/ \\"
+			echo "   | grep -e \"CS:ITEMS \" \\"
+			echo "      -e \"CS:ITEMS:Name \" \\"
+			echo "      -e \"CS:ITEMS:Formula \" \\"
+			echo "   | sed -e 's/ //g' -e 's/Group//'\`"
+			echo "echo -e \"\nitemsgroups=[\${itemsgroups}]\n\""
+			echo
+
+			echo "itemspaths=\"\"; \\"
+			echo "for ig in \${itemsgroups} ; do \\"
+			echo \
+			"itemspaths=\"\$itemspaths -p /entry/DASlogs/\${ig}/time\"; \\"
+			echo \
+			"itemspaths=\"\$itemspaths -p /entry/DASlogs/\${ig}/value\"; \\"
+			echo "done"
+			echo "echo -e \"\nitemspaths=[\$itemspaths]\n\""
+			echo
+
+			echo "${NXLS} \${nexus_file_path} \${itemspaths} -v -l"
+
+		# Use Beamline Number/Prefix to Show Key ITEMS Sample Meta-Data PVs
+		else
+
+			if [[ $verbose == 1 ]]; then
+				echo -e -n "\nShowing NeXus Sample Meta-Data PVs "
+				echo "for [${blprefix}]."
+			fi
+
+			echo -e "\nnexus_file_path=<NeXus_Path_Goes_Here>"
+			echo
+
+			echo "${NXLS} \${nexus_file_path} \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS/time \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS/value \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS:Name/time \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS:Name/value \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS:Formula/time \\"
+			echo "-p /entry/DASlogs/${blprefix}:CS:ITEMS:Formula/value \\"
+			echo "-p /entry/duration \\"
+			echo "-v -l"
+
+		fi
+
+	fi
+}
+
+# Determine Associated Facility, Beamline, IPTS and Run Number from Logs
+
+tsline=`echo "${log_lines}" | grep "Target Station"`
+#echo "tsline=[${tsline}]"
+
+ntslines=`echo "${tsline}" | wc | awk '{print $1}'`
+#echo "ntslines=[${ntslines}]"
+
+if [[ $verbose == 1 ]]; then
+	echo -e "\n${ntslines} Target Station Line(s) Found:\n\n   [${tsline}]"
+fi
+
+# No "Target Station" Line Found, Or *Multiple* "Target Station" Lines...
+# Search for NeXus File Paths, Or Just Dump Logs for Manual Inspection...
+if [[ -z "${tsline}" || ${ntslines} != 1 ]]; then
+
+	if [[ -z "${tsline}" ]]; then
+		echo -e "\nError: No \"Target Station\" Line Found in STC Logs..."
+	elif [[ ${ntslines} != 1 ]]; then
+		echo -e \
+		"\nError: Multiple \"Target Station\" Lines Found in STC Logs..."
+	fi
+
+	if [[ -n "${log_lines}" ]]; then
+
+		# Try to Find Some NeXus File Path(s) in the Log Lines...
+
+		nexus_lines=`echo "${log_lines}" \
+			| grep "Successfully Renamed Ne[Xx]us"`
+		#echo "nexus_lines=[$nexus_lines]"
+
+		if [[ -n "${nexus_lines}" ]]; then
+
+			if [[ $verbose == 1 ]]; then
+				echo -e "\nFound Successful NeXus File Line(s):"
+				echo -e "\n   [${nexus_lines}]"
+			fi
+
+			nexus_file_paths=`echo "$nexus_lines" | awk '{print $NF}'`
+			#echo "nexus_file_paths=[$nexus_file_paths]"
+
+			num_nexus_files=`echo "$nexus_file_paths" \
+				| wc | awk '{print $1}'`
+
+			echo -e "\nFound ${num_nexus_files} NeXus File Paths."
+
+			if [[ ${num_nexus_files} -gt 1 ]]; then
+				echo -e "\nChecking/Processing Each in Turn..."
+			fi
+
+			for nexus_file_path in ${nexus_file_paths} ; do
+
+				echo -e "\n*** ${blprefix} ***"
+
+				CHECK_PROCEED "[$nexus_file_path]"
+				cknexus=$?
+
+				if [[ $cknexus == 0 ]]; then
+					DUMP_SAMPLE_DASLOGS
+				fi
+
+			done
+
+		else
+
+			echo -e "\nNo NeXus File Log Lines Found."
+
+			echo -e "\nManual Log File Examination Required."
+
+			echo -e -n "\nDumping STC Log Lines - "
+			echo "Try to Determine NeXus File..."
+
+			echo -e \
+				"\n(Search for \"Successfully Renamed Ne[Xx]us\" line...)"
+
+			echo -e "\n*** ${blprefix} ***"
+
+			CHECK_PROCEED
+
+			# Determine Whether Pager Required...
+
+			nlines=`echo "$log_lines" | wc | awk '{print $1}'`
+
+			if [[ $nlines -gt 48 ]]; then
+
+				echo "${log_lines}" | /usr/bin/less -x4
+
+			else
+
+				echo "${log_lines}"
+
+			fi
+
+			DUMP_SAMPLE_DASLOGS
+
+		fi
+
+	else
+
+		echo -e "\n*** No STC Log Lines Found - Incorrect Process ID...?"
+
+		echo -e "\nShowing Commands for NeXus Sample Meta-Data Paths..."
+
+		CHECK_PROCEED
+
+		# Dump Out Commands for NeXus DASlogs Paths... ;-D
+		DUMP_SAMPLE_DASLOGS
+
+	fi
+
+else
+
+	# Parse "Target Station" Line into Parts...
+
+	facility=`echo "${tsline}" | awk -F "[:, ]+" '{print $13}'`
+	#echo "facility=[$facility]"
+
+	beamline=`echo "${tsline}" | awk -F "[:, ]+" '{print $14}'`
+	#echo "beamline=[$beamline]"
+
+	proposal=`echo "${tsline}" | awk -F "[:, ]+" '{print $16}'`
+	#echo "proposal=[$proposal]"
+
+	run=`echo "${tsline}" | awk -F "[:, ]+" '{print $18}'`
+	#echo "run=[$run]"
+
+	bail=0
+	if [[ -z "${facility}" ]]; then
+		echo -e "\nError Parsing Facility from STC Logs...!"
+		bail=1
+	elif [[ -z "${beamline}" ]]; then
+		echo -e "\nError Parsing Beamline from STC Logs...!"
+		bail=1
+	elif [[ -z "${proposal}" ]]; then
+		echo -e "\nError Parsing Proposal from STC Logs...!"
+		bail=1
+	elif [[ -z "${run}" ]]; then
+		echo -e "\nError Parsing Run from STC Logs...!"
+		bail=1
+	fi
+	if [[ $bail == 1 ]]; then
+		echo
+		echo "facility=[$facility]"
+		echo "beamline=[$beamline]"
+		echo "proposal=[$proposal]"
+		echo "run=[$run]"
+		echo -e "\nBailing...\n"
+		exit -3
+	elif [[ $verbose == 1 ]]; then
+		echo -e "\nRun Meta-Data Found:\n"
+		echo "facility=[$facility]"
+		echo "beamline=[$beamline]"
+		echo "proposal=[$proposal]"
+		echo "run=[$run]"
+	fi
+
+	# Construct Run Directory & NeXus Data File Name
+	# from Constituent Parts... ;-D
+
+	run_dir="/${facility}/${beamline}/${proposal}/nexus"
+	#echo "run_dir=[$run_dir]"
+
+	nexus="${beamline}_${run}.nxs.h5"
+	#echo "nexus=[$nexus]"
+
+	nexus_file_path="${run_dir}/${nexus}"
+	#echo "nexus_file_path=[$nexus_file_path]"
+
+	if [[ $verbose == 1 ]]; then
+		echo -e "\nConstructed NeXus Directory Path:"
+		echo -e "\n   [${nexus_file_path}]"
+	fi
+
+	if [[ ! -f "${nexus_file_path}" ]]; then
+		echo -e "\nError: NeXus Run File Does Not Exist/Not Readable...!\n"
+		/bin/ls -l "${nexus_file_path}"
+		echo -e "\nBailing...\n"
+		exit -4
+	fi
+
+	DUMP_SAMPLE_DASLOGS
+
+fi
+
+echo
+

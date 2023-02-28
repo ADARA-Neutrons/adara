@@ -2,21 +2,24 @@
 #define __BEAMLINE_INFO_H
 
 #include <boost/noncopyable.hpp>
-#include <boost/signal.hpp>
+#include <boost/signals2.hpp>
+#include <stdint.h>
 #include <string>
 
 class BeamlineInfo : boost::noncopyable {
 public:
-	BeamlineInfo(const std::string &id, const std::string &shortname,
-		     const std::string &longname);
+	BeamlineInfo(uint32_t targetStationNumber,
+			const std::string &id,
+			const std::string &shortName,
+			const std::string &longName);
 	~BeamlineInfo();
 
 private:
 	uint8_t *m_packet;
 	uint32_t m_packetSize;
-	boost::signals::connection m_connection;
+	boost::signals2::connection m_connection;
 
-	void onPrologue(void);
+	void onPrologue( bool capture_last );
 };
 
 #endif /* __BEAMLINE_INFO_H */

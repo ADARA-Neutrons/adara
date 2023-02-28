@@ -1,0 +1,201 @@
+#!/bin/bash
+
+#
+# Production-Deployed STC Configuration Files
+#    - on stc1.ornl.gov
+#    - on stc2.ornl.gov
+#    - on stc3.ornl.gov
+#
+
+STC_DIR="/SNS/users/$USER"
+
+STC_SSH="ssh -AY stc1.ornl.gov"
+#STC_SSH="ssh -AY stc2.ornl.gov"
+#STC_SSH="ssh -AY stc3.ornl.gov"
+
+STC_PROD="/SNS/snfs1/stcdata/stc_config.xml"
+STC_TEST="/SNS/snfs1/stcdata_test/stc_config.xml"
+STC_DUMMY="/TESTING/SNS/stcdata_dummy/stc_config.xml"
+STC_HFIR="/HFIR/stcdata_hfir/stc_config.xml"
+STC_HFIR_TEST="/HFIR/stcdata_hfir_test/stc_config.xml"
+STC_DEVEL="/TESTING/SNS/stcdata_devel/stc_config.xml"
+STC_MASTER="/TESTING/SNS/stcdata_master/stc_config.xml"
+STC_TESTING="/TESTING/SNS/stcdata/stc_config.xml"
+STC_JENKINS="/TESTING/JENKINS/SNS/stcdata/stc_config.xml"
+STC_JENKINS_DEVEL="/TESTING/JENKINS/SNS/stcdata_devel/stc_config.xml"
+
+USAGE()
+{
+	echo -e "\nusage: updateConfig [--diff] \\"
+	echo "   [ --prod | --test | --dummy | \\"
+	echo "      --hfir | --hfir-test | \\"
+	echo "      --devel | --master | --testing | \\"
+	echo "      --jenkins | --jenkins-devel | --all ]"
+	echo
+	echo "where:"
+	echo
+	echo " --diff           = don't actually update STC Configs, Diff Only"
+	echo
+	echo " --prod           = update Production STC Config"
+	echo " --test           = update Production TEST STC Config"
+	echo " --dummy          = update Production DUMMY STC Config"
+	echo " --hfir           = update Production HFIR STC Config"
+	echo " --hfir-test      = update Production HFIR TEST STC Config"
+	echo " --devel          = update ADARA Test Harness Devel STC Config"
+	echo " --master         = update ADARA Test Harness Master STC Config"
+	echo " --testing        = update ADARA Test Harness Generic STC Config"
+	echo " --jenkins        = update Jenkins Testing Master STC Config"
+	echo " --jenkins-devel  = update Jenkins Testing Devel STC Config"
+	echo
+}
+
+if [[ $# < 1 ]]; then
+	USAGE
+	exit -1
+fi
+
+CONFIGS=""
+
+DIFFONLY=0
+
+for opt in $@ ; do
+
+	if [[ $opt == "--all" && $DIFFONLY == 0 ]]; then
+		echo -e "\nAre you _Sure_ you want to Update 'All' STC Configs...?"
+		echo -e "\nThis could Break Production and/or Master Jenkins Tests!"
+		echo -en "\nContinue Updating Configs (yes/No/quit)? "
+
+		read cont_ck
+		cont_ck=`echo "$cont_ck" | tr '[:upper:]' '[:lower:]'`
+
+		if [[ "#$cont_ck#" == '#y#' || "#$cont_ck#" == '#yes#' ]]; then
+			echo -e "\nOk, Continuing to Deploy All STC Config Scripts...\n"
+		else 
+			echo -e "\nExiting Update Config Script at User's Request.\n"
+			exit 0
+		fi
+	fi
+
+	found=0
+
+	if [[ $opt == "--diff" ]]; then
+		DIFFONLY=1
+		found=1
+	fi
+
+	if [[ $opt == "--prod" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS PROD=$STC_PROD"
+		found=1
+	fi
+	if [[ $opt == "--test" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS TEST=$STC_TEST"
+		found=1
+	fi
+	if [[ $opt == "--dummy" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS DUMMY=$STC_DUMMY"
+		found=1
+	fi
+	if [[ $opt == "--hfir" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS HFIR=$STC_HFIR"
+		found=1
+	fi
+	if [[ $opt == "--hfir-test" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS HFIR-TEST=$STC_HFIR_TEST"
+		found=1
+	fi
+	if [[ $opt == "--devel" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS DEVEL=$STC_DEVEL"
+		found=1
+	fi
+	if [[ $opt == "--master" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS MASTER=$STC_MASTER"
+		found=1
+	fi
+	if [[ $opt == "--testing" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS TESTING=$STC_TESTING"
+		found=1
+	fi
+	if [[ $opt == "--jenkins" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS JENKINS=$STC_JENKINS"
+		found=1
+	fi
+	if [[ $opt == "--jenkins-devel" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS JENKINS-DEVEL=$STC_JENKINS_DEVEL"
+		found=1
+	fi
+
+	if [[ $found == 0 ]]; then
+		echo -e "\nError: Unknown Option \"$opt\"... Bailing out..."
+		USAGE
+		exit -2
+	fi
+
+done
+
+echo -e "\nProcessing STC Configs in:"
+echo "$CONFIGS" | sed "s/ /\n/g"
+
+config_temp="$STC_DIR/stc_config_update-$$.xml"
+echo -e "\nUsing Temporary STC Config File as:\n\t$config_temp\n"
+
+for config in $CONFIGS ; do
+
+	label=`echo "$config" | awk -F '=' '{print $1}'`
+	path=`echo "$config" | awk -F '=' '{print $2}'`
+
+	if [[ $DIFFONLY == 1 ]]; then
+
+		echo -e "Comparing to $label STC Config in:\n\n\t$path\n"
+
+		( echo -e "\n$path\n" ; diff ./stc_config.xml "$path" ; echo ) \
+			| less -x4
+
+		echo
+
+		continue
+
+	fi
+
+	echo -e "Updating $label STC Config in:\n\n\t$path\n"
+
+	cp "$path" $config_temp
+
+	xxdiff --title2 "[For ${label}: ${path}]" ./stc_config.xml $config_temp
+
+	# Check for File Differences...
+	diff $config_temp "$path" > /dev/null 2>&1
+	ckdiff=$?
+
+	if [[ $ckdiff != 0 ]]; then
+
+		diff $config_temp "$path" | less -x4
+
+		echo -en "Deploy Updated Config to:\n\n\t$path\n\n(yes/No/quit)? "
+
+		read deploy_ck
+		deploy_ck=`echo "$deploy_ck" | tr '[:upper:]' '[:lower:]'`
+
+		if [[ "#$deploy_ck#" == '#y#' || "#$deploy_ck#" == '#yes#' ]]; then
+			$STC_SSH cp $config_temp "$path"
+		elif [[ "#$deploy_ck#" == '#q#' \
+				|| "#$deploy_ck#" == '#quit#' ]]; then
+			echo -e "\nExiting Update Config Script at User's Request.\n"
+			/bin/rm $config_temp
+			exit 0
+		else
+			echo -e "\nOk, Leaving Deployed STC Config Script As Is...\n"
+		fi
+	
+	else
+
+		echo -e "No Change to Config File:\n\n\t$path\n"
+
+	fi
+
+done
+
+# Clean Up...
+if [[ $DIFFONLY == 0 ]]; then
+	/bin/rm $config_temp
+fi
+

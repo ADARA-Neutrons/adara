@@ -16,18 +16,24 @@ class ReadyAdapter;
 class SignalEvents {
 public:
 	typedef boost::function<void (const struct signalfd_siginfo &)> cbFunc;
-	static void registerHandler(int sig, cbFunc cb);
 
-	static int allocateRTsig(cbFunc cb);
+	SignalEvents();
+	~SignalEvents();
+
+	void registerHandler(int sig, cbFunc cb);
+
+	int allocateRTsig(cbFunc cb);
+
+	bool valid();
 
 private:
-	static std::vector<cbFunc> m_sig_map;
-	static ReadyAdapter *m_read;
-	static int m_fd;
-	static sigset_t m_sig_set;
+	std::vector<cbFunc> m_sig_map;
+	ReadyAdapter *m_read;
+	int m_fd;
+	sigset_t m_sig_set;
 
-	static void check_init(void);
-	static void signaled(void);
+	void check_init(void);
+	void signaled(void);
 };
 
 #endif /* __SIGNAL_EVENTS_H */

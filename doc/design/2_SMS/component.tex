@@ -90,10 +90,15 @@ is remapped, the new ID and time-of-flight value will be appended to a buffer
 corresponding to the appropriate detector bank.
 
 The pixel mapping and banking will be loaded from a configuration file specific
-to each beamline. This mapping shall be a one-to-one, reversible mapping such
-that no two input values map to the same output value. The revisibilty property
+to each beamline. This mapping is often (though not required to be)
+a one-to-one, reversible mapping such
+that no two input values map to the same output value.
+Except where specifically configured to be allowable,
+the reversibility property
 shall be enforced during load of the configuration, and violation will be
 considered a fatal error preventing startup of the service.
+(Note: this requirement has in general been loosened,
+see Section~\ref{section:protocol_pixel_mapping_alt_table}.)
 
 Once the end of raw frames for a pulse has been detected, the transformation
 engine will check that all packets for the pulse were received using the

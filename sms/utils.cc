@@ -1,5 +1,6 @@
 #include <stdexcept>
 #include <stdlib.h>
+#include <stdint.h>
 #include "utils.h"
 
 static uint64_t checked_multiply(uint64_t x, uint64_t y)
@@ -23,7 +24,7 @@ uint64_t parse_size(const std::string &val)
 	if (!tmp)
 		throw std::runtime_error("must be non-zero");
 	switch(*end) {
-	case 'p': case 'P': /* terabytes */
+	case 'p': case 'P': /* petabytes */
 		tmp = checked_multiply(tmp, 1024);
 	case 't': case 'T': /* terabytes */
 		tmp = checked_multiply(tmp, 1024);

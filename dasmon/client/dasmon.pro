@@ -9,9 +9,15 @@ QT       += core gui
 TARGET = dasmon
 TEMPLATE = app
 
+DEPENDPATH  +=  ../common \
+                ../../combus \
+                ../../stc \
+                ../server/engine \
+                ../../common
+
 INCLUDEPATH +=  ../common \
                 ../../combus \
-                ../../sts \
+                ../../stc \
                 ../server/engine \
                 ../../common
 
@@ -26,7 +32,7 @@ SOURCES += main.cpp \
     MainWindow.cpp
 
 HEADERS  += \
-    ../../combus/STSMessages.h \
+    ../../combus/STCMessages.h \
     ../../combus/ComBusMessages.h \
     ../../combus/ComBusAppender.h \
     ../../combus/ComBus.h \

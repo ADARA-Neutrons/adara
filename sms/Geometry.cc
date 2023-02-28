@@ -1,8 +1,14 @@
+
+#include "Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("SMS.Geometry"));
+
 #include <boost/bind.hpp>
 #include <fstream>
 #include <stdint.h>
 
 #include "ADARA.h"
+#include "ADARAUtils.h"
 #include "Geometry.h"
 #include "StorageManager.h"
 
@@ -22,6 +28,9 @@ Geometry::Geometry(const std::string &path)
 	f.seekg(0, std::ios::end);
 	contentsSize = f.tellg();
 
+	DEBUG("Found Geometry File at "
+		<< path << " - " << contentsSize << " Bytes");
+
 	/* TODO error checking, how big is too big? */
 
 	/* We need to add tailing bytes to make the payload a multiple of 4,
@@ -37,7 +46,9 @@ Geometry::Geometry(const std::string &path)
 	clock_gettime(CLOCK_REALTIME, &ts);
 
 	fields[0] = payloadSize;
-	fields[1] = ADARA::PacketType::GEOMETRY_V0;
+	fields[1] = ADARA_PKT_TYPE(
+		ADARA::PacketType::GEOMETRY_TYPE,
+		ADARA::PacketType::GEOMETRY_VERSION );
 	fields[2] = ts.tv_sec - ADARA::EPICS_EPOCH_OFFSET;
 	fields[3] = ts.tv_nsec;
 	fields[4] = contentsSize;
@@ -56,7 +67,7 @@ Geometry::Geometry(const std::string &path)
 	}
 
 	m_connection = StorageManager::onPrologue(
-				boost::bind(&Geometry::onPrologue, this));
+				boost::bind(&Geometry::onPrologue, this, _1));
 }
 
 Geometry::~Geometry()
@@ -65,7 +76,7 @@ Geometry::~Geometry()
 	m_connection.disconnect();
 }
 
-void Geometry::onPrologue(void)
+void Geometry::onPrologue( bool UNUSED(capture_last) )
 {
 	StorageManager::addPrologue(m_packet, m_packetSize);
 }

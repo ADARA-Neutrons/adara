@@ -1,0 +1,411 @@
+
+HYS_10601 (/TESTING/SNS/HYS/IPTS-0000/adara/HYS_10601.adara.INPUT)
+
+Default Chunk Size = 49152:
+- Run Total Counts = 8533 in 20.032928 seconds
+- Overall Run Bandwidth = 425.948708 events/sec
+- Total STS Processing Time = 8.639059 seconds
+- Total STS Processing Time = 3.759058 seconds (Direct)
+- Overall STS Bandwidth = 987.723308 events/sec
+- Overall STS Bandwidth = 2269.983454 events/sec (Direct)
+- STS Overhead Ratio = 0.431243
+- STS Overhead Ratio = 0.187644 (Direct)
+- 163544756 Aug 24 11:09 HYS_10601.nxs.h5.49152
+- 548328 Aug 24 11:09 HYS_10601.adara
+- nxDiff vs. ORIG: 0:08.32, 0:08.91
+- Mantid File Load = 2.89 seconds, 1.66 seconds
+
+Chunk Size = 8192:
+- Total STS Processing Time = 3.802595 seconds (101.1581%)
+- Overall STS Bandwidth = 2243.993963 events/sec (98.8550%)
+- STS Overhead Ratio = 0.189817
+- 28786356 Aug 24 19:05 HYS_10601.nxs.h5.8192 (17.6015%)
+- nxDiff vs. ORIG: 0:06.20
+- Mantid File Load = 1.66 seconds, 1.62 seconds
+
+Chunk Size = 4096:
+- Total STS Processing Time = 3.702997 seconds
+- Overall STS Bandwidth = 2304.349712 events/sec (101.5139%)
+- STS Overhead Ratio = 0.184846
+- 15310516 Aug 24 13:07 HYS_10601.nxs.h5.4096 (9.3%)
+- nxDiff vs. ORIG: 0:05.57, 0:04.79, 0:06.09
+- Mantid File Load = 1.63 seconds, 1.59 seconds
+
+Chunk Size = 1024:
+- Total STS Processing Time = 3.698146 seconds (98.3795%)
+- Overall STS Bandwidth = 2307.372331 events/sec (101.6470%)
+- STS Overhead Ratio = 0.184603
+- 5404340 Aug 24 14:01 HYS_10601.nxs.h5.1024 (3.3045%!)
+- nxDiff vs. ORIG: 0:01.13, 0:05.76
+- Mantid File Load = 1.57 seconds, 1.58 seconds
+
+HYS_10609 (/TESTING/SNS/HYS/IPTS-0000/adara/HYS_10609.adara.INPUT)
+
+Default Chunk Size = 49152:
+- Run Total Counts = 2144396 in 1814.013306 seconds
+- Overall Run Bandwidth = 1182.128044 events/sec
+- Total STS Processing Time = 28.391167 seconds
+- Total STS Processing Time = 4.384161 seconds (Direct)
+- Overall STS Bandwidth = 75530.393789 events/sec
+- Overall STS Bandwidth = 489123.461070 events/sec (Direct)
+- STS Overhead Ratio = 0.015651
+- STS Overhead Ratio = 0.002417 (Direct)
+- 181537180 Aug 24 11:10 HYS_10609.nxs.h5.49152
+- 50864376 Aug 24 11:10 HYS_10609.adara
+- nxDiff vs. ORIG: 0:08.92, 0:08.08
+- Mantid File Load = 2.93 seconds, 1.63 seconds
+
+Chunk Size = 8192:
+- Total STS Processing Time = 4.661282 seconds (106.3209%)
+- Overall STS Bandwidth = 460044.294810 events/sec (94.0548%)
+- STS Overhead Ratio = 0.002570
+- 59984284 Aug 24 19:05 HYS_10609.nxs.h5.8192 (33.0424%)
+- nxDiff vs. ORIG: 0:06.32
+- Mantid File Load = 1.89 seconds, 1.57 seconds
+
+Chunk Size = 4096:
+- Total STS Processing Time = 4.364386 seconds
+- Overall STS Bandwidth = 491339.719756 events/sec (100.4531%)
+- STS Overhead Ratio = 0.002406
+- 47426012 Aug 24 13:07 HYS_10609.nxs.h5.4096 (26.1%)
+- nxDiff vs. ORIG: 0:06.13, 0:04.91, 0:05.81
+- Mantid File Load = 1.95 seconds, 1.58 seconds
+
+Chunk Size = 1024:
+- Total STS Processing Time = 4.482211 seconds (102.2364%)
+- Overall STS Bandwidth = 478423.745352 events/sec (97.8124%)
+- STS Overhead Ratio = 0.002471
+- 38738492 Aug 24 14:01 HYS_10609.nxs.h5.1024 (21.3391%)
+- nxDiff vs. ORIG: 0:01.57, 0:06.92
+- Mantid File Load = 1.96 seconds, 1.64 seconds
+
+HYS_11087 (/TESTING/SNS/HYS/IPTS-0000/adara/HYS_11087.adara.INPUT)
+
+Default Chunk Size = 49152:
+- Run Total Counts = 1587 in 6.533201 seconds
+- Overall Run Bandwidth = 242.913075 events/sec
+- Total STS Processing Time = 8.123336 seconds
+- Total STS Processing Time = 3.564960 seconds (Direct)
+- Overall STS Bandwidth = 195.363091 events/sec
+- Overall STS Bandwidth = 445.166225 events/sec (Direct)
+- STS Overhead Ratio = 1.243393
+- STS Overhead Ratio = 0.545668 (Direct)
+- 154007868 Aug 24 11:10 HYS_11087.nxs.h5.49152
+- 294060 Aug 24 11:10 HYS_11087.adara
+- nxDiff vs. ORIG: 0:07.90, 0:08.06
+- Mantid File Load = 2.52 seconds, 1.53 seconds
+
+Chunk Size = 8192:
+- Total STS Processing Time = 3.531214 seconds (99.0533%)
+- Overall STS Bandwidth = 449.420541 events/sec (100.9556%)
+- STS Overhead Ratio = 0.540503
+- 27113788 Aug 24 19:05 HYS_11087.nxs.h5.8192 (17.6054%)
+- nxDiff vs. ORIG: 0:06.11
+- Mantid File Load = 1.62 seconds, 1.47 seconds
+
+Chunk Size = 4096:
+- Total STS Processing Time = 3.529122 seconds
+- Overall STS Bandwidth = 449.686935 events/sec (101.0155%)
+- STS Overhead Ratio = 0.540183
+- 14424380 Aug 24 13:07 HYS_11087.nxs.h5.4096 (9.3%)
+- nxDiff vs. ORIG: 0:05.58, 0:04.40, 0:05.77
+- Mantid File Load = 1.57 seconds, 1.61 seconds
+
+Chunk Size = 1024:
+- Total STS Processing Time = 3.534217 seconds (99.1376%)
+- Overall STS Bandwidth = 449.038596 events/sec (100.8698%)
+- STS Overhead Ratio = 0.540963
+- 4907324 Aug 24 14:01 HYS_11087.nxs.h5.1024 (3.1864%)
+- nxDiff vs. ORIG: 0:01.19, 0:05.27
+- Mantid File Load = 1.47 seconds, 1.49 seconds
+
+HYS_32396 (/TESTING/SNS/HYS/IPTS-0000/adara/HYS_32396.adara.INPUT)
+
+Default Chunk Size = 49152:
+- Run Total Counts = 21160 in 23.416239 seconds
+- Overall Run Bandwidth = 903.646405 events/sec
+- Total STS Processing Time = 9.117296 seconds
+- Total STS Processing Time = 3.769287 seconds (Direct)
+- Overall STS Bandwidth = 2320.863499 events/sec
+- Overall STS Bandwidth = 5613.793639 events/sec (Direct)
+- STS Overhead Ratio = 0.389358
+- STS Overhead Ratio = 0.160969 (Direct)
+- 170108124 Aug 24 11:11 HYS_32396.nxs.h5.49152
+- 868892 Aug 24 11:11 adara/HYS_32396.adara
+- nxDiff vs. ORIG: 0:08.28, 0:08.80
+- Mantid File Load = 3.66 seconds, 2.49 seconds
+
+Chunk Size = 8192:
+- Total STS Processing Time = 3.733732 seconds (99.0567%)
+- Overall STS Bandwidth = 5667.251260 events/sec (100.9522%)
+- STS Overhead Ratio = 0.159451
+- 30008540 Aug 24 19:05 HYS_32396.nxs.h5.8192 (17.6408%)
+- nxDiff vs. ORIG: 0:07.75
+- Mantid File Load = 2.37 seconds, 2.45 seconds
+
+Chunk Size = 4096:
+- Total STS Processing Time = 3.790768 seconds
+- Overall STS Bandwidth = 5581.982467 events/sec (99.4333%)
+- STS Overhead Ratio = 0.161886
+- 16041180 Aug 24 13:07 HYS_32396.nxs.h5.4096 (9.4%)
+- nxDiff vs. ORIG: 0:07.85, 0:04.85, 0:06.35
+- Mantid File Load = 2.39 seconds, 2.36 seconds
+
+Chunk Size = 1024:
+- Total STS Processing Time = 3.752838 seconds (99.5636%)
+- Overall STS Bandwidth = 5638.400040 events/sec (100.4383%)
+- STS Overhead Ratio = 0.160266
+- 5766364 Aug 24 14:02 HYS_32396.nxs.h5.1024 (3.3898%)
+- nxDiff vs. ORIG: 0:01.21, 0:06.07
+- Mantid File Load = 2.40 seconds, 2.40 seconds
+
+VIS_9999 (/TESTING/SNS/VIS/IPTS-0000/adara/VIS_9999.adara.INPUT)
+
+Default Chunk Size = 49152:
+- Run Total Counts = 2001987509 in 359.980011 seconds
+- Overall Run Bandwidth = 5561385.210014 events/sec
+- Total STS Processing Time = 626.219971 seconds
+- Total STS Processing Time = 642.729858 seconds (Direct)
+- Overall STS Bandwidth = 3196939.737888 events/sec
+- Overall STS Bandwidth = 3114819.519959 events/sec (Direct)
+- STS Overhead Ratio = 1.739597
+- STS Overhead Ratio = 1.785460 (Direct)
+- 20378584137 Aug 24 11:22 VIS_9999.nxs.h5.49152
+- 21966266996 Aug 24 11:22 VIS_9999.adara
+- nxDiff vs. ORIG: 14:00.78, 14:07.96
+- Mantid File Load = 3 minutes 49.75 seconds, 2 minutes 38.97 seconds
+- Mantid Nightly Load = 3 minutes 31.09 seconds, 2 minutes 41.19 seconds
+
+Chunk Size = 8192:
+- Total STS Processing Time = 693.193481 seconds (107.8514%)
+- Overall STS Bandwidth = 2888064.534055 events/sec (92.7201%)
+- STS Overhead Ratio = 1.925644
+- 20378845329 Aug 24 19:27 VIS_9999.nxs.h5.8192 (100.0012%)
+- nxDiff vs. ORIG: 15:08.42
+- Mantid File Load = 3 minutes 48.50 seconds, 2 minutes 27.18 seconds
+- Mantid Nightly Load = 
+
+Chunk Size = 4096:
+- Total STS Processing Time = 725.852539 seconds (112.9327%)
+- Overall STS Bandwidth = 2758118.765536 events/sec (88.5482%)
+- STS Overhead Ratio = 2.016369
+- 20394860441 Aug 24 13:19 VIS_9999.nxs.h5.4096 (100.0798%)
+- nxDiff vs. ORIG: 18:40.14 (133.3285%)
+- Mantid File Load = 5 minutes 56.70 seconds (after restart),
+     3 minutes 41.11 seconds
+- Mantid Nightly Load = 
+
+Chunk Size = 1024:
+- Total STS Processing Time = 741.990784 seconds (115.4436%)
+- Overall STS Bandwidth = 2698129.886520 events/sec (86.6223%)
+- STS Overhead Ratio = 2.061200
+- 20502982273 Aug 24 14:14 VIS_9999.nxs.h5.1024 (100.6104%)
+- nxDiff vs. ORIG: 27:11.03 ??? (194.0471%), 29:19.56
+- Mantid File Load = 8 minutes 24.98 seconds (after restart),
+     4 minutes 56.28 seconds, 4 minutes 47.73 seconds
+- Mantid Nightly Load = 
+
+REF_L_9998 (/TESTING/SNS/REF_L/IPTS-0000/adara/REF_L_9998.adara.INPUT)
+
+Default Chunk Size = 49152:
+- Run Total Counts = 2705397527 in 359.980011 seconds
+- Overall Run Bandwidth = 7515410.424005 events/sec
+- Total STS Processing Time = 503.133759 seconds
+- Total STS Processing Time = 648.012268 seconds (Direct)
+- Overall STS Bandwidth = 5377094.025303 events/sec
+- Overall STS Bandwidth = 4174917.143270 events/sec (Direct)
+- STS Overhead Ratio = 1.397671
+- STS Overhead Ratio = 1.800134 (Direct)
+- 21617554860 Aug 24 11:37 REF_L_9998.nxs.h5.49152
+- 22054803292 Aug 24 11:37 REF_L_9998.adara
+- nxDiff vs. ORIG: 21:28.81, 17:25.04
+- Mantid File Load = 3.20 seconds, 1.55 seconds
+- Mantid Nightly Load = 2.06 seconds, 1.55 seconds
+
+Chunk Size = 8192:
+- Total STS Processing Time = 664.100708 seconds (102.4827%)
+- Overall STS Bandwidth = 4073776.001709 events/sec (97.5774%)
+- STS Overhead Ratio = 1.844827
+- 21634447068 Aug 24 19:43 REF_L_9998.nxs.h5.8192 (100.0781%)
+- nxDiff vs. ORIG: 23:24.82
+- Mantid File Load = 5.18 seconds, 4.60 seconds
+- Mantid Nightly Load = 4.84 seconds, 4.21 seconds
+
+Chunk Size = 4096:
+- Total STS Processing Time = 687.055420 seconds (106.0250%)
+- Overall STS Bandwidth = 3937670.016936 events/sec (94.3173%)
+- STS Overhead Ratio = 1.908593
+- 21658662620 Aug 24 13:31 REF_L_9998.nxs.h5.4096 (100.1901%)
+- nxDiff vs. ORIG: 28:35.18 (132.5581%)
+- Mantid File Load = 8.86 seconds, 8.39 seconds
+- Mantid Nightly Load = 8.88 seconds, 8.58 seconds
+
+Chunk Size = 1024:
+- Total STS Processing Time = 681.422729 seconds (105.1558%)
+- Overall STS Bandwidth = 3970219.087080 events/sec (95.0969%)
+- STS Overhead Ratio = 1.892946
+- 21806435676 Aug 24 14:25 REF_L_9998.nxs.h5.1024 (100.8737%)
+- nxDiff vs. ORIG: 26:46.81 ??? (124.4186%), 23:18.91
+- Mantid File Load = BOOM
+- Mantid Nightly Load = 32.77 seconds, Duration 28.59 seconds
+
+NOM_9997 (/TESTING/SNS/NOM/IPTS-0000/adara/NOM_9997.adara.INPUT)
+
+Default Chunk Size = 49152:
+- Run Total Counts = 2705397527 in 359.980011 seconds
+- Overall Run Bandwidth = 7515410.424005 events/sec
+- Total STS Processing Time = 577.534363 seconds
+- Total STS Processing Time = 668.725891 seconds (Direct)
+- Overall STS Bandwidth = 4684392.308566 events/sec
+- Overall STS Bandwidth = 4045600.092582 events/sec (Direct)
+- STS Overhead Ratio = 1.604351
+- STS Overhead Ratio = 1.857675 (Direct)
+- 21685765464 Aug 24 11:47 NOM_9997.nxs.h5.49152
+- 22108581484 Aug 24 11:47 NOM_9997.adara
+- nxDiff vs. ORIG: 17:19.10, 17:27.32
+- Mantid File Load = 
+- Mantid Nightly Load = 7 minutes 26.33 seconds, 8 minutes 57.48 seconds
+     6 minutes 32.64 seconds
+
+Chunk Size = 8192:
+- Total STS Processing Time = 665.846680 seconds (99.5694%)
+- Overall STS Bandwidth = 4063093.816537 events/sec (100.4324%)
+- STS Overhead Ratio = 1.849677
+- 21657892056 Aug 24 19:55 NOM_9997.nxs.h5.8192 (99.8714%)
+- nxDiff vs. ORIG: 18:29.15
+- Mantid File Load = 
+- Mantid Nightly Load = 7 minutes 44.29 seconds, 9 minutes 6.17 seconds
+     8 minutes 34.33 seconds
+
+Chunk Size = 4096:
+- Total STS Processing Time = 675.780212 seconds (101.0548%)
+- Overall STS Bandwidth = 4003368.961311 events/sec (98.9561%)
+- STS Overhead Ratio = 1.877271
+- 21677451360 Aug 24 13:42 NOM_9997.nxs.h5.4096 (99.9616%)
+- nxDiff vs. ORIG: 26:36.15 (152.8875%)
+- Mantid File Load = 
+- Mantid Nightly Load = 9 minutes 56.25 seconds, BOOM
+     10 minutes 34.05 seconds
+
+Chunk Size = 1024:
+- Total STS Processing Time = 712.201965 seconds (106.5013%)
+- Overall STS Bandwidth = 3798638.109260 events/sec (93.8955%)
+- STS Overhead Ratio = 1.978449
+- 21822608536 Aug 24 14:37 NOM_9997.nxs.h5.1024 (100.6310%)
+- nxDiff vs. ORIG: 37:00.11 (213.4656%), 38:30.14
+- Mantid File Load = 
+- Mantid Nightly Load = 15 minutes 59.82 seconds
+
+VIS_26484 (/SNS/VIS/IPTS-16527/nexus/VIS_26484.nxs.h5)
+
+Default Chunk Size = 49152:
+- 4449644745 Aug 26 16:49 VIS_26484.nxs.h5
+- Mantid Nightly Load = 1.73 seconds, 0.91 seconds, 0.95 seconds
+
+Chunk Size = 8192:
+- Total STS Processing Time = 72.170410 seconds
+- Overall STS Bandwidth = 2317.750441 events/sec
+- STS Overhead Ratio = 2.860171
+- 4385992913 Aug 26 17:47 VIS_26484.nxs.h5.8192 (98.5695%)
+- Mantid Nightly Load = 0.95 seconds, 0.88 seconds
+
+Chunk Size = 4096:
+- Total STS Processing Time = 66.810265 seconds
+- Overall STS Bandwidth = 2503.702104 events/sec
+- STS Overhead Ratio = 2.647744
+- 4379693265 Aug 26 17:50 VIS_26484.nxs.h5.4096 (98.4279%)
+- Mantid Nightly Load = 0.88 seconds, 0.92 seconds
+
+Chunk Size = 1024:
+- Total STS Processing Time = 70.034508 seconds
+- Overall STS Bandwidth = 2388.436863 events/sec
+- STS Overhead Ratio = 2.775524
+- 4375083217 Aug 26 17:52 VIS_26484.nxs.h5.1024 (98.3243%)
+- Mantid Nightly Load = 0.89 seconds, 0.92 seconds
+
+Compression Tests:
+------------------
+
+SEQ_103285.nxs.h5 (ORIG)
+- 9115699823 Aug 23 12:19
+- Mantid File Load = 
+- Mantid Nightly Load = 1 minutes 18.72 seconds, 23.79 seconds, 22.71 secs
+
+Chunk Size = 262144:
+- Total STS Processing Time = 156.415588 seconds
+- Overall STS Bandwidth = 13628.692780 events/sec
+- STS Overhead Ratio = 0.001706
+- 9856310559 Aug 26 17:37 SEQ_103285.nxs.h5.262144 (108.1245%)
+- Mantid Nightly Load = 27.68 seconds, 20.21 seconds
+
+Chunk Size = 8192:
+- Total STS Processing Time = 167.837784 seconds
+- Overall STS Bandwidth = 12701.192494 events/sec
+- STS Overhead Ratio = 0.001831
+- 8983201847 Aug 26 17:11 SEQ_103285.nxs.h5.8192 (98.5464%)
+- Mantid Nightly Load = 1 minutes 36.17 seconds, 23.69 seconds
+
+Chunk Size = 4096:
+- Total STS Processing Time = 170.129501 seconds
+- Overall STS Bandwidth = 12530.101970 events/sec
+- STS Overhead Ratio = 0.001856
+- 8974738455 Aug 26 17:16 SEQ_103285.nxs.h5.4096 (98.4536%)
+- Mantid Nightly Load = 26.29 seconds, 24.57 seconds
+
+Chunk Size = 1024:
+- Total STS Processing Time = 237.246353 seconds
+- Overall STS Bandwidth = 8985.343596 events/sec
+- STS Overhead Ratio = 0.002588
+- 8993258119 Aug 26 17:22 SEQ_103285.nxs.h5.1024 (98.6568%)
+- Mantid Nightly Load = 33.92 seconds, 34.36 seconds
+
+bar.nxs.h5 (SEQ_103285.nxs.h5 wuith GZIP=1)
+- 446224878 Aug 23 12:27 (4.8951%)
+- Mantid File Load = 
+- Mantid Nightly Load = 46.57 seconds, 44.57 seconds
+
+bozo.nxs.h5 (SEQ_103285.nxs.h5 wuith GZIP=9)
+- 406577114 Aug 23 12:54 (4.4601%)
+- Mantid File Load = 
+- Mantid Nightly Load = 46.66 seconds, 44.02 seconds
+
+
+Current PFS Lustre Filesystem Usage:
+
+* /SNS/HYS/IPTS-*/nexus/*.nxs.h5
+   - 102959 NeXus Files
+   - 1.4T total
+   - wastedBytes = 1581383703840 (1472G)
+* /SNS/SEQ/IPTS-*/nexus/*.nxs.h5
+   - 67659 NeXus Files
+   - 7.7T total
+   - wastedBytes = 1727331757398 (1608G)
+* /SNS/CORELLI/IPTS-*/nexus/*.nxs.h5
+   - 31120 NeXus Files
+   - 8.9T total
+   - wastedBytes = 462338521374 (430G)
+* /SNS/USANS/IPTS-*/nexus/*.nxs.h5
+   - 23179 NeXus Files
+   - 663G total
+   - wastedBytes = 37150404576 (34G)
+* /SNS/NOM/IPTS-*/nexus/*.nxs.h5
+   - 1918 NeXus Files
+   - 2.0T total
+   - wastedBytes = 154635248568 (144G)
+* /SNS/PG3/IPTS-*/nexus/*.nxs.h5
+   - 6792 NeXus Files
+   - 234G total
+   - wastedBytes = 820296974016 (763G)
+* /SNS/VIS/IPTS-*/nexus/*.nxs.h5
+   - 22503 NeXus Files
+   - 86T total
+   - wastedBytes = 484036462389 (450G)
+-> Total Wasted Bytes = 5267173072161 (4905G = 4.9T)
+
+   $ df -h /SNS/lustre/
+   Filesystem            Size  Used Avail Use% Mounted on
+   128.219.165.68:/SNS/lustre
+                         1.1P  728T  301T  71% /SNS/lustre
+
+   (Only adds about 1.6% on top of currently available space... ;-)
+

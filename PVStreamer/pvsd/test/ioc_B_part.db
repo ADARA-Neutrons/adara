@@ -1,0 +1,36 @@
+record(ao,"b1"){
+    field(VAL,2)
+    field(UDF,1)
+    field(EGU,"m/s")
+    field(PINI,"YES")
+}
+
+
+record(mbbo,"b3"){
+    field(SDEF,4)
+    field(VAL,0)
+    field(ZRVL,0)
+    field(ONVL,1)
+    field(TWVL,2)
+    field(THVL,3)
+    field(ZRST,"Off")
+    field(ONST,"Low")
+    field(TWST,"Med")
+    field(THST,"High")
+    field(PINI,"YES")
+}
+
+record(mbbo,"b4"){
+    field(SDEF,4)
+    field(VAL,0)
+    field(ZRVL,0)
+    field(ONVL,1)
+    field(TWVL,2)
+    field(THVL,3)
+    field(ZRST,"Off")
+    field(ONST,"Low")
+    field(TWST,"Med")
+    field(THST,"High")
+    field(PINI,"YES")
+}
+

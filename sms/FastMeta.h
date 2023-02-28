@@ -7,6 +7,8 @@
 #include <string>
 #include <map>
 
+#include "SMSControl.h"
+
 class MetaDataMgr;
 
 class FastMeta {
@@ -16,14 +18,19 @@ public:
 
 	void addDevices(const boost::property_tree::ptree &conf);
 
-	bool validVariable(uint32_t pixel) {
+	bool validVariable(uint32_t pixel, uint32_t &key) {
 		/* Our variables are indexed by the type and device ID,
 		 * which are the upper 15 bits of the pixel.
 		 */
-		return !!m_vars.count(pixel & ~0xffff);
+		key = pixel & ~0xffff;
+		return !!m_vars.count(key);
 	}
 
+	void addGenericDevice(uint32_t pixel, uint32_t &key);
+
 	void sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof);
+
+	void sendMultUpdate(uint64_t pulse_id, SMSControl::EventVector events);
 
 private:
 	struct Variable {

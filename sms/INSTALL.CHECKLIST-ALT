@@ -1,0 +1,444 @@
+
+ADARA SMS-MON "Alternate"/Secondary Install Checklist
+
+	- for a New or Upgraded DAQ1 Host...
+
+*** ADARA Git Repository ***
+
+Please note that in the following installation instructions, it is
+assumed the ADARA Git Repository has been checked out/cloned into:
+
+   ~/gitsrc/ADARA
+
+from the Git repository in:
+
+   git+ssh://trac.sns.gov/var/repos/ADARA
+
+i.e.:
+
+   git clone git+ssh://trac.sns.gov/var/repos/ADARA ~/gitsrc/ADARA
+
+If you place your clone of the ADARA Git Repository into a different
+base directory in the filesystem, then you will need to update this
+source directory location for any configuration files being copied
+from the ADARA Git Repository.
+
+*** Note: to ensure proper file permissions for captured system files,
+please set your shell "umask" as follows before proceeding! ;-D
+
+   umask 0002
+
+# NOTE: If Verifying the State of an Existing Git Config Repository,
+# Please Skip Step 1.a. and Proceed to Step 1.b. :-D 
+
+1.a. Create Initial SMSD-MON Configuration on New Beamline/Host:
+
+	# Make Top Level Home Controls Area...
+
+	ls -ld /home/controls
+
+	sudo mkdir /home/controls
+
+	sudo chown controls /home/controls
+
+	sudo chgrp slowcontrols_developers /home/controls
+
+	sudo chmod g+ws /home/controls/
+
+	ls -ld /home/controls
+
+	# Create New Git Config Repo Branch, Copy/Steal from Existing Branch!
+
+	ls -l /home/controls/config-daq1-mon/
+
+	git clone git+ssh://trac.sns.gov/var/repos/config \
+		/home/controls/config-daq1-mon/
+
+	cd /home/controls/config-daq1-mon/
+
+	OLD="XXX-daq1-mon"   # "Old" or Existing Beamline Branch to Copy From
+
+	NEW="YYY-daq1-mon"   # "New" Beamline Branch Being Created
+
+	git checkout ${OLD}
+
+	git branch ${NEW}
+
+	git checkout ${NEW}
+
+	git branch -d ${OLD}
+
+	git branch -a | head
+
+		* YYY-daq1-mon
+		  master
+		  remotes/origin/HEAD -> origin/master
+		  . . .
+
+	# (Only needed when converting from a Primary SMS Deployment config...)
+
+	(git rm -r deploy/ sms/deployment.history.txt)
+
+	(git commit -m "Clearing Deployment History from Copied Branch" \
+		deploy/ sms/deployment.history.txt)
+
+	git status
+
+	git push origin ${NEW}
+
+	RedHat6:
+	vi .git/config
+		- add section:
+			[branch "YYY-daq1-mon"]
+				remote = origin
+				merge = refs/heads/YYY-daq1-mon
+
+	RedHat7:
+	git branch --set-upstream-to=origin/${NEW} ${NEW}
+
+	git push
+
+	git status
+
+	# Populate New Branch with Schtuff...! ;-D
+
+	### NOTE: If Just Copied Complete Setup from Existing Branch,
+	### Then Edit SMS-MON Config File and Please Proceed to Step 1.b. :-D
+
+	vi sms-mon/conf/smsd.conf
+		- set beamline_id = BLXXXMON
+		- set beamline_longname = BEAMLINE0
+		- set beamline_shortname = BL0
+		- set "preprocessor" uri = 127.0.0.1:31420
+		(distinct from 31416 prod)
+		- set "pvsd" data source uri = blXXX-dassrv1.sns.gov:31416
+		- set "storage" percent = 10 (don't steal storage from production!)
+		- set "combus" domain = SNS.BL0
+		- set "combus" broker_uri = tcp://amqbroker.sns.gov:61616
+		(use "amqbrokerdev" for commissioning/testing...!)
+		- set "livestream" service = 31419 (distinct from 31415 production)
+
+	### Else Proceed with Step 1.a to Create Brand New Config. :-D
+
+	# Remove Any "brdo" (BranchDo) Script Inherited from "master" Branch...
+
+	git rm brdo
+	git commit -m "Remove BranchDo Script from Master Branch" brdo
+
+	# Get/Copy/Create a "confck" Script...
+
+	cp /SNS/users/$USER/confck.smsd-mon confck
+	git add confck
+	git commit -m "Install ConfCk Script." confck
+
+	./confck
+
+	# SMSD-MON Init Script
+
+	mkdir sms-mon
+
+	sudo cp ~/gitsrc/ADARA/sms/smsd.initscript /etc/init.d/smsd-mon
+
+	ifconfig [Obtain Local Beamline IP/Subnet Address, i.e. 10.111.14.255]
+
+	sudo vi /etc/init.d/smsd-mon
+		- replace: EPICS_CA_ADDR_LIST="10.111.XXX.255 160.91.228.17"
+			-> e.g. with: EPICS_CA_ADDR_LIST="10.111.14.255"
+
+	cp /etc/init.d/smsd-mon sms-mon/smsd-mon.initscript
+
+	# ADARA Mailer Config
+
+	sudo cp /SNS/users/$USER/adaraMailer.conf \
+		/etc/rsyslog.d/adaraMailer.conf
+
+	cp /etc/rsyslog.d/adaraMailer.conf sms-mon/adaraMailer.conf
+
+	git add sms-mon
+	git commit -m "SMS-MON Base Config Directory." sms-mon
+
+	./confck
+
+	# Create Alternate SMS Directories in /SNSlocal/sms-mon/...
+
+	ls -l /SNSlocal/sms-mon
+
+	sudo mkdir /SNSlocal/sms-mon
+
+	sudo chmod g+ws /SNSlocal/sms-mon
+
+	sudo mkdir /SNSlocal/sms-mon/conf /SNSlocal/sms-mon/data
+
+	sudo chown -R snsdata /SNSlocal/sms-mon
+
+	sudo chgrp -R adara /SNSlocal/sms-mon
+
+	# Create SMSD-MON Config File...
+
+	mkdir sms-mon/conf
+
+	sudo cp ~/gitsrc/ADARA/sms/conf/smsd.conf \
+		/SNSlocal/sms-mon/conf/smsd.conf
+
+	sudo vi /SNSlocal/sms-mon/conf/smsd.conf
+		- set beamline_id = BLXXXMON
+		- set beamline_longname = BEAMLINE0
+		- set beamline_shortname = BL0
+		- set "preprocessor" uri = 127.0.0.1:31420
+		(distinct from 31416 prod)
+		- set "pvsd" data source uri = blXXX-dassrv1.sns.gov:31416
+		- set "storage" percent = 10 (don't steal storage from production!)
+		- set "combus" domain = SNS.BL0
+		- set "combus" broker_uri = tcp://amqbroker.sns.gov:61616
+		(use "amqbrokerdev" for commissioning/testing...!)
+		- set "livestream" service = 31419 (distinct from 31415 production)
+
+	cp /SNSlocal/sms-mon/conf/smsd.conf sms-mon/conf/smsd.conf
+
+	# Steal Pixel Mapping Table and Geometry from Production SMS Config
+
+	cp /SNSlocal/sms/conf/pixelmap ./sms-mon/conf
+	cp /SNSlocal/sms/conf/geometry.xml ./sms-mon/conf
+
+	git add sms-mon/conf
+	git commit -m "SMS-MON Config Files." sms-mon
+
+	# Create Initial SMS-MON "Next Run" Data File...
+
+	sudo vi /SNSlocal/sms-mon/data/next_run
+		- set First Run Number for New Beamline/Commissioning...
+			-> "12345"
+
+	# Copy SMS-MON Config Files into /SNSlocal/sms-mon/conf/...
+
+	sudo cp sms-mon/conf/* /SNSlocal/sms-mon/conf/
+
+	sudo chown -R snsdata /SNSlocal/sms-mon
+
+	sudo chgrp -R adara /SNSlocal/sms-mon
+
+	./confck
+
+-OR-
+
+1.b. Verify State of Any Existing Git Config Repository:
+
+	pushd /home/controls/config-daq1-mon/ ; git pull ; git diff ; git status
+
+	./confck
+
+	ifconfig [Obtain Local Beamline IP/Subnet Address, i.e. 10.111.14.255]
+
+	vi ./sms-mon/smsd-mon.initscript
+		- replace: EPICS_CA_ADDR_LIST="10.111.XXX.255 160.91.228.17"
+			-> e.g. with: EPICS_CA_ADDR_LIST="10.111.14.255"
+
+	sudo cp ./sms-mon/smsd-mon.initscript /etc/init.d/smsd-mon
+
+	sudo cp ./sms-mon/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+
+	ls -l /etc/init.d/smsd-mon /etc/rsyslog.d/adaraMailer.conf
+
+		-rwxr-xr-x 1 root root 4890 Apr  7  2017 /etc/init.d/smsd-mon*
+
+		-rw-r--r-- 1 root root 513 Apr 13  2017
+			/etc/rsyslog.d/adaraMailer.conf
+
+	./confck
+
+	# Steal Pixel Mapping Table and Geometry from Production SMS Config
+
+	cp /SNSlocal/sms/conf/pixelmap ./sms-mon/conf
+	cp /SNSlocal/sms/conf/geometry.xml ./sms-mon/conf
+
+	git commit -m "Modified SMS-MON Config Files for Beamline." sms-mon
+
+	# Create Alternate SMS Directories in /SNSlocal/sms-mon/...
+
+	ls -l /SNSlocal/sms-mon
+
+	sudo mkdir /SNSlocal/sms-mon
+
+	sudo chmod g+ws /SNSlocal/sms-mon
+
+	sudo mkdir /SNSlocal/sms-mon/conf /SNSlocal/sms-mon/data
+
+	# Create Initial SMS-MON "Next Run" Data File...
+
+	sudo vi /SNSlocal/sms-mon/data/next_run
+		- set First Run Number for New Beamline/Commissioning...
+			-> "12345"
+
+	# Copy SMS-MON Config Files into /SNSlocal/sms-mon/conf/...
+
+	sudo cp sms-mon/conf/* /SNSlocal/sms-mon/conf/
+
+	sudo chown -R snsdata /SNSlocal/sms-mon
+
+	sudo chgrp -R adara /SNSlocal/sms-mon
+
+	./confck
+
+2. RSyslog Setup:
+
+	sudo vi /etc/rsyslog.conf
+
+		#### RULES ####
+
+		# smsd-mon log
+		if $programname == 'smsd-mon' then /var/log/smsd-mon.log
+		& ~
+
+	ls -l /var/log/smsd-mon.log
+
+	sudo touch /var/log/smsd-mon.log
+
+	sudo chgrp users /var/log/smsd-mon.log
+
+	sudo chmod g+w /var/log/smsd-mon.log
+
+	ls -l /var/log/smsd-mon.log
+
+	sudo /sbin/service rsyslog status
+
+	sudo /sbin/service rsyslog restart
+
+	sudo tail /var/log/messages
+
+	cp /etc/rsyslog.conf ./sms-mon/rsyslog.conf
+
+	git add ./sms-mon/rsyslog.conf
+	git commit ./sms-mon/rsyslog.conf
+
+	./confck
+
+3. Administrator Crontab Setup:
+
+	crontab -l
+
+	crontab -e
+
+		[Add to Existing Crontab...]
+		MAILTO=kohlja@ornl.gov
+		0-59/10 * * * * /SNS/users/$USER/stuff/exec/smsd_mon --alt="-mon"
+		0 8,17 * * * /home/controls/config-daq1-mon/confck --quiet
+		0 8,17 * * * /usr/local/bin/liveconf \
+			--config=/SNSlocal/sms-mon/conf/smsd.conf --terse --quiet confck
+		0 0 * * * /SNS/users/$USER/stuff/exec/bump_mon_run \
+			--config="/SNSlocal/sms-mon/conf/smsd.conf"
+
+	crontab -l
+
+4. Add SMS-MON to Local Run Levels
+
+	chkconfig --list smsd-mon
+
+	sudo chkconfig --add smsd-mon
+
+	chkconfig --list smsd-mon
+
+	sudo chkconfig smsd-mon on
+
+	chkconfig --list smsd-mon
+
+	(rm ./sms-mon/chkconfig.smsd-mon)
+
+	chkconfig --list smsd-mon > ./sms-mon/chkconfig.smsd-mon 2>&1
+
+	git add ./sms-mon/chkconfig.smsd-mon
+	git commit ./sms-mon/chkconfig.smsd-mon
+
+	git diff ; git pull ; git push ; git status
+
+	./confck
+
+5. User Local Bin Soft Link Setup:
+
+	ls -l /usr/local/bin/smsd*
+
+	sudo ln -s /home/controls/config-daq1/deploy/smsd \
+	        /usr/local/bin/smsd-mon
+
+	ls -l /usr/local/bin/smsd*
+
+6. Start SMS-MON Daemon:
+
+	sudo /sbin/service smsd-mon status
+
+	sudo /sbin/service smsd-mon start
+
+	smslog --alt="-mon"
+
+	liveconf --alt="-mon" status
+
+	caput -S BLXXXMON:SMS:RunInfo:ProposalId "BEAMLINE_SHORT_NAME"
+
+	(e.g. caput -S BL12MON:SMS:RunInfo:ProposalId "TOPAZ"
+
+	caput -S BLXXXMON:SMS:RunInfo:ProposalTitle \
+		"BEAMLINE_SHORT_NAME Beam Monitor Monitoring"
+
+	caput -S BLXXXMON:SMS:RunInfo:RunTitle "Daily Beam Monitor Run"
+
+	liveconf --alt="-mon" status
+
+DONE!!! :-D
+
+   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+
+ADDENDUMS:
+
+A. Jeeem's Production ADARA EPICS Setup in $HOME/.bashrc:
+
+	export EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"
+	export EPICS_BASEV4="/home/controls/prod/ADARA/EpicsBaseV4Link"
+	export EPICS_EXTENSIONS="/home/controls/prod/ADARA/EpicsExtensionsLink"
+	export EPICS_CA_AUTO_ADDR_LIST="NO"
+	export EPICS_CA_MAX_ARRAY_BYTES="100000000"
+
+	if [[ -x "${EPICS_BASE}"/startup/EpicsHostArch.pl ]]; then
+   		export EPICS_HOST_ARCH=`"${EPICS_BASE}"/startup/EpicsHostArch.pl`
+	else
+   		export EPICS_HOST_ARCH="none"
+	fi
+
+	if [[ -z $EPICS_CA_ADDR_LIST ]]; then
+   		#export EPICS_CA_ADDR_LIST="localhost"
+   		# support multiple local iocs on a host...! ;-D
+   		export EPICS_CA_ADDR_LIST="127.255.255.255"
+	fi
+
+	# From EPICS V4 setup_profile.sh...
+
+	export EPICS4_DIR="$EPICS_BASEV4"
+
+	# From EPICS Extensions setup_profile.sh...
+
+	export EDMOBJECTS="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMPVOBJECTS="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMFILES="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMHELPFILES="${EPICS_EXTENSIONS}/src/edm/helpFiles"
+	export EDMLIBS="${EPICS_EXTENSIONS}/lib/$EPICS_HOST_ARCH"
+	export EDMLIB_SUFFIX="so"
+	export EDMACTIONS="${EPICS_EXTENSIONS}/pref/edm"
+
+	# Executable Path Stuff...
+
+	epicspath="/home/controls/bin"
+	epicspath="$epicspath:${EPICS_BASE}/bin/${EPICS_HOST_ARCH}"
+	epicspath="$epicspath:${EPICS_BASEV4}/pvAccessCPP/bin/linux-x86_64/"
+	epicspath="$epicspath:${EPICS_EXTENSIONS}/bin/${EPICS_HOST_ARCH}"
+	epicspath="$epicspath:${EPICS_EXTENSIONS}/bin"
+
+	### NOTE: Customize to Your Path Setup...!
+	export PATH="...:$epicspath:..."
+
+	# Additional EPICS Python Cruft...
+	export PYTHONPATH="${PYTHONPATH}:/home/controls/share/master/python"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_BASEV4}/pvaPy/lib/python/2.7/linux-x86_64"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/cothread"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy/build/lib.linux-x86_64-2.6/pcaspy/"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pyepics/build/lib"
+	export PYTHONPATH="${PYTHONPATH}:/home/controls/python"
+

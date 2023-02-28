@@ -13,12 +13,20 @@
 #include <activemq/library/ActiveMQCPP.h>
 #include <cms/Connection.h>
 #include <cms/Session.h>
+#include <cms/ExceptionListener.h>
 #include <activemq/transport/TransportListener.h>
 #include "ComBusDefs.h"
 
 
 namespace ADARA {
 namespace ComBus {
+
+const std::string VERSION = "2.3.8";
+
+enum LogStatus {
+    INFO_LOG    =   0x0,
+    ERR_LOG     =   0x1,
+};
 
 class MessageBase;
 
@@ -56,61 +64,102 @@ public:
 /**
  * /class Connection
  *
- * The ComBus::Connection class provides access to connection management, message ouptut, and
- * topic subscription. Incoming messages are handled by an internal Translator class that then
- * forwards ComBus messages to subscriber objects via the various listener interfaces. There are
- * three distinct types of listener interfaces: status, control, and topic. An arbitrary
- * number of objects may attach to status and general topics, but only one object may be set as
- * the control listener. Internal routing of paired messages (p2p) must currently be implemented
- * by the client control listener object (see dasmon-gui rule config dialog for an example).
+ * The ComBus::Connection class provides access to connection management,
+ * message ouptut, and topic subscription. Incoming messages are handled
+ * by an internal Translator class that then forwards ComBus messages
+ * to subscriber objects via the various listener interfaces. There are
+ * three distinct types of listener interfaces: status, control, and topic.
+ * An arbitrary number of objects may attach to status and general topics,
+ * but only one object may be set as the control listener. Internal routing
+ * of paired messages (p2p) must currently be implemented by the client
+ * control listener object (see dasmon-gui rule config dialog for an
+ * example).
  *
- * Connection parameters may be specified in the Connection constructor, or supplied/changed later
- * using the setConnection() method. Note that if the connection parameters are changed, all
- * subscribed topics are dropped and must be re-established. This does not apply if the connection
- * is lost and re-acquired; in this case, all subscriptions are automatically reconnected when
- * the connection is re-established.
+ * Connection parameters may be specified in the Connection constructor,
+ * or supplied/changed later using the setConnection() method. Note that
+ * if the connection parameters are changed, all subscribed topics are
+ * dropped and must be re-established. This does not apply if the
+ * connection is lost and re-acquired; in this case, all subscriptions are
+ * automatically reconnected when the connection is re-established.
  */
-class Connection
+class Connection : public cms::ExceptionListener
 {
 public:
-    Connection(  const std::string &a_base_path, const std::string &a_proc_name, uint32_t a_inst_num,
-                 const std::string &a_broker_uri, const std::string &a_user, const std::string &a_pass,
-                 const std::string &a_log_dir = "/tmp" );
+    Connection( std::string &a_domain,
+        const std::string &a_proc_name, uint32_t a_inst_num,
+        std::string &a_broker_uri, const std::string &a_user,
+        const std::string &a_pass,
+        const std::string &a_log_info_prefix,
+        const std::string &a_log_err_prefix,
+        const std::string &a_log_dir = "/tmp" );
 
     ~Connection() throw();
 
     static Connection&  getInst();
-    void                setConnection( const std::string &a_domain, const std::string &a_broker_uri,
-                                       const std::string &a_user, const std::string &a_pass );
+
+    static std::string& checkBrokerURI( std::string &a_broker_uri );
+    static std::string& checkDomain( std::string &a_domain );
+
+    void                setConnection( std::string &a_domain,
+                            std::string &a_broker_uri,
+                            const std::string &a_user,
+                            const std::string &a_pass );
+
     bool                waitForConnect( unsigned short a_timeout ) const;
     void                setInputListener( IInputListener &a_ctrl_listener );
+
     void                attach( IConnectionListener  &a_subscriber );
     void                detach( IConnectionListener  &a_subscriber );
-    void                attach( ITopicListener &a_subscriber, const std::string &a_topic );
-    void                detach( ITopicListener &a_subscriber, const std::string &a_topic );
+
+    void                attach( ITopicListener &a_subscriber,
+                            const std::string &a_topic );
+    void                detach( ITopicListener &a_subscriber,
+                            const std::string &a_topic );
     void                detach( ITopicListener &a_subscriber );
+
     bool                status( StatusCode a_status );
-    bool                log( const std::string &a_msg, Level a_level, const char *a_file = "",
-                             uint32_t a_line = 0, uint32_t a_tid = 0 );
+
+    bool                log( const std::string &a_msg, Level a_level,
+                            const char *a_file = "",
+                            uint32_t a_line = 0, uint32_t a_tid = 0 );
+
     bool                broadcast( MessageBase &a_msg );
-    bool                send( MessageBase &a_msg, const std::string &a_dest_proc,
-                              const std::string *a_correlation_id = 0 );
+
+    bool                send( MessageBase &a_msg,
+                            const std::string &a_dest_proc,
+                            const std::string *a_correlation_id = 0 );
+
     bool                postWorkflow( MessageBase &a_msg );
+
+    uint32_t            getReconnRetry() { return m_reconn_retry; }
+    void                setReconnRetry( uint32_t a_reconn_retry )
+                            { m_reconn_retry = a_reconn_retry; }
+
+    void                exceptionLog( std::string a_msg,
+                            ADARA::ComBus::LogStatus a_status );
+
+    void                onException( const cms::CMSException &ex );
 
 private:
 
-    typedef std::map<std::string,std::pair<cms::Topic*,cms::MessageProducer*> > ProducerMap;
-    typedef std::map<std::string,std::pair<cms::Topic*,cms::MessageConsumer*> > ConsumerMap;
+    typedef
+        std::map<std::string,std::pair<cms::Topic*,cms::MessageProducer*> >
+        ProducerMap;
+
+    typedef
+        std::map<std::string,std::pair<cms::Topic*,cms::MessageConsumer*> >
+        ConsumerMap;
 
     /** \brief Provides inbound connection/topic message handling
       *
-      * The Translator class is a private class that provides handling for inbound
-      * AMQ messages on a per-listener basis. Receieved messages are inspected and
-      * translated to ComBus messages, then dispatched via client interfaces. One
-      * Translator instance manages all topic sucbscrpiptions for a given client/
-      * listener; however, only one topic should be attached for input handlers
-      * (the [domain].INPUT.[proc_name] topic); otherwise, non-input messages
-      * would be routed to the input/comand handler of the client.
+      * The Translator class is a private class that provides handling for
+      * inbound AMQ messages on a per-listener basis. Receieved messages
+      * are inspected and translated to ComBus messages, then dispatched
+      * via client interfaces. One Translator instance manages all topic
+      * sucbscrpiptions for a given client/listener; however, only one
+      * topic should be attached for input handlers
+      * (the [domain].INPUT.[proc_name] topic); otherwise, non-input
+      * messages would be routed to the input/comand handler of the client.
       */
     class Translator : public cms::MessageListener
     {
@@ -121,7 +170,9 @@ private:
 
         void                attach( const std::string &a_topic );
         void                detach( const std::string &a_topic );
+
         inline bool         haveTopics() { return !m_topics.empty(); }
+
         void                connect_all();
         void                disconnect_all();
 
@@ -135,10 +186,16 @@ private:
     };
 
     void                    reconnectThread();
+
     void                    connectionStatusNotifyThread();
+
     void                    disconnect();
-    void                    createTopicConsumer( const std::string &a_topic_name, cms::Topic **a_topic,
-                                                 cms::MessageConsumer **a_consumer );
+
+    void                    createTopicConsumer(
+                                const std::string &a_topic_name,
+                                cms::Topic **a_topic,
+                                cms::MessageConsumer **a_consumer );
+
     static MessageBase*     makeMessage( const cms::TextMessage &a_msg );
 
     bool                                    m_running;          ///< Flag indicating ComBus lib is active/running
@@ -152,13 +209,16 @@ private:
     std::string                             m_broker_uri;       ///< AMQP broker URI
     std::string                             m_broker_user;      ///< AMQP broker user name
     std::string                             m_broker_pass;      ///< AMQP broker password
-    std::string                             m_log_file;         ///< Alternative log ouput file
+    std::string                             m_log_info_prefix;  ///< Exception Log Info Prefix
+    std::string                             m_log_err_prefix;   ///< Exception Log Error Prefix
+    std::string                             m_log_file;         ///< Alternative log output file
     activemq::core::ActiveMQConnection     *m_connection;       ///< AMQP connction instance
     cms::Session                           *m_session;          ///< AMQP session instance
     std::vector<IConnectionListener*>       m_status_listeners; ///< Connection status listeners
     ProducerMap                             m_producer_topics;  ///< AMQP topic-producer map
     std::map<ITopicListener*,Translator*>   m_listeners;        ///< Topic listeners (subscribers)
     boost::thread                          *m_reconnect_thread; ///< AMQP connection maintenance thread
+    uint32_t                                m_reconn_retry;     ///< Retry period for Reconnect Thread (seconds)
     boost::thread                          *m_status_thread;    ///< Status / watchdog thread
     boost::mutex                            m_status_mutex;     ///< Connection status/maint mutex
     boost::condition_variable               m_status_cond;      ///< Connection status cond var
@@ -170,4 +230,6 @@ private:
 } // End ADARA namespace
 
 #endif // COMBUS_H
+
+// vim: expandtab
 

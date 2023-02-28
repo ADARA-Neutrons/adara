@@ -3,10 +3,12 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/tokenizer.hpp>
 #include <syslog.h>
+#include <unistd.h>
 
 #include "ADARA.h"
 #include "ComBus.h"
 #include "StreamAnalyzer.h"
+#include "ADARAUtils.h"
 
 #include <iostream>
 #include <fstream>
@@ -33,9 +35,15 @@ namespace DASMON {
   */
 StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_dir )
     :m_monitor(a_monitor), m_engine(0), m_pv_prefix("PV_"), m_pv_err_prefix("PVERR_"),
-      m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir ), m_debounce_sec(0), m_batch_mask(0), m_ok(true)
+      m_pv_lim_prefix("PVLIM_"), m_cfg_dir( a_cfg_dir ), m_batch_mask(0)
 {
+    if ( !m_cfg_dir.empty() && m_cfg_dir[m_cfg_dir.length()-1] != '/' )
+         m_cfg_dir += "/";
+
     m_engine = new RuleEngine();
+    // Suppress all output until stream is connected and event data received
+    m_engine->beginBatch();
+
     m_monitor.addListener( *this );
     m_engine->attach( *this );
 
@@ -71,13 +79,16 @@ StreamAnalyzer::StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const s
     m_fact_name[BIF_SMS_CONNECTED]       = "SMS_CONNECTED";
     m_fact_name[BIF_GENERAL_PV_LIMIT]    = "GENERAL_PV_LIMIT";
     m_fact_name[BIF_GENERAL_PV_ERROR]    = "GENERAL_PV_ERROR";
+    m_fact_name[BIF_PULSE_PCHG_UNCOR]    = "RUN_PULSE_PCHG_UNCOR";
+    m_fact_name[BIF_GOT_METADATA_COUNT]  = "RUN_GOT_METADATA_COUNT";
+    m_fact_name[BIF_GOT_NEUTRONS_COUNT]  = "RUN_GOT_NEUTRONS_COUNT";
+    m_fact_name[BIF_HAS_STATES_COUNT]    = "RUN_HAS_STATES_COUNT";
+    m_fact_name[BIF_TOTAL_PULSES_COUNT]  = "RUN_TOTAL_PULSES_COUNT";
 
     for ( int i = 0; i < BIF_COUNT; ++i )
         m_fact[i] = m_engine->getFactHandle( m_fact_name[i] );
 
     loadConfig();
-
-    m_debounce_thread = new boost::thread( boost::bind( &StreamAnalyzer::runDebounceThread, this ));
 }
 
 
@@ -105,8 +116,7 @@ StreamAnalyzer::loadConfig()
     SignalInfo                      signal;
     vector<SignalInfo>              loaded_signals;
 
-    boost::char_separator<char> sep1(":");
-    boost::char_separator<char> sep2(",");
+    boost::char_separator<char> sep1(";");
     boost::tokenizer<boost::char_separator<char> >::iterator tok;
 
     string cfg = m_cfg_dir + "dasmond.cfg";
@@ -114,10 +124,13 @@ StreamAnalyzer::loadConfig()
     ifstream inf( cfg.c_str());
     string line;
     int mode = 0;
+    int line_no = 0;
+    size_t num_tok;
 
     if ( !inf.is_open())
     {
         syslog( LOG_ERR, "Could not open configuration file: %s", cfg.c_str() );
+        usleep(30000); // give syslog a chance...
     }
     else
     {
@@ -126,6 +139,7 @@ StreamAnalyzer::loadConfig()
             while( !inf.eof())
             {
                 getline( inf, line );
+                ++line_no;
 
                 if ( line.empty() || line[0] == '#' )
                     continue;
@@ -139,36 +153,49 @@ StreamAnalyzer::loadConfig()
                     if ( mode == 1 )
                     {
                         boost::tokenizer<boost::char_separator<char> > tokens( line, sep1 );
-                        tok = tokens.begin();
+                        num_tok = distance( tokens.begin(), tokens.end() );
+                        if ( num_tok < 3 )
+                            throw -1;
 
-                        if ( tok == tokens.end())
-                            throw -1;
+                        tok = tokens.begin();
+                        rule.enabled = boost::lexical_cast<bool>(*tok++);
                         rule.fact = *tok++;
-                        if ( tok == tokens.end())
-                            throw -1;
-                        rule.expr = *tok;
+                        rule.expr = *tok++;
+
+                        if ( tok != tokens.end())
+                        {
+                            rule.desc = *tok++;
+                            while ( tok != tokens.end())
+                                rule.desc += ";" + *tok++;
+                        }
+                        else
+                            rule.desc.clear();
+
                         loaded_rules.push_back( rule );
                     }
                     else if ( mode == 2 )
                     {
-                        boost::tokenizer<boost::char_separator<char> > tokens( line, sep2 );
-                        tok = tokens.begin();
+                        boost::tokenizer<boost::char_separator<char> > tokens( line, sep1 );
+                        num_tok = distance( tokens.begin(), tokens.end() );
+                        if ( num_tok < 6 )
+                            throw -1;
 
-                        if ( tok == tokens.end())
-                            throw -1;
+                        tok = tokens.begin();
+                        signal.enabled = boost::lexical_cast<bool>(*tok++);
                         signal.name = *tok++;
-                        if ( tok == tokens.end())
-                            throw -1;
                         signal.fact = *tok++;
-                        if ( tok == tokens.end())
-                            throw -1;
                         signal.source = *tok++;
-                        if ( tok == tokens.end())
-                            throw -1;
                         signal.level = ComBus::ComBusHelper::toLevel( *tok++ );
-                        if ( tok == tokens.end())
-                            throw -1;
                         signal.msg = *tok++;
+
+                        if ( tok != tokens.end())
+                        {
+                            signal.desc = *tok++;
+                            while ( tok != tokens.end())
+                                signal.desc += ";" + *tok++;
+                        }
+                        else
+                            signal.desc.clear();
 
                         loaded_signals.push_back( signal );
                     }
@@ -181,16 +208,21 @@ StreamAnalyzer::loadConfig()
             map<string,string> errors;
             if ( !setDefinitions( loaded_rules, loaded_signals, errors ))
             {
-                syslog( LOG_ERR, "Failed loading configuration file: %s", cfg.c_str() );
+                syslog( LOG_ERR, "Failed setting rules from configuration file: %s", cfg.c_str() );
+                usleep(30000); // give syslog a chance...
 
                 for ( map<string,string>::iterator ie = errors.begin(); ie != errors.end(); ++ie )
+                {
                     syslog( LOG_ERR, "Config error on %s: %s", ie->first.c_str(), ie->second.c_str() );
+                    usleep(30000); // give syslog a chance...
+                }
             }
         }
         catch ( ... )
         {
             inf.close();
-            syslog( LOG_ERR, "Failed loading configuration file: %s", cfg.c_str() );
+            syslog( LOG_ERR, "Error at line %i in configuration file: %s", line_no, cfg.c_str() );
+            usleep(30000); // give syslog a chance...
         }
     }
 }
@@ -210,29 +242,43 @@ StreamAnalyzer::saveConfig()
     if ( !outf.is_open())
     {
         syslog( LOG_ERR, "Could not open configuration file: %s", cfg.c_str() );
+        usleep(30000); // give syslog a chance...
         return;
     }
 
-    // FACT_ID  Rule expression
+    // enabled;FACT_ID;Rule expression;comment
 
     outf << "[rules]" << endl;
 
     vector<RuleEngine::RuleInfo> rules;
+    vector<RuleEngine::RuleInfo>::iterator rule;
+
     m_engine->getDefinedRules( rules );
 
-    for ( vector<RuleEngine::RuleInfo>::iterator rule = rules.begin(); rule != rules.end(); ++rule )
+    for ( rule = rules.begin(); rule != rules.end(); ++rule )
     {
-        outf << rule->fact << ":" << rule->expr << endl;
+        outf << true << ";" << rule->fact << ";" << rule->expr << ";" << rule->desc << endl;
     }
 
-    // SIGNAL_ID,FACT_ID,SOURCE,LEVEL,Message
+    for ( rule = m_rules_disabled.begin(); rule != m_rules_disabled.end(); ++rule )
+    {
+        outf << false << ";" << rule->fact << ";" << rule->expr << ";" << rule->desc << endl;
+    }
+
+    // enabled;SIGNAL_ID;FACT_ID;SOURCE;LEVEL;Message;Comment
 
     outf << "[signals]" << endl;
 
     for ( map<string,SignalInfo>::iterator sig = m_signals.begin(); sig != m_signals.end(); ++sig )
     {
-        outf << sig->second.name << "," << sig->second.fact << "," << sig->second.source << ",";
-        outf << sig->second.level << "," << sig->second.msg << endl;
+        outf << true << ";" << sig->second.name << ";" << sig->second.fact << ";" << sig->second.source << ";";
+        outf << sig->second.level << ";" << sig->second.msg << ";" << sig->second.desc << endl;
+    }
+
+    for ( vector<SignalInfo>::iterator sig = m_signals_disabled.begin(); sig != m_signals_disabled.end(); ++sig )
+    {
+        outf << false << ";" << sig->name << ";" << sig->fact << ";" << sig->source << ";";
+        outf << sig->level << ";" << sig->msg << ";" << sig->desc << endl;
     }
 
     outf.close();
@@ -266,6 +312,7 @@ StreamAnalyzer::restoreDefaultConfig()
     catch ( ... )
     {
         syslog( LOG_ERR, "Could not restore default rule configuration file." );
+        usleep(30000); // give syslog a chance...
     }
 }
 
@@ -292,6 +339,7 @@ StreamAnalyzer::setDefaultConfig()
     catch ( ... )
     {
         syslog( LOG_ERR, "Could not set default rule configuration file." );
+        usleep(30000); // give syslog a chance...
     }
 }
 
@@ -348,9 +396,15 @@ StreamAnalyzer::getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std:
 {
     m_engine->getDefinedRules( a_rules );
 
+    for ( vector<RuleEngine::RuleInfo>::iterator r = m_rules_disabled.begin(); r != m_rules_disabled.end(); ++r )
+        a_rules.push_back( *r );
+
     a_signals.clear();
     for ( map<string,SignalInfo>::const_iterator s = m_signals.begin(); s != m_signals.end(); ++s )
         a_signals.push_back( s->second );
+
+    for ( vector<SignalInfo>::iterator s = m_signals_disabled.begin(); s != m_signals_disabled.end(); ++s )
+        a_signals.push_back( *s );
 }
 
 
@@ -376,12 +430,17 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
     bool res = true;
     RuleEngine *engine = new RuleEngine();
     vector<RuleEngine::RuleInfo>::const_iterator r;
+    vector<RuleEngine::RuleInfo> rules_disabled;
+    vector<SignalInfo> signals_disabled;
 
     for ( r = a_rules.begin(); r != a_rules.end(); ++r )
     {
         try
         {
-            engine->defineRule( r->fact, r->expr );
+            if ( r->enabled )
+                engine->defineRule( r->fact, r->expr, r->desc );
+            else
+                rules_disabled.push_back( *r );
         }
         catch ( std::exception &e )
         {
@@ -405,42 +464,53 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     for ( vector<SignalInfo>::const_iterator sig = a_signals.begin(); sig != a_signals.end(); ++sig )
     {
-        // Rule engine converts facts to upper case and trims spaces
-        sig_fact = boost::to_upper_copy( sig->fact );
-        boost::algorithm::trim( sig_fact );
-
-        // The only real check to do here is to ensure referential integrity
-        for ( r = a_rules.begin(); r != a_rules.end(); ++r )
+        // Ignore disabled signals
+        if ( sig->enabled )
         {
             // Rule engine converts facts to upper case and trims spaces
-            tmp = boost::to_upper_copy( r->fact );
-            boost::algorithm::trim( tmp );
+            sig_fact = boost::to_upper_copy( sig->fact );
+            boost::algorithm::trim( sig_fact );
 
-            if ( sig_fact == tmp )
+            // The only real check to do here is to ensure referential integrity
+            for ( r = a_rules.begin(); r != a_rules.end(); ++r )
             {
-                tmp_signals[sig_fact] = *sig;
-                break;
-            }
-        }
+                if ( !r->enabled )
+                    continue;
 
-        if ( r == a_rules.end())
-        {
-            // Is this a built-in fact?
-            for ( i = 0; i < BIF_COUNT; ++i )
-            {
-                if ( m_fact_name[i] == sig_fact )
+                // Rule engine converts facts to upper case and trims spaces
+                tmp = boost::to_upper_copy( r->fact );
+                boost::algorithm::trim( tmp );
+
+                if ( sig_fact == tmp )
                 {
                     tmp_signals[sig_fact] = *sig;
                     break;
                 }
             }
 
-            // If unassociated signal found, abort (probably a mistake)
-            if ( i == BIF_COUNT )
+            if ( r == a_rules.end())
             {
-                a_errors[sig->name] = "References undefined rule";
-                res = false;
+                // Is this a built-in fact?
+                for ( i = 0; i < BIF_COUNT; ++i )
+                {
+                    if ( m_fact_name[i] == sig_fact )
+                    {
+                        tmp_signals[sig_fact] = *sig;
+                        break;
+                    }
+                }
+
+                // If unassociated signal found, abort (probably a mistake)
+                if ( i == BIF_COUNT )
+                {
+                    a_errors[sig->name] = "References undefined rule";
+                    res = false;
+                }
             }
+        }
+        else
+        {
+            signals_disabled.push_back( *sig );
         }
     }
 
@@ -555,6 +625,8 @@ StreamAnalyzer::setDefinitions( const vector<RuleEngine::RuleInfo> &a_rules, con
 
     // Make new engine and new signals active
     m_engine = engine;
+    m_rules_disabled = rules_disabled;
+    m_signals_disabled = signals_disabled;
 
     return true;
 }
@@ -601,6 +673,11 @@ StreamAnalyzer::getInputFacts( std::set<std::string> &a_facts ) const
     a_facts.insert(m_fact_name[BIF_SMS_CONNECTED]);
     a_facts.insert(m_fact_name[BIF_GENERAL_PV_LIMIT]);
     a_facts.insert(m_fact_name[BIF_GENERAL_PV_ERROR]);
+    a_facts.insert(m_fact_name[BIF_PULSE_PCHG_UNCOR]);
+    a_facts.insert(m_fact_name[BIF_GOT_METADATA_COUNT]);
+    a_facts.insert(m_fact_name[BIF_GOT_NEUTRONS_COUNT]);
+    a_facts.insert(m_fact_name[BIF_HAS_STATES_COUNT]);
+    a_facts.insert(m_fact_name[BIF_TOTAL_PULSES_COUNT]);
 
     vector<string> facts;
     m_engine->getAsserted( facts );
@@ -691,35 +768,6 @@ StreamAnalyzer::findByName( map<string,SignalInfo> &a_map, std::string a_name )
 }
 
 
-/** \brief This method debounces fact "noise" at run boundaries
-  *
-  * When a run is started or stopped, many facts in the rule engine must be
-  * retracted due to PVs being redefined. The PVs that are unchanged will be
-  * asserted again very quickly and would causes the associated rules or signals
-  * to flicker. To avoid this, the rule engine is place in batch mode on run
-  * transition, and this thread is used to end the batch mode after a specified
-  * debounce time.
-  */
-void
-StreamAnalyzer::runDebounceThread()
-{
-    while ( 1 )
-    {
-        sleep( 1 );
-
-        boost::unique_lock<boost::mutex> lock(m_mutex);
-        if ( m_debounce_sec )
-        {
-            --m_debounce_sec;
-            if ( !m_debounce_sec )
-            {
-                endBatch( RUN_BATCH_MASK );
-            }
-        }
-    }
-}
-
-
 /** \brief This method starts batch mode for the rule engine
   * \param a_mask - Bitmask for batch context
   *
@@ -731,7 +779,9 @@ void
 StreamAnalyzer::beginBatch( uint32_t a_mask )
 {
     if ( !m_batch_mask )
+    {
         m_engine->beginBatch();
+    }
 
     m_batch_mask |= a_mask;
 }
@@ -752,7 +802,9 @@ StreamAnalyzer::endBatch( uint32_t a_mask )
         m_batch_mask &= ~a_mask;
 
         if ( !m_batch_mask )
+        {
             m_engine->endBatch();
+        }
     }
 }
 
@@ -764,6 +816,7 @@ StreamAnalyzer::endBatch( uint32_t a_mask )
   * \param a_recording - When true, indicates system is recording
   * \param a_run_number - Run number of recording (0 when no recording)
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
   * This method is called by the StreamMonitor instance whenever the system
   * starts or stops recording a run. The recording state and run number are
@@ -772,23 +825,17 @@ StreamAnalyzer::endBatch( uint32_t a_mask )
   * resends device descriptors after each transition.
   */
 void
-StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
+StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
     (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
 
     // For both starting and stopping a run, facts associated with PVs must be cleared
     // as the SMS will re-broadcast only active PVs at these transitions. This allows
     // stale PVs (from disconnected devices) to be cleared out.
-
-    // In order to "debounce" signals that may flicker when this happens, batch mode
-    // is initiated here, then ended a few seconds later by a timer. This way only
-    // more persistent signal changes will be emitted rather than the bounce
-    // caused by the clear and reassertion of facts.
-
-    beginBatch( RUN_BATCH_MASK );
-    m_debounce_sec = 2;
 
     // Retract all PV facts
     m_engine->retractPrefix( m_pv_prefix );
@@ -827,6 +874,20 @@ StreamAnalyzer::runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_t
 
         //TODO Add retraction of beam and run info when protocol is changed
     }
+}
+
+
+void
+StreamAnalyzer::beginProlog()
+{
+    beginBatch( RUN_BATCH_MASK );
+}
+
+
+void
+StreamAnalyzer::endProlog()
+{
+    endBatch( RUN_BATCH_MASK );
 }
 
 
@@ -893,6 +954,10 @@ StreamAnalyzer::beamInfo( const ADARA::DASMON::BeamInfo &a_info )
 
     if ( !a_info.m_facility.empty() )
         m_engine->assert( m_fact[BIF_FAC_NAME] );
+
+    // Note: BeamInfo now includes "Target Station Number" field,
+    // m_target_station_number.
+
     if ( !a_info.m_beam_id.empty() )
         m_engine->assert( m_fact[BIF_BEAM_ID] );
     if ( !a_info.m_beam_sname.empty() )
@@ -986,11 +1051,16 @@ StreamAnalyzer::runMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
     m_engine->assert( m_fact[BIF_MAP_ERROR_COUNT], a_metrics.m_mapping_error_count );
     m_engine->assert( m_fact[BIF_MISS_RTDL_COUNT], a_metrics.m_missing_rtdl_count );
     m_engine->assert( m_fact[BIF_PULSE_VETO_COUNT], a_metrics.m_pulse_veto_count );
+    m_engine->assert( m_fact[BIF_PULSE_PCHG_UNCOR], a_metrics.m_pulse_pcharge_uncorrected );
+    m_engine->assert( m_fact[BIF_GOT_METADATA_COUNT], a_metrics.m_got_metadata_count );
+    m_engine->assert( m_fact[BIF_GOT_NEUTRONS_COUNT], a_metrics.m_got_neutrons_count );
+    m_engine->assert( m_fact[BIF_HAS_STATES_COUNT], a_metrics.m_has_states_count );
+    m_engine->assert( m_fact[BIF_TOTAL_PULSES_COUNT], a_metrics.m_total_pulses_count );
 }
 
 
 void
-StreamAnalyzer::streamMetrics( const StreamMetrics &a_metrics )
+StreamAnalyzer::streamMetrics( const StreamMetrics &UNUSED(a_metrics) )
 {
     // TODO assert stream metrics facts
 }
@@ -1030,23 +1100,33 @@ StreamAnalyzer::pvUndefined( const std::string &a_pv_name )
   * \param a_value - New value of PV
   * \param a_status - New status of PV
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
-  * This method is called when a PV value or status changes. If status is
-  * disconnected, pv is retracted from rule engine; otherwise pv is asserted
-  * with associated value. Status is processed by a call to porcessPVStatus().
+  * This method is called when a PV value or status changes. If status
+  * is disconnected, pv is retracted from rule engine; otherwise pv is
+  * asserted with associated value. Status is processed by a call to
+  * processPVStatus().
   */
 void
-StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+StreamAnalyzer::pvValue( const std::string &a_name,
+        uint32_t a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
-    (void)a_timestamp;
+    (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_name );
 
-    if ( a_status == VariableStatus::NO_COMMUNICATION || a_status == VariableStatus::UPSTREAM_DISCONNECTED )
+    if ( a_status == VariableStatus::NO_COMMUNICATION
+            || a_status == VariableStatus::UPSTREAM_DISCONNECTED )
+    {
         m_engine->retract( m_pv_prefix + pv_name );
+    }
     else
+    {
         m_engine->assert( m_pv_prefix + pv_name, a_value );
+    }
 
     processPvStatus( pv_name, a_status, false );
 }
@@ -1057,23 +1137,157 @@ StreamAnalyzer::pvValue( const std::string &a_name, uint32_t a_value, VariableSt
   * \param a_value - New value of PV
   * \param a_status - New status of PV
   * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
   *
-  * This method is called when a PV value or status changes. If status is
-  * disconnected, pv is retracted from rule engine; otherwise pv is asserted
-  * with associated value. Status is processed by a call to porcessPVStatus().
+  * This method is called when a PV value or status changes. If status
+  * is disconnected, pv is retracted from rule engine; otherwise pv is
+  * asserted with associated value. Status is processed by a call to
+  * processPVStatus().
   */
 void
-StreamAnalyzer::pvValue( const std::string &a_pv_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp )
+StreamAnalyzer::pvValue( const std::string &a_pv_name,
+        double a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
 {
-    (void)a_timestamp;
+    (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
 
     boost::lock_guard<boost::mutex> lock(m_mutex);
     string pv_name = boost::to_upper_copy( a_pv_name );
 
-    if ( a_status == VariableStatus::NO_COMMUNICATION || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
+    if ( a_status == VariableStatus::NO_COMMUNICATION
+            || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
+    {
         m_engine->retract( m_pv_prefix + pv_name );
+    }
     else
+    {
         m_engine->assert( m_pv_prefix + pv_name, a_value );
+    }
+
+    processPvStatus( pv_name, a_status, false );
+}
+
+
+/** \brief Callback to update the value and status of a string PV.
+  * \param a_pv_name - Name of process variable
+  * \param a_value - New value of PV
+  * \param a_status - New status of PV
+  * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
+  *
+  * This method is called when a PV value or status changes. String values
+  * are converted to "booleans" - true if not empty, false otherwise
+  */
+void
+StreamAnalyzer::pvValue( const std::string &a_pv_name,
+        string &a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+{
+    (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    string pv_name = boost::to_upper_copy( a_pv_name );
+
+    if ( a_status == VariableStatus::NO_COMMUNICATION
+            || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
+    {
+        m_engine->retract( m_pv_prefix + pv_name );
+    }
+    else
+    {
+        m_engine->assert( m_pv_prefix + pv_name,
+            a_value.empty() ? 0.0 : 1.0 );
+    }
+
+    processPvStatus( pv_name, a_status, false );
+}
+
+
+/** \brief Callback to update the value and status of a integer PV.
+  * \param a_pv_name - Name of process variable
+  * \param a_value - New value of PV
+  * \param a_status - New status of PV
+  * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
+  *
+  * This method is called when a PV value or status changes. If status
+  * is disconnected, pv is retracted from rule engine; otherwise pv is
+  * asserted with associated value. Status is processed by a call to
+  * processPVStatus().
+  *
+  * Numerical array values are collapsed to scalars, using only
+  * the *First Array Element* for Rule-based usage. Anything more
+  * sophisticated will have to be implemented in "Version 2.0", lol... :-D
+  */
+void
+StreamAnalyzer::pvValue( const std::string &a_name,
+        vector<uint32_t> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+{
+    (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    string pv_name = boost::to_upper_copy( a_name );
+
+    if ( a_status == VariableStatus::NO_COMMUNICATION
+            || a_status == VariableStatus::UPSTREAM_DISCONNECTED )
+    {
+        m_engine->retract( m_pv_prefix + pv_name );
+    }
+    else
+    {
+        uint32_t scalar_value = -1;
+        if ( a_value.size() > 0 )
+            scalar_value = a_value[0];
+        m_engine->assert( m_pv_prefix + pv_name, scalar_value );
+    }
+
+    processPvStatus( pv_name, a_status, false );
+}
+
+
+/** \brief Callback to update the value and status of a double PV.
+  * \param a_pv_name - Name of process variable
+  * \param a_value - New value of PV
+  * \param a_status - New status of PV
+  * \param a_timestamp - Timestamp of update (EPICS epoch)
+  * \param a_timestamp_nanosec - Timestamp Nanosecs of update (EPICS epoch)
+  *
+  * This method is called when a PV value or status changes. If status
+  * is disconnected, pv is retracted from rule engine; otherwise pv is
+  * asserted with associated value. Status is processed by a call to
+  * processPVStatus().
+  *
+  * Numerical array values are collapsed to scalars, using only
+  * the *First Array Element* for Rule-based usage. Anything more
+  * sophisticated will have to be implemented in "Version 2.0", lol... :-D
+  */
+void
+StreamAnalyzer::pvValue( const std::string &a_pv_name,
+        vector<double> a_value, VariableStatus::Enum a_status,
+        uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+{
+    (void)a_timestamp;  // Don't use timestamp
+    (void)a_timestamp_nanosec;  // Don't use timestamp_nanosec
+
+    boost::lock_guard<boost::mutex> lock(m_mutex);
+    string pv_name = boost::to_upper_copy( a_pv_name );
+
+    if ( a_status == VariableStatus::NO_COMMUNICATION
+            || a_status == VariableStatus::UPSTREAM_DISCONNECTED  )
+    {
+        m_engine->retract( m_pv_prefix + pv_name );
+    }
+    else
+    {
+        double scalar_value = -1.0;
+        if ( a_value.size() > 0 )
+            scalar_value = a_value[0];
+        m_engine->assert( m_pv_prefix + pv_name, scalar_value );
+    }
 
     processPvStatus( pv_name, a_status, false );
 }
@@ -1184,7 +1398,7 @@ void
 StreamAnalyzer::onAssert( const std::string &a_fact )
 {
     map<string,SignalInfo>::iterator isig = m_signals.find( a_fact );
-    if ( isig != m_signals.end())
+    if ( isig != m_signals.end() )
     {
         for ( vector<ISignalListener*>::iterator l = m_listeners.begin(); l != m_listeners.end(); ++l )
             (*l)->signalAssert( isig->second );
@@ -1211,3 +1425,6 @@ StreamAnalyzer::onRetract( const std::string &a_fact )
 }
 
 }}
+
+// vim: expandtab
+

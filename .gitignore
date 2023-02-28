@@ -1,0 +1,41 @@
+*.o
+.*.swp
+
+# These could be moved to per-dir .gitignore, but easiest to keep them
+# at the top for now.
+#
+common/test/parser-test
+
+tools/adara-gen
+tools/adara-munge
+tools/adara-pvgen
+tools/adara-parser
+tools/adara-dump
+
+parser/adara-parser
+
+sms/smsd
+sms/testfs
+sms/test/storage-test
+
+stc/stc
+stc/UserIdLdap
+stc/retrieveUnmapped
+
+dasmon/server/dasmond
+
+# All of this crap is from autotools
+#
+.dirstamp
+.deps
+configure
+config.log
+config.status
+missing
+install-sh
+compile
+depcomp
+aclocal.m4
+Makefile
+Makefile.in
+autom4te.cache

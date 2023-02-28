@@ -1,0 +1,28 @@
+#!/bin/bash
+
+ALT="" # for Alternate/Secondary SMS Deployments... ;-D
+
+#
+# Parse Command Line Options... ;-)
+#
+
+NLINES="-15"
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+
+	if [[ "#$key#" == '#--alt#' ]]; then
+		ALT="$value"
+	elif [[ $key =~ ^[0-9]+$ ]]; then
+		NLINES="$arg"
+	elif [[ "#$key#" == '#--help#' || "#$key#" == '#-h#' ]]; then
+		echo "usage:  smst [--alt=\"-mon\"] [-NLines]"
+		exit 0
+	fi
+
+done
+
+tail ${NLINES} /var/log/smsd${ALT}.log
+

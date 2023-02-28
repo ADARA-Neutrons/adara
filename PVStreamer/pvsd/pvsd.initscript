@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# pvsd		This shell script takes care of starting and stopping
+#		PVStreamer for the ADARA system
+#
+# chkconfig: - 97 95
+# description: PVStreamer
+
+### BEGIN INIT INFO
+# Provides: pvsd
+# Required-Start: $network $local_fs $remote_fs
+# Required-Stop: $network $local_fs $remote_fs
+# Should-Start: $syslog $named
+# Should-Stop: $syslog $named
+# Short-Description: start and stop pvsd
+# Description: PVStreamer
+### END INIT INFO
+
+# Source function library.
+. /etc/init.d/functions
+
+# Source networking configuration.
+. /etc/sysconfig/network
+
+prog=pvsd
+lockfile=/var/lock/subsys/$prog
+
+# Get Base EPICS Executable Path (for potential caRepeater startup)
+export EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"
+if [[ -x "${EPICS_BASE}"/startup/EpicsHostArch.pl ]]; then
+	export EPICS_HOST_ARCH=`"${EPICS_BASE}"/startup/EpicsHostArch.pl`
+else
+	export EPICS_HOST_ARCH="none"
+fi
+export PATH="${EPICS_BASE}/bin/${EPICS_HOST_ARCH}:${PATH}"
+
+# Other EPICS Environment Settings
+export EPICS_BASEV4="/home/controls/prod/ADARA/EpicsBaseV4Link"
+export EPICS_EXTENSIONS="/home/controls/prod/ADARA/EpicsExtensionsLink"
+export EPICS_CA_AUTO_ADDR_LIST="NO"
+export EPICS_CA_MAX_ARRAY_BYTES="100000000"
+export EPICS_CA_ADDR_LIST="10.111.XXX.255 160.91.228.17"
+# NOTE: Resolve "XXX" Per Beamline Subnet
+
+export PATH=/usr/local/bin:$PATH
+
+start() {
+	[ "$EUID" != "0" ] && exit 4
+	[ "$NETWORKING" = "no" ] && exit 1
+	[ -x /usr/local/bin/pvsd ] || exit 5
+
+        # Start daemons.
+        echo -n $"Starting $prog: "
+        daemon $prog $OPTIONS
+	RETVAL=$?
+        echo
+	[ $RETVAL -eq 0 ] && touch $lockfile
+	return $RETVAL
+}
+
+stop() {
+	[ "$EUID" != "0" ] && exit 4
+        echo -n $"Shutting down $prog: "
+	killproc $prog
+	RETVAL=$?
+        echo
+	[ $RETVAL -eq 0 ] && rm -f $lockfile
+	return $RETVAL
+}
+
+# See how we were called.
+case "$1" in
+  start)
+	start
+	;;
+  stop)
+	stop
+	;;
+  status)
+	status $prog
+	;;
+  restart|force-reload)
+	stop
+	start
+	;;
+  try-restart|condrestart)
+	if status $prog > /dev/null; then
+	    stop
+	    start
+	fi
+	;;
+  reload)
+	exit 3
+	;;
+  *)
+	echo $"Usage: $0 {start|stop|status|restart|try-restart|force-reload}"
+	exit 2
+esac

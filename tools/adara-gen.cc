@@ -1,3 +1,12 @@
+
+#include "../sms/Logging.h"
+
+static LoggerPtr logger(Logger::getLogger("ADARA-Gen"));
+
+#include <iostream>
+#include <vector>
+#include <list>
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <stdint.h>
@@ -7,9 +16,6 @@
 #include <netdb.h>
 #include <signal.h>
 
-#include <iostream>
-#include <vector>
-#include <list>
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
 #include <boost/bind.hpp>
@@ -19,6 +25,7 @@
 
 #include "ADARA.h"
 #include "ReadyAdapter.h"
+#include "ADARAUtils.h"
 
 #include <fdManager.h>
 #include <epicsTimer.h>
@@ -119,7 +126,8 @@ public:
 	void wantWrite(void) {
 		if (!ready)
 			ready = new ReadyAdapter(fd, fdrWrite,
-					boost::bind(&Client::writable, this));
+					boost::bind(&Client::writable, this),
+					1 /* verbose */);
 	}
 
 	void idle(void) {
@@ -128,7 +136,7 @@ public:
 	}
 
 	uint32_t *buildCommon(uint32_t *pkt, Pulse &p) {
-		/* pulse charge and beam flavor first */
+		/* pulse beam flavor */
 		if (p.cycle) {
 			*pkt = (uint32_t) ADARA::PulseFlavor::NORMAL << 24;
 
@@ -137,6 +145,15 @@ public:
 			*pkt = (uint32_t) ADARA::PulseFlavor::NO_BEAM << 24;
 		}
 
+		/* pulse data flags (Got Neutrons/Metadata) */
+		uint32_t dataFlags = 0;
+		if (p.nevents)
+			dataFlags |= ADARA::DataFlags::GOT_NEUTRONS;
+		if (p.cevents || p.mevents)
+			dataFlags |= ADARA::DataFlags::GOT_METADATA;
+		*pkt |= (uint32_t) dataFlags << 27;
+
+		/* pulse charge */
 		if (p.cycle != 1) {
 			/* 18.47e-6 C => 18.47 uC => 18470000 pC
 			 * charge is in units of 10 pC
@@ -167,7 +184,9 @@ public:
 
 		uint32_t *field = (uint32_t *) packet;
 		*field++ = 120;
-		*field++ = ADARA::PacketType::RTDL_V0;
+		*field++ = ADARA_PKT_TYPE(
+			ADARA::PacketType::RTDL_TYPE,
+			ADARA::PacketType::RTDL_VERSION );
 		*field++ = p.ts.tv_sec;
 		*field++ = p.ts.tv_nsec;
 		memset(field, 0, 120);
@@ -185,7 +204,9 @@ public:
 		uint32_t *payload_len = field;
 
 		*field++ = 24;
-		*field++ = ADARA::PacketType::RAW_EVENT_V0;
+		*field++ = ADARA_PKT_TYPE(
+			ADARA::PacketType::RAW_EVENT_TYPE,
+			ADARA::PacketType::RAW_EVENT_VERSION );
 		*field++ = p.ts.tv_sec;
 		*field++ = p.ts.tv_nsec;
 
@@ -391,8 +412,8 @@ Listener::Listener()
 
 	try {
 		m_fdreg = new ReadyAdapter(m_fd, fdrRead,
-					boost::bind(&Listener::newConnection,
-						    this));
+					boost::bind(&Listener::newConnection, this),
+					1 /* verbose */);
 	} catch(...) {
 		close(m_fd);
 		freeaddrinfo(ai);
@@ -451,7 +472,7 @@ public:
 		timer.start(*this, pulse_interval + timer_fudge);
 	}
 
-	expireStatus expire(const epicsTime &currentTime) {
+	expireStatus expire(const epicsTime &UNUSED(currentTime)) {
 		struct timespec now, diff;
 		uint32_t intrapulse;
 

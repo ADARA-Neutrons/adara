@@ -1,0 +1,30 @@
+#!/bin/bash
+
+ALT="" # for Alternate/Secondary SMS Deployments... ;-D
+
+#
+# Parse Command Line Options... ;-)
+#
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | awk -F = '{print $1}'`
+	value=`echo "$arg" | awk -F = '{print $2}'`
+
+	if [ "#$key#" == '#--alt#' ]; then
+		ALT="$value"
+	elif [ "#$key#" == '#--help#' ]; then
+		echo "usage:  smslog [--alt=\"-mon\"]"
+		exit 0
+	fi
+
+done
+
+echo
+
+/sbin/chkconfig --list smsd${ALT}
+
+echo
+
+tail -f /var/log/smsd${ALT}.log
+

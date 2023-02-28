@@ -1,0 +1,71 @@
+<beamline>
+    <devices>
+        <device active="true">
+            <name>Device A</name>
+            <!--pv>
+                <name>a1</name>
+                <alias>A1</alias>
+		<log/>
+                <scan/>
+            </pv>
+            <pv>
+                <name>a2</name>
+                <alias>A2</alias>
+                <log/>
+                <scan/>
+            </pv-->
+            <pv><name>a1</name></pv>
+            <pv><name>a2</name></pv>
+            <pv><name>a3</name></pv>
+            <pv><name>a4</name></pv>
+            <!--pv>
+                <name>a3</name>
+                <alias>A3</alias>
+                <log/>
+                <scan/>
+            </pv>
+            <pv>
+                <name>a4</name>
+                <alias>A4</alias>
+                <logx/>
+                <scan/>
+            </pv-->
+        </device>
+        <device active="true">
+            <name>Device B</name>
+            <pv>
+                <name>b1</name>
+                <alias>B1</alias>
+                <log/>
+                <scan/>
+            </pv>
+            <pv>
+                <name>b2</name>
+                <alias>B2</alias>
+                <log/>
+                <scan/>
+            </pv>
+            <pv>
+                <name>b3</name>
+                <alias>B3</alias>
+                <logx/>
+                <scan/>
+            </pv>
+            <pv>
+                <name>b4</name>
+                <alias>B4</alias>
+                <log/>
+                <scan/>
+            </pv>
+        </device>
+        <device active="false">
+            <name>Device C</name>
+            <pv>
+                <name>fubar2</name>
+                <alias>fubar2</alias>
+                <log/>
+                <scan/>
+            </pv>
+        </device>
+    </devices>
+</beamline>

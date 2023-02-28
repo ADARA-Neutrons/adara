@@ -1,0 +1,646 @@
+
+ADARA SMS Install Checklist
+
+	- for a New or Upgraded DAQ1 Host...
+
+*** ADARA Git Repository ***
+
+Please note that in the following installation instructions, it is
+assumed the ADARA Git Repository has been checked out/cloned into:
+
+   ~/gitsrc/ADARA
+
+from the Git repository in:
+
+   git+ssh://trac.sns.gov/var/repos/ADARA
+
+i.e.:
+
+   git clone git+ssh://trac.sns.gov/var/repos/ADARA ~/gitsrc/ADARA
+
+If you place your clone of the ADARA Git Repository into a different
+base directory in the filesystem, then you will need to update this
+source directory location for any configuration files being copied
+from the ADARA Git Repository.
+
+*** Note: to ensure proper file permissions for captured system files,
+please set your shell "umask" as follows before proceeding! ;-D
+
+   umask 0002
+
+# NOTE: If Verifying the State of an Existing Git Config Repository,
+# Please Skip Step 1.a. and Proceed to Step 1.b. :-D 
+
+1.a. Create Initial SMSD Configuration on New Beamline/Host:
+
+	# Make Top Level Home Controls Area...
+
+	ls -ld /home/controls
+
+	sudo mkdir /home/controls
+
+	sudo chown controls /home/controls
+
+	sudo chgrp slowcontrols_developers /home/controls
+
+	sudo chmod g+ws /home/controls/
+
+	ls -ld /home/controls
+
+	# Create New Git Config Repo Branch, Copy/Steal from Existing Branch!
+
+	ls -l /home/controls/config-daq1/
+
+	git clone git+ssh://trac.sns.gov/var/repos/config \
+		/home/controls/config-daq1/
+
+	cd /home/controls/config-daq1/
+
+	OLD="XXX-daq1"   # "Old" or Existing Beamline Branch to Copy From
+
+	NEW="YYY-daq1"   # "New" Beamline Branch Being Created
+
+	git checkout ${OLD}
+
+	git branch ${NEW}
+
+	git checkout ${NEW}
+
+	git branch -d ${OLD}
+
+	git branch -a | head
+
+		* YYY-daq1
+		  master
+		  remotes/origin/HEAD -> origin/master
+		  . . .
+
+	git rm -r deploy/ sms/deployment.history.txt
+
+	git commit -m "Clearing Deployment History from Copied Branch" \
+		deploy/ sms/deployment.history.txt
+
+	git status
+
+	git push origin ${NEW}
+
+	RedHat6:
+	vi .git/config
+		- add section:
+			[branch "YYY-daq1"]
+				remote = origin
+				merge = refs/heads/YYY-daq1
+
+	RedHat7:
+	git branch --set-upstream-to=origin/${NEW} ${NEW}
+
+	git push
+
+	git status
+
+	# Populate New Branch with Schtuff...! ;-D
+
+	### NOTE: If Just Copied Complete Setup from Existing Branch,
+	### Then Edit SMS Config Files and Please Proceed to Step 1.b. :-D
+
+	vi sms/conf/smsd.conf
+		- set beamline_id = BLXXX
+		- set beamline_longname = INSTRUMENT
+		- set beamline_shortname = INST
+		- set "pvsd" data source uri = blXXX-dassrv1.sns.gov:31416
+		- set "combus" domain = SNS.INST
+		- set "combus" broker_uri = tcp://amqbrokerdev.sns.gov:61616
+		(use "amqbrokerdev" for commissioning/testing...!)
+
+	-> Replace sms/conf/pixelmap with the Pixel Mapping Table for Beamline
+		- use "makePixelMapTable" in ADARA "Test-Harness/src" (Git Repo)
+	
+	-> Replace sms/conf/geometry.xml with Latest "INSTRUMENT_Definition.xml"
+	Instrument Definition File (IDF) from Mantid Nightly RPM...
+		- in /opt/mantidnightly/instrument/...
+
+	### Else Proceed with Step 1.a to Create Brand New Config. :-D
+
+	# Remove Any "brdo" (BranchDo) Script Inherited from "master" Branch...
+
+	git rm brdo
+	git commit -m "Remove BranchDo Script from Master Branch" brdo
+
+	# Get/Copy/Create a "confck" Script...
+
+	cp /SNS/users/$USER/confck.smsd confck
+	git add confck
+	git commit -m "Install ConfCk Script." confck
+
+	./confck
+
+	# SMSD Init Script
+
+	mkdir sms
+
+	sudo cp ~/gitsrc/ADARA/sms/smsd.initscript /etc/init.d/smsd
+
+	ifconfig [Obtain Local Beamline IP/Subnet Address, i.e. 10.111.14.255]
+
+	sudo vi /etc/init.d/smsd
+		- replace: EPICS_CA_ADDR_LIST="10.111.XXX.255 160.91.228.17"
+			-> e.g. with: EPICS_CA_ADDR_LIST="10.111.14.255"
+
+	cp /etc/init.d/smsd sms/smsd.initscript
+
+	# ADARA Mailer Config
+
+	sudo cp /SNS/users/$USER/adaraMailer.conf \
+		/etc/rsyslog.d/adaraMailer.conf
+
+	cp /etc/rsyslog.d/adaraMailer.conf sms/adaraMailer.conf
+
+	git add sms
+	git commit -m "SMS Base Config Directory." sms
+
+	./confck
+
+	# Create SMSD Config File...
+
+	mkdir sms/conf
+
+	sudo cp ~/gitsrc/ADARA/sms/conf/smsd.conf /SNSlocal/sms/conf/smsd.conf
+
+	sudo vi /SNSlocal/sms/conf/smsd.conf
+		- set beamline_id = BLXXX
+		- set beamline_longname = INSTRUMENT
+		- set beamline_shortname = INST
+		- set "pvsd" data source uri = blXXX-dassrv1.sns.gov:31416
+		- set "combus" domain = SNS.INST
+		- set "combus" broker_uri = tcp://amqbrokerdev.sns.gov:61616
+		(use "amqbrokerdev" for commissioning/testing...!)
+
+	cp /SNSlocal/sms/conf/smsd.conf sms/conf/smsd.conf
+
+	# Create SMS Pixel Mapping Table
+
+	-> Use "makePixelMapTable" in ADARA "Test-Harness/src" (Git Repo)
+
+	sudo cp pixelmap /SNSlocal/sms/conf/pixelmap
+
+	cp /SNSlocal/sms/conf/pixelmap sms/conf/pixelmap
+
+	# Get SMS "Geometry" File from Mantid Instrument Definition File (IDF)
+
+	-> Use Latest "INSTRUMENT_Definition.xml" IDF from Mantid Nightly RPM...
+		- in /opt/mantidnightly/instrument/...
+
+	sudo cp INSTRUMENT_Definition.xml /SNSlocal/sms/conf/geometry.xml
+
+	cp /SNSlocal/sms/conf/geometry.xml sms/conf/geometry.xml
+
+	git add sms/conf
+	git commit -m "SMS Config Files." sms
+
+	# Create Initial SMS "Next Run" Data File...
+
+	sudo vi /SNSlocal/sms/data/next_run
+		- set First Run Number for New Beamline/Commissioning...
+			-> "12345"
+
+-OR-
+
+1.b. Verify State of Any Existing Git Config Repository:
+
+	pushd /home/controls/config-daq1/ ; git pull ; git diff ; git status
+
+	./confck
+
+	sudo cp ./sms/smsd.initscript /etc/init.d/smsd
+
+	sudo cp ./sms/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+
+	ls -l /etc/init.d/smsd /etc/rsyslog.d/adaraMailer.conf
+
+		-rwxr-xr-x 1 root root 4890 Apr  7  2017 /etc/init.d/smsd*
+
+		-rw-r--r-- 1 root root 513 Apr 13  2017
+			/etc/rsyslog.d/adaraMailer.conf
+
+	./confck
+
+	sudo cp sms/conf/* /SNSlocal/sms/conf/
+
+	./confck
+
+2. RSyslog Setup:
+
+	sudo vi /etc/rsyslog.conf
+
+		#### RULES ####
+
+		# smsd log
+		if $programname == 'smsd' then /var/log/smsd.log
+		& ~
+
+	ls -l /var/log/smsd.log
+
+	sudo touch /var/log/smsd.log
+
+	sudo chgrp users /var/log/smsd.log
+
+	sudo chmod g+w /var/log/smsd.log
+
+	ls -l /var/log/smsd.log
+
+	sudo /sbin/service rsyslog status
+
+	sudo /sbin/service rsyslog restart
+
+	sudo tail /var/log/messages
+
+	cp /etc/rsyslog.conf ./sms/rsyslog.conf
+
+	git add ./sms/rsyslog.conf
+	git commit ./sms/rsyslog.conf
+
+	./confck
+
+	ls -l /etc/logrotate.d/smsd_log
+
+	sudo cp ~/gitsrc/ADARA/sms/smsd_log /etc/logrotate.d/
+
+	ls -l /etc/logrotate.d/smsd_log
+
+	cp /etc/logrotate.d/smsd_log ./sms/etc.logrotate.d.smsd_log
+
+	git add ./sms/etc.logrotate.d.smsd_log
+	git commit ./sms/etc.logrotate.d.smsd_log
+
+	./confck
+
+3. RSyslog Pipes Setup (repeated here from ADARA/RSYSLOG.MAILER):
+
+	ls -l /etc/rsyslog.pipes
+
+	sudo mkdir /etc/rsyslog.pipes
+
+	sudo mknod /etc/rsyslog.pipes/criticalMessages p
+
+	sudo chgrp snswheel /etc/rsyslog.pipes/criticalMessages
+
+	sudo chmod 660 /etc/rsyslog.pipes/criticalMessages
+
+	cp ~/gitsrc/ADARA/big_err_pipe.c /tmp
+
+	cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+
+	/tmp/big_err_pipe
+
+	sudo cp ~/gitsrc/ADARA/rsyslogMailer /usr/local/bin
+
+	sudo vi /etc/crontab
+
+		# Don't try to send crontab output to "root@ornl.gov" which doesn't exist
+		# MAILTO=root
+		MAILTO="root@localhost"
+		HOME=/
+
+		*/10 * * * * root /usr/local/bin/rsyslogMailer > /dev/null 2>&1
+
+	cp /etc/crontab ./sms/etc.crontab
+
+	git add ./sms/etc.crontab
+	git commit ./sms/etc.crontab
+
+	./confck
+
+	ls -l /SNSlocal/rsyslog.cache
+
+	sudo mkdir /SNSlocal/rsyslog.cache
+
+	sudo chown snsdata /SNSlocal/rsyslog.cache
+
+	sudo chgrp adara /SNSlocal/rsyslog.cache
+
+	sudo chmod g+ws /SNSlocal/rsyslog.cache
+
+	ls -ld /SNSlocal/rsyslog.cache
+
+		drwxrwsr-x 2 snsdata adara 168 Apr 26 13:28 /SNSlocal/rsyslog.cache
+
+	ls -l /SNSlocal/rsyslog.cache
+
+4. Administrator Crontab Setup:
+
+	crontab -l
+
+	crontab -e
+
+		MAILTO=kohlja@ornl.gov,8654057070@messaging.sprintpcs.com
+		0-59/10 * * * * /SNS/users/$USER/stuff/exec/smsd_mon
+		0 8,17 * * * /home/controls/config-daq1/confck --quiet
+		0 8,17 * * * /usr/local/bin/liveconf --terse --quiet confck
+
+	* Optional SMSD-MON Crontab Commands:
+
+		# SMS-MON
+		0-59/10 * * * * /SNS/users/$USER/stuff/exec/smsd_mon --alt="-mon"
+		0 8,17 * * * /home/controls/config-daq1-mon/confck --quiet
+		0 8,17 * * * /usr/local/bin/liveconf
+	!	   --config=/SNSlocal/sms-mon/conf/smsd.conf --terse --quiet confck
+		0 0 * * * /SNS/users/$USER/stuff/exec/bump_mon_run
+	!	   --config="/SNSlocal/sms-mon/conf/smsd.conf"
+
+	crontab -l
+
+5. Add SMS to Local Run Levels
+
+	chkconfig --list smsd
+
+	sudo chkconfig --add smsd
+
+	chkconfig --list smsd
+
+	sudo chkconfig smsd on
+
+	chkconfig --list smsd
+
+	(rm ./sms/chkconfig.smsd)
+
+	chkconfig --list smsd > ./sms/chkconfig.smsd 2>&1
+
+	git add ./sms/chkconfig.smsd
+	git commit ./sms/chkconfig.smsd
+
+	git diff ; git pull ; git push ; git status
+
+	./confck
+
+6. User Local Bin Soft Link Setup:
+
+	ls -l /usr/local/bin/
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara_add_run_end \
+		/usr/local/bin/adara_add_run_end
+
+	sudo ln -s /home/controls/config-daq1/deploy/adaracat \
+		/usr/local/bin/adaracat
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara_data_find \
+		/usr/local/bin/adara_data_find
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara-dump \
+		/usr/local/bin/adara-dump
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara_fix_ipts \
+		/usr/local/bin/adara_fix_ipts
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara-gen \
+		/usr/local/bin/adara-gen
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara-munge \
+		/usr/local/bin/adara-munge
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara-parser \
+		/usr/local/bin/adara-parser
+
+	sudo ln -s /home/controls/config-daq1/deploy/adara-pvgen \
+		/usr/local/bin/adara-pvgen
+
+	sudo ln -s /home/controls/config-daq1/deploy/liveconf \
+		/usr/local/bin/liveconf
+
+	sudo ln -s /home/controls/config-daq1/deploy/smsd \
+		/usr/local/bin/smsd
+
+	ls -l /usr/local/bin/
+
+7. Semi-Manually Deploy Local EPICS Libraries and Utilities...
+
+	# Temporarily Edit $HOME/.bashrc EPICS Settings for the Build Process
+
+	vi $HOME/.bashrc
+	   - EPICS_BASE=/home/controls/epics/base/master
+	   - EPICS_CA_AUTO_ADDR_LIST=NO
+	   - EPICS_HOST_ARCH=linux-x86_64
+	   - EPICS_CA_ADDR_LIST=127.255.255.255
+	   - EPICS_CA_MAX_ARRAY_BYTES=100000000
+	   - EPICS_EXTENSIONS=/home/controls/epics/extensions/master
+	   - EPICS_BASEV4=/home/controls/epics/basev4/master
+	   - EPICS4_DIR=/home/controls/epics/basev4/master
+
+	mkdir /tmp/share
+
+	git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/master
+
+	/tmp/share/master/scripts/setup_controls.sh
+	   - Note: Prompts for User Password for Sudo Commands...
+	   - script can be re-executed repeatedly after fixing any errors... :-)
+
+	rm -rf /tmp/share
+
+	# Create Production EPICS Releases
+
+	# EPICS Base
+
+	# Determine Official EPICS Base Version
+	# e.g. #define EPICS_VERSION_STRING "EPICS 3.14.12.6"
+	grep EPICS_VERSION_STRING \
+		/home/controls/epics/base/master/include/epicsVersion.h
+
+	# Determine Latest Modification Date for EPICS Base
+	# e.g. Date:   Mon Feb 12 11:34:21 2018 -0500
+	#    -> YYYYMMDD = 20180212
+	git log /home/controls/epics/base/master | head
+
+	# Construct EPICS Base Release Name:
+	# "rel" + EPICS_VERSION_STRING + "_" + YYYYMMDD
+	#    -> "rel3.14.12.6_20180212"
+
+	mkdir -p /home/controls/prod/epics/base
+
+	cp -rp /home/controls/epics/base/master \
+		/home/controls/prod/epics/base/rel3.14.12.6_20180212
+
+	# EPICS Extensions
+
+	# Determine Official EPICS Extensions Version
+	#    -> at the moment, it's "1.3", undocumented... ;-b
+
+	# Determine Latest Modification Date for EPICS Extensions
+	# e.g. Date:   Wed Aug 14 11:38:20 2019 -0400
+	#    -> YYYYMMDD = 20190814
+	git log /home/controls/epics/extensions/master | head
+
+	# Construct EPICS Extensions Release Name:
+	# "rel1.3" + "_" + YYYYMMDD
+	#    -> "rel1.3_20190814"
+
+	mkdir -p /home/controls/prod/epics/extensions
+
+	cp -rp /home/controls/epics/extensions/master \
+		/home/controls/prod/epics/extensions/rel1.3_20190814
+
+	# EPICS BaseV4
+
+	# Determine Official EPICS BaseV4 Version
+	# e.g. EPICS V4 Release 4.6.0 C++ Bundle Read-Me
+	#    -> just use Major/Minor Release Numbers: "4.6"
+	grep Release /home/controls/epics/basev4/master/README.md
+
+	# Determine Latest Modification Date for EPICS BaseV4
+	# e.g. Date:   Thu Nov 15 11:07:42 2018 -0500
+	#    -> YYYYMMDD = 20181115
+	git log /home/controls/epics/basev4/master | head
+
+	# Construct EPICS BaseV4 Release Name:
+	# "rel" + EPICS_V4_Release + "_" + YYYYMMDD
+	#    -> "rel4.6_20181115"
+
+	mkdir -p /home/controls/prod/epics/basev4
+
+	cp -rp /home/controls/epics/basev4/master \
+		/home/controls/prod/epics/basev4/rel4.6_20181115
+
+8. ADARA Production EPICS Soft Links Setup:
+
+	ls -l /home/controls/prod/ADARA
+
+	mkdir /home/controls/prod/ADARA
+
+	ls -l /home/controls/prod/ADARA
+
+	(rm /home/controls/prod/ADARA/EpicsBaseLink)
+
+	ln -s /home/controls/prod/epics/base/rel3.14.12.6_20180212 \
+		/home/controls/prod/ADARA/EpicsBaseLink
+
+	(rm /home/controls/prod/ADARA/EpicsBaseV4Link)
+
+	ln -s /home/controls/prod/epics/basev4/rel4.6_20181115 \
+		/home/controls/prod/ADARA/EpicsBaseV4Link
+
+	(rm /home/controls/prod/ADARA/EpicsExtensionsLink)
+
+	ln -s /home/controls/prod/epics/extensions/rel1.3_20190814 \
+		/home/controls/prod/ADARA/EpicsExtensionsLink
+
+	ls -l /home/controls/prod/ADARA
+
+	# Note: See Below for Jeeem's Production ADARA EPICS Setup
+	# in "$HOME/.bashrc"... ;-D
+
+	# Generally, Set the basic EPICS Environment to:
+
+	vi $HOME/.bashrc
+	   - EPICS_BASE=/home/controls/prod/ADARA/EpicsBaseLink
+	   - EPICS_EXTENSIONS=/home/controls/prod/ADARA/EpicsExtensionsLink
+	   - EPICS_CA_AUTO_ADDR_LIST=NO
+	   - EPICS_HOST_ARCH=linux-x86_64
+	   - EPICS_CA_ADDR_LIST=127.255.255.255
+	   - EPICS_BASEV4=/home/controls/prod/ADARA/EpicsBaseV4Link
+	   - EPICS4_DIR=/home/controls/prod/ADARA/EpicsBaseV4Link
+	   - EPICS_CA_MAX_ARRAY_BYTES=100000000
+
+	source $HOME/.bashrc
+
+	printenv | grep EPICS
+
+9. Make Sure Accelerator Timing Git Repo is Deployed:
+
+	ls -l /home/controls/Accelerator/
+
+	cd /home/controls
+
+	git clone git+ssh://trac.sns.gov/var/repos/Accelerator
+
+	ls -l /home/controls/Accelerator/
+
+		total 388
+		-rw-rw-r-- 1 USER slowcontrols_developers  18277 Mar 31  2016
+			snsTiming.h
+		-rw-rw-r-- 1 USER slowcontrols_developers 373279 Mar 31  2016
+			SNS.Timing.Master.Functional.System.Description.pdf
+
+10. Deploy SMS Daemon:
+
+	pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
+
+	(ls -l /home/controls/config-daq1/deploy/smsd)
+
+		lrwxrwxrwx 1 USER slowcontrols_developers 47 Jul 18 12:46
+			/home/controls/config-daq1/deploy/smsd ->
+				/home/controls/prod/ADARA/20170717/v1.6.19/smsd*
+
+	./deploy_adara sms
+
+11. Start SMS Daemon:
+
+	sudo /sbin/service smsd status
+
+	sudo /sbin/service smsd start
+
+	smslog
+
+	liveconf status
+
+	caput -S BL17:SMS:RunInfo:ProposalId IPTS-0000
+
+	liveconf status
+
+DONE!!! :-D
+
+   Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+
+ADDENDUMS:
+
+A. Jeeem's Production ADARA EPICS Setup in $HOME/.bashrc:
+
+	export EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"
+	export EPICS_BASEV4="/home/controls/prod/ADARA/EpicsBaseV4Link"
+	export EPICS_EXTENSIONS="/home/controls/prod/ADARA/EpicsExtensionsLink"
+	export EPICS_CA_AUTO_ADDR_LIST="NO"
+	export EPICS_CA_MAX_ARRAY_BYTES="100000000"
+
+	if [[ -x "${EPICS_BASE}"/startup/EpicsHostArch.pl ]]; then
+   		export EPICS_HOST_ARCH=`"${EPICS_BASE}"/startup/EpicsHostArch.pl`
+	else
+   		export EPICS_HOST_ARCH="none"
+	fi
+
+	if [[ -z $EPICS_CA_ADDR_LIST ]]; then
+   		#export EPICS_CA_ADDR_LIST="localhost"
+   		# support multiple local iocs on a host...! ;-D
+   		export EPICS_CA_ADDR_LIST="127.255.255.255"
+	fi
+
+	# From EPICS V4 setup_profile.sh...
+
+	export EPICS4_DIR="$EPICS_BASEV4"
+
+	# From EPICS Extensions setup_profile.sh...
+
+	export EDMOBJECTS="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMPVOBJECTS="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMFILES="${EPICS_EXTENSIONS}/pref/edm"
+	export EDMHELPFILES="${EPICS_EXTENSIONS}/src/edm/helpFiles"
+	export EDMLIBS="${EPICS_EXTENSIONS}/lib/$EPICS_HOST_ARCH"
+	export EDMLIB_SUFFIX="so"
+	export EDMACTIONS="${EPICS_EXTENSIONS}/pref/edm"
+
+	# Executable Path Stuff...
+
+	epicspath="/home/controls/bin"
+	epicspath="$epicspath:${EPICS_BASE}/bin/${EPICS_HOST_ARCH}"
+	epicspath="$epicspath:${EPICS_BASEV4}/pvAccessCPP/bin/linux-x86_64/"
+	epicspath="$epicspath:${EPICS_EXTENSIONS}/bin/${EPICS_HOST_ARCH}"
+	epicspath="$epicspath:${EPICS_EXTENSIONS}/bin"
+
+	### NOTE: Customize to Your Path Setup...!
+	export PATH="...:$epicspath:..."
+
+	# Additional EPICS Python Cruft...
+	export PYTHONPATH="${PYTHONPATH}:/home/controls/share/master/python"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_BASEV4}/pvaPy/lib/python/2.7/linux-x86_64"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/cothread"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy/build/lib.linux-x86_64-2.6/pcaspy/"
+	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pyepics/build/lib"
+	export PYTHONPATH="${PYTHONPATH}:/home/controls/python"
+

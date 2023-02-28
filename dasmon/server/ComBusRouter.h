@@ -13,20 +13,29 @@
 namespace ADARA {
 namespace DASMON {
 /**
- * The ComBusRouter class is repesponsible for emitting asserted rules from the rule engine (stream analyzer)
- * onto the SIGNAL topic of the ComBus.
+ * The ComBusRouter class is repesponsible for emitting asserted rules
+ * from the rule engine (stream analyzer) onto the SIGNAL topic
+ * of the ComBus.
  *
- * Change how signals are processed: All processes that emit signals must re-emit asserted signals every
- * 5 seconds. When a signal is retracted, a retraction message will be sent, and the signal will no longer be
- * re-emitted. This allows clients to utilize a hybrid stateful-statless approach such that signals can be refreshed
- * either from the re-emitted messages, or based on asserts and retracts. If retracts are used, a fail-safe timeout
- * must be employed to prevent stuck signals if the retract message is missed (due to process or broker crash).
+ * Change how signals are processed: All processes that emit signals
+ * must re-emit asserted signals every 5 seconds. When a signal is
+ * retracted, a retraction message will be sent, and the signal will
+ * no longer be re-emitted. This allows clients to utilize a hybrid
+ * stateful-statless approach such that signals can be refreshed
+ * either from the re-emitted messages, or based on asserts and retracts.
+ * If retracts are used, a fail-safe timeout must be employed to
+ * prevent stuck signals if the retract message is missed
+ * (due to process or broker crash).
  */
-class ComBusRouter : public IStreamListener, public ADARA::ComBus::IConnectionListener, public ADARA::ComBus::IInputListener,
-        public StreamAnalyzer::ISignalListener, public ADARA::ComBus::ITopicListener
+class ComBusRouter
+    : public IStreamListener, public ADARA::ComBus::IConnectionListener,
+    public ADARA::ComBus::IInputListener,
+    public StreamAnalyzer::ISignalListener,
+    public ADARA::ComBus::ITopicListener
 {
 public:
-    ComBusRouter( StreamMonitor &a_monitor, StreamAnalyzer &a_analyzer );
+    ComBusRouter( StreamMonitor &a_monitor,
+        StreamAnalyzer &a_analyzer, uint16_t a_metrics_period  );
     virtual ~ComBusRouter();
 
     void    run();
@@ -35,11 +44,16 @@ private:
     struct ProcInfo
     {
         ProcInfo()
-            : status(ADARA::ComBus::STATUS_INACTIVE), prev_status(ADARA::ComBus::STATUS_INACTIVE), required(false), last_updated(0)
+            : status(ADARA::ComBus::STATUS_INACTIVE),
+            prev_status(ADARA::ComBus::STATUS_INACTIVE),
+            required(false), last_updated(0)
         {}
 
-        ProcInfo( ADARA::ComBus::StatusCode a_status, ADARA::ComBus::StatusCode a_prev_status, bool a_required, uint32_t a_time )
-            : status(a_status), prev_status(a_prev_status), required(a_required), last_updated(a_time)
+        ProcInfo( ADARA::ComBus::StatusCode a_status,
+                ADARA::ComBus::StatusCode a_prev_status,
+                bool a_required, uint32_t a_time )
+            : status(a_status), prev_status(a_prev_status),
+            required(a_required), last_updated(a_time)
         {}
 
         ADARA::ComBus::StatusCode   status;
@@ -48,13 +62,19 @@ private:
         uint32_t                    last_updated;
     };
 
-    void    sendRuleDefinitions( const std::string &a_src_proc, const std::string &a_CID );
+    void    sendRuleDefinitions( const std::string &a_src_proc,
+                const std::string &a_CID );
     void    setRuleDefinitions( const ADARA::ComBus::MessageBase *a_msg );
-    void    sendInputFacts( const std::string &a_src_proc, const std::string &a_CID );
-    void    sendPVs( const std::string &a_src_proc, const std::string &a_CID );
+    void    sendInputFacts( const std::string &a_src_proc,
+                const std::string &a_CID );
+    void    sendPVs( const std::string &a_src_proc,
+                const std::string &a_CID );
 
     // IStreamListener Interface
-    void    runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp );
+    void    runStatus( bool a_recording, uint32_t a_run_number,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void    beginProlog() {}
+    void    endProlog() {}
     void    pauseStatus( bool a_paused );
     void    scanStatus( bool a_scanning, uint32_t a_scan_number );
     void    beamInfo( const BeamInfo &a_info );
@@ -64,9 +84,25 @@ private:
     void    streamMetrics( const StreamMetrics &a_metrics );
     void    pvDefined( const std::string &a_name );
     void    pvUndefined( const std::string &a_name );
-    void    pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
-    void    pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
-    void    connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
+    void    pvValue( const std::string &a_name,
+                uint32_t a_value, VariableStatus::Enum a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void    pvValue( const std::string &a_name,
+                double a_value, VariableStatus::Enum a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void    pvValue( const std::string &a_name,
+                std::string &a_value, VariableStatus::Enum a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void    pvValue( const std::string &a_name,
+                std::vector<uint32_t> a_value,
+                VariableStatus::Enum a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void    pvValue( const std::string &a_name,
+                std::vector<double> a_value,
+                VariableStatus::Enum a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void    connectionStatus( bool a_connected,
+                const std::string &a_host, unsigned short a_port );
 
     // IStatusListener Interface
     void    comBusConnectionStatus( bool a_connected );
@@ -92,8 +128,15 @@ private:
     mutable boost::mutex            m_mutex;
     std::map<std::string,ProcInfo>  m_procs;
     mutable boost::mutex            m_proc_mutex;
+    uint16_t                        m_metrics_period;
+    uint16_t                        m_beam_metrics_count;
+    uint16_t                        m_run_metrics_count;
+    uint16_t                        m_stream_metrics_count;
 };
 
 }}
 
 #endif // AMQPRULEROUTER_H
+
+// vim: expandtab
+

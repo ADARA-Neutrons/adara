@@ -1,0 +1,19 @@
+
+# SMS Daemon Log Rotate Config
+# - to be installed in: /etc/logrotate.d/smsd_log 
+
+/var/log/smsd.log {
+   # to avoid the need for a SIGHUP
+   copytruncate
+   nomissingok
+   notifempty
+   compress
+   rotate 7
+   dateext
+   size 100M
+   # 'create' isn't used with 'copytruncate',
+   # but in case we change the mechanism later:
+   create 0664 root users
+   su root users
+}
+

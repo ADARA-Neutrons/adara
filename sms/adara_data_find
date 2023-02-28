@@ -1,0 +1,690 @@
+#!/bin/bash
+#
+# ADARA "Data Find" Script...! ;-D
+#
+# Script to Automate the Searching for Occurrences of a
+# Specific Timestamp Value amidst the Local SMS Raw Data Stream Files,
+# as this is often Obscured by the "Ending/Last-Modified" Date and the
+# Odd Ordering of the Enclosing Raw Data Directories/Files themselves.
+#
+
+#
+# Defaults:
+#
+
+ADARA_PARSER="/usr/local/bin/adara-parser"
+
+SMS_CONFIG="/SNSlocal/sms/conf/smsd.conf"
+
+SMS_DATA="/SNSlocal/sms/data"
+
+# EPICS Time Epoch Offset from 1970-01-01...
+EPICS_EPOCH=631152000
+
+DIR_MAX_TIME=6
+DIR_DELAY=1
+
+DATE="/usr/bin/date"
+DIFF="/usr/bin/diff"
+FIND="/usr/bin/find"
+HEAD="/usr/bin/head"
+TAIL="/usr/bin/tail"
+SORT="/usr/bin/sort"
+CMP="/usr/bin/cmp"
+Less="/usr/bin/less"
+AWK="/usr/bin/awk"
+WC="/usr/bin/wc"
+GREP="/bin/grep"
+SED="/bin/sed"
+CP="/bin/cp"
+MV="/bin/mv"
+LS="/bin/ls"
+
+USAGE()
+{
+	echo -e "\nusage: adara_data_find \\"
+	echo "    [--epics=<EPICSTimeInSeconds>] \\"
+	echo "    [--secs=<TimeInSeconds>] \\"
+	echo "    [--human=\"<DateString>\"] \\"
+	echo "    [--SMS|--sms] [--OLDSMS|--oldsms] \\"
+	echo "    [--nED|--ned|--ds=1] \\"
+	echo "    [--PVSD|--pvsd|--ds=3] \\"
+	echo "    [--ds=<N>] [--pkt=\"RTDL|VARIABLE|DATA\"] \\"
+	echo "    [--delay=<Hours>(${DIR_DELAY})] \\"
+	echo "    [--max_time=<Hours>(${DIR_MAX_TIME})] \\"
+	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
+	echo "    [--extra_parser_args=\"--showfoo\"]  \\"
+	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
+	echo "    [--sms_data=<${SMS_DATA}>] \\"
+	echo "    [--help|-h]"
+	echo
+	echo "where:"
+	echo 
+	echo "   adara_data_find --epics=\"771180658[.123456789]\""
+	echo "      -> Mon Jun  9 12:50:58 EDT 2014"
+	echo
+	echo "   adara_data_find --secs=\"1402332658[.123456789]\""
+	echo "      -> Mon Jun  9 12:50:58 EDT 2014"
+	echo
+	echo "   adara_data_find --human=\"Mon Jun  9 12:50:58 EDT 2014\""
+	echo "      -> 1402332658 -> 771180658"
+	echo
+	echo -n "Note: the \"=\" is optional for the time-based "
+	echo "command-line arguments."
+	echo
+}
+
+CHECK_PROCEED()
+{
+	local _proceed_query="Proceed"
+	local _alt_query=0
+
+	if [[ "#$1#" != '##' ]]; then
+		_proceed_query="$1"
+		_alt_query=1
+	fi
+
+	local _proceed_ck=""
+
+	echo -e -n "\n${_proceed_query} (yes/No)? "
+	read _proceed_ck
+
+	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ -z ${_proceed_ck} || ${_proceed_ck} == "n" \
+			|| ${_proceed_ck} == "no" ]]; then
+		# Alternate Query? Just Return...
+		if [[ ${_alt_query} == 1 ]]; then
+			return 99
+		# Else Actually Exit Script...
+		else
+			echo -e "\nExiting ADARA Data Find at User's Request.\n"
+			exit 99
+		fi
+	fi
+
+	return 0
+}
+
+SECS_TO_EPICS()
+{
+	local _secs="$1"
+
+	local _sec_only=`echo "${_secs}" | ${SED} 's/\.[0-9]*//'`
+	local _nsec_only=`echo "${_secs}" | ${SED} "s/${_sec_only}\.//"`
+	local _epics=$(( _sec_only - EPICS_EPOCH ))
+	_epics="${_epics}.${_nsec_only}"
+	echo -e "\nConverted to EPICS Time in Seconds:" >&2
+	echo -e "\t[${_epics}]" >&2
+
+	echo "${_epics}"
+}
+
+EPICS_TO_SECS()
+{
+	local _epics="$1"
+
+	local _sec_only=`echo "${_epics}" | ${SED} 's/\.[0-9]*//'`
+	local _nsec_only=`echo "${_epics}" | ${SED} "s/${_sec_only}\.//"`
+	local _secs=$(( _sec_only + EPICS_EPOCH ))
+	_secs="${_secs}.${_nsec_only}"
+	echo -e "\nConverted to Time in Seconds:" >&2
+	echo -e "\t[${_secs}]" >&2
+
+	echo "${_secs}"
+}
+
+EPICSTimeInSeconds=""
+
+SET_EPICS_TIME()
+{
+	local _epics="$1"
+	shift
+
+	EPICSTimeInSeconds="${_epics}"
+	echo -e "\nSetting EPICS Search Time in Seconds to:"
+	echo -e "\t[${EPICSTimeInSeconds}]"
+}
+
+SET_SECS_TIME()
+{
+	local _secs="$1"
+	shift
+
+	echo -e "\nSetting Search Time in Seconds to:"
+	echo -e "\t[${_secs}]"
+	EPICSTimeInSeconds=`SECS_TO_EPICS "${_secs}"`
+}
+
+SET_HUMAN_TIME()
+{
+	local _human="$1"
+	shift
+
+	echo -e "\nSetting Search Time String to:"
+	echo -e "\t[${_human}]"
+	local _secs=`${DATE} --date="${_human}" +%s`
+	echo -e "\nConverted to Search Time in Seconds:"
+	echo -e "\t[${_secs}]"
+	EPICSTimeInSeconds=`SECS_TO_EPICS "${_secs}"`
+}
+
+#
+# Get Starting Timestamp of Local Raw Data File
+#
+
+GET_DATA_START_TIME()
+{
+	# Data Directory
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Data Directory Specified for Get Start Time!" \
+			>&2
+		echo ""
+		return
+	fi
+	local _datadir="$1"
+	shift
+
+	# Data File
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Data File Specified for Get Start Time!" >&2
+		echo ""
+		return
+	fi
+	local _datafile="$1"
+	shift
+
+	# Set Bash Pipefail Option as Needed...
+	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
+	if [[ "$pfck" == "off" ]]; then
+		set -o pipefail
+	fi
+
+	local _first_rtdl_line=`${ADARA_PARSER} "${_datadir}/${_datafile}" \
+		| ${GREP} " ${FILE_PACKET} " | ${HEAD} -1`
+	local _ckrtdl=$?
+
+	# Reset Bash Pipefail Option as Needed...
+	if [[ "$pfck" == "off" ]]; then
+		set +o pipefail
+	fi
+
+	if [[ ${_ckrtdl} != 0 ]]; then
+		echo -e "\nError Searching ADARA Parser Output for Data File:" >&2
+		echo -e "\t[${_datadir}/${_datafile}]" >&2
+		echo >&2
+		${LS} -l "${_datadir}/${_datafile}" >&2
+		echo ""
+		return
+	fi
+
+	# Just Return If No Desired File Packets Lines Found...
+	if [[ -z "${_first_rtdl_line}" ]]; then
+		echo ""
+		return
+	fi
+
+	local _data_start_time=`echo "${_first_rtdl_line}" \
+		| ${AWK} '{print $1}'`
+
+	if [[ $? != 0 || -z "${_data_start_time}" ]]; then
+		echo -e -n "\nError Parsing First ${FILE_PACKET} Line Output " >&2
+		echo "for Data File:" >&2
+		echo -e "\t[${_first_rtdl_line}]" >&2
+		echo ""
+		return
+	fi
+
+	echo "${_data_start_time}"
+}
+
+#
+# Parse Command Line Arguments
+#
+
+FILE_TYPE="SMS"
+FILE_PREFIX="m"
+FILE_PACKET=""
+
+EXTRA_PARSER_ARGS=""
+
+NextValue=""
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | ${AWK} -F = '{print $1}'`
+	value=`echo "$arg" | ${AWK} -F = '{print $2}'`
+
+	# --epics <EPICSTimeInSeconds>
+	if [[ "${NextValue}" == "epics" ]]; then
+		SET_EPICS_TIME "${key}"
+		NextValue=""   # Reset "Next Value" Flag...
+	# --secs <TimeInSeconds>
+	elif [[ "${NextValue}" == "secs" ]]; then
+		SET_SECS_TIME "${key}"
+		NextValue=""   # Reset "Next Value" Flag...
+	# --human "<DateString>"
+	elif [[ "${NextValue}" == "human" ]]; then
+		SET_HUMAN_TIME "${key}"
+		NextValue=""   # Reset "Next Value" Flag...
+	# Grab "Next" Command Line Parameter as "Value"...
+	elif [[ "#$key#" == '#--epics#' ]]; then
+		if [[ -n "${value}" ]]; then
+			SET_EPICS_TIME "${value}"
+		else
+			NextValue="epics"
+		fi
+	# Grab "Next" Command Line Parameter as "Value"...
+	elif [[ "#$key#" == '#--secs#' ]]; then
+		if [[ -n "${value}" ]]; then
+			SET_SECS_TIME "${value}"
+		else
+			NextValue="secs"
+		fi
+	# Grab "Next" Command Line Parameter as "Value"...
+	elif [[ "#$key#" == '#--human#' ]]; then
+		if [[ -n "${value}" ]]; then
+			SET_HUMAN_TIME "${value}"
+		else
+			NextValue="human"
+		fi
+	elif [[ "#$key#" == '#--SMS#' || "#$key#" == '#--sms#' ]]; then
+		FILE_TYPE="SMS"
+		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		FILE_PREFIX="m"
+		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+		if [[ -z "${FILE_PACKET}" ]]; then
+			FILE_PACKET="RTDL"
+			echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		else
+			echo -e "\n\tLEAVING File Packet Type As: \"${FILE_PACKET}\""
+		fi
+	elif [[ "#$key#" == '#--OLDSMS#' || "#$key#" == '#--oldsms#' ]]; then
+		FILE_TYPE="OLDSMS"
+		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		FILE_PREFIX="f"
+		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+		if [[ -z "${FILE_PACKET}" ]]; then
+			FILE_PACKET="RTDL"
+			echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		else
+			echo -e "\n\tLEAVING File Packet Type As: \"${FILE_PACKET}\""
+		fi
+	elif [[ "#$key#" == '#--nED#' || "#$key#" == '#--ned#' ]]; then
+		FILE_TYPE="nED"
+		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		FILE_PREFIX="ds00000001-s"
+		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+		if [[ -z "${FILE_PACKET}" ]]; then
+			FILE_PACKET="RTDL"
+			echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		else
+			echo -e "\n\tLEAVING File Packet Type As: \"${FILE_PACKET}\""
+		fi
+	elif [[ "#$key#" == '#--PVSD#' || "#$key#" == '#--pvsd#' ]]; then
+		FILE_TYPE="PVSD"
+		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		FILE_PREFIX="ds00000003-s"
+		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+		if [[ -z "${FILE_PACKET}" ]]; then
+			FILE_PACKET="VARIABLE"
+			echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		else
+			echo -e "\n\tLEAVING File Packet Type As: \"${FILE_PACKET}\""
+		fi
+	elif [[ "#$key#" == '#--ds#' ]]; then
+		# Single-Digit Data Source Numbers...
+		if [[ ${value} -lt 10 ]]; then
+			FILE_TYPE="DataSource#${value}"
+			FILE_PREFIX="ds0000000${value}-s"
+		# Double-Digit Data Source Numbers...
+		elif [[ ${value} -lt 100 ]]; then
+			FILE_TYPE="DataSource#${value}"
+			FILE_PREFIX="ds000000${value}-s"
+		else
+			echo -n "\nReally...?! More than 100 Data Sources...?? ;-D"
+			exit -99
+		fi
+		echo -e "\nSetting ADARA Stream File Type to:\n\n\t[${FILE_TYPE}]"
+		echo -e "\n\tFile Prefix: \"${FILE_PREFIX}\""
+		if [[ -z "${FILE_PACKET}" ]]; then
+			FILE_PACKET="RTDL"   # Can be overridden by "--pkt=FOO"...
+			echo -e "\n\tFile Packet Type: \"${FILE_PACKET}\""
+		else
+			echo -e "\n\tLEAVING File Packet Type As: \"${FILE_PACKET}\""
+		fi
+	elif [[ "#$key#" == '#--pkt#' ]]; then
+		FILE_PACKET="${value}"
+		echo -e "\nFile Packet Type Set to: \"${FILE_PACKET}\""
+	elif [[ "#$key#" == '#--delay#' ]]; then
+		DIR_DELAY="${value}"
+		echo -e -n "\nSetting Data Directory Find Delay to: "
+		echo "[${DIR_DELAY} Hours]"
+	elif [[ "#$key#" == '#--max_time#' ]]; then
+		DIR_MAX_TIME="${value}"
+		echo -e -n "\nSetting Data Directory Find Max Time to: "
+		echo "[${DIR_MAX_TIME} Hours]"
+	elif [[ "#$key#" == '#--adara_parser#' ]]; then
+		ADARA_PARSER="${value}"
+		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
+	elif [[ "#$key#" == '#--extra_parser_args#' ]]; then
+		EXTRA_PARSER_ARGS="${value}"
+		echo -e "\nSetting Extra ADARA Parser Args to:"
+		echo -e "\n\t[${EXTRA_PARSER_ARGS}]"
+	elif [[ "#$key#" == '#--sms_config#' ]]; then
+		SMS_CONFIG="${value%/}"
+		echo -e "\nSetting SMS Config Directory to:\n\t[${SMS_CONF}]"
+	elif [[ "#$key#" == '#--sms_data#' ]]; then
+		SMS_DATA="${value%/}"
+		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+	elif [[ "#$key#" == '#--help#' || "#$key#" == '#-h#' ]]; then
+		USAGE
+		exit 0
+	else
+		echo -e "\nError: Unknown Command Line Option [${arg}]"
+		USAGE
+		exit 1
+	fi
+
+done
+
+if [[ -z "${EPICSTimeInSeconds}" ]]; then
+	echo -e "\nError: No EPICS Search Time in Seconds Specified!"
+	USAGE
+	exit 2
+fi
+
+# Strip Off Nanoseconds...
+EPICSSecs=`echo "${EPICSTimeInSeconds}" | ${SED} 's/\.[0-9]*//'`
+
+# Snag Nanoseconds...
+EPICSNsecs=`echo "${EPICSTimeInSeconds}" | ${SED} "s/${EPICSSecs}\.//"`
+
+if [[ -z "${FILE_PACKET}" ]]; then
+	FILE_PACKET="RTDL"   # Can be overridden by "--pkt=FOO"...
+	echo -e "\n\tUsing Default File Packet Type: \"${FILE_PACKET}\""
+fi
+
+#
+# Ready to Begin...! :-D
+#
+
+echo -e "\n*** Searching for Local ${FILE_TYPE} Raw Data Files Containing:"
+
+echo -e "\n\tEPICS Search Time in Seconds:  ${EPICSTimeInSeconds}"
+
+echo -e "\n\tUsing Local ${FILE_TYPE} Raw Data in:  [${SMS_DATA}]"
+
+CHECK_PROCEED
+
+#
+# Collect Candidate Local SMS Data Subdirectories...
+# (I.e. Data Directories Modified "Around or After" the Target Time...)
+#
+
+# Convert EPICS Time to "Regular" Seconds...
+target_time=`EPICS_TO_SECS "${EPICSTimeInSeconds}"`
+
+# Strip Off Nanoseconds...
+target_secs=`echo "${target_time}" | ${SED} 's/\.[0-9]*//'`
+
+# Subtract Directory Delay (Hours) from Target Seconds...
+target_secs_delay=$(( $target_secs - ( 3600 * $DIR_DELAY ) ))
+
+# Convert Target Time to String Format for "Find" Utility...
+target_str=`date --date="1970-01-01 UTC ${target_secs_delay} seconds"`
+
+echo -e "\n\"${DIR_DELAY} Hour(s) Earlier\" Target Date String:"
+echo -e "\n\t[${target_str}]"
+
+# Add Directory Max Time (Hours) to Target Seconds...
+target_max_secs=$(( $target_secs + ( 3600 * $DIR_MAX_TIME ) ))
+
+# Convert Target Time to String Format for "Find" Utility...
+target_max_str=`date --date="1970-01-01 UTC ${target_max_secs} seconds"`
+
+echo -e "\n\"${DIR_MAX_TIME} Hour(s) Later\" Target Max Date String:"
+echo -e "\n\t[${target_max_str}]"
+
+echo -e "\nSearching Raw Data Files..."
+
+newer_files=`${FIND} ${SMS_DATA} \
+	-mindepth 3 -maxdepth 3 \
+	-newermt "${target_str}" -a \! -newermt "${target_max_str}" \
+	| ${GREP} -v "state-storage" | ${SORT}` 
+
+if [[ -z "${newer_files}" ]]; then
+	echo -e "\nError: No Candidate Newer Data Files Found...!"
+	echo -e "\n${SMS_DATA}:\n"
+	${LS} -lt ${SMS_DATA} | ${HEAD} -n 20
+	echo
+	exit 3
+fi
+
+echo -e -n "\nCollecting Raw Data Directories..."
+
+data_dirs=""
+
+for nf in ${newer_files} ; do
+
+	echo -n "."
+
+	#echo "nf=[${nf}]"
+
+	data_dir=`dirname "${nf}"`
+	#echo "data_dir=[${data_dir}]"
+
+	if [[ -z "${data_dirs}" ]]; then
+		data_dirs="${data_dir}"
+	else
+		data_dirs="${data_dirs}\n${data_dir}"
+	fi
+
+done
+
+echo
+
+if [[ -z "${data_dirs}" ]]; then
+	echo -e "\nError: No Candidate Data Subdirectories Found...!"
+	echo -e "\n${SMS_DATA}:\n"
+	${LS} -lt ${SMS_DATA} | ${HEAD} -n 20
+	echo
+	exit 3
+fi
+
+echo -e "\nEliminating Duplicate Raw Data Directories..."
+
+data_dirs=`echo -e "${data_dirs}" | sort --unique`
+
+echo -e "\nFound Potential Local SMS Data Subdirectories:\n\n$data_dirs"
+
+echo -e \
+	"\n(Going Back ${DIR_DELAY} Hour(s) Prior to Desired Target Time...)"
+
+echo -e \
+	"\n(No Later Than ${DIR_MAX_TIME} Hour(s) After Desired Target Time...)"
+
+CHECK_PROCEED
+
+#
+# Search Candidate SMS Data Subdirectories for a Candidate Data File...
+#
+
+found_data_dir=""
+found_data_file=""
+
+for data_dir in ${data_dirs} ; do
+
+	# Break Out If the Data Directory/File Have Been Found...! ;-D
+	if [[ -n "${found_data_dir}" && -n "${found_data_file}" ]]; then
+		break
+	fi
+
+	echo -e "\nSearching for Data Files in Local SMS Data Subdirectory:"
+	echo -e "\n[${data_dir}]"
+
+	data_files=`${LS} -t -r "${data_dir}" \
+		| ${GREP} -e "^${FILE_PREFIX}.*\.adara$"`
+
+	if [[ $? != 0 || -z "${data_files}" ]]; then
+		echo -e "\nNo Data Files Found... Skip to Next Data Subdirectory..."
+		continue
+	fi
+
+	for data_file in ${data_files} ; do
+
+		echo -e "\n\tData File:   [${data_file}]"
+
+		first_time=`GET_DATA_START_TIME "${data_dir}" "${data_file}"`
+
+		if [[ -n "${first_time}" ]]; then
+
+			echo -e "\tFirst ${FILE_PACKET} Time:  ${first_time}"
+
+			# Strip Off Nanoseconds...
+			first_secs=`echo "${first_time}" | ${SED} 's/\.[0-9]*//'`
+
+			# Snag Nanoseconds...
+			first_nsecs=`echo "${first_time}" \
+				| ${SED} "s/${first_secs}\.//"`
+
+			if [[ ${first_secs} -lt ${EPICSSecs} ]]; then
+
+				echo -e -n "\t\tBEFORE TARGET TIME "
+				echo -n "${first_secs} < ${EPICSSecs} "
+				echo "[$(( EPICSSecs - first_secs )) Diff]"
+
+				last_before_data_dir="${data_dir}"
+				last_before_data_file="${data_file}"
+
+			elif [[ ${first_secs} -gt ${EPICSSecs} ]]; then
+
+				echo -e -n "\t\tAFTER TARGET TIME "
+				echo -n "${first_secs} > ${EPICSSecs} "
+				echo "[$(( first_secs - EPICSSecs )) Diff]"
+
+				# It was the Last Guy...! ;-D
+				echo -e "\n\t\tLAST GUY! ;-)"
+				found_data_dir="${last_before_data_dir}"
+				found_data_file="${last_before_data_file}"
+
+				break
+
+			else
+
+				echo -e -n "\t\t*** EQUALS TARGET TIME "
+				echo "${first_secs} == ${EPICSSecs}"
+
+				if [[ ${first_nsecs} -le ${EPICSNsecs} ]]; then
+
+					echo -e -n "\t\t*** Before/Equal TARGET TIME Nanosecs "
+					echo "${first_nsecs} <= ${EPICSNsecs}"
+
+					# It's Me...! ;-D
+					echo -e "\n\t\tIT'S ME! :-D"
+					found_data_dir="${data_dir}"
+					found_data_file="${data_file}"
+
+					break
+
+				elif [[ ${first_nsecs} -gt ${EPICSNsecs} ]]; then
+
+					echo -e -n "\t\t*** After TARGET TIME Nanosecs "
+					echo "${first_nsecs} > ${EPICSNsecs}"
+
+					# It was the Last Guy...! ;-D
+					echo -e "\n\t\tLAST GUY! :-)"
+					found_data_dir="${last_before_data_dir}"
+					found_data_file="${last_before_data_file}"
+
+					break
+
+				fi
+
+			fi
+
+		fi
+
+	done
+
+done
+
+display_file=0
+
+#
+# Found It...! ;-D
+#
+
+if [[ -n "${found_data_dir}" && -n "${found_data_file}" ]]; then
+
+	echo -e "\nFound Target Time in:"
+
+	echo -e "\n\t[${found_data_dir}]"
+
+	echo -e "\n\t[${found_data_file}]"
+
+	display_file=1
+
+#
+# Didn't Find It... ;-b
+#
+
+elif [[ -n "${last_before_data_dir}" \
+		&& -n "${last_before_data_file}" ]]; then
+
+	echo -e "\n*** Bummer! Failed to Find Target Time..."
+
+	echo -e "\nLast Time Before Target Time was:"
+
+	echo -e "\n\t[${last_before_data_dir}]"
+
+	echo -e "\n\t[${last_before_data_file}]"
+
+	found_data_dir="${last_before_data_dir}"
+	found_data_file="${last_before_data_file}"
+
+	display_file=1
+
+#
+# Didn't Find Anything... :-Q
+#
+
+else
+
+	echo -e "\n*** BUMMER! Failed to Find ANY Time Preceding Target Time!!"
+
+fi
+
+#
+# Display Found Data File/Next Best Guess... ;-D
+#
+
+if [[ $display_file == 1 ]]; then
+
+	lsout=`${LS} -l "${found_data_dir}/${found_data_file}"`
+
+	if [[ $? == 0 ]]; then
+		lsout=`echo "${lsout}" \
+			| ${SED} -e "s@ ${SMS_DATA}/@\n\t\t${SMS_DATA}/\n\t\t\t@" \
+				-e "s@${FILE_PREFIX}[0-9][0-9][0-9]@\n\t\t\t\t&@"`
+		echo -e "\n\t${lsout}"
+	else
+		echo -e "\nError Listing Data File Path...!"
+		echo "${lsout}"
+	fi
+
+	CHECK_PROCEED "Display ${FILE_TYPE} ADARA Data Stream File"
+	if [[ $? != 0 ]]; then
+		echo
+		exit
+	fi
+
+	${ADARA_PARSER} --showrun --showddp --events ${EXTRA_PARSER_ARGS} \
+		"${found_data_dir}/${found_data_file}" \
+			| ${Less} "+/^${EPICSTimeInSeconds}"
+	ckparse=$?
+
+fi
+
+echo
+

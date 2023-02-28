@@ -17,7 +17,8 @@ namespace ADARA {
 namespace DASMON {
 
 
-class StreamAnalyzer: public IStreamListener, public RuleEngine::IFactListener
+class StreamAnalyzer
+    : public IStreamListener, public RuleEngine::IFactListener
 {
 public:
     class ISignalListener
@@ -27,7 +28,8 @@ public:
         virtual void    signalRetract( const std::string &a_name ) = 0;
     };
 
-    StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor, const std::string &a_cfg_file );
+    StreamAnalyzer( ADARA::DASMON::StreamMonitor &a_monitor,
+        const std::string &a_cfg_file );
     virtual ~StreamAnalyzer();
 
     void    setConfigSource( const std::string &a_file );
@@ -38,17 +40,24 @@ public:
     void    attach( ISignalListener &a_listener );
     void    detach( ISignalListener &a_listener );
     void    resendState();
-    void    getDefinitions( std::vector<RuleEngine::RuleInfo> &a_rules, std::vector<SignalInfo> &a_signals );
-    bool    setDefinitions( const std::vector<RuleEngine::RuleInfo> &a_rules, const std::vector<SignalInfo> &a_signals, std::map<std::string,std::string> &a_errors );
+    void    getDefinitions(
+                std::vector<RuleEngine::RuleInfo> &a_rules,
+                std::vector<SignalInfo> &a_signals );
+    bool    setDefinitions(
+                const std::vector<RuleEngine::RuleInfo> &a_rules,
+                const std::vector<SignalInfo> &a_signals,
+                std::map<std::string,std::string> &a_errors );
     void    getInputFacts( std::set<std::string> &a_facts ) const;
-    bool    isOK() const { return m_ok; }
     void    assertFact( const std::string &a_fact );
     template<class T>
     void    assertFact( const std::string &a_fact, T a_value );
     void    retractFact( const std::string &a_fact );
 
 private:
-    std::map<std::string,SignalInfo>::iterator    findByName( std::map<std::string,SignalInfo> &a_map, std::string a_name );
+    std::map<std::string,SignalInfo>::iterator
+            findByName(
+                std::map<std::string,SignalInfo> &a_map,
+                std::string a_name );
 
     enum BIF
     {
@@ -84,11 +93,19 @@ private:
         BIF_SMS_CONNECTED,
         BIF_GENERAL_PV_LIMIT,
         BIF_GENERAL_PV_ERROR,
+        BIF_PULSE_PCHG_UNCOR,
+        BIF_GOT_METADATA_COUNT,
+        BIF_GOT_NEUTRONS_COUNT,
+        BIF_HAS_STATES_COUNT,
+        BIF_TOTAL_PULSES_COUNT,
         BIF_COUNT
     };
 
     // IStreamListener Interface
-    void runStatus( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp );
+    void runStatus( bool a_recording, uint32_t a_run_number,
+            uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void beginProlog();
+    void endProlog();
     void pauseStatus( bool a_paused );
     void scanStatus( bool a_scanning, uint32_t a_scan_number );
     void beamInfo( const BeamInfo &a_info );
@@ -98,16 +115,30 @@ private:
     void streamMetrics( const StreamMetrics &a_metrics );
     void pvDefined( const std::string &a_name );
     void pvUndefined( const std::string &a_name );
-    void pvValue( const std::string &a_name, uint32_t a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
-    void pvValue( const std::string &a_name, double a_value, VariableStatus::Enum a_status, uint32_t a_timestamp );
-    void connectionStatus( bool a_connected, const std::string &a_host, unsigned short a_port );
+    void pvValue( const std::string &a_name,
+             uint32_t a_value, VariableStatus::Enum a_status,
+             uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void pvValue( const std::string &a_name,
+             double a_value, VariableStatus::Enum a_status,
+             uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void pvValue( const std::string &a_name,
+             std::string &a_value, VariableStatus::Enum a_status,
+             uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void pvValue( const std::string &a_name,
+             std::vector<uint32_t> a_value, VariableStatus::Enum a_status,
+             uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void pvValue( const std::string &a_name,
+             std::vector<double> a_value, VariableStatus::Enum a_status,
+             uint32_t a_timestamp, uint32_t a_timestamp_nanosec );
+    void connectionStatus( bool a_connected,
+             const std::string &a_host, unsigned short a_port );
 
     // IFactListener Interface
     void onAssert( const std::string &a_fact );
     void onRetract( const std::string &a_fact );
 
-    void processPvStatus( const std::string &pv_name, VariableStatus::Enum a_status, bool a_retracted );
-    void runDebounceThread();
+    void processPvStatus( const std::string &pv_name,
+             VariableStatus::Enum a_status, bool a_retracted );
     void beginBatch( uint32_t a_mask );
     void endBatch( uint32_t a_mask );
 
@@ -115,6 +146,8 @@ private:
     RuleEngine                         *m_engine;
     std::vector<ISignalListener*>       m_listeners;
     std::map<std::string,SignalInfo>    m_signals;
+    std::vector<SignalInfo>             m_signals_disabled;
+    std::vector<RuleEngine::RuleInfo>   m_rules_disabled;
     std::string                         m_pv_prefix;
     std::string                         m_pv_err_prefix;
     std::string                         m_pv_lim_prefix;
@@ -125,12 +158,12 @@ private:
     std::set<std::string>               m_limit_pvs;
     RuleEngine::HFACT                   m_fact[BIF_COUNT];
     std::string                         m_fact_name[BIF_COUNT];
-    boost::thread                      *m_debounce_thread;
-    uint32_t                            m_debounce_sec;
     uint32_t                            m_batch_mask;
-    bool                                m_ok;
 };
 
 }}
 
 #endif // RULEENGINE_H
+
+// vim: expandtab
+

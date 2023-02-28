@@ -70,8 +70,8 @@ private:
     void updateStatusIndicator();
     void dasmonStatus( bool active );
     bool comBusControlMessage( const ADARA::ComBus::MessageBase &a_msg );
-    void setupRuleTableRow( int a_row, bool a_error );
-    void setupSignalTableRow( int a_row, bool a_error );
+    void setupRuleTableRow( int a_row, bool a_checked, bool a_error );
+    void setupSignalTableRow( int a_row, bool a_checked, bool a_error );
     void setRules( bool a_set_default );
     void updateGUIState();
 
@@ -86,7 +86,9 @@ private:
     bool            m_quit_on_set;
     FactFilter      m_fact_filter;
     std::vector<RuleEngine::RuleInfo>       m_rules;
+    std::vector<RuleEngine::RuleInfo>       m_old_rules;
     std::vector<ADARA::DASMON::SignalInfo>  m_signals;
+    std::vector<ADARA::DASMON::SignalInfo>  m_old_signals;
     std::set<std::string>                   m_fact_list;
     std::map<std::string,std::string>       m_errors;
 };

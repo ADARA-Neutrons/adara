@@ -1,0 +1,5 @@
+This directory contains source code specific to the linux pvstreamer
+daemon process. This source code includes the application and initialization
+components as well as ComBus interfaces. Core classes are referenced from the
+../common directory, and EPICS translation classes are referenced from the
+ ../epics directory.

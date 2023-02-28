@@ -12,6 +12,10 @@
 
 using namespace std;
 
+// TODO Wire-up enabled flags in rule engine and signal system
+// TODO Make rule dialog remember old state and clear mod flag when no changes
+// TODO Add an "Undo changes"
+
 RuleConfigDialog::RuleConfigDialog( MainWindow &a_parent) :
     QDialog( &a_parent), SubClient(a_parent), ui(new Ui::RuleConfigDialog), m_mainwin(a_parent),
     m_comm_status(Disconnected), m_dirty(false), m_quit_on_set(false), m_fact_filter(FilterAll)
@@ -19,15 +23,17 @@ RuleConfigDialog::RuleConfigDialog( MainWindow &a_parent) :
     ui->setupUi(this);
 
     QStringList headers;
-    headers << "Stat" << "Rule ID" << "Rule Expression";
+    headers << "En/Stat" << "Rule ID" << "Rule Expression" << "Description";
     ui->ruleTable->setHorizontalHeaderLabels( headers );
     ui->ruleTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+    ui->ruleTable->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
     ui->ruleTable->horizontalHeader()->show();
 
     headers.clear();
-    headers << "Stat" << "Signal ID" << "Rule ID" << "Source" << "Level" << "Message";
+    headers << "En/Stat" << "Signal ID" << "Rule ID" << "Source" << "Level" << "Message" << "Description";
     ui->signalTable->setHorizontalHeaderLabels( headers );
     ui->signalTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+    ui->signalTable->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
     ui->signalTable->horizontalHeader()->show();
 
     ui->factFilterCB->insertItem(0,"PVs at Limits");
@@ -45,6 +51,8 @@ RuleConfigDialog::RuleConfigDialog( MainWindow &a_parent) :
     connect( &m_com_timer, SIGNAL(timeout()), this, SLOT(commTimeout()));
     connect( ui->ruleTable, SIGNAL(cellChanged(int,int)), this, SLOT(ruleCellChanged(int,int)));
     connect( ui->signalTable, SIGNAL(cellChanged(int,int)), this, SLOT(signalCellChanged(int,int)));
+
+    ui->okButton->setFocus();
 
     m_load_timer.setSingleShot( true );
     m_load_timer.start( 10 );
@@ -158,10 +166,11 @@ RuleConfigDialog::comBusControlMessage( const ADARA::ComBus::MessageBase &a_msg 
         const RuleDefinitions *defs = dynamic_cast<const RuleDefinitions *>( &a_msg );
         if ( defs )
         {
-
             // Make copy of data, then trigger UI refresh
             m_rules = defs->m_rules;
+            m_old_rules = m_rules;
             m_signals = defs->m_signals;
+            m_old_signals = m_signals;
             m_errors.clear();
 
             QMetaObject::invokeMethod( this, "updateRuleTables", Qt::QueuedConnection );
@@ -207,10 +216,12 @@ RuleConfigDialog::updateRuleTables()
     for ( row = cur_count; row < ui->ruleTable->rowCount(); ++row )
     {
         item = new QTableWidgetItem( "" );
-
+        item->setFlags( Qt::ItemIsSelectable );
         ui->ruleTable->setItem( row, 0, item );
+
         ui->ruleTable->setItem( row, 1, new QTableWidgetItem(""));
         ui->ruleTable->setItem( row, 2, new QTableWidgetItem(""));
+        ui->ruleTable->setItem( row, 3, new QTableWidgetItem(""));
     }
 
     row = 0;
@@ -221,12 +232,15 @@ RuleConfigDialog::updateRuleTables()
         else
             tip.clear();
 
+        ui->ruleTable->item( row, 0 )->setToolTip( tip );
         ui->ruleTable->item( row, 1 )->setText( r->fact.c_str() );
         ui->ruleTable->item( row, 1 )->setToolTip( tip );
         ui->ruleTable->item( row, 2 )->setText( r->expr.c_str() );
         ui->ruleTable->item( row, 2 )->setToolTip( tip );
+        ui->ruleTable->item( row, 3 )->setText( r->desc.c_str() );
+        ui->ruleTable->item( row, 3 )->setToolTip( tip );
 
-        setupRuleTableRow( row, ie != m_errors.end());
+        setupRuleTableRow( row, r->enabled, ie != m_errors.end());
     }
 
     cur_count = ui->signalTable->rowCount();
@@ -234,12 +248,16 @@ RuleConfigDialog::updateRuleTables()
 
     for ( row = cur_count; row < ui->signalTable->rowCount(); ++row )
     {
-        ui->signalTable->setItem( row, 0, new QTableWidgetItem(""));
+        item = new QTableWidgetItem( "" );
+        item->setFlags( Qt::ItemIsSelectable );
+        ui->signalTable->setItem( row, 0, item );
+
         ui->signalTable->setItem( row, 1, new QTableWidgetItem(""));
         ui->signalTable->setItem( row, 2, new QTableWidgetItem(""));
         ui->signalTable->setItem( row, 3, new QTableWidgetItem(""));
         ui->signalTable->setItem( row, 4, new QTableWidgetItem(""));
         ui->signalTable->setItem( row, 5, new QTableWidgetItem(""));
+        ui->signalTable->setItem( row, 6, new QTableWidgetItem(""));
     }
 
     ui->signalTable->setRowCount( m_signals.size() );
@@ -251,6 +269,7 @@ RuleConfigDialog::updateRuleTables()
         else
             tip.clear();
 
+        ui->signalTable->item( row, 0 )->setToolTip( tip );
         ui->signalTable->item( row, 1 )->setText( s->name.c_str() );
         ui->signalTable->item( row, 1 )->setToolTip( tip );
         ui->signalTable->item( row, 2 )->setText( s->fact.c_str() );
@@ -261,8 +280,10 @@ RuleConfigDialog::updateRuleTables()
         ui->signalTable->item( row, 4 )->setToolTip( tip );
         ui->signalTable->item( row, 5 )->setText( s->msg.c_str() );
         ui->signalTable->item( row, 5 )->setToolTip( tip );
+        ui->signalTable->item( row, 6 )->setText( s->desc.c_str() );
+        ui->signalTable->item( row, 6 )->setToolTip( tip );
 
-        setupSignalTableRow( row, ie != m_errors.end());
+        setupSignalTableRow( row, s->enabled, ie != m_errors.end());
     }
 
     connect( ui->ruleTable, SIGNAL(cellChanged(int,int)), this, SLOT(ruleCellChanged(int,int)));
@@ -353,7 +374,7 @@ RuleConfigDialog::ruleCellChanged( int row, int col )
     m_dirty = true;
 
     QTableWidgetItem *item = ui->ruleTable->item( row, 0 );
-    item->setText( "(*)" );
+    item->setText( "(mod)" );
 
     updateGUIState();
 }
@@ -365,7 +386,7 @@ RuleConfigDialog::signalCellChanged( int row, int col )
     m_dirty = true;
 
     QTableWidgetItem *item = ui->signalTable->item( row, 0 );
-    item->setText( "(*)" );
+    item->setText( "(mod)" );
 
     updateGUIState();
 }
@@ -440,9 +461,10 @@ RuleConfigDialog::setRules( bool a_set_default )
             int count = ui->ruleTable->rowCount();
             for ( row = 0; row < count; ++row )
             {
+                rule.enabled = ( ui->ruleTable->item( row, 0 )->checkState() == Qt::Checked );
                 rule.fact = ui->ruleTable->item( row, 1 )->text().toUpper().toStdString();
-                //rule.expr = ui->ruleTable->item( row, 2 )->text().toUpper().toStdString();
                 rule.expr = ui->ruleTable->item( row, 2 )->text().toStdString();
+                rule.desc = ui->ruleTable->item( row, 3 )->text().toStdString();
                 m_rules.push_back( rule );
             }
 
@@ -451,6 +473,7 @@ RuleConfigDialog::setRules( bool a_set_default )
             count = ui->signalTable->rowCount();
             for ( row = 0; row < count; ++row )
             {
+                sig.enabled = ( ui->signalTable->item( row, 0 )->checkState() == Qt::Checked );
                 sig.name = ui->signalTable->item( row, 1 )->text().toUpper().toStdString();
                 sig.fact = ui->signalTable->item( row, 2 )->text().toUpper().toStdString();
                 sig.source = ui->signalTable->item( row, 3 )->text().toUpper().toStdString();
@@ -465,6 +488,7 @@ RuleConfigDialog::setRules( bool a_set_default )
                 }
 
                 sig.msg = ui->signalTable->item( row, 5 )->text().toStdString();
+                sig.desc = ui->signalTable->item( row, 6 )->text().toStdString();
 
                 m_signals.push_back( sig );
             }
@@ -535,11 +559,14 @@ void
 RuleConfigDialog::addRule()
 {
     int row = ui->ruleTable->rowCount();
+
     ui->ruleTable->insertRow( row );
     ui->ruleTable->setItem( row, 0, new QTableWidgetItem(""));
     ui->ruleTable->setItem( row, 1, new QTableWidgetItem(""));
     ui->ruleTable->setItem( row, 2, new QTableWidgetItem(""));
-    setupRuleTableRow( ui->ruleTable->rowCount() - 1, false );
+    ui->ruleTable->setItem( row, 3, new QTableWidgetItem(""));
+
+    setupRuleTableRow( row, true, false );
 
     ui->ruleTable->scrollToBottom();
     ui->ruleTable->setCurrentCell( ui->ruleTable->rowCount() - 1, 1 );
@@ -567,6 +594,7 @@ void
 RuleConfigDialog::addSignal()
 {
     int row = ui->signalTable->rowCount();
+
     ui->signalTable->insertRow( row );
     ui->signalTable->setItem( row, 0, new QTableWidgetItem(""));
     ui->signalTable->setItem( row, 1, new QTableWidgetItem(""));
@@ -574,7 +602,9 @@ RuleConfigDialog::addSignal()
     ui->signalTable->setItem( row, 3, new QTableWidgetItem(""));
     ui->signalTable->setItem( row, 4, new QTableWidgetItem(""));
     ui->signalTable->setItem( row, 5, new QTableWidgetItem(""));
-    setupSignalTableRow( ui->signalTable->rowCount() - 1, false );
+    ui->signalTable->setItem( row, 6, new QTableWidgetItem(""));
+
+    setupSignalTableRow( row, true, false );
 
     ui->signalTable->scrollToBottom();
     ui->signalTable->setCurrentCell( ui->signalTable->rowCount() - 1, 1 );
@@ -600,30 +630,40 @@ RuleConfigDialog::removeSelectedSignal()
 
 
 void
-RuleConfigDialog::setupRuleTableRow( int a_row, bool a_error  )
+RuleConfigDialog::setupRuleTableRow( int a_row, bool a_checked, bool a_error  )
 {
     QTableWidgetItem *item = ui->ruleTable->item( a_row, 0 );
 
     if ( a_error )
-        item->setText( "(!)" );
+        item->setText( "(err)" );
     else
         item->setText( "" );
 
-    item->setFlags( Qt::ItemIsSelectable | Qt::ItemIsEnabled );
+    item->setFlags( Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable );
+
+    if ( a_checked )
+        item->setCheckState( Qt::Checked );
+    else
+        item->setCheckState( Qt::Unchecked );
 }
 
 
 void
-RuleConfigDialog::setupSignalTableRow( int a_row, bool a_error )
+RuleConfigDialog::setupSignalTableRow( int a_row, bool a_checked, bool a_error )
 {
     QTableWidgetItem *item = ui->signalTable->item( a_row, 0 );
 
     if ( a_error )
-        item->setText( "(!)" );
+        item->setText( "(err)" );
     else
         item->setText( "" );
 
-    item->setFlags( Qt::ItemIsSelectable | Qt::ItemIsEnabled );
+    item->setFlags( Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable );
+
+    if ( a_checked )
+        item->setCheckState( Qt::Checked );
+    else
+        item->setCheckState( Qt::Unchecked );
 }
 
 
@@ -631,21 +671,12 @@ void
 RuleConfigDialog::showHelp()
 {
     string help_msg =
-            "Rule expression syntax:\n\n"
-            "    FACT_ID OP [VALUE] [OP FACT_ID OP [VALUE] ...]\n\n"
-            "where OP is one of:\n\n"
-            "    DEF (unary - fact is defined)\n"
-            "    UNDEF (unary - fact is undefined)\n"
-            "    <, <=, =, !=, >=, >  (numeric comparisons)\n"
-            "    |    (boolean OR)\n"
-            "    &    (boolean AND)\n"
-            "    !|   (boolean NOR)\n"
-            "    !&   (boolean NAND)\n"
-            "    ^    (boolean XOR)\n\n"
-            "For non-unary operators, a value must be specified. The value "
-            "can be a numberic constant, or it may be a FACT_ID. For compound "
-            "expressions, additional fact-value clauses must be preceeded by "
-            "a boolean operator.";
+            "Rule operators:\n\n"
+            "    <, <=, ==, !=, >=, >  comparisons\n"
+            "    =    assignment\n"
+            "    ||   boolean OR)\n"
+            "    &&   boolean AND)\n"
+            "    ^    (boolean XOR)\n";
 
     QMessageBox::information( this, "DAS Monitor Rule Configuration Help", help_msg.c_str(), QMessageBox::Ok );
 }

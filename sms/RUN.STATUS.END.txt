@@ -1,0 +1,72 @@
+
+1. Capture First Packet Time (Hex Seconds) from Top of 1st Raw Data File:
+	f00000001-run-37.adara
+	915944402.119052935 SYNC (0x4008,v0) [44 bytes]
+		Signature [SNSADARAORNL], File Offset 0, Comment []
+	915944402.119075212 RUN STATUS (0x4003,v0) [28 bytes]
+		New run 
+		Run 37 started at epoch 915944402
+		File index 1
+	-> 915944402 = 0x369833d2 -> d233 9836...
+		=> insert in 4.C. below...
+
+2. Capture Last Packet Time (Hex Seconds) from Bottom of Last Raw Data File:
+	f00000003-run-37.adara
+	915978348.118810265 U32 VARIABLE (0x8001,v0) [32 bytes]
+		Device 12 Variable 30
+		Status UpDisc Severity Invalid
+		Value 0
+	-> 915978348.118810265 = 0x3698b86c 0x714e699 = 6cb8 9836 99e6 4e71
+		=> insert in 4.A. below...
+
+3. Backup Last Raw Data File:
+	-> cp f00000003-run-37.adara f00000003-run-37.adara.BACKUP.1.10.2019
+
+4. Edit Last Raw Data File, Switch to Hex Mode, Go to End of File.
+
+*** IF Run Status Packet (0c00 0000 0003 4000 ...) is Present, then:
+
+A. Replace Packet Time with Hex Seconds/Nanoseconds of Preceding Pkt:
+	915978348.118810265 = 0x3698b86c 0x714e699 = 6cb8 9836 99e6 4e71
+	-> ssss ssss nnnn nnnn
+	-> 6cb8 9836 99e6 4e71
+
+B. Replace Run Number with Hex Bytes:
+	-> 37 = 0x25 -> 2500 0000
+	-> RRRR RRRR
+	-> 2500 0000
+
+C. Replace Starting Epoch with Hex Seconds from (1):
+	-> SSSS SSSS
+	-> d233 9836
+
+D. Replace File Index with Hex Index of This Last File:
+	-> ffff
+	-> 0300
+
+E. Set End of Run Status:
+	-> 0004
+
+*** ELSE Add New Closing Run Status Packet of the form:
+	-> 0c00 0000 0003 4000 ssss ssss nnnn nnnn RRRR RRRR SSSS SSSS ffff 0004
+	-> 0c00 0000 0003 4000 6cb8 9836 99e6 1407 2500 0000 d233 9836 0300 0004
+
+Note: File Must End in "0a" Byte...! ;-D
+
+5. When Done, Convert Back to "Analog", Save File, and then:
+	-> truncate --size=-1 f00000001-run-204619.adara
+
+6. Remove the "manual_processing_needed" marker file.
+
+7. Call LiveConf to get RescanRunDir PV for this beamline:
+	-> liveconf sys_status
+		=> BLXXX:SMS:StorageManager:RescanRunDir
+
+8. Set RescanRunDir to `pwd`
+	-> caput -S BLXXX:SMS:StorageManager:RescanRunDir `pwd`
+
+E.g.:
+3d55c90: XXXX XXXX 0c00 0000 0003 4000 4dde 3835  ed........@.M.85
+3d55ca0: e67a da31 dfd4 0200 bbcc 3835 0100 0004  .z.1......85....
+3d55cb0: 0a                                       .
+

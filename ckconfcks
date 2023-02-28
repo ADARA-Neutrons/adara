@@ -1,0 +1,100 @@
+#!/bin/bash
+#
+# Check ConfCk Template Scripts... ;-D
+#
+# (And Now MkStatList Template Scripts, Too...! ;-D)
+#
+
+TARGET_DIR=/SNS/users/$USER
+
+CONFCKS="./dasmon/server/confck.dasmon \
+	./stc/confck.stc \
+	./stc/confck.stc-config \
+	./PVStreamer/pvsd/confck.pvsd \
+	./sms/confck.smsd-mon \
+	./sms/confck.smsd \
+	./sms/confck.now"
+
+MKSTATLISTS="./dasmon/server/mkstatlist.dasmon \
+	./stc/mkstatlist.stc \
+	./PVStreamer/pvsd/mkstatlist.pvsd \
+	./sms/mkstatlist.smsd-mon \
+	./sms/mkstatlist.smsd \
+	./sms/mkstatlist.now"
+
+echo -e -n "\nComparing Git Repo ConfCk/MkStatList Templates"
+echo -e " Versus Deployed in:"
+echo -e "\n\t[$TARGET_DIR]"
+
+checked=0
+differ=0
+updated=0
+
+for cfck in ${CONFCKS} ${MKSTATLISTS} ; do
+
+	echo -e "\nChecking Deployed ConfCk/MkStatList Template:\n"
+	echo -e "\t[$cfck]"
+
+	bn=`basename $cfck`
+
+	echo -e "\ndiff $cfck $TARGET_DIR/$bn"
+	diff "$cfck" "$TARGET_DIR/$bn"
+
+	ckcfck=$?
+
+	if [[ $ckcfck != 0 ]]; then
+		echo -e -n "\nERROR: Deployed ConfCk/MkStatList Template"
+		echo -e " \"$bn\" Differs!\n"
+		/bin/ls -l "$cfck" "$TARGET_DIR/$bn"
+		differ=$(( differ + 1 ))
+		echo -e -n "\nCopy Over Deployed ConfCk/MkStatList Template"
+		echo -e -n " \"$bn\"...? [y/N/q] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ $ckUpdate == "q" ]]; then
+			echo -e "\nExiting ckconfcks at User Request.\n"
+			exit 0
+		elif [[ $ckUpdate == "y" ]]; then
+			/bin/cp -i "$cfck" "$TARGET_DIR/$bn"
+			if [[ $? != 0 ]]; then
+				echo -e -n "\nERROR Copying Over"
+				echo -e " Deployed ConfCk/MkStatList Template!!\n"
+				/bin/ls -l "$cfck" "$TARGET_DIR/$bn"
+				echo -e "\nFiles May Still Differ!!"
+				echo -e "\ndiff $cfck $TARGET_DIR/$bn"
+				diff "$cfck" "$TARGET_DIR/$bn"
+			else
+				# Double Check...
+				cmpout=`cmp "$cfck" "$TARGET_DIR/$bn"`
+				if [[ $? != 0 ]]; then
+					echo -e -n "\n\t-> Failed to Deploy"
+					echo -e " ConfCk/MkStatList Template \"$bn\"!!"
+					echo -e "\n\t[$cmpout]\n"
+					/bin/ls -l "$cfck" "$TARGET_DIR/$bn"
+					echo -e "\ndiff $cfck $TARGET_DIR/$bn"
+					diff "$cfck" "$TARGET_DIR/$bn"
+				else
+					echo -e -n "\n\t-> Deployed ConfCk/MkStatList"
+					echo -e " Template \"$bn\" Updated."
+					updated=$(( updated + 1 ))
+				fi
+			fi
+		else
+			echo -e -n "\n\t-> Leaving Deployed ConfCk/MkStatList"
+			echo -e " Template \"$bn\" As Is."
+		fi
+
+	else
+		echo -e "\n\t-> ConfCk/MkStatList Template \"$bn\" is Ok."
+	fi
+
+	checked=$(( checked + 1 ))
+
+done
+
+echo -e "\n*** $checked Deployed ConfCk/MkStatList Templates Checked."
+
+echo -e "\n\t-> $differ Deployed ConfCk/MkStatList Templates Differed."
+
+echo -e "\n\t-> $updated Deployed ConfCk/MkStatList Templates Updated.\n"
+

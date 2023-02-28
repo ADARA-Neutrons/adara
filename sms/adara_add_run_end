@@ -1,0 +1,1063 @@
+#!/bin/bash
+#
+# ADARA "Add Run End" Script...! ;-D
+#
+# Script to Automate the Adding of an Omitted Run Status Packet
+# at the End of the Last ADARA Stream File for a Run, to Enable
+# Proper Translation by the STC... ;-D
+#
+# This is usually needed when the ADARA/SMS service is inadvertently
+# Stopped or Crashes, like when the DAQ1 machine is rebooted...
+# (Especially on Beamlines where there's a Secondary/Alternate
+# "SMSD-MON" instance running...!)
+#
+# After the Last Run File is Properly Tweaked to Include
+# a Final Run Status "End of Run" Packet (using ADARA Munge!),
+# then the Associated Run Files are Submitted Through to the
+# STC for Translation. ;-D
+#
+
+#
+# Defaults:
+#
+
+ADARA_PARSER="/usr/local/bin/adara-parser"
+
+ADARA_MUNGE="/usr/local/bin/adara-munge"
+
+ADARA_CAT="/usr/local/bin/adaracat"
+
+FINDNEXUS="/SNS/software/bin/findnexus"
+
+NXLS="/SNS/software/bin/nxls"
+
+SMS_CONFIG="/SNSlocal/sms/conf/smsd.conf"
+
+SMS_DATA="/SNSlocal/sms/data"
+
+TMP="/tmp/adara_add_run_end"
+
+XINETD_DIR="/etc/xinetd.d"
+
+STC1="stc1.ornl.gov"
+STC2="stc2.ornl.gov"
+STC3="stc3.ornl.gov"
+
+TOUCH="/usr/bin/touch"
+DIFF="/usr/bin/diff"
+HEAD="/usr/bin/head"
+TAIL="/usr/bin/tail"
+CMP="/usr/bin/cmp"
+Less="/usr/bin/less"
+AWK="/usr/bin/awk"
+SSH="/usr/bin/ssh"
+NC="/usr/bin/nc"
+RM="/usr/bin/rm"
+WC="/usr/bin/wc"
+GREP="/bin/grep"
+SED="/bin/sed"
+CP="/bin/cp"
+MV="/bin/mv"
+LS="/bin/ls"
+
+#
+# Set Umask for Any/All Files Created/Generated Herein...! ;-D
+#
+# (to avoid situations like the POWGEN SMS Restart Failures
+#    caused by "Fix IPTS" leftovers & edits that were owned
+#    by Jeeem and Not Readable by User "SNSData" Group "ADARA"... ;-b)
+#
+umask 0000
+
+USAGE()
+{
+	echo -e "\nusage: adara_add_run_end \\"
+	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc_host=<STC_HOST>] \\"
+	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
+	echo "    [--stc_port=<STCPort>] \\"
+	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
+	echo "    [--adara_munge=<${ADARA_MUNGE}>] \\"
+	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
+	echo "    [--sms_data=<${SMS_DATA}>] \\"
+	echo "    [--send-paused-data] [--no-send-paused-data] \\"
+	echo "    [--run=<RunNumber>] \\"
+	echo "    [--help|-h]"
+	echo
+}
+
+CHECK_PROCEED()
+{
+	local _proceed_query="Proceed"
+	local _alt_query=0
+
+	if [[ "#$1#" != '##' ]]; then
+		_proceed_query="$1"
+		_alt_query=1
+	fi
+
+	local _proceed_ck=""
+
+	echo -e -n "\n${_proceed_query} (yes/No)? "
+	read _proceed_ck
+
+	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ -z ${_proceed_ck} || ${_proceed_ck} == "n" \
+			|| ${_proceed_ck} == "no" ]]; then
+		# Alternate Query? Just Return...
+		if [[ ${_alt_query} == 1 ]]; then
+			return 99
+		# Else Actually Exit Script...
+		else
+			echo -e "\nExiting ADARA Add Run End at User's Request.\n"
+			exit 99
+		fi
+	fi
+
+	return 0
+}
+
+#
+# Parse Command Line Arguments
+#
+
+STC_HOST="${STC1}"
+
+STC_SERVICE="stc_dummy"
+STC_PORT=""
+
+RUN_NUMBER=""
+
+SEND_PAUSED_DATA=""
+
+FACILITY=""
+
+INST=""
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | ${AWK} -F = '{print $1}'`
+	value=`echo "$arg" | ${AWK} -F = '{print $2}'`
+
+	if [[ "#$key#" == '#--inst#' ]]; then
+		INST="$value"
+		echo -e "\nSetting Beamline Short Name to: ${INST}"
+	elif [[ "#$key#" == '#--facility#' ]]; then
+		FACILITY="$value"
+		echo -e "\nSetting Facility Name to: ${FACILITY}"
+	elif [[ "#$key#" == '#--stc1#' ]]; then
+		STC_HOST="${STC1}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc2#' ]]; then
+		STC_HOST="${STC2}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc3#' ]]; then
+		STC_HOST="${STC3}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc_host#' ]]; then
+		STC_HOST="${value}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc#' ]]; then
+		STC_SERVICE="stc"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_test#' ]]; then
+		STC_SERVICE="stc_test"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_dummy#' ]]; then
+		STC_SERVICE="stc_dummy"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_hfir#' ]]; then
+		STC_SERVICE="stc_hfir"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_hfir_test#' ]]; then
+		STC_SERVICE="stc_hfir_test"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_port#' ]]; then
+		STC_PORT="$value"
+		echo -e "\nSetting STC Port to: ${STC_PORT}"
+	elif [[ "#$key#" == '#--adara_parser#' ]]; then
+		ADARA_PARSER="${value}"
+		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
+	elif [[ "#$key#" == '#--adara_munge#' ]]; then
+		ADARA_MUNGE="${value}"
+		echo -e "\nSetting ADARA Munge Path to:\n\t[${ADARA_MUNGE}]"
+	elif [[ "#$key#" == '#--sms_config#' ]]; then
+		SMS_CONFIG="${value%/}"
+		echo -e "\nSetting SMS Config Directory to:\n\t[${SMS_CONFIG}]"
+	elif [[ "#$key#" == '#--sms_data#' ]]; then
+		SMS_DATA="${value%/}"
+		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+	elif [[ "#$key#" == '#--send-paused-data#' ]]; then
+		SEND_PAUSED_DATA="${key}"
+		echo -e "\nSetting ADARA Cat \"Send Paused Data\" to:"
+		echo -e "\t[${SEND_PAUSED_DATA}]"
+	elif [[ "#$key#" == '#--no-send-paused-data#' ]]; then
+		SEND_PAUSED_DATA="${key}"
+		echo -e "\nSetting ADARA Cat \"Send Paused Data\" to:"
+		echo -e "\t[${SEND_PAUSED_DATA}]"
+	elif [[ "#$key#" == '#--run#' ]]; then
+		RUN_NUMBER="${value}"
+		echo -e "\nProcessing Run Number: ${RUN_NUMBER}"
+	elif [[ "#$key#" == '#--help#' || "#$key#" == '#-h#' ]]; then
+		USAGE
+		exit 0
+	else
+		echo -e "\nError: Unknown Command Line Option [${arg}]"
+		USAGE
+		exit 1
+	fi
+
+done
+
+if [[ -z "${RUN_NUMBER}" ]]; then
+	echo -e "\nError: No Run Number Specified!"
+	USAGE
+	exit 2
+fi
+
+#
+# Determine Proper STC Service Port...! ;-D
+#
+
+if [[ -z "${STC_PORT}" ]]; then
+
+	echo -e "\nContacting STC Host \"${STC_HOST}\" via SSH"
+	echo "to Determine Port for STC \"${STC_SERVICE}\" Service..."
+
+	echo -e \
+		"\n${SSH} ${STC_HOST} ${GREP} port ${XINETD_DIR}/${STC_SERVICE}"
+
+	# Set Bash Pipefail Option as Needed...
+	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
+	if [[ "$pfck" == "off" ]]; then
+		set -o pipefail
+	fi
+
+	STC_PORT=`${SSH} ${STC_HOST} \
+		${GREP} "port" ${XINETD_DIR}/${STC_SERVICE} \
+		| ${AWK} '{print $3}'`
+	ckstcport=$?
+
+	if [[ ${ckstcport} != 0 ]]; then
+		echo -e -n "\nError Determining STC Port "
+		echo "for \"${STC_SERVICE}\" Service on ${STC_HOST}...!"
+		USAGE
+		exit 4
+	fi
+
+	# Reset Bash Pipefail Option as Needed...
+	if [[ "$pfck" == "off" ]]; then
+		set +o pipefail
+	fi
+
+	echo -e \
+		"\nGot STC Port ${STC_PORT} for STC \"${STC_SERVICE}\" Service."
+fi
+
+#
+# Ready to Begin...! :-D
+#
+
+echo -e "\n*** Adding Run End Status Packet for Run Number:  ${RUN_NUMBER}"
+
+echo -e -n "\nUsing STC \"${STC_SERVICE}\" Service "
+echo "on \"${STC_HOST}:${STC_PORT}\"."
+
+CHECK_PROCEED
+
+#
+# Install and Check the Validity of a Modified Data File...
+#
+# usage: INSTALL_AND_CHECK_DATAFILE "${rundir}" "${datafile}"
+#
+# - Assumes New/Modified Data File Exists, of form "${datafile}.NEW-$$"...
+# - Show File Differences to User...
+# - Make Sure File Still ADARA-Parses...!
+# - Copy Original Data File to Backup Copy Before Proceeding...
+# - Install New Data File... (Overwrite Original...)
+#
+INSTALL_AND_CHECK_DATAFILE()
+{
+	# Run Directory
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Run Directory Specified for Install Check!"
+		return 11
+	fi
+	local _rundir="$1"
+	shift
+
+	# Data File
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Data File Specified for Install Check!"
+		return 12
+	fi
+	local _datafile="$1"
+	shift
+
+	# Show File Differences to User...
+
+	echo -e "\nFile Differences After Run End Status Packet Addition:\n"
+
+	echo -e "<<< ${_datafile}"
+	echo -e ">>> ${_datafile}.NEW-$$"
+
+	${ADARA_PARSER} --showrun ${_rundir}/${_datafile} \
+		> "${TMP}.ORIG-$$"
+
+	if [[ $? != 0 ]]; then
+		echo -e "\nError Generating ADARA Parser Output for Original:"
+		echo -e "\t${_rundir}/${_datafile}"
+		${LS} -l "${_rundir}/${_datafile}"
+		return 13
+	fi
+
+	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
+		> "${TMP}.NEW-$$"
+
+	if [[ $? != 0 ]]; then
+		echo -e "\nError Generating ADARA Parser Output for New:"
+		echo -e "\t${_rundir}/${_datafile}.NEW-$$"
+		${LS} -l "${_rundir}/${_datafile}.NEW-$$"
+		return 14
+	fi
+
+	echo
+
+	${DIFF} "${TMP}.ORIG-$$" "${TMP}.NEW-$$"
+
+	# Make Sure File Still ADARA-Parses...!
+
+	lesscmd="G"
+
+	echo -e "\nNow Verify Still a Valid Stream File with ADARA Parser..."
+	echo -e -n "\n\t-> Verify File Parses to End!"
+	echo
+
+	CHECK_PROCEED
+
+	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
+		| ${Less} "+${lesscmd}"
+
+	#
+	# Copy Original Data File to Backup Copy Before Proceeding...
+	# (_If_ We Haven't Already Created a Backup Copy for This IPTS Fix!)
+	#
+
+	if [[ -e "${_rundir}/${_datafile}.BACKUP-$$" ]]; then
+
+		echo -e -n "\nBackup for Last ADARA Output "
+		echo -e "Stream File Already Exists for This IPTS Fix:\n"
+		${LS} -l "${_rundir}/${_datafile}.BACKUP-$$"
+		CHECK_PROCEED
+		echo -e "\nOk, Continuing with Data File Install and Check..."
+
+	else
+
+		echo -e -n "\nBacking Up Last ADARA Output "
+		echo "Stream File for Run ${RUN_NUMBER}:"
+		echo -e "\t[${_datafile}]"
+		echo -e "\t->[${_datafile}.BACKUP-$$]"
+
+		${CP} -i \
+			"${_rundir}/${_datafile}" "${_rundir}/${_datafile}.BACKUP-$$"
+		ckcp=$?
+
+		if [[ ${ckcp} != 0 ]]; then
+			echo -e -n "\nERROR Copying Last Original "
+			echo "Stream File for Backup of Run ${RUN_NUMBER}!"
+			CHECK_PROCEED
+			return 15
+		fi
+	fi
+
+	# Install New Data File... (Overwrite Original Now...)
+
+	echo -e -n "\nReady to Overwrite Last Original "
+	echo "Stream File with New One:"
+	echo -e "\t[${_datafile}.NEW-$$]"
+	echo -e "\t-> [${_datafile}]"
+
+	CHECK_PROCEED
+
+	echo -e -n "\nMoving Substituted Data File into Place of "
+	echo "Last Original Stream File:"
+	echo -e "\t[${_datafile}.NEW-$$]"
+	echo -e "\t-> [${_datafile}]"
+
+	${MV} "${_rundir}/${_datafile}.NEW-$$" "${_rundir}/${_datafile}"
+	ckmvdata=$?
+
+	if [[ ${ckmvdata} != 0 ]]; then
+		echo -e -n "\nERROR Moving Modified Stream File Over "
+		echo -n "Last Original Stream File "
+		echo "for Run ${RUN_NUMBER}!"
+		CHECK_PROCEED
+		return 16
+	fi
+
+	#
+	# Done Installing & Checking the Modified Data File for This Run...
+	#
+
+	echo -e -n "\nDone Installing/Checking the Modified Data File "
+	echo "in Run ${RUN_NUMBER}."
+
+	return 0
+}
+
+#
+# Prepare Raw Data Run Directory and Re-Submit Run for Translation to NeXus
+#
+# usage: RESUBMIT_RUN "${rundir}" "${datafile}"
+#
+# - Re-Name the "proposal-*" Placeholder File in the Run Directory...!
+# - Re-Submit SMS Raw Data Files to STC for Re-Translation...!
+#
+RESUBMIT_RUN()
+{
+	# Run Directory
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Run Directory Specified for Re-Submit Run!"
+		echo -e "\nContinuing with Next Run Number..."
+		return 15
+	fi
+	local _rundir="$1"
+	shift
+
+	# Data File
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Data File Specified for Re-Submit Run!"
+		echo -e "\nContinuing with Next Run Number..."
+		return 16
+	fi
+	local _datafile="$1"
+	shift
+
+	#
+	# Re-Submit SMS Raw Data Files to STC for Re-Translation...!
+	#
+	# Use "ADARACat" to Account for Any Intervening/Sent Paused Data...
+	#
+
+	echo -e -n "\nReady to Re-Submit SMS Raw Data Files "
+	echo "for Run ${RUN_NUMBER} to STC for Re-Translation,"
+	echo -e "with Run End Status Packet Appended:"
+
+	if [[ -n ${SEND_PAUSED_DATA} ]]; then
+		echo -e -n "\nADARA Cat \"Send Paused Data\" Set to: "
+		echo "[${SEND_PAUSED_DATA}]"
+	fi
+
+	echo -e -n "\nUsing STC \"${STC_SERVICE}\" Service "
+	echo "on \"${STC_HOST}:${STC_PORT}\"."
+
+	CHECK_PROCEED
+
+	${ADARA_CAT} ${SEND_PAUSED_DATA} \
+			--run="${RUN_NUMBER}" --dir="${rundir}" \
+		| ${NC} ${STC_HOST} ${STC_PORT}
+	ckstc=$?
+
+	echo
+
+	if [[ ${ckstc} != 0 ]]; then
+		echo -e -n "\nERROR Re-Submitting SMS Raw Data Files to STC "
+		echo "for Run ${RUN_NUMBER}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return 17
+	fi
+
+	#
+	# Determine the Facility and Beamline (Short) Names
+	# for Post-Processing Options...
+	#
+
+	# Set Bash Pipefail Option as Needed...
+	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
+	if [[ "$pfck" == "off" ]]; then
+		set -o pipefail
+	fi
+
+	# Only Retrieve the Facility Name if Not Explicitly Specified
+	if [[ -z "${FACILITY}" ]]; then
+
+		FACILITY=`${GREP} "facility" ${SMS_CONFIG} | ${GREP} -v ";" \
+			| ${AWK} '{print $3}'`
+		ckfac=$?
+
+		if [[ ${ckfac} != 0 || -z ${FACILITY} ]]; then
+			echo -e -n "\nERROR Determining Facility from SMS Config "
+			echo "for Run ${RUN_NUMBER}!"
+			echo -e "\n\t${SMS_CONFIG}"
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			return 18
+		fi
+
+		echo -e "\nFacility Name Determined to be: [${FACILITY}]"
+
+	fi
+
+	# Only Retrieve the Beamline Short Name if Not Explicitly Specified
+	if [[ -z "${INST}" ]]; then
+
+		INST=`${GREP} "beamline_shortname" ${SMS_CONFIG} \
+			| ${GREP} -v ";" | ${AWK} '{print $3}'`
+		ckinst=$?
+
+		if [[ ${ckinst} != 0 || -z ${INST} ]]; then
+			echo -e -n "\nERROR Determining Beamline Short Name "
+			echo "from SMS Config for Run ${RUN_NUMBER}!"
+			echo -e "\n\t${SMS_CONFIG}"
+			CHECK_PROCEED
+			echo -e "\nContinuing with Next Run Number..."
+			return 19
+		fi
+
+		echo -e "\nBeamline Short Name Determined to be: [${INST}]"
+
+	fi
+
+	# Reset Bash Pipefail Option as Needed...
+	if [[ "$pfck" == "off" ]]; then
+		set +o pipefail
+	fi
+
+	#
+	# Now Verify that the NeXus File was Generated...
+	#
+
+	# Prompt User for NeXus Ls Check
+	local _ckdonxls
+	CHECK_PROCEED \
+		"Do You Want To Verify that the NeXus File was Generated"
+	_ckdonxls=$?
+
+	if [[ ${_ckdonxls} == 0 ]]; then
+
+		# NeXus Ls the New NeXus File...
+		# (This will Never Execute as Archive Not Mounted on Beamline DAQ1)
+
+		local _archive="${ARCHIVE_PATH}"
+		if [[ ${_archive:${#_archive} - 1} == "/" ]]; then
+			_archive="${_archive}${FACILITY}/${INST}"
+		else
+			_archive="${_archive}/${FACILITY}/${INST}"
+		fi
+
+		local _nexus="nexus/${INST}_${RUN_NUMBER}.nxs.h5"
+
+		echo -e "\n${NXLS} \\"
+		echo -e "\t${_archive}/${IPTS}/${_nexus} \\"
+		echo -e "\t-p /entry -v -l\n"
+
+		${NXLS} \
+			"${_archive}/${IPTS}/${_nexus}" \
+			-p /entry -v -l
+
+		# Shell Ls the New NeXus File...
+		# (This will Never Execute as Archive Not Mounted on Beamline DAQ1)
+
+		echo -e "\n${LS} -l \"${_archive}/${IPTS}/${_nexus}\"\n"
+
+		${LS} -l "${_archive}/${IPTS}/${_nexus}"
+
+	fi
+
+	#
+	# Now Check FindNeXus and the Catalog to Verify the Run Made It...
+	#
+
+	# Prompt User for FindNeXus Catalog Check...
+	local _cknotify
+	CHECK_PROCEED \
+		"Do You Want To Use FindNeXus to Verify the Run Completed"
+	_cknotify=$?
+
+	if [[ ${_cknotify} == 0 ]]; then
+
+		echo -e "\n${FINDNEXUS} -i ${INST} ${RUN_NUMBER}"
+		echo
+
+		${FINDNEXUS} -i ${INST} ${RUN_NUMBER}
+		ckfindnexus=$?
+
+		if [[ ${ckfindnexus} != 0 ]]; then
+			echo -e -n "\nERROR Checking FindNeXus to Verify "
+			echo "that Run ${RUN_NUMBER} Completed...!"
+			echo -e "\n\t${FINDNEXUS} -i ${INST} ${RUN_NUMBER}"
+		fi
+
+	fi
+
+	#
+	# Check for "Manual Processing Needed" Marker File...
+	#
+
+	if [[ -f "${rundir}/manual_processing_needed" ]]; then
+
+		# Prompt User to Delete "Manual Processing Needed" Marker File...
+		local _ckdelman
+		CHECK_PROCEED \
+			"Delete the Old \'manual_processing_needed\' Marker File"
+		_ckdelman=$?
+
+		if [[ ${_ckdelman} == 0 ]]; then
+
+			${RM} "${rundir}/manual_processing_needed"
+			ckrm=$?
+
+			if [[ ${ckrm} != 0 ]]; then
+				echo -e -n "\nERROR Deleting \'manual_processing_needed\' "
+				echo "Marker File for Run ${RUN_NUMBER}...!"
+				echo -e "\n\t${RM} \"${rundir}/manual_processing_needed\""
+				echo -e \
+					"\n\t${LS} -l \"${rundir}/manual_processing_needed\"\n"
+				${LS} -l "${rundir}/manual_processing_needed"
+				echo
+			fi
+
+		fi
+
+	fi
+
+	#
+	# Now Create the "Translation Completed" Marker File...
+	#
+
+	# Prompt User for Creating "Translation Completed" Marker File...
+	local _ckmarker
+	CHECK_PROCEED \
+		"Do You Want To Create the \'translation_completed\' Marker File"
+	_ckmarker=$?
+
+	if [[ ${_ckmarker} == 0 ]]; then
+
+		${TOUCH} "${rundir}/translation_completed"
+		cktouch=$?
+
+		if [[ ${cktouch} != 0 ]]; then
+			echo -e -n "\nERROR Creating the \'translation_completed\' "
+			echo "Marker File for Run ${RUN_NUMBER}...!"
+			echo -e "\n\t${TOUCH} \"${rundir}/translation_completed\""
+		fi
+
+	fi
+
+	#
+	# Done with This Run...
+	#
+
+	echo -e "\nDone Re-Submitting/Updating Run ${RUN_NUMBER}."
+
+	return 0
+}
+
+#
+# Manually Edit a Datafile, With Proper Cleanup/Newline Truncation...
+#
+# usage: MANUAL_EDIT "${rundir}" "${datafile}"
+#
+MANUAL_EDIT()
+{
+	# Run Directory
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Run Directory Specified for Manual Editing!"
+		echo -e "\nContinuing with Next Run Number..."
+		return 20
+	fi
+	local _rundir="$1"
+	shift
+
+	# Data File
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nError: No Data File Specified for Manual Editing!"
+		echo -e "\nContinuing with Next Run Number..."
+		return 21
+	fi
+	local _datafile="$1"
+	shift
+
+	# Prompt User for Manually Editing...
+	CHECK_PROCEED "Do You Want To Manually Edit the Data File"
+	local _ckmanedit=$?
+
+	if [[ ${_ckmanedit} != 0 ]]; then
+		return 22
+	fi
+
+	# Copy Original Data File to New Copy for Editing...
+
+	echo -e "\nCopying Last ADARA Output Stream File "
+	echo "for Editing Run ${RUN_NUMBER}:"
+	echo -e "\t[${_datafile}]"
+	echo -e "\t->[${_datafile}.NEW-$$]"
+
+	${CP} -i "${_rundir}/${_datafile}" "${_rundir}/${_datafile}.NEW-$$"
+	ckcp=$?
+
+	if [[ ${ckcp} != 0 ]]; then
+		echo -e -n "\nERROR Copying Last Original "
+		echo "Stream File to Edit for Run ${RUN_NUMBER}!"
+		return 23
+	fi
+
+	# Pre-Edit Prompt...
+	echo -e "\nReady to Manually Edit the Data File:"
+	echo -e "\n\t[${_datafile}.NEW-$$]"
+	echo -e "\n\tin [${_rundir}]"
+	echo -e "\nto Add Run End Status Packet."
+	echo -e "\n(Please see ADARA/sms/RUN.STATUS.END.txt for Instructions.)"
+	CHECK_PROCEED "Proceed"
+	if [[ $? != 0 ]]; then
+		echo -e "\nOK, Skipping This Run Number."
+		return 24
+	fi
+
+	# Manually Edit the Data File...
+
+	search="+G"
+
+	${Editor} "$search" "${_rundir}/${_datafile}.NEW-$$"
+	ckedit=$?
+
+	if [[ ${ckedit} != 0 ]]; then
+		echo -e "\nERROR Manually Editing Data File for Run ${RUN_NUMBER}!"
+		return 25
+	fi
+
+	# See If File Was Edited/Changed At All...
+
+	echo -e "\nVerifying Whether Data File was Modified:"
+
+	${CMP} "${_rundir}/${_datafile}" "${_rundir}/${_datafile}.NEW-$$"
+	ckcmp=$?
+
+	if [[ ${ckcmp} == 0 ]]; then
+		echo -e -n "\nNo Changes Made to Last Original "
+		echo "Stream File for Run ${RUN_NUMBER}."
+		return 26
+	fi
+
+	# Truncate the Extra Newline that Gets Added When Manually Editing!
+
+	echo -e "\nTruncating Trailing Newline from Edited File:"
+	echo -e "\t[${_datafile}.NEW-$$]"
+
+	${TRUNCATE} --size=-1 "${_rundir}/${_datafile}.NEW-$$"
+	cktrunc=$?
+
+	if [[ ${cktrunc} != 0 ]]; then
+		echo -e -n "\nERROR Truncating Newline from "
+		echo -e "Manually Edited Data File for Run ${RUN_NUMBER}!"
+		return 27
+	fi
+
+	return 0
+}
+
+LOOKUP_PROPOSAL_METADATA()
+{
+	local _xml_tag="$1"
+	shift
+
+	local _meta_name="$1"
+	shift
+
+	local _old_line_wnum_var="$1"
+	shift
+
+	local _old_value_var="$1"
+	shift
+
+	local _allow_multi="NoMulti"
+	if [[ "$1" == "AllowMulti" ]]; then
+		_allow_multi="$1"
+		shift
+	fi
+
+	echo -e -n "\nLOOKUP_PROPOSAL_METADATA(): XML Tag for ${_meta_name} "
+	echo "= \"${_xml_tag}\""
+
+	if [[ "${_allow_multi}" == "AllowMulti" ]]; then
+		echo -e "\t[Allow Multiple Lookup Results!]"
+	fi
+
+	#
+	# Determine the Current Proposal Meta-Data for This Run...
+	#
+	# - Fortunately, the Proposal Meta-Data is Stored in the RunInfo Packet
+	# as Plain Text XML, So We Can Parse and Substitute It "Easily"... ;-D
+	#
+	# Note: Be Careful to _Avoid_ Things like "IPTS-ITEMS" in the RunInfo!
+	# - Better Use the XML Tag "<proposal_id>" instead of plain "IPTS"...
+	# - Also, This Covers the Case where the Original Proposal was
+	# _Not_ of the form "IPTS-*"... ;-D
+	#
+
+	# Limit Search to First/Last RunInfo Section in File...
+	local _old_line_wnum=`${AWK} \
+			"{ if ( NR >= ${runinfo_lines_start} \
+					&& NR <= ${runinfo_lines_end} ) \
+				printf(\"%s:%s\\n\",NR,\\$0) }" \
+			"${rundir}/${datafile}" \
+		| ${GREP} --text "<${_xml_tag}>"`
+	ckoldiptsline=$?
+
+	if [[ ${ckoldiptsline} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Old ${_meta_name} Line "
+		echo "from Stream File for Run ${RUN_NUMBER}!"
+		echo -e "\n\t[${_old_line_wnum}]"
+		### TODO: Try the "2nd" or "Next to Last" File...?
+		# No Manual Edit, Just Return... This is Optional Meta-Data...
+		return 30
+	fi
+
+	# See How Many Old Proposal Meta-Data Lines We Got...
+	ckoneline=`echo "${_old_line_wnum}" | ${WC} | ${AWK} '{print $1}'`
+
+	# Make Sure We Only Get *1* Old Proposal Meta-Data Line...! ;-D
+	if [[ "${_allow_multi}" == "NoMulti" ]]; then
+
+		# Oops, Got More Than 1 Meta-Data Line...
+		if [[ ${ckoneline} != 1 ]]; then
+
+			echo -e -n "\nWarning: Multiple ${_meta_name} Lines Found "
+			echo "for Run ${RUN_NUMBER}!"
+			echo -e "\n${_old_line_wnum}"
+				# Allow Self-Indenting from XML Line(s)
+
+			# Take Last Line of the Last Data File...
+			_old_line_wnum=`echo "${_old_line_wnum}" | ${TAIL} -1`
+			echo -e -n "\nUsing Last ${_meta_name} "
+			echo "of the Last Data File for Run ${RUN_NUMBER}:"
+			echo -e "\n${_old_line_wnum}"
+				# Allow Self-Indenting from XML Line(s)
+
+		fi
+
+	# Take 'Em All, We're Ok with Multiple Meta-Data Lines...
+	else
+		echo -e "\nLookup Found ${ckoneline} Results."
+	fi
+
+	echo -e "\nOld ${_meta_name} Line(s) for Run ${RUN_NUMBER}:"
+	echo -e "\n${_old_line_wnum}"
+		# Allow Self-Indenting from XML Line(s)
+
+	local _old_value=`echo "${_old_line_wnum}" \
+		| ${AWK} -F "[<>]" '{print $3}'`
+	ckoldipts=$?
+
+	if [[ ${ckoldipts} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Old ${_meta_name} from Stream File "
+		echo "for Run ${RUN_NUMBER}!"
+		# No Manual Edit, Just Return... This is Optional Meta-Data...
+		return 32
+	fi
+
+	echo -e "\nFound Old ${_meta_name} for Run ${RUN_NUMBER}:"
+	echo -e "\n\t["${_old_value}"]"   # Collapse Multi-Line Values
+
+	#
+	# Set/Save Old Line w/Number Global, If Specified...
+	#
+
+	if [[ -n "${_old_line_wnum_var}" ]]; then
+		eval "${_old_line_wnum_var}=\"${_old_line_wnum}\""
+	fi
+
+	#
+	# Set/Save Old Value Global, If Specified...
+	#
+
+	if [[ -n "${_old_value_var}" ]]; then
+		eval "${_old_value_var}=\"${_old_value}\""
+	fi
+
+	return 0
+}
+
+#
+# Process Each Run Number in Turn...
+#
+
+echo -e "\nProcessing Run Number: ${RUN_NUMBER}"
+
+#
+# Find the SMS Raw Data Files for This Run...! ;-D
+#
+
+rundir=`${LS} -d ${SMS_DATA}/*/*-run-${RUN_NUMBER} 2>&1`
+ckrundir=$?
+
+if [[ ${ckrundir} != 0 ]]; then
+	echo -e -n "\nERROR Locating SMS Raw Data Directory "
+	echo "for Run ${RUN_NUMBER}!"
+	echo -e "\nBailing..."
+	exit -30
+fi
+
+echo -e "\nFound SMS Raw Data Directory for Run ${RUN_NUMBER}:"
+echo -e "\t[${rundir}]"
+
+#
+# Locate & Backup the First ADARA Output Stream File for This Run
+#
+
+echo -e "\nLocating Last Data File for Run ${RUN_NUMBER}."
+datafile=`${LS} "${rundir}" \
+	| ${GREP} -E \
+		--regexp "^m[0-9]+-f[0-9]+-run-${RUN_NUMBER}.adara$" \
+		--regexp "^f[0-9]+-run-${RUN_NUMBER}.adara$" \
+	| ${TAIL} -1`
+ckdatafile=$?
+
+if [[ ${ckdatafile} != 0 ]]; then
+	echo -e -n "\nERROR Locating Last ADARA Output "
+	echo "Stream File for Run ${RUN_NUMBER}!"
+	echo -e "\nBailing..."
+	exit -31
+fi
+
+# Make Sure We Only Got *1* Data File...! ;-D
+ckone=`echo "${datafile}" | ${WC} | ${AWK} '{print $1}'`
+
+if [[ ${ckone} != 1 ]]; then
+	echo -e -n "\nERROR: Multiple Output Stream Files Found "
+	echo "for Run ${RUN_NUMBER}!"
+	echo -e "\n${datafile}\n"
+	echo -e "\nBailing..."
+	exit -32
+fi
+
+echo -e -n "\nFound Last ADARA Output Stream File "
+echo "for Run ${RUN_NUMBER}:"
+echo -e "\t[${datafile}]"
+
+#
+# Capture the Line Number Bounds of Last "RunInfo" Section,
+# for Limiting Range of Subsequent Substitutions...
+#
+
+runinfo_lines_wnum=`${GREP} --text -n -e "<runinfo " -e "</runinfo>" \
+	"${rundir}/${datafile}"`
+ckruninfolines=$?
+
+if [[ ${ckruninfolines} != 0 ]]; then
+
+	echo -e -n "\nERROR Extracting RunInfo Section Lines "
+	echo "from Stream File for Run ${RUN_NUMBER}!"
+	echo -e "\n\t[${runinfo_lines_wnum}]"
+
+	### TODO: Try the "Next to Last" File...?
+
+	# Don't Bail Here, Just Wing It... This is Optional Meta-Data...
+	runinfo_lines_start=0
+	runinfo_lines_end=999999999
+
+else
+
+	# Take Last Set of RunInfo Lines of the Last Data File...
+	runinfo_lines_wnum=`echo "${runinfo_lines_wnum}" \
+		| ${TAIL} -2`
+	echo -e -n "\nUsing Last Set of RunInfo Lines "
+	echo -e "of the Last Data File for Run ${RUN_NUMBER}:\n"
+	echo "${runinfo_lines_wnum}" | ${SED} 's/runinfo.*/runinfo.../'
+		# Allow Self-Indenting from XML Line(s)
+
+	# Extract Starting/Ending Line Number Range...
+
+	runinfo_lines_start=`echo "${runinfo_lines_wnum}" \
+		| ${HEAD} -1 | ${AWK} -F ":" '{print $1}'`
+	ckawkruninfostart=$?
+
+	if [[ ${ckawkruninfostart} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Line Number for Last "
+		echo "RunInfo Meta-Data Start Line...!"
+		echo -e "\n[${runinfo_lines_wnum}]"
+		# Don't Bail Here, Just Wing It... This is Optional Meta-Data...
+		runinfo_lines_start=0
+	fi
+
+	runinfo_lines_end=`echo "${runinfo_lines_wnum}" \
+		| ${TAIL} -1 | ${AWK} -F ":" '{print $1}'`
+	ckawkruninfoend=$?
+
+	if [[ ${ckawkruninfoend} != 0 ]]; then
+		echo -e -n "\nERROR Extracting Line Number for Last "
+		echo "RunInfo Meta-Data End Line...!"
+		echo -e "\n[${runinfo_lines_wnum}]"
+		# Don't Bail Here, Just Wing It... This is Optional Meta-Data...
+		runinfo_lines_end=999999999
+	fi
+fi
+
+echo -e -n "\nFound Line Number Range for Last "
+echo -n "RunInfo Meta-Data - "
+echo "Lines ${runinfo_lines_start} to ${runinfo_lines_end}."
+
+#
+# Update the Proposal Id Meta-Data
+#
+
+IPTS=""
+
+LOOKUP_PROPOSAL_METADATA \
+	"proposal_id" "Proposal Id" \
+	"ipts_old_line_wnum" "IPTS"
+cklookup=$?
+
+if [[ ${cklookup} != 0 ]]; then
+	echo -e "\nError Looking Up IPTS Proposal for Run..."
+	IPTS="IPTS-NOT-KNOWN"
+	echo -e "\nUsing Dummy Proposal: \"${IPTS}\""
+fi
+
+# Append Run End Status Packet to Original Data File... :-D
+
+echo -e -n "\nAppending Run End Status Packet "
+echo "to Original Data File:"
+echo -e "\t[${datafile}]"
+echo -e "\t-> ${datafile}.NEW-$$"
+
+echo -e "\n${ADARA_MUNGE} --addrunend --terse \\"
+echo -e "   \"${rundir}/${datafile}\" \\"
+echo -e "   > \"${rundir}/${datafile}.NEW-$$\"\n"
+
+eval "${ADARA_MUNGE}" --addrunend --terse "${rundir}/${datafile}" \
+	> "${rundir}/${datafile}.NEW-$$"
+ckmunge=$?
+
+if [[ ${ckmunge} != 0 ]]; then
+	echo -e -n "\nERROR Munging Data File "
+	echo "to Add Run End Status Packet...!"
+	MANUAL_EDIT "${rundir}" "${datafile}"
+	if [[ $? != 0 ]]; then
+		echo -e "\nBailing..."
+		exit -36
+	fi
+fi
+
+# Install and Check Modified Data File...
+INSTALL_AND_CHECK_DATAFILE "${rundir}" "${datafile}"
+ckinstall=$?
+
+if [[ ${ckinstall} != 0 ]]; then
+	echo -e -n "\nERROR Installing and Checking "
+	echo "Modified Data File for Run ${RUN_NUMBER}!"
+	echo -e "\nBailing..."
+	exit -37
+fi
+
+# Re-Submit Modified Run for Translation to NeXus...
+RESUBMIT_RUN "${rundir}" "${datafile}"
+
+#
+# Done
+#
+
+echo -e "\nDone.\n"
+

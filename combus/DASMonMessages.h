@@ -1,8 +1,10 @@
 #ifndef DASMONMESSAGES_H
 #define DASMONMESSAGES_H
 
+#include <iostream>
 #include <set>
 #include <boost/foreach.hpp>
+#include "ADARAUtils.h"
 #include "ComBusDefs.h"
 #include "RuleEngine.h"
 #include "DASMonDefs.h"
@@ -50,8 +52,10 @@ protected:
         try {
             BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("rules"))
             {
+                rule.enabled = v.second.get( "enabled", false );
                 rule.fact = v.second.get( "fact", "" );
                 rule.expr = v.second.get( "expr", "" );
+                rule.desc = v.second.get( "desc", "" );
 
                 m_rules.push_back( rule );
             }
@@ -62,11 +66,13 @@ protected:
         try {
             BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("signals"))
             {
+                signal.enabled = v.second.get( "enabled", false );
                 signal.name = v.second.get( "name", "" );
                 signal.fact = v.second.get( "fact", "" );
                 signal.source = v.second.get( "source", "" );
                 signal.level = (Level)v.second.get( "level", 0 );
                 signal.msg = v.second.get( "message", "" );
+                signal.desc = v.second.get( "desc", "" );
 
                 m_signals.push_back( signal );
             }
@@ -78,19 +84,23 @@ protected:
         for ( std::vector<RuleEngine::RuleInfo>::iterator r = m_rules.begin(); r != m_rules.end(); ++r )
         {
             boost::property_tree::ptree pt;
+            pt.put( "enabled", r->enabled );
             pt.put( "fact", r->fact );
             pt.put( "expr", r->expr );
+            pt.put( "desc", r->desc );
             a_prop_tree.add_child( "rules.rule", pt );
         }
 
         for ( std::vector<ADARA::DASMON::SignalInfo>::iterator s = m_signals.begin(); s != m_signals.end(); ++s )
         {
             boost::property_tree::ptree pt;
+            pt.put( "enabled", s->enabled );
             pt.put( "name", s->name );
             pt.put( "fact", s->fact );
             pt.put( "source", s->source );
             pt.put( "level", (unsigned short)s->level );
             pt.put( "message", s->msg );
+            pt.put( "desc", s->desc );
             a_prop_tree.add_child( "signals.signal", pt );
         }
     }
@@ -252,7 +262,18 @@ protected:
 
 // Note: The ProcessVariables message will be removed when direct output to db is available
 
-class ProcessVariables : public ADARA::ComBus::TemplMessageBase<MSG_DASMON_PVS,ProcessVariables>
+/// Process variable types
+enum PVDataType
+{
+    PVDT_UINT,
+    PVDT_DOUBLE,
+    PVDT_STRING,
+    PVDT_UINT_ARRAY,
+    PVDT_DOUBLE_ARRAY
+};
+
+class ProcessVariables :
+    public ADARA::ComBus::TemplMessageBase<MSG_DASMON_PVS, ProcessVariables>
 {
 public:
     ProcessVariables()
@@ -261,19 +282,64 @@ public:
     struct PVData
     {
         PVData()
-            : value(0.0), status(0), timestamp(0)
+            : pv_type(PVDT_DOUBLE), is_str(false),
+            uint_val(0), dbl_val(0.0),
+            status(0), timestamp(0), timestamp_nanosec(0)
         {}
 
-        PVData( double a_value, int a_status, uint32_t a_timestamp )
-            : value(a_value), status(a_status), timestamp(a_timestamp)
+        PVData( uint32_t a_value, int a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+            : pv_type(PVDT_UINT), is_str(false),
+            uint_val(a_value), dbl_val(0.0),
+            status(a_status),
+            timestamp(a_timestamp), timestamp_nanosec(a_timestamp_nanosec)
         {}
 
-        double          value;
-        int             status;
-        uint32_t        timestamp;
+        PVData( double a_value, int a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+            : pv_type(PVDT_DOUBLE), is_str(false),
+            uint_val(0), dbl_val(a_value),
+            status(a_status),
+            timestamp(a_timestamp), timestamp_nanosec(a_timestamp_nanosec)
+        {}
+
+        PVData( const std::string &a_value, int a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+            : pv_type(PVDT_STRING), is_str(true),
+            uint_val(0), dbl_val(0.0), str_val(a_value),
+            status(a_status),
+            timestamp(a_timestamp), timestamp_nanosec(a_timestamp_nanosec)
+        {}
+
+        PVData( std::vector<uint32_t> a_value, int a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+            : pv_type(PVDT_UINT_ARRAY), is_str(false),
+            uint_val(0), dbl_val(0.0), uint_array(a_value),
+            status(a_status),
+            timestamp(a_timestamp), timestamp_nanosec(a_timestamp_nanosec)
+        {}
+
+        PVData( std::vector<double> a_value, int a_status,
+                uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+            : pv_type(PVDT_DOUBLE_ARRAY), is_str(false),
+            uint_val(0), dbl_val(0.0), dbl_array(a_value),
+            status(a_status),
+            timestamp(a_timestamp), timestamp_nanosec(a_timestamp_nanosec)
+        {}
+
+        PVDataType              pv_type;
+        bool                    is_str;
+        uint32_t                uint_val;
+        double                  dbl_val;
+        std::string             str_val;
+        std::vector<uint32_t>   uint_array;
+        std::vector<double>     dbl_array;
+        int                     status;
+        uint32_t                timestamp;
+        uint32_t                timestamp_nanosec;
     };
 
-    std::map<std::string,PVData> m_pvs;
+    std::map<std::string, PVData> m_pvs;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -282,30 +348,160 @@ protected:
 
         PVData data;
         m_pvs.clear();
-        try {
-            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v, a_prop_tree.get_child("pvs"))
+        try
+        {
+            BOOST_FOREACH( const boost::property_tree::ptree::value_type &v,
+                    a_prop_tree.get_child("pvs") )
             {
+                int32_t type_ck = v.second.get( "pv_type", -1 );
+
+                // Old Style, No "pv_type", Only "is_str" (Assumes Double)
+                if ( type_ck == -1 )
+                {
+                    data.is_str = v.second.get( "is_str", false );
+                    data.pv_type = ( data.is_str )
+                        ? PVDT_STRING : PVDT_DOUBLE;
+                }
+
+                // New Style, Use "pv_type", But Still Set "is_str"... ;-D
+                else
+                {
+                    data.pv_type = (PVDataType) type_ck;
+                    data.is_str = ( data.pv_type == PVDT_STRING );
+                }
+
                 data.status = v.second.get( "status", 0 );
-                data.value = v.second.get( "value", 0.0 );
+
+                std::string array_str;
+
+                switch ( data.pv_type )
+                {
+                    case PVDT_UINT:
+                        data.uint_val = v.second.get( "uint_val", 0 );
+                        break;
+                    case PVDT_DOUBLE:
+                        data.dbl_val = v.second.get( "dbl_val", 0.0 );
+                        break;
+                    case PVDT_STRING:
+                        data.str_val = v.second.get( "str_val", "" );
+                        break;
+                    case PVDT_UINT_ARRAY:
+                        array_str = v.second.get( "uint_array", "[]" );
+                        Utils::parseArrayString(
+                            array_str, data.uint_array );
+                        break;
+                    case PVDT_DOUBLE_ARRAY:
+                        array_str = v.second.get( "dbl_array", "[]" );
+                        Utils::parseArrayString(
+                            array_str, data.dbl_array );
+                        break;
+                    // Unknown Data Type, Dang... (No Way to Log from Here!)
+                    // - Just Default to a Double(0.0)... ;-b
+                    default:
+                        data.pv_type = PVDT_DOUBLE;
+                        data.dbl_val = 0.0;
+                        break;
+                }
+
                 data.timestamp = v.second.get( "timestamp", 0UL );
-                m_pvs[v.first] = data;
+
+                double timestamp_micro_ck =
+                    v.second.get( "timestamp_micro", -1.0 );
+
+                // Old Style, No Double Floating Point Timestamp w/Microsecs
+                if ( timestamp_micro_ck == -1.0 )
+                    data.timestamp_nanosec = 0;
+
+                // Extract Nanosecs (Approx) from Double Timestamp...
+                // Converting to Double _Only_ Retains Microsecond Precision
+                else
+                {
+                    data.timestamp_nanosec = (uint32_t)
+                        ( ( timestamp_micro_ck - ((double) data.timestamp) )
+                            * 1e9 );
+                }
+
+                m_pvs[v.second.get( "name", "" )] = data;
             }
-        } catch(...) {}
+        }
+        catch(...) {}
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
     {
         MessageBase::write( a_prop_tree );
 
-        for ( std::map<std::string,PVData>::iterator ipv = m_pvs.begin(); ipv != m_pvs.end(); ++ipv )
+        boost::property_tree::ptree ppt;
+
+        for ( std::map<std::string,PVData>::iterator ipv = m_pvs.begin();
+                ipv != m_pvs.end(); ++ipv )
         {
             boost::property_tree::ptree pt;
+            pt.put( "name", ipv->first );
             pt.put( "status", ipv->second.status );
-            pt.put( "value", ipv->second.value );
+
+            std::string array_str;
+
+            switch ( ipv->second.pv_type )
+            {
+                case PVDT_UINT:
+                    pt.put( "uint_val", ipv->second.uint_val );
+                    // For Backwards Compatibility, For Now... ;-D
+                    pt.put( "dbl_val", (double)ipv->second.uint_val );
+                    break;
+                case PVDT_DOUBLE:
+                    pt.put( "dbl_val", ipv->second.dbl_val );
+                    break;
+                case PVDT_STRING:
+                    pt.put( "str_val", ipv->second.str_val );
+                    break;
+                case PVDT_UINT_ARRAY:
+                    Utils::printArrayString( ipv->second.uint_array,
+                        array_str );
+                    pt.put( "uint_array", array_str );
+                    // For Backwards Compatibility, For Now... ;-D
+                    if ( ipv->second.uint_array.size() > 0 )
+                    {
+                        pt.put( "dbl_val",
+                            (double)ipv->second.uint_array[0] );
+                    }
+                    else
+                        pt.put( "dbl_val", 0.0 );
+                    break;
+                case PVDT_DOUBLE_ARRAY:
+                    Utils::printArrayString( ipv->second.dbl_array,
+                        array_str );
+                    pt.put( "dbl_array", array_str );
+                    // For Backwards Compatibility, For Now... ;-D
+                    if ( ipv->second.dbl_array.size() > 0 )
+                        pt.put( "dbl_val", ipv->second.dbl_array[0] );
+                    else
+                        pt.put( "dbl_val", 0.0 );
+                    break;
+                // Unknown Data Type, Dang... (No Way to Log from Here!)
+                // - Just Default to a Double(0.0)... ;-b
+                default:
+                    ipv->second.pv_type = PVDT_DOUBLE;
+                    ipv->second.is_str = false;
+                    pt.put( "dbl_val", 0.0 );
+                    break;
+            }
+
+            pt.put( "pv_type", ipv->second.pv_type );
+            pt.put( "is_str", ipv->second.is_str );
+
             pt.put( "timestamp", ipv->second.timestamp );
 
-            a_prop_tree.add_child( std::string("pvs.") + ipv->first, pt );
+            // Assemble Double Timestamp with Microsecond Precision
+            // (Converting to Double _Only_ Retains Microsecond Precision
+            // from Nanosecond Value...)
+            double timestamp_micro = ((double) ipv->second.timestamp)
+                + ( ((double) ipv->second.timestamp_nanosec) / 1.0e9 );
+            pt.put( "timestamp_micro", timestamp_micro );
+
+            ppt.push_back( std::make_pair( "", pt ));
         }
+        a_prop_tree.add_child( "pvs", ppt );
     }
 };
 
@@ -357,12 +553,16 @@ public:
     RunStatusMessage()
     {}
 
-    RunStatusMessage( bool a_recording, uint32_t a_run_number, uint32_t a_timestamp )
-        : m_recording(a_recording), m_run_number(a_run_number), m_timestamp(a_timestamp) {}
+    RunStatusMessage( bool a_recording, uint32_t a_run_number,
+            uint32_t a_timestamp, uint32_t a_timestamp_nanosec )
+        : m_recording(a_recording), m_run_number(a_run_number),
+        m_timestamp(a_timestamp), m_timestamp_nanosec(a_timestamp_nanosec)
+    {}
 
     bool        m_recording;
     uint32_t    m_run_number;
     uint32_t    m_timestamp;
+    uint32_t    m_timestamp_nanosec;
 
 protected:
     virtual void read( const boost::property_tree::ptree &a_prop_tree )
@@ -372,6 +572,20 @@ protected:
         m_recording = a_prop_tree.get( "recording", false );
         m_run_number = a_prop_tree.get( "run_number", 0UL );
         m_timestamp = a_prop_tree.get( "timestamp", 0UL );
+
+        double timestamp_micro_ck =
+            a_prop_tree.get( "timestamp_micro", -1.0 );
+
+        // Old Style, No Double Floating Point Timestamp w/Microsecs
+        if ( timestamp_micro_ck == -1.0 )
+            m_timestamp_nanosec = 0;
+
+        // Extract Nanosecs (Approx) from Double Timestamp...
+        // Converting to Double _Only_ Retains Microsecond Precision
+        else {
+            m_timestamp_nanosec = (uint32_t)
+                ( ( timestamp_micro_ck - ((double) m_timestamp) ) * 1.0e9 );
+        }
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -381,6 +595,13 @@ protected:
         a_prop_tree.put( "recording", m_recording );
         a_prop_tree.put( "run_number", m_run_number );
         a_prop_tree.put( "timestamp", m_timestamp );
+
+        // Assemble Double Timestamp with Microsecond Precision
+        // (Converting to Double _Only_ Retains Microsecond Precision
+        // from Nanosecond Value...)
+        double timestamp_micro = ((double) m_timestamp)
+            + ( ((double) m_timestamp_nanosec) / 1.0e9 );
+        a_prop_tree.put( "timestamp_micro", timestamp_micro );
     }
 };
 
@@ -467,6 +688,10 @@ protected:
         MessageBase::read( a_prop_tree );
 
         m_facility = a_prop_tree.get( "facility", "" );
+
+        m_target_station_number = a_prop_tree.get(
+            "target_station_number", 1 );
+
         m_beam_id = a_prop_tree.get( "beam_id", "" );
         m_beam_sname = a_prop_tree.get( "beam_sname", "" );
         m_beam_lname = a_prop_tree.get( "beam_lname", "" );
@@ -477,6 +702,9 @@ protected:
         MessageBase::write( a_prop_tree );
 
         a_prop_tree.put( "facility", m_facility );
+
+        a_prop_tree.put( "target_station_number", m_target_station_number );
+
         a_prop_tree.put( "beam_id", m_beam_id );
         a_prop_tree.put( "beam_sname", m_beam_sname );
         a_prop_tree.put( "beam_lname", m_beam_lname );
@@ -636,6 +864,13 @@ protected:
         m_pulse_veto_count      = a_prop_tree.get( "pulse_veto_count", 0UL );
         m_mapping_error_count   = a_prop_tree.get( "mapping_error_count", 0UL );
         m_missing_rtdl_count    = a_prop_tree.get( "missing_rtdl_count", 0UL );
+        m_pulse_pcharge_uncorrected
+                                = a_prop_tree.get(
+                                      "pulse_pcharge_uncorrected", 0UL );
+        m_got_metadata_count    = a_prop_tree.get( "got_metadata_count", 0UL );
+        m_got_neutrons_count    = a_prop_tree.get( "got_neutrons_count", 0UL );
+        m_has_states_count      = a_prop_tree.get( "has_states_count", 0UL );
+        m_total_pulses_count    = a_prop_tree.get( "total_pulses_count", 0UL );
     }
 
     virtual void write( boost::property_tree::ptree &a_prop_tree )
@@ -650,6 +885,12 @@ protected:
         a_prop_tree.put( "pulse_veto_count", m_pulse_veto_count );
         a_prop_tree.put( "mapping_error_count", m_mapping_error_count );
         a_prop_tree.put( "missing_rtdl_count", m_missing_rtdl_count );
+        a_prop_tree.put( "pulse_pcharge_uncorrected",
+            m_pulse_pcharge_uncorrected );
+        a_prop_tree.put( "got_metadata_count", m_got_metadata_count );
+        a_prop_tree.put( "got_neutrons_count", m_got_neutrons_count );
+        a_prop_tree.put( "has_states_count", m_has_states_count );
+        a_prop_tree.put( "total_pulses_count", m_total_pulses_count );
     }
 };
 
@@ -719,3 +960,6 @@ protected:
 
 
 #endif // DASMONMESSAGES_H
+
+// vim: expandtab
+

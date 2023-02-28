@@ -15,7 +15,7 @@
 #include "RuleConfigDialog.h"
 #include "ComBusMessages.h"
 #include "DASMonMessages.h"
-#include "STSMessages.h"
+#include "STCMessages.h"
 #include "style.h"
 
 using namespace std;
@@ -24,14 +24,14 @@ using namespace std;
 #define TIMEOUT_PROC_UNRESPONSIVE   10
 #define TIMEOUT_PROC_DEAD           30
 #define TIMEOUT_PROC_DEAD_CLEANUP   30
-#define TIMEOUT_STS_INACTIVE        30
-#define TIMEOUT_STS_UNRESPONSIVE    10
-#define MONITOR_ID_INACTIVE_TIMEOUT 86400 // 24 hours
-#define MONITOR_ID_DATA_TIMEOUT     5
+#define TIMEOUT_STC_INACTIVE        30
+#define TIMEOUT_STC_UNRESPONSIVE    10
+#define MONITOR_ID_INACTIVE_TIMEOUT 60
+#define MONITOR_ID_DATA_TIMEOUT     10
 #define TOPIC_STATUS                "STATUS.>"
 #define TOPIC_SIGNALS               "SIGNAL.>"
 #define TOPIC_DASMON                "APP.DASMON"
-#define TOPIC_STS                   "APP.STS"
+#define TOPIC_STC                   "APP.STC"
 
 
 MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user,
@@ -81,7 +81,9 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     if ( !m_domain.empty() && *m_domain.rbegin() != '.' )
         m_domain += ".";
 
-    m_combus = new ADARA::ComBus::Connection( m_domain, "DASMON-GUI", a_master?0:getpid(), m_broker_uri, m_broker_user, m_broker_pass );
+    m_combus = new ADARA::ComBus::Connection( m_domain, "DASMON-GUI",
+        a_master ? 0 : getpid(),
+        m_broker_uri, m_broker_user, m_broker_pass, "", "" );
 
     updateMainWindowTitle();
 
@@ -131,7 +133,7 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     m_combus->attach( *this, TOPIC_STATUS ); // Listen to ADARA process health status (display only)
     m_combus->attach( *this, TOPIC_SIGNALS ); // Listen to ADARA signals
     m_combus->attach( *this, TOPIC_DASMON ); // Listen to dasmon service
-    m_combus->attach( *this, TOPIC_STS ); // Listen to (local) STS translation messages
+    m_combus->attach( *this, TOPIC_STC ); // Listen to (local) STC translation messages
 
     m_start_time = QDateTime::currentDateTime();
 
@@ -411,13 +413,13 @@ MainWindow::onTableTimer()
 
         ui->logTable->setRowCount( m_log_entries.size());
         row = 0;
-        for ( deque<QString>::iterator l = m_log_entries.begin(); l != m_log_entries.end(); ++l, ++row )
+        for ( deque<QString>::iterator l = m_log_entries.begin();
+                l != m_log_entries.end(); ++l, ++row )
         {
             ui->logTable->setItem( row, 0, new QTableWidgetItem( *l ) );
         }
         ui->logTable->scrollToBottom();
     }
-
 
     QMutexLocker lock( &m_mutex );
 
@@ -427,7 +429,8 @@ MainWindow::onTableTimer()
 
         ui->procStatusTable->setRowCount( m_proc_status.size());
         row = 0;
-        for ( map<string,ProcInfo>::iterator p = m_proc_status.begin(); p != m_proc_status.end(); ++p, ++row )
+        for ( map<string, ProcInfo>::iterator p = m_proc_status.begin();
+                p != m_proc_status.end(); ++p, ++row )
         {
             item[0] = new QTableWidgetItem( p->second.name );
             item[1] = new QTableWidgetItem( p->second.label );
@@ -441,7 +444,8 @@ MainWindow::onTableTimer()
     else
     {
         row = 0;
-        for ( map<string,ProcInfo>::iterator p = m_proc_status.begin(); p != m_proc_status.end(); ++p, ++row )
+        for ( map<string, ProcInfo>::iterator p = m_proc_status.begin();
+                p != m_proc_status.end(); ++p, ++row )
         {
             if ( p->second.hl_count )
             {
@@ -459,12 +463,14 @@ MainWindow::onTableTimer()
 
         ui->alertTable->setRowCount( m_alerts.size());
         int row = 0;
-        for ( map<string,AlertInfo>::iterator ia = m_alerts.begin(); ia != m_alerts.end(); ++ia, ++row )
+        for ( map<string, AlertInfo>::iterator ia = m_alerts.begin();
+                ia != m_alerts.end(); ++ia, ++row )
         {
-            item[0] = new QTableWidgetItem( ia->second.name.c_str());
-            item[1] = new QTableWidgetItem( ia->second.source.c_str());
-            item[2] = new QTableWidgetItem( ADARA::ComBus::ComBusHelper::toText( ia->second.level ));
-            item[3] = new QTableWidgetItem(ia->second.msg.c_str());
+            item[0] = new QTableWidgetItem( ia->second.name.c_str() );
+            item[1] = new QTableWidgetItem( ia->second.source.c_str() );
+            item[2] = new QTableWidgetItem(
+                ADARA::ComBus::ComBusHelper::toText( ia->second.level ) );
+            item[3] = new QTableWidgetItem(ia->second.msg.c_str() );
 
             ui->alertTable->setItem( row, 0, item[0] );
             ui->alertTable->setItem( row, 1, item[1] );
@@ -477,7 +483,8 @@ MainWindow::onTableTimer()
     else
     {
         row = 0;
-        for ( map<string,AlertInfo>::iterator ia = m_alerts.begin(); ia != m_alerts.end(); ++ia, ++row )
+        for ( map<string, AlertInfo>::iterator ia = m_alerts.begin();
+                ia != m_alerts.end(); ++ia, ++row )
         {
             if ( ia->second.hl_count )
             {
@@ -499,20 +506,28 @@ MainWindow::onTableTimer()
     }
 
     row = 0;
-    for ( map<uint32_t,MonitorInfo>::iterator im = m_monitor_rate.begin(); im != m_monitor_rate.end(); )
+    for ( map<uint32_t, MonitorInfo>::iterator im = m_monitor_rate.begin();
+            im != m_monitor_rate.end(); )
     {
-        if (( im->second.last_updated + MONITOR_ID_INACTIVE_TIMEOUT ) < now ) // After timeout, remove monitor ID entry
+        if ( ( im->second.last_updated + MONITOR_ID_INACTIVE_TIMEOUT )
+                < now ) // After timeout, remove monitor ID entry
         {
             m_monitor_rate.erase( im++ );
             ui->monitorTable->removeRow( row );
         }
         else
         {
-            if (( im->second.last_updated + MONITOR_ID_DATA_TIMEOUT ) < now ) // After no data timeout, zero rate
+            if ( ( im->second.last_updated + MONITOR_ID_DATA_TIMEOUT )
+                    < now ) // After no data timeout, zero rate
+            {
                 im->second.rate = 0;
+            }
 
-            ui->monitorTable->setItem( row, 0, new QTableWidgetItem(QString("%1").arg( im->first )));
-            ui->monitorTable->setItem( row, 1, new QTableWidgetItem(QString("%1").arg( im->second.rate )));
+            ui->monitorTable->setItem( row, 0,
+                new QTableWidgetItem( QString("%1").arg( im->first ) ) );
+            ui->monitorTable->setItem( row, 1,
+                new QTableWidgetItem(
+                    QString("%1").arg( im->second.rate ) ) );
             ++row;
             ++im;
         }
@@ -521,34 +536,87 @@ MainWindow::onTableTimer()
     if ( m_refresh_pv_table )
     {
         if ( ui->pvTable->rowCount() != (int)m_pvs.size() )
-            ui->pvTable->setRowCount( m_pvs.size());
+            ui->pvTable->setRowCount( m_pvs.size() );
 
-        map<string,ADARA::ComBus::DASMON::ProcessVariables::PVData>::const_iterator ipv = m_pvs.begin();
+        map<string, ADARA::ComBus::DASMON::ProcessVariables::PVData>
+            ::const_iterator ipv = m_pvs.begin();
         int i = 0;
         for ( ; ipv != m_pvs.end(); ++ipv, ++i )
         {
-            ui->pvTable->setItem( i, 0, new QTableWidgetItem(QString("%1").arg( ipv->first.c_str() )));
-            ui->pvTable->setItem( i, 1, new QTableWidgetItem(QString("%1").arg( ipv->second.value )));
-            ui->pvTable->setItem( i, 2, new QTableWidgetItem(QString("%1").arg( getStatusText(ipv->second.status) )));
-            ui->pvTable->setItem( i, 3, new QTableWidgetItem( QDateTime::fromTime_t(ipv->second.timestamp).toString() ));
+            ui->pvTable->setItem( i, 0,
+                new QTableWidgetItem(
+                    QString("%1").arg( ipv->first.c_str() ) ) );
+
+            std::string array_str;
+
+            switch ( ipv->second.pv_type )
+            {
+                case ADARA::ComBus::DASMON::PVDT_UINT:
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            ipv->second.uint_val ) ) );
+                    break;
+                case ADARA::ComBus::DASMON::PVDT_DOUBLE:
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            ipv->second.dbl_val ) ) );
+                    break;
+                case ADARA::ComBus::DASMON::PVDT_STRING:
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            ipv->second.str_val.c_str() ) ) );
+                    break;
+                case ADARA::ComBus::DASMON::PVDT_UINT_ARRAY:
+                    Utils::printArrayString( ipv->second.uint_array,
+                        array_str );
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            array_str.c_str() ) ) );
+                    break;
+                case ADARA::ComBus::DASMON::PVDT_DOUBLE_ARRAY:
+                    Utils::printArrayString( ipv->second.dbl_array,
+                        array_str );
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            array_str.c_str() ) ) );
+                    break;
+                // Unknown Data Type, Dang...
+                // - Just Default to Ugly Double... ;-b
+                default:
+                    ui->pvTable->setItem( i, 1,
+                        new QTableWidgetItem( QString("%1").arg(
+                            (double) -999.999999 ) ) );
+                    break;
+            }
+
+            ui->pvTable->setItem( i, 2,
+                new QTableWidgetItem( QString("%1").arg(
+                    getStatusText(ipv->second.status) ) ) );
+            ui->pvTable->setItem( i, 2,
+                new QTableWidgetItem( QString("%1").arg(
+                    getStatusText(ipv->second.status) ) ) );
+            ui->pvTable->setItem( i, 3,
+                new QTableWidgetItem( QDateTime::fromTime_t(
+                    ipv->second.timestamp).toString() ) );
         }
 
         m_refresh_pv_table = false;
     }
 
-
     // Examine translation status for unresponsive or stale information
-    for ( map<unsigned long,TransStatus>::iterator ts = m_trans_status.begin(); ts != m_trans_status.end();  )
+    for ( map<unsigned long, TransStatus>::iterator ts
+                = m_trans_status.begin();
+            ts != m_trans_status.end();  )
     {
         // Maybe leave finished info up for a diff time than unresponsive?
-        if ( ts->second.last_updated + TIMEOUT_STS_INACTIVE < now )
+        if ( ts->second.last_updated + TIMEOUT_STC_INACTIVE < now )
         {
             m_trans_status.erase( ts++ );
             m_refresh_trans_table = true;
         }
         else
         {
-            if ( ts->second.last_updated + TIMEOUT_STS_UNRESPONSIVE < now )
+            if ( ts->second.last_updated + TIMEOUT_STC_UNRESPONSIVE < now )
                 m_refresh_trans_table = true;
 
             ++ts;
@@ -560,41 +628,71 @@ MainWindow::onTableTimer()
         m_refresh_trans_table = false;
 
         if ( ui->transTable->rowCount() != (int)m_trans_status.size() )
-            ui->transTable->setRowCount( m_trans_status.size());
+            ui->transTable->setRowCount( m_trans_status.size() );
 
-        map<unsigned long,TransStatus>::reverse_iterator ts = m_trans_status.rbegin();
+        map<unsigned long, TransStatus>::reverse_iterator ts =
+            m_trans_status.rbegin();
         row = 0;
         for ( ; ts != m_trans_status.rend(); ++ts, ++row )
         {
-            ui->transTable->setItem( row, 0, new QTableWidgetItem(QString("%1").arg( ts->first )));
-            ui->transTable->setItem( row, 1, new QTableWidgetItem(QString("%1").arg( ts->second.sts_pid.c_str() )));
+            ui->transTable->setItem( row, 0,
+                new QTableWidgetItem( QString("%1").arg( ts->first ) ) );
+            ui->transTable->setItem( row, 1,
+                new QTableWidgetItem( QString("%1 (%2)").arg(
+                    ts->second.stc_pid.c_str() ).arg(
+                        ts->second.stc_host.c_str() ) ) );
 
             if ( ts->second.running )
             {
-                if ( ts->second.last_updated + TIMEOUT_STS_UNRESPONSIVE < now )
-                    ui->transTable->setItem( row, 2, new QTableWidgetItem( "Unresponsive" ));
+                if ( ts->second.last_updated + TIMEOUT_STC_UNRESPONSIVE
+                        < now )
+                {
+                    ui->transTable->setItem( row, 2,
+                        new QTableWidgetItem( "Unresponsive" ) );
+                }
                 else
-                    ui->transTable->setItem( row, 2, new QTableWidgetItem( QString("Running - %1").arg( getStatusText( ts->second.run_status ))));
+                {
+                    ui->transTable->setItem( row, 2,
+                        new QTableWidgetItem( QString("Running - %1").arg(
+                            getStatusText( ts->second.run_status ) ) ) );
+                }
             }
             else
-                ui->transTable->setItem( row, 2, new QTableWidgetItem(QString("%1").arg( getTransStatusText( ts->second.trans_status ))));
+            {
+                ui->transTable->setItem( row, 2,
+                    new QTableWidgetItem( QString("%1").arg(
+                        getTransStatusText(
+                            ts->second.trans_status ) ) ) );
+            }
         }
     }
 
 #if 0
         m_monitor->getStatistics( m_stats );
-        ui->statisticsTable->setRowCount( m_stats.size());
+        ui->statisticsTable->setRowCount( m_stats.size() );
         row = 0;
-        for ( map<uint32_t,PktStats>::iterator p = m_stats.begin(); p != m_stats.end(); ++p, ++row )
+        for ( map<uint32_t, PktStats>::iterator p = m_stats.begin();
+                p != m_stats.end(); ++p, ++row )
         {
-            ui->statisticsTable->setItem( row, 0, new QTableWidgetItem(QString("0x%1").arg( p->first >> 8, 0, 16 )));
-            ui->statisticsTable->setItem( row, 1, new QTableWidgetItem(QString("%1").arg( m_monitor->getPktName( p->first ))));
-            ui->statisticsTable->setItem( row, 2, new QTableWidgetItem(QString("%1").arg( p->second.count )));
-            ui->statisticsTable->setItem( row, 3, new QTableWidgetItem(QString("%1").arg( p->second.min_pkt_size )));
-            ui->statisticsTable->setItem( row, 4, new QTableWidgetItem(QString("%1").arg( p->second.max_pkt_size )));
-            ui->statisticsTable->setItem( row, 5, new QTableWidgetItem(QString("%1").arg( p->second.total_size )));
+            ui->statisticsTable->setItem( row, 0,
+                new QTableWidgetItem( QString("0x%1").arg(
+                    p->first >> 8, 0, 16 ) ) );
+            ui->statisticsTable->setItem( row, 1,
+                new QTableWidgetItem( QString("%1").arg(
+                    m_monitor->getPktName( p->first ) ) ) );
+            ui->statisticsTable->setItem( row, 2,
+                new QTableWidgetItem( QString("%1").arg(
+                    p->second.count ) ) );
+            ui->statisticsTable->setItem( row, 3,
+                new QTableWidgetItem( QString("%1").arg(
+                    p->second.min_pkt_size ) ) );
+            ui->statisticsTable->setItem( row, 4,
+                new QTableWidgetItem( QString("%1").arg(
+                    p->second.max_pkt_size ) ) );
+            ui->statisticsTable->setItem( row, 5,
+                new QTableWidgetItem( QString("%1").arg(
+                    p->second.total_size ) ) );
         }
-
 #endif
 }
 
@@ -635,7 +733,7 @@ MainWindow::configActiveMQ()
         m_combus->attach( *this, TOPIC_STATUS );
         m_combus->attach( *this, TOPIC_SIGNALS );
         m_combus->attach( *this, TOPIC_DASMON );
-        m_combus->attach( *this, TOPIC_STS ); // Listen to (local) STS translation messages
+        m_combus->attach( *this, TOPIC_STC ); // Listen to (local) STC translation messages
 
         updateMainWindowTitle();
     }
@@ -664,7 +762,12 @@ MainWindow::configRules()
 void
 MainWindow::about()
 {
-    QMessageBox::about( this, "About DAS Monitor", QString( "SNS Data Acquisition System Monitor\nVersion: %1" ).arg( DASMON_GUI_VERSION ));
+    string version = DASMON_GUI_VERSION
+        + string( " (ADARA Common " ) + ADARA::VERSION
+        + string( ", ComBus " ) + ADARA::ComBus::VERSION + string( ")" );
+    QMessageBox::about( this, "About DAS Monitor",
+        QString( "SNS Data Acquisition System Monitor\nVersion: %1" ).arg(
+            version.c_str() ) );
 }
 
 
@@ -678,16 +781,23 @@ MainWindow::updateMainWindowTitle()
     // Trim off any existing domain string
     int idx = windowTitle.lastIndexOf(" [");
     if ( idx >= 0 )
-        windowTitle = windowTitle.left(idx - 1);
+    {
+        windowTitle = windowTitle.left( idx );
+    }
 
     // Add back in any new domain string
     if ( !m_domain.empty() )
     {
         // If domain includes trailing ".", remove it for title display
-        if ( m_domain[m_domain.length()-1] == '.' )
-            windowTitle += QString::fromStdString( " [" + m_domain.substr(0, m_domain.length()-1) + "]" );
+        if ( m_domain[ m_domain.length() - 1 ] == '.' )
+        {
+            windowTitle += QString::fromStdString( " ["
+                + m_domain.substr( 0, m_domain.length() - 1 ) + "]" );
+        }
         else
+        {
             windowTitle += QString::fromStdString( " [" + m_domain + "]" );
+        }
     }
 
     // Set the new MainWindow Title
@@ -921,6 +1031,10 @@ MainWindow::updateBeamInfo( const ADARA::DASMON::BeamInfo &a_beam_info )
     QMetaObject::invokeMethod( ui->beamIdEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,a_beam_info.m_beam_id.c_str()));
     QMetaObject::invokeMethod( ui->beamNameShortEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,a_beam_info.m_beam_sname.c_str()));
     QMetaObject::invokeMethod( ui->beamNameLongEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,a_beam_info.m_beam_lname.c_str()));
+
+    // Note: BeamInfo now contains "Target Station Number",
+    // m_target_station_number.
+
     QMetaObject::invokeMethod( ui->facilityNameEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,a_beam_info.m_facility.c_str()));
 }
 
@@ -971,11 +1085,16 @@ MainWindow::updateRunMetrics( const ADARA::DASMON::RunMetrics &a_metrics )
     QMetaObject::invokeMethod( ui->durationLabel, "setText", Qt::QueuedConnection, Q_ARG(QString, QString("%1:%2.%3").arg( hour, 2, 10, QLatin1Char('0') ).arg( min, 2, 10, QLatin1Char('0') ).arg( sec, 2, 10, QLatin1Char('0') ) ));
     QMetaObject::invokeMethod( ui->totalCountsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_total_counts )));
     QMetaObject::invokeMethod( ui->totalChargeEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_total_charge )));
-    QMetaObject::invokeMethod( ui->pixErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pixel_error_count )));
-    QMetaObject::invokeMethod( ui->dupPulseLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_dup_pulse_count )));
-    QMetaObject::invokeMethod( ui->mapErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_mapping_error_count )));
-    QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_veto_count )));
-    QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_missing_rtdl_count )));
+    QMetaObject::invokeMethod( ui->pixErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_pixel_error_count )));
+    QMetaObject::invokeMethod( ui->dupPulseLabel, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_dup_pulse_count )));
+    QMetaObject::invokeMethod( ui->mapErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_mapping_error_count )));
+    QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_pulse_veto_count )));
+    QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_missing_rtdl_count )));
+    QMetaObject::invokeMethod( ui->pulsePchgUncorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,QString("%1").arg( a_metrics.m_pulse_pcharge_uncorrected )));
+    QMetaObject::invokeMethod( ui->gotMetadataEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_got_metadata_count )));
+    QMetaObject::invokeMethod( ui->gotNeutronsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_got_neutrons_count )));
+    QMetaObject::invokeMethod( ui->hasStatesEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_has_states_count )));
+    QMetaObject::invokeMethod( ui->totalPulsesEdit, "setText", Qt::QueuedConnection, Q_ARG(QString, m_locale.toString( (uint) a_metrics.m_total_pulses_count )));
 }
 
 
@@ -1014,7 +1133,6 @@ MainWindow::clearBeamDisplay()
     QMetaObject::invokeMethod( ui->pchargeLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->pfreqLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     QMetaObject::invokeMethod( ui->bitRateLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
-    //QMetaObject::invokeMethod( ui->durationLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
 }
 
 
@@ -1050,6 +1168,11 @@ MainWindow::clearRunDisplay( bool a_lost_comm )
         QMetaObject::invokeMethod( ui->mapErrorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
         QMetaObject::invokeMethod( ui->pulseVetoLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
         QMetaObject::invokeMethod( ui->missRTDLLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->pulsePchgUncorLabel, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->gotMetadataEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->gotNeutronsEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->hasStatesEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
+        QMetaObject::invokeMethod( ui->totalPulsesEdit, "setText", Qt::QueuedConnection, Q_ARG(QString,""));
     }
     else
     {
@@ -1068,6 +1191,11 @@ MainWindow::clearRunDisplay( bool a_lost_comm )
         setStaleText( ui->mapErrorLabel );
         setStaleText( ui->pulseVetoLabel );
         setStaleText( ui->missRTDLLabel );
+        setStaleText( ui->pulsePchgUncorLabel );
+        setStaleText( ui->gotMetadataEdit );
+        setStaleText( ui->gotNeutronsEdit );
+        setStaleText( ui->hasStatesEdit );
+        setStaleText( ui->totalPulsesEdit );
     }
 }
 
@@ -1111,7 +1239,8 @@ MainWindow::comBusConnectionStatus( bool a_connected )
     setComBusActive( a_connected );
 
     // If we're connecting for the first time, ask DASMON service to rebroadcast it's full state
-    if ( m_init && a_connected )
+    //if ( m_init && a_connected )
+    if ( a_connected )
     {
         ADARA::ComBus::EmitStateCommand cmd;
         m_combus->send( cmd, "DASMON_0" );
@@ -1160,11 +1289,12 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
                 m_refresh_proc_table = true;
             }
 
-            if ( a_msg.getSourceID().compare( 0, 3, "STS" ) == 0 )
+            if ( a_msg.getSourceID().compare( 0, 3, "STC" ) == 0 )
             {
-                for ( map<unsigned long,TransStatus>::iterator ts = m_trans_status.begin(); ts != m_trans_status.end(); ++ts )
+                map<unsigned long,TransStatus>::iterator ts;
+                for ( ts = m_trans_status.begin(); ts != m_trans_status.end(); ++ts )
                 {
-                    if ( ts->second.sts_pid == a_msg.getSourceID() )
+                    if ( ts->second.stc_pid == a_msg.getSourceID() )
                     {
                         if ( ts->second.run_status != ((ADARA::ComBus::StatusMessage&)a_msg).m_status )
                         {
@@ -1174,6 +1304,19 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
                         ts->second.last_updated = time(0);
                         break;
                     }
+                }
+
+                if ( ts == m_trans_status.end())
+                {
+                    TransStatus status;
+                    status.running = true;
+                    status.run_num = 0;
+                    status.stc_pid = a_msg.getSourceID();
+                    status.stc_host = "?";
+                    status.run_status = ((ADARA::ComBus::StatusMessage&)a_msg).m_status;
+                    status.last_updated = time(0);
+                    m_trans_status[status.run_num] = status;
+                    m_refresh_trans_table = true;
                 }
             }
 
@@ -1317,14 +1460,15 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         }
         break;
 
-    case ADARA::ComBus::MSG_STS_TRANS_STARTED:
+    case ADARA::ComBus::MSG_STC_TRANS_STARTED:
         {
-            const ADARA::ComBus::STS::TranslationStartedMsg &msg = (const ADARA::ComBus::STS::TranslationStartedMsg&)a_msg;
+            const ADARA::ComBus::STC::TranslationStartedMsg &msg = (const ADARA::ComBus::STC::TranslationStartedMsg&)a_msg;
 
             TransStatus status;
             status.running = true;
             status.run_num = msg.m_run_num;
-            status.sts_pid = msg.getSourceID();
+            status.stc_pid = msg.getSourceID();
+            status.stc_host = msg.m_host;
             status.run_status = ADARA::ComBus::STATUS_OK;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
@@ -1332,29 +1476,31 @@ MainWindow::comBusMessage( const ADARA::ComBus::MessageBase &a_msg )
         }
         break;
 
-    case ADARA::ComBus::MSG_STS_TRANS_FINISHED:
+    case ADARA::ComBus::MSG_STC_TRANS_FINISHED:
         {
-            const ADARA::ComBus::STS::TranslationFinishedMsg &msg = (const ADARA::ComBus::STS::TranslationFinishedMsg&)a_msg;
+            const ADARA::ComBus::STC::TranslationFinishedMsg &msg = (const ADARA::ComBus::STC::TranslationFinishedMsg&)a_msg;
 
             TransStatus status;
             status.running = false;
             status.run_num = msg.m_run_num;
-            status.sts_pid = msg.getSourceID();
-            status.trans_status = STS::TS_SUCCESS;
+            status.stc_pid = msg.getSourceID();
+            status.stc_host = msg.m_host;
+            status.trans_status = STC::TS_SUCCESS;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
             m_refresh_trans_table = true;
         }
         break;
 
-    case ADARA::ComBus::MSG_STS_TRANS_FAILED:
+    case ADARA::ComBus::MSG_STC_TRANS_FAILED:
         {
-            const ADARA::ComBus::STS::TranslationFailedMsg &msg = (const ADARA::ComBus::STS::TranslationFailedMsg&)a_msg;
+            const ADARA::ComBus::STC::TranslationFailedMsg &msg = (const ADARA::ComBus::STC::TranslationFailedMsg&)a_msg;
 
             TransStatus status;
             status.running = false;
             status.run_num = msg.m_run_num;
-            status.sts_pid = msg.getSourceID();
+            status.stc_pid = msg.getSourceID();
+            status.stc_host = msg.m_host;
             status.trans_status = msg.m_code;
             status.last_updated = time(0);
             m_trans_status[status.run_num] = status;
@@ -1402,9 +1548,10 @@ MainWindow::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
     if ( a_msg.getAppCategory() == ADARA::ComBus::APP_DASMON )
         setDASMonActive( true );
 
-    // See if this message belogs to a sub client (by correlation id)
+    // See if this message belongs to a sub client (by correlation id)
 
-    map<string,SubClient*>::iterator iRoute = m_client_cids.find( a_msg.getCorrelationID() );
+    map<string, SubClient*>::iterator iRoute =
+        m_client_cids.find( a_msg.getCorrelationID() );
     if ( iRoute != m_client_cids.end() )
     {
         if ( !iRoute->second->comBusControlMessage( a_msg ))
@@ -1419,7 +1566,8 @@ MainWindow::comBusInputMessage( const ADARA::ComBus::MessageBase &a_msg )
     // Process main thread commands here
     if ( a_msg.getMessageType() == ADARA::ComBus::MSG_DASMON_PVS )
     {
-        m_pvs = ((const ADARA::ComBus::DASMON::ProcessVariables &)a_msg).m_pvs;
+        m_pvs =
+            ((const ADARA::ComBus::DASMON::ProcessVariables &)a_msg).m_pvs;
         m_refresh_pv_table = true;
     }
 }
@@ -1497,14 +1645,16 @@ MainWindow::getStatusText( int a_status )
 
 
 const char *
-MainWindow::getTransStatusText( STS::TranslationStatusCode &a_status )
+MainWindow::getTransStatusText( STC::TranslationStatusCode &a_status )
 {
     switch( a_status )
     {
-    case STS::TS_SUCCESS: return "Completed Successfully";
-    case STS::TS_PERM_ERROR: return "Critical Error";
-    case STS::TS_TRANSIENT_ERROR: return "Transient Error";
+    case STC::TS_SUCCESS: return "Completed Successfully";
+    case STC::TS_PERM_ERROR: return "Critical Error";
+    case STC::TS_TRANSIENT_ERROR: return "Transient Error";
     default: return "ERROR";
     }
 }
+
+// vim: expandtab
 

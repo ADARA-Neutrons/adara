@@ -38,8 +38,10 @@ public:
 
     struct RuleInfo
     {
+        bool            enabled;
         std::string     fact;
         std::string     expr;
+        std::string     desc;
     };
 
     class IFactListener
@@ -56,7 +58,7 @@ public:
     void        attach( IFactListener &a_listener );
     void        detach( IFactListener &a_listener );
     void        sendAsserted( IFactListener &a_listener );
-    void        defineRule( const std::string &a_id, const std::string &a_expression );
+    void        defineRule( const std::string &a_id, const std::string &a_expression, const std::string a_description );
     void        undefineRule( const std::string &a_rule_id );
     void        undefineAllRules();
     void        getDefinedRules( std::vector<RuleInfo> &a_rules ) const;
@@ -152,12 +154,13 @@ private:
     class Rule
     {
     public:
-                                    Rule( RuleEngine &a_engine, const std::string a_id, const std::string &a_expr );
+                                    Rule( RuleEngine &a_engine, const std::string a_id, const std::string &a_expr, const std::string &a_desc );
                                    ~Rule();
         void                        evaluate( Fact *a_updated_fact = 0 );
         inline const std::string&   getID() { return m_id; }
         inline const std::string&   getExpr() { return m_expr; }
         inline Fact*                getFact() { return m_rule_fact; }
+        inline const std::string&   getDesc() { return m_desc; }
 
     private:
         static double  *parserVarFactory( const char *a_var_name, void *a_data );
@@ -165,6 +168,7 @@ private:
         bool            isCircular( Rule *a_target_rule, Rule *a_rule );
         bool            isCircular( Rule *a_target_rule, Fact *a_fact );
 
+        /*
         struct FactInfo
         {
             FactInfo()
@@ -177,15 +181,17 @@ private:
 
             double  m_value;        ///< Variable (addr) given to muParser
             bool    m_assert_type;  ///< Flag indicates a "assertion" input to expression
-        };
+        };*/
 
         RuleEngine                 &m_engine;       ///< Owning RuleEngine instance
         std::string                 m_id;           ///< Unique ID of rule (and ID of output fact)
         std::string                 m_expr;         ///< Original rule expression
+        std::string                 m_desc;         ///< Rule description
         Fact                       *m_rule_fact;    ///< Output fact
         double                      m_rule_value;   ///< Output value of rule
         bool                        m_valid;        ///< Flag indicates if all value inputs are valid (asserted)
-        std::map<Fact*,FactInfo>    m_facts;        ///< Maps input facts to muParser value variables
+        std::map<Fact*,double>      m_inputs;       ///< Maps input facts to muParser value variables
+        std::map<Fact*,double>      m_asserts;      ///< Maps input facts to muParser value variables
         mu::Parser                  m_parser;       ///< Expression parser and evaluator
         double                      m_tmp_values[10];
         unsigned short              m_tmp_count;
