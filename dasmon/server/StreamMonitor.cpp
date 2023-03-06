@@ -934,6 +934,24 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingAltPkt &a_pkt )
                 usleep(30000); // give syslog a chance...
 #endif
 
+                // Check for Pixel Start/Stop/Step Sanity...!
+                if ( physical_step == 0 || logical_step == 0 )
+                {
+                    syslog( LOG_ERR,
+                        "%s: %s %s=%d/%d/%d %s=%d/%d/%d: %s - %s",
+                        "ADARA::PixelMappingAltPkt",
+                        "WHOA! Erroneous PixelId Sequence!",
+                        "physical",
+                        physical_start, physical_stop, physical_step,
+                        "logical",
+                        logical_start, logical_stop, logical_step,
+                        "Zero Step Size in Shorthand Sequence",
+                        "Bail on Packet Parse...!" );
+                    usleep(30000); // give syslog a chance...
+
+                    return false;
+                }
+
                 // Verify Physical PixelId Count Versus Section Count...
                 cnt = ( physical_stop - physical_start + physical_step )
                     / physical_step;
