@@ -9,6 +9,10 @@ STC_HOSTS="stc1.ornl.gov stc2.ornl.gov stc3.ornl.gov"
 
 echo
 
+date
+
+echo
+
 for h in $STC_HOSTS ; do
 
 	echo "STC Processes on ${h}:"
