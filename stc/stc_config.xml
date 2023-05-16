@@ -824,5 +824,41 @@
 		</element>
 	</command>
 
+	<!-- Pre-Post-Auto-Reduction Command Interface (for Timepix3 Image Files from CG1D) -->
+	<command>
+		<name>MobileTimepix3Command</name>
+		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_mobile_timepix3.py</path>
+		<!-- Imaging Mode Conditional PV Check -->
+		<condition>
+			<name>Timepixe3 Imaging Mode</name>
+			<pattern>:CS:TpxGway:IsMobileTpx3$</pattern>
+			<value>1</value><!-- Mobile Timepix3 Imaging Mode Activated -->
+		</condition>
+		<element>
+			<pattern>:CS:TpxGway:IsMobileTpx3$</pattern>
+			<name>Tpx3IsMobileTpx3</name>
+		</element>
+		<element>
+			<pattern>:CS:TpxGway:FileNameTemplate$</pattern>
+			<name>Tpx3FileNameTemplate</name>
+		</element>
+		<element>
+			<pattern>:CS:TpxGway:FilePath$</pattern>
+			<name>Tpx3FilePath</name>
+		</element>
+		<element>
+			<pattern>:CS:TpxGway:RunNumber$</pattern>
+			<name>Tpx3RunNumber</name>
+		</element>
+		<element>
+			<pattern>:CS:TpxGway:RunNumberOffset$</pattern>
+			<name>Tpx3RunNumberOffset</name>
+		</element>
+		<element>
+			<pattern>:CS:TpxGway:SPICENextScanNumber$</pattern>
+			<name>Tpx3SPICENextScanNumber</name>
+		</element>
+	</command>
+
 </stc_config>
 
