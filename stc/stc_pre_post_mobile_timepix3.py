@@ -13,6 +13,8 @@ as command line parameters, of the form:
 @author Ray Gregory and Jeeem Kohl
 """
 
+# print("STC script checkpoint 1.\n")
+
 import sys
 import os
 import errno
@@ -22,6 +24,8 @@ import subprocess
 import traceback
 import requests
 import pathlib
+
+# print("STC script checkpoint 2.\n")
 
 
 def split_leading_directory(file_path):
@@ -91,7 +95,7 @@ def determine_source_and_target_directories(source_dir, ipts_dir, target_dir, pr
 		# expand away tilde if present.
 		target_dir = os.path.expanduser(target_dir)
 	else:
-		target_dir = '/HFIR/NOWG'
+		target_dir = '/HFIR/NOWG/IPTS-31333'
 	
 	# Proposal is already in path. Don't need it in subdir.
 	image_subdir = new_subdir.replace(proposal + '/', '')
@@ -115,7 +119,7 @@ def determine_raw_tpx3_directories(target_dir, proposal, run_number):
 		# expand away tilde if present.
 		target_dir = os.path.expanduser(target_dir)
 	else:
-		target_dir = '/HFIR/NOWG'
+		target_dir = '/HFIR/NOWG/IPTS-31333'
 	# new_tpx3_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
 	# new_tpx3_dir = "{}/{}/images/mcp/Run_{}/tpx3".format(target_dir, proposal, run_number) 
 	new_tpx3_dir = "{}/images/tpx3/Run_{}".format(target_dir, run_number) 
@@ -384,13 +388,20 @@ def do_pre_post_timepix3(arg_list):
 	"""
 	Do pre-post-processing for Timepix3 Imaging.
 	"""
+	# print("STC script checkpoint 5.\n")
 	return_code = 0
 	try:
+		# print("STC script checkpoint 6.\n")
+
 		print('\n\nPre-Post-Processing for Timepix3.\n\n')
 
 		proposal, run_number, source_dir, target_dir, tpx_file_path = process_args(arg_list)
 
+		# print("STC script checkpoint 7.\n")
+
 		parms_present = all (p is not None for p in [proposal, run_number])
+
+		# print("STC script checkpoint 8.\n")
 
 		if parms_present is not None:
 			files_to_catalog = copy_images(proposal, run_number, source_dir, target_dir)
@@ -398,12 +409,19 @@ def do_pre_post_timepix3(arg_list):
 		else:
 			print('\n\nERROR: Not all parameters present.\n\n')
 			return_code = -2
+
+		# print("STC script checkpoint 9.\n")
+
 	except Exception as e:
 		print('\n\nERROR In do_pre_post_imaging(): {}\n\n'.format(str(e)))
 		print(traceback.format_exc())
 		return_code = -1
 	finally:
+		# print("STC script checkpoint 10.\n")
 		finish_up(return_code)
+
+
+# print("STC script checkpoint 3.\n")
 
 
 if __name__ == "__main__":
@@ -411,5 +429,7 @@ if __name__ == "__main__":
 	print("\nSTC Pre-Post AutoReduction Mobile Timepix3 Command Script Entry.\n")
 	print("   [%s]\n" % sys.argv[0])
 	print("   [%s]" % sys.argv)
+
+	# print("STC script checkpoint 4.\n")
 
 	do_pre_post_timepix3(sys.argv[1:])
