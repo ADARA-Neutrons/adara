@@ -2666,6 +2666,8 @@ StreamMonitor::dbThread()
     int  i;
 
     std::string Monitor_PV_List;
+    std::string Monitor_PV_List_Last = "Not Yet Set";
+    bool Monitor_PV_was_set;
 
     vector<pair<PVInfoLite,uint32_t> >              int_pvs;
     vector<pair<PVInfoLite,uint32_t> >::iterator    iintpv;
@@ -2728,6 +2730,8 @@ StreamMonitor::dbThread()
 
                 Monitor_PV_List.clear();
 
+                Monitor_PV_was_set = false;
+
                 for ( ipvm = m_pvs.begin(); ipvm != m_pvs.end(); ++ipvm )
                 {
                     if ( ipvm->second->m_updated || send_all )
@@ -2743,6 +2747,8 @@ StreamMonitor::dbThread()
 
                             Monitor_PV_List = 
                                 ((PVInfo<string>*)(ipvm->second))->m_value;
+
+                            Monitor_PV_was_set = true;
 
                             syslog( LOG_ERR,
                                 "Found Web Monitor PV Update - %s = [%s]",
@@ -2844,17 +2850,20 @@ StreamMonitor::dbThread()
                 ++m_db_ticker;
 
                 // Send Web Monitor PVs List to database
-                if ( !Monitor_PV_List.empty() )
+                if ( Monitor_PV_was_set
+                        && Monitor_PV_List.compare(
+                            Monitor_PV_List_Last ) )
                 {
                     // Note: Monitor PVs List is of the Form:
                     // "'pv_name1', 'pv_name2', 'pv_name3'"
 
                     sprintf( buf,
-                        "select setInstrumentPVs('%s'::text,ARRAY[%s])",
+                   "select setInstrumentPVs('%s'::text,ARRAY[%s]::text[])",
                         m_beam_info.m_beam_sname.c_str(),
                         Monitor_PV_List.c_str() );
 
-                    syslog( LOG_ERR, "Sending %s Update - buf=[%s]",
+                    syslog( LOG_ERR, "%s - Sending %s Update - buf=[%s]",
+                        "Monitor PV List Changed",
                         "Web Monitor Status PV List", buf );
                     usleep(30000); // give syslog a chance...
 
@@ -2879,6 +2888,9 @@ StreamMonitor::dbThread()
                         send_all = false;
                         ++m_db_ticker;
                     }
+
+                    // Save This Monitor PV List for Next Time...
+                    Monitor_PV_List_Last = Monitor_PV_List;
                 }
 
                 ++m_db_ticker;
