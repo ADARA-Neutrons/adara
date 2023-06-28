@@ -20,8 +20,8 @@ Extract Correct ITEMS ID PV Variable Value Packets:
 
 	less munge.out
 
-	mv m0000000-f00000002-add00000001-run-XXXXXX.adara \
-		${items}.m0000000-f00000002-add00000001-run-XXXXXX.adara
+	mv m00000001-f00000002-add00000001-run-XXXXXX.adara \
+		${items}.m00000001-f00000002-add00000001-run-XXXXXX.adara
 
 Fix Runs:
 
