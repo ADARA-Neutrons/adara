@@ -2935,7 +2935,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 			}
 			// Unknown Exception... ;-Q
 			catch ( ... ) {
-				ERROR("Transient Unknown Error Trying to Start Run "
+				ERROR("Transient Unknown Error Trying to Stop Run "
 					<< save_current_run_number
 					<< " - retry_count=" << try_count);
 				// Run Failed to Stop...!
