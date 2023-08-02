@@ -13,6 +13,8 @@ as command line parameters, of the form:
 @author Ray Gregory and Jeeem Kohl
 """
 
+# print("STC script checkpoint 1.\n")
+
 import sys
 import os
 import errno
@@ -22,6 +24,8 @@ import subprocess
 import traceback
 import requests
 import pathlib
+
+# print("STC script checkpoint 2.\n")
 
 
 def split_leading_directory(file_path):
@@ -91,7 +95,7 @@ def determine_source_and_target_directories(source_dir, ipts_dir, target_dir, pr
 		# expand away tilde if present.
 		target_dir = os.path.expanduser(target_dir)
 	else:
-		target_dir = '/SNS/SNAP'
+		target_dir = '/HFIR/NOWG/IPTS-31333'
 	
 	# Proposal is already in path. Don't need it in subdir.
 	image_subdir = new_subdir.replace(proposal + '/', '')
@@ -107,16 +111,18 @@ def determine_raw_tpx3_directories(target_dir, proposal, run_number):
 	Determines source and target directories for copying.
 	"""
 	# tpx3_base = '/mcp-cg1d/tpx3files'
-	tpx3_base = '/mcp-tpx3/tpx3files'
-	initial_tpx3_dir = "{}/{}/Run_{}".format(tpx3_base, proposal, run_number) 
+	# tpx3_base = '/mcp-tpx3/tpx3files'
+	tpx3_base = '/mcp-cg4b/tpx3/raw'
+	initial_tpx3_dir = "{}/Run_{}".format(tpx3_base, run_number) 
 
 	if target_dir is not None:
 		# expand away tilde if present.
 		target_dir = os.path.expanduser(target_dir)
 	else:
-		target_dir = '/SNS/SNAP'
+		target_dir = '/HFIR/NOWG/IPTS-31333'
 	# new_tpx3_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
-	new_tpx3_dir = "{}/{}/images/mcp/Run_{}/tpx3".format(target_dir, proposal, run_number) 
+	# new_tpx3_dir = "{}/{}/images/mcp/Run_{}/tpx3".format(target_dir, proposal, run_number) 
+	new_tpx3_dir = "{}/images/tpx3/Run_{}".format(target_dir, run_number) 
 	
 	print('\n\ninitial_tpx3_dir: {}\nnew_tpx3_dir: {}\n\n'.format(initial_tpx3_dir, new_tpx3_dir))
 	return initial_tpx3_dir, new_tpx3_dir
@@ -265,33 +271,14 @@ def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_p
 	return source_files, target_files
 
 
-def copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, include_tiff_files=True):
+def copy_images(proposal, run_number, source_dir, target_dir):
 	"""
 	Copies image files for the specified run.
 	"""
-	print('\n\nIn copy_images().\nproposal: {}\nrun_number: {}\n\n'.format(proposal, run_number, tiff_file_path, tiff_file_name))
-
-	# Determine proper subdirectories.
-	source_dir, ipts_dir, new_subdir = determine_subdirectories(tiff_file_path)
-
-	if include_tiff_files:
-		try:
-			# Determine source and target directories.
-			initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, ipts_dir, target_dir, proposal, new_subdir, run_number)
-					
-			# Identify target files (for use in cataloging). Wait for file count to be stable for at least 60.0 seconds.
-			# target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
-			source_files, target_files = get_target_files_patiently(initial_image_dir, run_number, new_image_dir, wait_period_sec=60.0)
-
-			print('\n\nIn copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
-
-			# Assure target directory exists.
-			assure_directory_exists(new_image_dir)
-			copy_files_batch(initial_image_dir, new_image_dir, run_number)
-		except:
-			e = sys.exc_info()
-			print('\n\nERROR In copy_images(). Trying to write TIFF files: {}\n\n'.format(str(e)))
-			traceback.print_exc(limit=50, file=sys.stdout)
+	# user_name = os.getlogin()
+	import getpass as gt
+	user_name = gt.getuser()
+	print(f'\n\nIn copy_images().\nproposal: {proposal}\nrun_number: {run_number}\nuser: {user_name}\n\n')
 
 	# ---------------------
 	# Handle raw tpx3 files
@@ -369,8 +356,6 @@ def process_args(arg_list):
 	source_dir = None
 	target_dir = None
 
-	tiff_file_path = 'not_found_yet'
-	tiff_file_name = 'not_found_yet'
 	tpx_file_path = 'not_found_yet'
 
 	# Loop through Command Line Parameters...
@@ -392,47 +377,59 @@ def process_args(arg_list):
 			source_dir = value
 		elif key == "target_dir":
 			target_dir = value
-		elif key == "TIFFFilePath":
-			tiff_file_path = value
-		elif key == "TIFFFileName":
-			tiff_file_name = value
 		elif key == "TpxFilePath":
 			tpx_file_path = value
 
 
-	return proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path
+	return proposal, run_number, source_dir, target_dir, tpx_file_path
 
 
 def do_pre_post_timepix3(arg_list):
 	"""
 	Do pre-post-processing for Timepix3 Imaging.
 	"""
+	# print("STC script checkpoint 5.\n")
 	return_code = 0
 	try:
+		# print("STC script checkpoint 6.\n")
+
 		print('\n\nPre-Post-Processing for Timepix3.\n\n')
 
-		proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path = process_args(arg_list)
+		proposal, run_number, source_dir, target_dir, tpx_file_path = process_args(arg_list)
 
-		parms_present = all (p is not None for p in [proposal, run_number, tiff_file_path, tiff_file_name])
+		# print("STC script checkpoint 7.\n")
+
+		parms_present = all (p is not None for p in [proposal, run_number])
+
+		# print("STC script checkpoint 8.\n")
 
 		if parms_present is not None:
-			files_to_catalog = copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, include_tiff_files=True)
+			files_to_catalog = copy_images(proposal, run_number, source_dir, target_dir)
 			catalog_images(files_to_catalog)
 		else:
 			print('\n\nERROR: Not all parameters present.\n\n')
 			return_code = -2
+
+		# print("STC script checkpoint 9.\n")
+
 	except Exception as e:
 		print('\n\nERROR In do_pre_post_imaging(): {}\n\n'.format(str(e)))
 		print(traceback.format_exc())
 		return_code = -1
 	finally:
+		# print("STC script checkpoint 10.\n")
 		finish_up(return_code)
+
+
+# print("STC script checkpoint 3.\n")
 
 
 if __name__ == "__main__":
 	# Test parameters: [['/TESTING/SNS/stcdata_devel/stc_pre_post_timepix3.py', 'FileName=C:/data/IPTS-26687/DAS_TEST_8_1_21/20210803_Run_51901_sample_file_0001_0605', 'SubDir=DAS_TEST_8_1_21', 'facility=SNS', 'beamline=HFIR', 'proposal=IPTS-26687', 'run_number=51901']]
-	print("\nSTC Pre-Post AutoReduction Timepix3 Command Script Entry.\n")
+	print("\nSTC Pre-Post AutoReduction Mobile Timepix3 Command Script Entry.\n")
 	print("   [%s]\n" % sys.argv[0])
 	print("   [%s]" % sys.argv)
+
+	# print("STC script checkpoint 4.\n")
 
 	do_pre_post_timepix3(sys.argv[1:])

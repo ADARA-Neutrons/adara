@@ -11,7 +11,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STC_VERSION "1.13.3"
+#define STC_VERSION "1.13.4"
 extern pid_t g_pid;
 
 #define STC_DOUBLE_EPSILON (0.00000000000001)

@@ -60,7 +60,7 @@ nlines=`echo "$log_lines" | wc | awk '{print $1}'`
 
 if [[ $nlines -gt 48 ]]; then
 
-	echo "${log_lines}" | /usr/bin/less -x4
+	echo "${log_lines}" | /usr/bin/less -x4 +"G?Target Station"
 
 else
 

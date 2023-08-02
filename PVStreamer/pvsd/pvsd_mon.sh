@@ -166,7 +166,6 @@ SET_ERROR_COUNT()
 	elif [[ $min -eq ${SOS_MIN} ]]; then
 		echo -e -n "${NL}Error Writing Error Count (${ERROR_COUNT})"
 		echo " to PVSD Monitor Log File!"
-		echo -e "\n${ckt}"
 		NL="\n"
 	fi
 }

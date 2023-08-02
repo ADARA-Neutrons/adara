@@ -903,54 +903,80 @@ fi
 addToIntroOutput "Changing/Checking Configuration on " \
 	"Host ${config_host} [$config_blnum].\n\n"
 
-if [ ${PRE} == "[NotSet]" ]; then
+if [[ ${PRE} == "[NotSet]" ]]; then
 
-	if [ ! -f $SMSD_CONFIG ]; then
+	if [[ ! -f $SMSD_CONFIG ]]; then
 		echo -e -n "$introOutput"
 		echo -e "Error: Invalid SMSD Config File Does Not Exist!\n"
 		echo -e "   $SMSD_CONFIG\n"
-		exit -90
+
+	else
+		bid_ck=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+			| wc | awk '{print $1}'`
+		if [[ "#$bid_ck#" != '#1#' ]]; then
+			echo -e -n "$introOutput"
+			echo -e "Error: Invalid Beamline Id in SMSD Config File!\n"
+			ls -l $SMSD_CONFIG
+			echo
+			grep -e "beamline_id" $SMSD_CONFIG | grep -v ';'
+
+		else
+			bid_clean=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+				| awk '{print $1$2$3}'`
+
+			bid_key=`echo "$bid_clean" | awk -F '=' '{print $1}'`
+			bid_value=`echo "$bid_clean" | awk -F '=' '{print $2}'`
+
+			if [[ "#$bid_key#" != '#beamline_id#' ]]; then
+				echo -e -n "$introOutput"
+				echo -e "Error Parsing Beamline Id in SMSD Config File!\n"
+				ls -l $SMSD_CONFIG
+				echo -e "\n   $bid_clean"
+
+			else
+				PRE="$bid_value"
+				addToIntroOutput \
+					"Setting EPICS PV Prefix from SMSD Config File:\n" \
+					"   $SMSD_CONFIG\n" \
+					"      -> $bid_key = $bid_value\n" \
+					"         => [${PRE}].\n" \
+					"\n"
+			fi
+		fi
 	fi
 
-	bid_ck=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
-		| wc | awk '{print $1}'`
-	if [[ "#$bid_ck#" != '#1#' ]]; then
-		echo -e -n "$introOutput"
-		echo -e "Error: Invalid Beamline Id in SMSD Config File!\n"
-		ls -l $SMSD_CONFIG
-		echo
-		grep -e "beamline_id" $SMSD_CONFIG | grep -v ';'
-		exit -91
+	# Still Not Set? Resort to Environment Variable Settings...
+	if [[ ${PRE} == "[NotSet]" ]]; then
+
+		if [[ -n ${BL} ]]; then
+
+			# Construct SMS Live Control PV Prefix from ALT Suffix...
+			if [[ -n ${ALT} ]]; then
+				pre="${ALT}"
+				# Strip Leading '-'
+				if [[ ${pre} =~ ^- ]]; then pre="${pre/-/}" ; fi
+				PRE=`echo "${BL}${pre}" | tr '[:lower:]' '[:upper:]'`
+				addToIntroOutput \
+					"Setting SMS Live Control PV Prefix to: [${PRE}]\n"
+
+			else
+				PRE="${BL}"
+				addToIntroOutput \
+					"Setting EPICS PV Prefix from \${BL} Environment:" \
+					" [${PRE}]\n"
+			fi
+
+		else
+			echo -e "\nError Setting EPICS PV Prefix! Bailing..."
+			exit -90
+		fi
 	fi
-
-	bid_clean=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
-		| awk '{print $1$2$3}'`
-
-	bid_key=`echo "$bid_clean" | awk -F '=' '{print $1}'`
-	bid_value=`echo "$bid_clean" | awk -F '=' '{print $2}'`
-
-	if [[ "#$bid_key#" != '#beamline_id#' ]]; then
-		echo -e -n "$introOutput"
-		echo -e "Error Parsing Beamline Id in SMSD Config File!\n"
-		ls -l $SMSD_CONFIG
-		echo -e "\n   $bid_clean\n"
-		exit -92
-	fi
-
-	PRE="$bid_value"
-
-	addToIntroOutput "Setting EPICS PV Prefix from SMSD Config File:\n" \
-		"   $SMSD_CONFIG\n" \
-		"      -> $bid_key = $bid_value\n" \
-		"         => [${PRE}].\n" \
-		"\n"
-
 fi
 
 # Check for "ParADARA" SMS Instance Id in SMSD Config File...
-if [ ${SMS_ID} == "[NotSet]" ]; then
+if [[ ${SMS_ID} == "[NotSet]" ]]; then
 
-	if [ ! -f $SMSD_CONFIG ]; then
+	if [[ ! -f $SMSD_CONFIG ]]; then
 		echo -e -n "$introOutput"
 		echo -e "Error: Invalid SMSD Config File Does Not Exist!\n"
 		echo -e "   $SMSD_CONFIG\n"

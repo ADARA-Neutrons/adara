@@ -9,8 +9,15 @@
 #NXLS="/SNS/users/$USER/stuff/exec/nxls"
 NXLS="$HOME/bin/nxls"
 
+TTY=`tty`
+
 CHECK_PROCEED()
 {
+	if [[ $TTY == "not a tty" ]]; then
+		echo -e "\nNot Running on a TTY... Assuming We Proceed..."
+		return 0
+	fi
+
 	local _do_exit=1
 
 	if [[ -n "$1" ]]; then

@@ -22,6 +22,8 @@ XINETD_DIR="/etc/xinetd.d"
 STC_PORT_HFIR="31420"
 STC_PORT_SNS="31417"
 
+SMSD_CONFIG="/SNSlocal/sms/conf/smsd.conf"
+
 SMS_DATA="/SNSlocal/sms/data"
 
 SMS_LOG="/var/log/smsd.log"
@@ -40,6 +42,8 @@ USAGE()
 {
 	echo -e "\nusage: adara_retranslate_manual \\"
 	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
+	echo "    [--beamline=BL14B] [--instance_id=<0123>] \\"
+	echo "    [--config=./smsd.conf] \\"
 	echo "    [--stc1|--stc2|--stc3|--stc_host=<STC_HOST>] \\"
 	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
 	echo "    [--stc_devel|--stc_master] (ADARA Test Harness Use Only) \\"
@@ -148,14 +152,16 @@ FACILITY=""
 INST=""
 ALT=""
 
+PRE="[NotSet]"
+SMS_ID="[NotSet]"
+SMS="SMS"
+
 SMS_DATA_OPT=""
 
 STC_SERVICE=""
 STC_HOST=""
 
 STC_PORT=""
-
-PRE="${BL}"
 
 RUN_NUMBERS=""
 
@@ -166,31 +172,41 @@ for arg in "$@" ; do
 
 	if [[ "#$key#" == '#--inst#' ]]; then
 		INST="$value"
-		echo -e "\nSetting Beamline Short Name to: ${INST}"
+		echo -e "\nSetting Beamline Short Name to: [${INST}]"
 	elif [[ "#$key#" == '#--facility#' ]]; then
 		FACILITY="$value"
-		echo -e "\nSetting Facility Name to: ${FACILITY}"
+		echo -e "\nSetting Facility Name to: [${FACILITY}]"
 		if [[ ${FACILITY} == "SNS" ]]; then
 			STC_PORT="${STC_PORT_SNS}"
-			echo -e "\nSetting STC Port to: ${STC_PORT}"
+			echo -e "\nSetting STC Port to: [${STC_PORT}]"
 		elif [[ ${FACILITY} == "HFIR" ]]; then
 			STC_PORT="${STC_PORT_HFIR}"
-			echo -e "\nSetting STC Port to: ${STC_PORT}"
+			echo -e "\nSetting STC Port to: [${STC_PORT}]"
 		else
 			echo -e "\nERROR: Unknown Facility Keyword \"${FACILITY}\"...!"
 			echo -e "\nCannot Deduce STC Port...!"
 		fi
+	elif [[ "#$key#" == '#--beamline#' ]]; then
+		PRE="$value"
+		echo -e "\nSetting EPICS PV Prefix to: [${PRE}]"
+	elif [[ "#$key#" == '#--instance_id#' ]]; then
+		SMS_ID="$value"
+		echo -e "\nSetting SMS Instance Id to: [$SMS_ID]"
+	elif [[ "#$key#" == '#--config#' ]]; then
+		SMSD_CONFIG="$value"
+		echo -e "\nUsing SMS Daemon Config File in:"
+		echo -e "   [$SMSD_CONFIG]"
 	elif [[ "#$key#" == '#--stc1#' \
 			|| "#$key#" == '#--stc2#' \
 			|| "#$key#" == '#--stc3#' ]]; then
 		STC_HOST="${key}"
-		echo -e "\nSetting STC Host to: ${STC_HOST}"
+		echo -e "\nSetting STC Host to: [${STC_HOST}]"
 		STC_HOST_NAME=`echo "${STC_HOST}" | ${SED} 's/^--//'`
 		DEFAULT_STC_HOST="${STC_HOST_NAME}.${DEFAULT_STC_HOST_DOMAIN}"
 	elif [[ "#$key#" == '#--stc_host#' ]]; then
 		STC_HOST="${key}=${value}"
 		STC_HOST_NAME="$value"
-		echo -e "\nSetting STC Host to: ${STC_HOST_NAME}"
+		echo -e "\nSetting STC Host to: [${STC_HOST_NAME}]"
 		DEFAULT_STC_HOST="${STC_HOST_NAME}"
 	elif [[ "#$key#" == '#--stc#' || "#$key#" == '#--stc_test#'
 			|| "#$key#" == '#--stc_dummy#'
@@ -200,7 +216,7 @@ for arg in "$@" ; do
 			|| "#$key#" == '#--stc_master#' ]]; then
 		STC_SERVICE="${key}"
 		STC_SERVICE_NAME=`echo "${STC_SERVICE}" | ${SED} 's/^--//'`
-		echo -e "\nSetting STC Service to: ${STC_SERVICE_NAME}"
+		echo -e "\nSetting STC Service to: [${STC_SERVICE_NAME}]"
 		echo -e "\nContacting STC Host \"${DEFAULT_STC_HOST}\" via SSH"
 		echo "   to Get Port for STC \"${STC_SERVICE_NAME}\" Service..."
 		echo -e -n "\n${SSH} ${DEFAULT_STC_HOST}"
@@ -208,38 +224,42 @@ for arg in "$@" ; do
 		STC_PORT=`${SSH} ${DEFAULT_STC_HOST} \
 			${GREP} "port" ${XINETD_DIR}/${STC_SERVICE_NAME} \
 			| ${AWK} '{print $3}'`
-		echo -e -n "\nGot STC Port ${STC_PORT}"
+		echo -e -n "\nGot STC Port [${STC_PORT}]"
 		echo -e " for STC \"${STC_SERVICE_NAME}\" Service."
 	elif [[ "#$key#" == '#--stc_port#' ]]; then
 		STC_PORT="$value"
-		echo -e "\nSetting STC Port to: ${STC_PORT}"
+		echo -e "\nSetting STC Port to: [${STC_PORT}]"
 	elif [[ "#$key#" == '#--adara_add_run_end#' ]]; then
 		ADARA_ADD_RUN_END="${value}"
 		echo -e "\nSetting ADARA Add Run End Path to:"
-		echo -e "\t[${ADARA_ADD_RUN_END}]"
+		echo -e "   [${ADARA_ADD_RUN_END}]"
 	elif [[ "#$key#" == '#--adara_parser#' ]]; then
 		ADARA_PARSER="${value}"
-		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
+		echo -e "\nSetting ADARA Parser Path to:"
+		echo -e "   [${ADARA_PARSER}]"
 	elif [[ "#$key#" == '#--alt#' ]]; then
 		ALT="$value"
 		echo -e "\nSetting Alternate SMS Suffix to: [$ALT]"
+		SMSD_CONFIG="/SNSlocal/sms${ALT}/conf/smsd.conf"
+		echo -e "\nUsing SMS Alternate Daemon Config File in:"
+		echo -e "   [${SMSD_CONFIG}]"
 		SMS_DATA="/SNSlocal/sms${ALT}/data"
-		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+		echo -e "\nSetting SMS Data Directory to:"
+		echo -e "   [${SMS_DATA}]"
 		SMS_DATA_OPT="--sms_data=${SMS_DATA}"
-		echo -e "\nSetting SMS Data Option to:\n\t[${SMS_DATA_OPT}]"
+		echo -e "\nSetting SMS Data Option to:"
+		echo -e "   [${SMS_DATA_OPT}]"
 		SMS_LOG="/var/log/smsd${ALT}.log"
-		echo -e "\nSetting SMS Log File to:\n\t[${SMS_LOG}]"
-		# Construct SMS Live Control PV Prefix from ALT Suffix...
-		pre="${ALT}"
-		if [[ ${pre} =~ ^- ]]; then pre="${pre/-/}" ; fi # Strip Leading '-'
-		PRE=`echo "${BL}${pre}" | tr '[:lower:]' '[:upper:]'`
-		echo -e "\nSetting SMS Live Control PV Prefix to:\n\t[${PRE}]"
+		echo -e "\nSetting SMS Log File to:"
+		echo -e "   [${SMS_LOG}]"
 	elif [[ "#$key#" == '#--sms_data#' ]]; then
 		SMS_DATA="${value%/}"
-		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+		echo -e "\nSetting SMS Data Directory to:"
+		echo -e "   [${SMS_DATA}]"
 	elif [[ "#$key#" == '#--sms_log#' ]]; then
 		SMS_LOG="${value}"
-		echo -e "\nSetting SMS Log File to:\n\t[${SMS_LOG}]"
+		echo -e "\nSetting SMS Log File to:"
+		echo -e "   [${SMS_LOG}]"
 	elif [[ "#$key#" == '#--run#' ]]; then
 		PARSE_RUN_NUMBERS "${value}"
 	elif [[ "#$key#" == '#--help#' || "#$key#" == '#-h#' ]]; then
@@ -257,6 +277,129 @@ if [[ -z "${INST}" ]]; then
 	echo -e "\nERROR: No Beamline Short Name Specified!"
 	USAGE
 	exit 2
+fi
+
+if [[ ${PRE} == "[NotSet]" ]]; then
+
+	if [[ ! -f $SMSD_CONFIG ]]; then
+		echo -e "\nError: Invalid SMSD Config File Does Not Exist!"
+		echo -e "   [${SMSD_CONFIG}]"
+
+	else
+		bid_ck=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+			| wc | awk '{print $1}'`
+		if [[ "#$bid_ck#" != '#1#' ]]; then
+			echo -e "\nError: Invalid Beamline Id in SMSD Config File!\n"
+			ls -l $SMSD_CONFIG
+			echo
+			grep -e "beamline_id" $SMSD_CONFIG | grep -v ';'
+
+		else
+			bid_clean=`grep "beamline_id" $SMSD_CONFIG | grep -v ';' \
+				| awk '{print $1$2$3}'`
+
+			bid_key=`echo "$bid_clean" | awk -F '=' '{print $1}'`
+			bid_value=`echo "$bid_clean" | awk -F '=' '{print $2}'`
+
+			if [[ "#$bid_key#" != '#beamline_id#' ]]; then
+				echo -e "Error Parsing Beamline Id in SMSD Config File!\n"
+				ls -l $SMSD_CONFIG
+				echo -e "\n   $bid_clean"
+
+			else
+				PRE="$bid_value"
+				echo -e "\nSetting EPICS PV Prefix from SMSD Config File:"
+				echo -e "   [${SMSD_CONFIG}]"
+				echo -e "      -> $bid_key = $bid_value"
+				echo -e "         => [${PRE}]"
+			fi
+		fi
+	fi
+
+	# Still Not Set? Resort to Environment Variable Settings...
+	if [[ ${PRE} == "[NotSet]" ]]; then
+
+		if [[ -n ${BL} ]]; then
+
+			# Construct SMS Live Control PV Prefix from ALT Suffix...
+			if [[ -n ${ALT} ]]; then
+				pre="${ALT}"
+				# Strip Leading '-'
+				if [[ ${pre} =~ ^- ]]; then pre="${pre/-/}" ; fi
+				PRE=`echo "${BL}${pre}" | tr '[:lower:]' '[:upper:]'`
+				echo -e "\nSetting SMS Live Control PV Prefix to: [${PRE}]"
+
+			else
+				PRE="${BL}"
+				echo -e -n \
+					"\nSetting EPICS PV Prefix from \${BL} Environment:"
+				echo -e " [${PRE}]"
+			fi
+
+		else
+			echo -e "\nError Setting EPICS PV Prefix! Bailing..."
+			exit -90
+		fi
+
+	fi
+fi
+
+
+# Check for "ParADARA" SMS Instance Id in SMSD Config File...
+if [[ ${SMS_ID} == "[NotSet]" ]]; then
+
+	if [[ ! -f $SMSD_CONFIG ]]; then
+		echo -e "\nError: Invalid SMSD Config File Does Not Exist!"
+		echo -e "   [${SMSD_CONFIG}]\n"
+		exit -93
+	fi
+
+	iid_ck=`grep "instance_id" $SMSD_CONFIG | grep -v ';' \
+		| wc | awk '{print $1}'`
+
+	# If Instance Id is _Not_ Specified, Assume "Primary" SMS...
+	if [[ "#$iid_ck#" == '#0#' ]]; then
+
+		SMS_ID="0"
+
+		echo -e \
+			"\nAssuming Primary SMS Instance, No Id in SMSD Config File:"
+		echo -e "   [${SMSD_CONFIG}]"
+		echo -e "      -> No \"instance_id\" Key."
+		echo -e "         => [${SMS_ID}]"
+	
+	# Extract SMS Instance Id from SMSD Config File...
+	else
+
+		iid_clean=`grep "instance_id" $SMSD_CONFIG | grep -v ';' \
+			| awk '{print $1$2$3}'`
+
+		iid_key=`echo "$iid_clean" | awk -F '=' '{print $1}'`
+		iid_value=`echo "$iid_clean" | awk -F '=' '{print $2}'`
+
+		if [[ "#$iid_key#" != '#instance_id#' ]]; then
+			echo -e "\nError Parsing SMS Instance Id in SMSD Config File!\n"
+			ls -l $SMSD_CONFIG
+			echo -e "\n   $iid_clean\n"
+			exit -95
+		fi
+
+		SMS_ID="$iid_value"
+
+		echo -e "\nSetting SMS Instance Id from SMSD Config File:"
+		echo -e "   [${SMSD_CONFIG}]"
+		echo -e "      -> $iid_key = $iid_value"
+		echo -e "         => [${SMS_ID}]"
+
+	fi
+
+fi
+
+# Set the "SMS" Portion of the PV Prefix Based on the SMS Instance Id...
+# Note: SMS Instance Id = 0 for *Primary*, Non-Zero for *Secondary*...
+if [[ ${SMS_ID} != "[NotSet]" && ${SMS_ID} != 0 ]]; then
+	SMS="${SMS}:${SMS_ID}"
+	echo -e "\nSetting SMS PV Prefix from Instance Id: [${SMS}]"
 fi
 
 # Generate List of Raw Data Directories...
@@ -460,7 +603,7 @@ for dir in ${DIRS} ; do
 					/bin/rm translation_completed
 				fi
 
-				caput -S ${PRE}:SMS:StorageManager:RescanRunDir `pwd`
+				caput -S ${PRE}:${SMS}:StorageManager:RescanRunDir `pwd`
 
 				sleep 3
 

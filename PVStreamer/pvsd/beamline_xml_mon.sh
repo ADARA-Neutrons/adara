@@ -12,12 +12,154 @@ set -o pipefail
 # Source Local EPICS Beamline Environment (e.g. $BEAMLINE):
 . /home/controls/share/master/scripts/beamline_profile.sh
 
+#LOG_HOME="/SNS/users/$USER"
+LOG_HOME="$HOME"
+
+# Handle Scenario Where ${LOG_HOME} Directory is Missing/Unmounted...!
+# -> as needed, just write to /tmp until the Directory Mount returns...
+# --> this will ensure we can still do Proper Error Counting...! ;-D
+if [[ ! -d ${LOG_HOME} ]]; then
+	LOG_HOME="/tmp"
+	USING_ALT_LOG_HOME="\n\n[Note: Using Alternate \${LOG_HOME\} ="
+	USING_ALT_LOG_HOME="${USING_ALT_LOG_HOME} [${LOG_HOME}]"
+else
+	USING_ALT_LOG_HOME=""
+fi
+
+host=`hostname`
+#echo "host=$host"
+
+host_short=`echo $host | awk -F '.' '{print $1}'`
+#echo "host_short=$host_short"
+
+PROG="beamline_xml_mon"
+
+LOG_DIR="${PROG}"
+
+LOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short.log"
+
+# The Minute When We Gasp Our Dying Breath and Beg for Help... ;-D
+SOS_MIN=0
+
+NL=`date`
+NL="${NL}\n\n"
+
+NLL="${NL}"
+
 # Handle "Quiet" Operation Option for Cron Usage...
 # (Only output on errors...)
 QUIET=0
 if [ "$1" == "--quiet" ]; then
 	QUIET=1
 fi
+
+# Get Date (and Hours/Minutes for Sub-Schedule Control...)
+
+date=`date`
+#echo "date=$date"
+
+hour=`echo $date | awk '{print $4}' | awk -F ":" '{print $1}' \
+	| sed 's/^0//g'`
+#echo "hour=$hour"
+min=`echo $date | awk '{print $4}' | awk -F ":" '{print $2}' \
+	| sed 's/^0//g'`
+#echo "min=$min"
+
+# If Log Sub-Directory Doesn't Exist, Try to Create It... ;-D
+if [[ ! -d "${LOG_HOME}/${LOG_DIR}" ]]; then
+
+	ckd=`mkdir -p "${LOG_HOME}/${LOG_DIR}" 2>&1`
+
+	# Only Whine Once Per Hour If There's No Log Sub-Directory
+	# (And We Can't Create It...)
+	if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
+		echo -e "${NL}Error Creating BeamlineXML Monitor Log Sub-Directory!"
+		echo -e "\n${ckd}"
+		NL="\n"
+	fi
+fi
+
+# If Log File Doesn't Exist, Try to Create It... ;-D
+if [[ ! -e "${LOGFILE}" ]]; then
+
+	ckt=`touch "${LOGFILE}" 2>&1`
+
+	# Only Whine Once Per Hour If There's No Log File
+	# (And We Can't Create It...)
+	if [[ $? != 0 && $min -eq ${SOS_MIN} ]]; then
+		echo -e "${NL}Error Creating BeamlineXML Monitor Log File!"
+		echo -e "\n${ckt}"
+		NL="\n"
+	fi
+fi
+
+# Track Any Error Count Already Retrieved for This Invocation...
+ERROR_COUNT=0
+log_error=0
+
+# Check Error Count Embedded in Last Line of Log File...
+GET_ERROR_COUNT()
+{
+	# Only Retrieve Error Count from Log File If Not Already Set...!
+	if [[ $ERROR_COUNT == 0 ]]; then
+		if [[ -r "${LOGFILE}" ]]; then
+			local _last=`tail -1 "${LOGFILE}"`
+			if [[ "${_last}" =~ ErrorCount= ]]; then
+				ERROR_COUNT=`echo "${_last}" | awk -F "=" '{print $2}'`
+			fi
+		fi
+		# Add 1 for This Invocation's New Error...
+		ERROR_COUNT=$(( ERROR_COUNT + 1 ))
+	fi
+}
+
+# Set Error Count, Append as Last Line of Log File...
+SET_ERROR_COUNT()
+{
+	if [[ -w "${LOGFILE}" ]]; then
+
+		echo -e "\nErrorCount=${ERROR_COUNT}" >> ${LOGFILE}
+
+	# Only Whine Once Per Hour If We've Become
+	# Disconnected from the Universe...
+	elif [[ $min -eq ${SOS_MIN} ]]; then
+		echo -e -n "${NL}Error Writing Error Count (${ERROR_COUNT})"
+		echo " to BeamlineXML Monitor Log File!"
+		NL="\n"
+	fi
+}
+
+# We've Just Encountered an Error...!
+# Implement Exponential Error Reporting Fall Off...
+# (Based on Cron Job Check Every 1 Hours)
+CHECK_ERROR_REPORTING()
+{
+	local _do_report=1
+
+	# Check for Any Saved "Error Count" from Last Invocation...
+	GET_ERROR_COUNT
+
+	# After First 3 Days, Report Once Per Week...
+	if [[ ${ERROR_COUNT} -gt 73 ]]; then
+		if [[ $(( ( ERROR_COUNT - 1 ) % 168 )) != 0 ]]; then
+			_do_report=0
+		fi
+	
+	# After First 3 Hours, Report Once Per Day...
+	elif [[ ${ERROR_COUNT} -gt 4 ]]; then
+		if [[ $(( ( ERROR_COUNT - 1 ) % 24 )) != 0 ]]; then
+			_do_report=0
+		fi
+	
+	# Report First 3 Occurrences in a Row Per Hour...
+	fi
+
+	if [[ ${_do_report} == 1 ]]; then
+		log_error=1
+	fi
+
+	return ${_do_report}
+}
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 BEAMLINE_GIT_DIR="/home/controls/$BEAMLINE"
@@ -78,7 +220,7 @@ CHECK_BEAMLINE_XML()
 		_err="${_status}"
 	fi
 	if [[ -n "${diffCk}" ]]; then
-		echo -e "Uncommitted Local Changes:\n"
+		echo -e "\nUncommitted Local Changes:\n"
 		echo "${diffCk}"
 	fi
 
@@ -90,7 +232,7 @@ CHECK_BEAMLINE_XML()
 		_err="${_status}"
 	fi
 	if [[ "${diffCkOrigin}" != "${diffCk}" ]]; then
-		echo -e -n "Committed Local Changes Not Yet Pushed to Origin"
+		echo -e -n "\nCommitted Local Changes Not Yet Pushed to Origin"
 		echo -e " (Branch \"${origin_branch}\"):\n"
 		echo "${diffCkOrigin}"
 	fi
@@ -101,28 +243,131 @@ CHECK_BEAMLINE_XML()
 doCkBeamlineXML=`CHECK_BEAMLINE_XML 2>&1`
 _status=$?
 
-if [[ "${_status}" != 0 || -n "${doCkBeamlineXML}" || $QUIET == 0 ]]; then
-	echo -e "\nBeamline XML Configuration Change Check:\n"
+if [[ "${_status}" != 0 || -n "${doCkBeamlineXML}" ]]; then
+
+	CHECK_ERROR_REPORTING
+	do_report="$?"
+
+	# Report Error...
+	if [[ $do_report == 1 ]]; then
+		echo -e "${NL}Beamline XML Configuration Change Check:"
+		NL="\n"
+	fi
+
 fi
+
+# Log It...
+echo -e "${NLL}Beamline XML Configuration Change Check:" >> $LOGFILE
+NLL="\n"
 
 if [[ "${_status}" != 0 ]]; then
-	echo -n "*** Error Checking "
-	echo -e "Beamline XML for Config Changes!\n"
+
+	CHECK_ERROR_REPORTING
+	do_report="$?"
+
+	# Log It...
+	echo -e -n "${NLL}*** Error Checking " >> ${LOGFILE}
+	echo -e "Beamline XML for Config Changes!\n" >> ${LOGFILE}
 	/bin/ls -l "${BEAMLINE_GIT_DIR}/${BEAMLINE_XML}" \
-		| sed "s@ ${BEAMLINE_GIT_DIR}@\n   ${BEAMLINE_GIT_DIR}@"
-	echo
+		| sed "s@ ${BEAMLINE_GIT_DIR}@\n   ${BEAMLINE_GIT_DIR}@" \
+			>> ${LOGFILE}
+	NLL="\n"
+
+	# Report Error...
+	if [[ $do_report == 1 || $QUIET == 0 ]]; then
+		echo -e -n "${NL}*** Error Checking "
+		echo -e "Beamline XML for Config Changes!\n"
+		/bin/ls -l "${BEAMLINE_GIT_DIR}/${BEAMLINE_XML}" \
+			| sed "s@ ${BEAMLINE_GIT_DIR}@\n   ${BEAMLINE_GIT_DIR}@"
+		NL="\n"
+	fi
+
 elif [[ -n "${doCkBeamlineXML}" ]]; then
-	echo -n "*** Uncommitted or Unpushed "
-	echo -e "Beamline XML Config Changes Found!\n"
+
+	CHECK_ERROR_REPORTING
+	do_report="$?"
+
+	# Log It...
+	echo -e -n "${NLL}*** Uncommitted or Unpushed " >> ${LOGFILE}
+	echo -e "Beamline XML Config Changes Found!\n" >> ${LOGFILE}
 	/bin/ls -l "${BEAMLINE_GIT_DIR}/${BEAMLINE_XML}" \
-		| sed "s@ ${BEAMLINE_GIT_DIR}@\n   ${BEAMLINE_GIT_DIR}@"
-	echo
+		| sed "s@ ${BEAMLINE_GIT_DIR}@\n   ${BEAMLINE_GIT_DIR}@" \
+			>> ${LOGFILE}
+	NLL="\n"
+
+	# Report Error...
+	if [[ $do_report == 1 || $QUIET == 0 ]]; then
+		echo -e -n "${NL}*** Uncommitted or Unpushed "
+		echo -e "Beamline XML Config Changes Found!\n"
+		/bin/ls -l "${BEAMLINE_GIT_DIR}/${BEAMLINE_XML}" \
+			| sed "s@ ${BEAMLINE_GIT_DIR}@\n   ${BEAMLINE_GIT_DIR}@"
+		NL="\n"
+	fi
+
+else
+
+	# Log It...
+	echo -e "${NLL}OK." >> ${LOGFILE}
+	NLL="\n"
+
+	if [[ $QUIET == 0 ]]; then
+		echo -e "${NL}OK."
+		NL="\n"
+	fi
+
 fi
 
 if [[ "${_status}" != 0 || -n "${doCkBeamlineXML}" || $QUIET == 0 ]]; then
+
 	if [[ -n "${doCkBeamlineXML}" ]]; then
-		echo -e "$doCkBeamlineXML\n"
+
+		# Log It...
+		echo -e "$doCkBeamlineXML" >> ${LOGFILE}
+
+		# (Inherit $log_error from above...)
+
+		# Report Error...
+		if [[ ${log_error} != 0 || $QUIET == 0 ]]; then
+			echo -e "$doCkBeamlineXML"
+		fi
+
 	fi
-	echo -e "Status = ${_status}\n"
+
+	# Log It...
+	echo -e "${NLL}Status = ${_status}" >> ${LOGFILE}
+	NLL="\n"
+
+	# (Inherit $log_error from above...)
+
+	# Report Error...
+	if [[ ${log_error} != 0 || $QUIET == 0 ]]; then
+		echo -e "${NL}Status = ${_status}"
+		NL="\n"
+	fi
+
+fi
+
+# Log If Using Alternate Log Home Directory...
+if [[ ${USING_ALT_LOG_HOME} != "" ]]; then
+	# Log It...
+	echo -e "${NLL}${USING_ALT_LOG_HOME}" >> ${LOGFILE}
+	NLL="\n"
+	if [[ ${log_error} != 0 || $QUIET == 0 ]]; then
+		echo -e "${NL}${USING_ALT_LOG_HOME}"
+		NL="\n"
+	fi
+fi
+
+# Set Error Count for Next Invocation
+if [[ ${ERROR_COUNT} -gt 0 ]]; then
+	SET_ERROR_COUNT
+	if [[ ${log_error} != 0 || $QUIET == 0 ]]; then
+		echo -e "${NL}ErrorCount=${ERROR_COUNT}\n"
+		NL="\n"
+	fi
+	exit -1
+elif [[ $QUIET == 0 ]]; then
+	echo >> ${LOGFILE}
+	echo
 fi
 

@@ -315,7 +315,7 @@ echo -e "\n${FINAL_LOGS}"
 nout=`echo -e "${FINAL_LOGS}" | ${WC} | ${AWK} '{print $1}'`
 
 if [[ $nout -gt 20 ]]; then
-	echo -e "\n${FINAL_LOGS}" | ${Less} +/"Run: ${RUN_NUMBER}"
+	echo -e "\n${FINAL_LOGS}" | ${Less} +/"Run: ${RUN_NUMBER} "
 fi
 
 #
@@ -328,7 +328,7 @@ if [[ $DO_ALL_LOGS == 0 ]]; then
 
 	if [[ $? == 0 ]]; then
 		ssh -AY ${USER}@${HOST} ${STCVIEW} ${PID} \
-			| ${Less} +/"Run: ${RUN_NUMBER}"
+			| ${Less} +/"Run: ${RUN_NUMBER} "
 	fi
 
 fi

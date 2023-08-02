@@ -1,0 +1,81 @@
+For NOMAD Set of Runs to have ITEMS ID Fixed... ;-Q
+	- originally from 1/24/2022, also used for POWGEN on 6/28/2023...  ;-b
+
+Runs 168920-168924: -> ITEMS ID 70930
+
+Runs 168725-168729: -> ITEMS ID 39922
+
+Extract Correct ITEMS ID PV Variable Value Packets:
+
+	items=70930
+
+	run=168838
+
+	cd /SNSlocal/sms/data/2*/*run*${run} ; ls -l
+
+	~/adara-munge m00000001-f00000001-run-${run}.adara \
+		--savefile "m00000001-f00000002-add00000001-run-XXXXXX.adara" \
+		--savepkts 8388864 --savepkts 8389120 --savepkts 8389376 \
+		--deviceid 18 1>/dev/null 2>munge.out
+
+	less munge.out
+
+	mv m00000001-f00000002-add00000001-run-XXXXXX.adara \
+		~/${items}.m00000001-f00000002-add00000001-run-XXXXXX.adara
+
+	rm munge.out
+
+Fix Runs:
+
+	items=70930
+
+	run=168726
+
+	cd /SNSlocal/sms/data/2*/*run*${run} ; ls -l
+
+	# Watch Out for last=8 or 9... Digit Wrap...! ;-D
+	last=5
+
+	cp ~/${items}.m00000001-f00000002-add00000001-run-XXXXXX.adara .
+
+	mv ${items}.m00000001-f00000002-add00000001-run-XXXXXX.adara \
+		m00000001-f0000000$(( last + 1 ))-run-${run}.adara
+	
+	~/adara-munge m00000001-f0000000${last}-run-${run}.adara \
+		--savefile m00000001-f0000000$(( last + 2 ))-run-${run}.adara \
+		--savestop 1>/dev/null 2>munge.out
+	
+	less munge.out
+
+	adara-parser m00000001-f0000000$(( last + 2 ))-run-${run}.adara
+
+	rm munge.out
+	
+	mv m00000001-f0000000${last}-run-${run}.adara \
+		m00000001-f0000000${last}-run-${run}.adara.BACKUP-99999
+
+	~/adara-munge m00000001-f0000000${last}-run-${run}.adara.BACKUP-99999 \
+		--skipstop 1>m00000001-f0000000${last}-run-${run}.adara 2>munge.out
+	
+	less munge.out
+
+	adara-parser m00000001-f0000000${last}-run-${run}.adara.BACKUP-99999 \
+		| tail -20
+
+	adara-parser m00000001-f0000000${last}-run-${run}.adara \
+		| tail -20
+
+	rm munge.out
+	
+	rm translation_completed
+
+	caput -S ${BL}:SMS:StorageManager:RescanRunDir `pwd` ; smslog
+
+	ls -l
+
+	From archive-accessible host:
+
+	ll /SNS/NOM/IPTS-25172/nexus/NOM_${run}.nxs.h5
+
+	nxls /SNS/NOM/IPTS-25172/nexus/NOM_${run}.nxs.h5 -p /entry/sample -v -l
+
