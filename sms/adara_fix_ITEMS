@@ -1,0 +1,923 @@
+#!/bin/bash
+#
+# ADARA "Fix ITEMS" Script...! ;-O
+#
+# At present, changing ITEMS Sample ID numbers when Re-Translating a Run
+# is *Very* Precarious and Fraught with Peril, so NEVER USE THIS, Lol. ;-D
+#
+# Seriously though, you can do this, but it requires applying a very
+# in-depth manual hands-on procedure/recipe per Run, including capturing
+# and inserting a series of several dozen binary data packets (it's not
+# _Just_ the Sample ID, but *All* 42 of the associated Sample Meta-Data
+# PVs, too! ;-D), as harvested from some _Other_ existing Run's Raw Data,
+# that already had the given ITEMS Sample ID selected, so all the
+# Meta-Data fields have already been populated and binary data packets
+# generated. I don't have any automated tools to query the ITEMS
+# database or fabricate the ADARA binary stream packets, from outside of
+# the production ADARA server software.
+#
+# This preliminary Script is to Automate Changing the ITEMS Sample ID for
+# Run(s) and Resubmitting Them Through the STC to Re-Catalog...! ;-D
+#
+# (Because it can happen that often... ;-)
+#
+# This current version is based on the latest accumulated knowledge
+# from manually fixing several series of Runs with the Wrong ITEMS
+# Sample ID Meta-Data on NOMAD and POWGEN.
+#
+# I Wish You Good Luck and God's Speed...! ;-D
+#
+#    Jeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeem :)
+#
+
+#
+# Example "Fix ITEMS" Commands:
+#
+# ./sms/adara_fix_ITEMS --inst=PG3 --stc_host=localhost --stc_port=31420 \
+#    --sms_data=/SNS/users/$USER --no-send-paused-data \
+#    --archive_path=/TESTING --run=38524-38527 --items=12345
+#
+# ./sms/adara_fix_ITEMS --inst=VULCAN --stc_host=localhost \
+#    --stc_port=31420 --sms_data=/SNS/users/$USER --no-send-paused-data \
+#    --archive_path=/TESTING --run=156458 --items=12345
+#
+# ./sms/adara_fix_ITEMS --inst=EQSANS --stc_host=localhost \
+#    --stc_port=31420 --sms_data=/SNS/users/$USER --no-send-paused-data \
+#    --archive_path=/TESTING --run=98446-98448 --items=12345
+#
+# ./sms/adara_fix_ITEMS --inst=ARCS --facility=SNS --stc_host=localhost \
+#    --stc_port=31420 --sms_data=/SNS/users/$USER --no-send-paused-data \
+#    --archive_path=/TESTING --run=125356-125363 --items=12345
+#
+
+#
+# Defaults:
+#
+
+ONCAT_AUTH="/SNS/users/${USER}/ONCat.Authentication.Certificate.txt"
+
+ONCAT_URL="https://oncat.ornl.gov/api/datafiles"
+
+#NOTIFY_EMAIL_LIST="parkerpg@ornl.gov rens@ornl.gov kohlja@ornl.gov"
+NOTIFY_EMAIL_LIST="kohlja@ornl.gov"
+
+MAILER="/usr/bin/Mail"
+
+ADARA_PARSER="/usr/local/bin/adara-parser"
+
+ADARA_MUNGE="/usr/local/bin/adara-munge"
+
+ADARA_CAT="/usr/local/bin/adaracat"
+
+FINDNEXUS="/SNS/software/bin/findnexus"
+
+NXDIFF="/SNS/software/bin/nxDiff"
+
+SMS_CONFIG="/SNSlocal/sms/conf/smsd.conf"
+
+SMS_DATA="/SNSlocal/sms/data"
+
+XINETD_DIR="/etc/xinetd.d"
+
+ARCHIVE_PATH="/"
+
+STC1="stc1.ornl.gov"
+STC2="stc2.ornl.gov"
+STC3="stc3.ornl.gov"
+
+TRUNCATE="/usr/bin/truncate"
+Editor="/usr/bin/vim"
+CURL="/usr/bin/curl"
+DIFF="/usr/bin/diff"
+HEAD="/usr/bin/head"
+TAIL="/usr/bin/tail"
+CMP="/usr/bin/cmp"
+Less="/usr/bin/less"
+AWK="/usr/bin/awk"
+SSH="/usr/bin/ssh"
+NC="/usr/bin/nc"
+WC="/usr/bin/wc"
+GREP="/bin/grep"
+SED="/bin/sed"
+CP="/bin/cp"
+MV="/bin/mv"
+LS="/bin/ls"
+
+#
+# Set Umask for Any/All Files Created/Generated Herein...! ;-D
+#
+# (to avoid situations like the POWGEN SMS Restart Failures
+#    caused by "Fix ITEMS" leftovers & edits that were owned
+#    by Jeeem and Not Readable by User "SNSData" Group "ADARA"... ;-b)
+#
+umask 0000
+
+USAGE()
+{
+	echo -e "\nusage: adara_fix_ITEMS \\"
+	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc_host=<STC_HOST>] \\"
+	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
+	echo "    [--stc_port=<STCPort>] \\"
+	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
+	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
+	echo "    [--sms_data=<${SMS_DATA}>] \\"
+	echo "    [--send-paused-data] [--no-send-paused-data] \\"
+	echo "    [--archive_path=<${ARCHIVE_PATH}>] \\"
+	echo "    [--space_marker=<${SPACE_MARKER}>] \\"
+	echo "    [--run=<RunNumber1>] \\"
+	echo "    [--run=<RunNumber2,RunNumber3,...>] \\"
+	echo "    [--run=<RunNumber4-RunNumber5>] \\"
+	echo "    [--items=<nnnnn>] [--help]"
+	echo
+}
+
+PARSE_RUN_NUMBERS()
+{
+	local _runlist="$1"
+
+	echo -e "\nParsing Run Numbers: [${_runlist}]"
+
+	# Strip Off Any Comma Separators...
+	_runlist=`echo "${_runlist}" | ${SED} 's/,/ /g'`
+	cksed=$?
+
+	if [[ ${cksed} != 0 ]]; then
+		echo -e "\nERROR Parsing Comma-Separated Run Number List...!"
+		echo -e "\nBailing..."
+		exit 111
+	fi
+
+	# Step Through Run Numbers Looking for Any Run Number Ranges
+	local _runlistall
+	local _run
+	for _run in ${_runlist} ; do
+		# Run Number Range
+		if [[ "${_run}" =~ - ]]; then
+			local _start
+			local _end
+			_start=`echo "${_run}" | ${AWK} -F "-" '{print $1}'`
+			_end=`echo "${_run}" | ${AWK} -F "-" '{print $2}'`
+			for (( i = _start ; i <= _end ; ++i )); do
+				if [[ -z "${_runlistall}" ]]; then
+					_runlistall="$i"
+				else
+					_runlistall="${_runlistall} $i"
+				fi
+			done
+		# Plain Run Number
+		else
+			if [[ -z "${_runlistall}" ]]; then
+				_runlistall="${_run}"
+			else
+				_runlistall="${_runlistall} ${_run}"
+			fi
+		fi
+	done
+
+	# Now Append Parsed Run Number List to Overall Run List
+	if [[ -z "${RUN_NUMBERS}" ]]; then
+		RUN_NUMBERS="${_runlistall}"
+	else
+		RUN_NUMBERS="${RUN_NUMBERS} ${_runlistall}"
+	fi
+	echo -e "\nAdding Run Number(s) ${_runlistall} to Run List."
+}
+
+CHECK_PROCEED()
+{
+	local _proceed_query="Proceed"
+	local _alt_query=0
+
+	if [[ "#$1#" != '##' ]]; then
+		_proceed_query="$1"
+		_alt_query=1
+	fi
+
+	local _proceed_ck=""
+
+	echo -e -n "\n${_proceed_query} (yes/No)? "
+	read _proceed_ck
+
+	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
+
+	if [[ -z ${_proceed_ck} || ${_proceed_ck} == "n" \
+			|| ${_proceed_ck} == "no" ]]; then
+		# Alternate Query? Just Return...
+		if [[ ${_alt_query} == 1 ]]; then
+			return 99
+		# Else Actually Exit Script...
+		else
+			echo -e "\nExiting ADARA Fix ITEMS at User's Request.\n"
+			exit 99
+		fi
+	fi
+
+	return 0
+}
+
+#
+# Parse Command Line Arguments
+#
+
+STC_HOST="${STC1}"
+
+STC_SERVICE="stc_dummy"
+STC_PORT=""
+
+RUN_NUMBERS=""
+
+ITEMS_NEW=""
+
+SEND_PAUSED_DATA=""
+
+SPACES_NEEDED=0
+SPACE_MARKER="#"
+
+ADDED_USERS=0
+
+FACILITY=""
+
+INST=""
+
+for arg in "$@" ; do
+
+	key=`echo "$arg" | ${AWK} -F = '{print $1}'`
+	value=`echo "$arg" | ${AWK} -F = '{print $2}'`
+
+	if [[ "#$key#" == '#--inst#' ]]; then
+		INST="$value"
+		echo -e "\nSetting Beamline Short Name to: ${INST}"
+	elif [[ "#$key#" == '#--facility#' ]]; then
+		FACILITY="$value"
+		echo -e "\nSetting Facility Name to: ${FACILITY}"
+	elif [[ "#$key#" == '#--stc1#' ]]; then
+		STC_HOST="${STC1}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc2#' ]]; then
+		STC_HOST="${STC2}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc3#' ]]; then
+		STC_HOST="${STC3}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc_host#' ]]; then
+		STC_HOST="${value}"
+		echo -e "\nSetting STC Host to: ${STC_HOST}"
+	elif [[ "#$key#" == '#--stc#' ]]; then
+		STC_SERVICE="stc"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_test#' ]]; then
+		STC_SERVICE="stc_test"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_dummy#' ]]; then
+		STC_SERVICE="stc_dummy"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_hfir#' ]]; then
+		STC_SERVICE="stc_hfir"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_hfir_test#' ]]; then
+		STC_SERVICE="stc_hfir_test"
+		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+	elif [[ "#$key#" == '#--stc_port#' ]]; then
+		STC_PORT="$value"
+		echo -e "\nSetting STC Port to: ${STC_PORT}"
+	elif [[ "#$key#" == '#--adara_parser#' ]]; then
+		ADARA_PARSER="${value}"
+		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
+	elif [[ "#$key#" == '#--sms_config#' ]]; then
+		SMS_CONFIG="${value%/}"
+		echo -e "\nSetting SMS Config Directory to:\n\t[${SMS_CONF}]"
+	elif [[ "#$key#" == '#--sms_data#' ]]; then
+		SMS_DATA="${value%/}"
+		echo -e "\nSetting SMS Data Directory to:\n\t[${SMS_DATA}]"
+	elif [[ "#$key#" == '#--send-paused-data#' ]]; then
+		SEND_PAUSED_DATA="${key}"
+		echo -e "\nSetting ADARA Cat \"Send Paused Data\" to:"
+		echo -e "\t[${SEND_PAUSED_DATA}]"
+	elif [[ "#$key#" == '#--no-send-paused-data#' ]]; then
+		SEND_PAUSED_DATA="${key}"
+		echo -e "\nSetting ADARA Cat \"Send Paused Data\" to:"
+		echo -e "\t[${SEND_PAUSED_DATA}]"
+	elif [[ "#$key#" == '#--archive_path#' ]]; then
+		ARCHIVE_PATH="${value%/}"
+		echo -e "\nSetting Archive Path Directory to:\n\t[${ARCHIVE_PATH}]"
+	elif [[ "#$key#" == '#--space_marker#' ]]; then
+		SPACE_MARKER="${value}"
+		echo -e "\nSetting White Space Marker to:\n\t[${SPACE_MARKER}]"
+	elif [[ "#$key#" == '#--run#' ]]; then
+		PARSE_RUN_NUMBERS "${value}"
+	elif [[ "#$key#" == '#--items#' ]]; then
+		ITEMS_NEW="${value}"
+		echo -e "\nSetting New ITEMS Proposal to: [${ITEMS_NEW}]"
+	elif [[ "#$key#" == '#--help#' || "#$key#" == '#-h#' ]]; then
+		USAGE
+		exit 0
+	else
+		echo -e "\nERROR: Unknown Command Line Option [${arg}]"
+		USAGE
+		exit 1
+	fi
+
+done
+
+if [[ -z "${RUN_NUMBERS}" ]]; then
+	echo -e "\nERROR: No Run Numbers Specified!"
+	USAGE
+	exit 2
+fi
+
+if [[ -z "${ITEMS_NEW}" ]]; then
+	echo -e "\nERROR: No Replacement ITEMS Sample ID Specified!"
+	USAGE
+	exit 3
+fi
+
+#
+# Determine Proper STC Service Port...! ;-D
+#
+
+if [[ -z "${STC_PORT}" ]]; then
+
+	echo -e "\nContacting STC Host \"${STC_HOST}\" via SSH"
+	echo "to Determine Port for STC \"${STC_SERVICE}\" Service..."
+
+	echo -e \
+		"\n${SSH} ${STC_HOST} ${GREP} port ${XINETD_DIR}/${STC_SERVICE}"
+
+	# Set Bash Pipefail Option as Needed...
+	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
+	if [[ "$pfck" == "off" ]]; then
+		set -o pipefail
+	fi
+
+	STC_PORT=`${SSH} ${STC_HOST} \
+		${GREP} "port" ${XINETD_DIR}/${STC_SERVICE} \
+		| ${AWK} '{print $3}'`
+	ckstcport=$?
+
+	if [[ ${ckstcport} != 0 ]]; then
+		echo -e -n "\nERROR Determining STC Port "
+		echo "for \"${STC_SERVICE}\" Service on ${STC_HOST}...!"
+		USAGE
+		exit 4
+	fi
+
+	# Reset Bash Pipefail Option as Needed...
+	if [[ "$pfck" == "off" ]]; then
+		set +o pipefail
+	fi
+
+	echo -e \
+		"\nGot STC Port ${STC_PORT} for STC \"${STC_SERVICE}\" Service."
+fi
+
+#
+# Determine the Facility and Beamline (Short) Names
+# for Post-Processing Options...
+#
+
+# Set Bash Pipefail Option as Needed...
+pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
+if [[ "$pfck" == "off" ]]; then
+	set -o pipefail
+fi
+
+# Only Retrieve the Facility Name if Not Explicitly Specified
+if [[ -z "${FACILITY}" ]]; then
+
+	FACILITY=`${GREP} "facility" ${SMS_CONFIG} | ${GREP} -v ";" \
+		| ${AWK} '{print $3}'`
+	ckfac=$?
+
+	if [[ ${ckfac} != 0 || -z ${FACILITY} ]]; then
+		echo -e -n "\nERROR Determining Facility from SMS Config "
+		echo "for Run ${run}!"
+		echo -e "\n\t${SMS_CONFIG}"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return 18
+	fi
+
+	echo -e "\nFacility Name Determined to be: [${FACILITY}]"
+
+fi
+
+# Only Retrieve the Beamline Short Name if Not Explicitly Specified
+if [[ -z "${INST}" ]]; then
+
+	INST=`${GREP} "beamline_shortname" ${SMS_CONFIG} \
+		| ${GREP} -v ";" | ${AWK} '{print $3}'`
+	ckinst=$?
+
+	if [[ ${ckinst} != 0 || -z ${INST} ]]; then
+		echo -e -n "\nERROR Determining Beamline Short Name "
+		echo "from SMS Config for Run ${run}!"
+		echo -e "\n\t${SMS_CONFIG}"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return 19
+	fi
+
+	echo -e "\nBeamline Short Name Determined to be: [${INST}]"
+
+fi
+
+# Reset Bash Pipefail Option as Needed...
+if [[ "$pfck" == "off" ]]; then
+	set +o pipefail
+fi
+
+# Set Proper Archive Directory...
+
+ARCHIVE="${ARCHIVE_PATH}"
+if [[ ${ARCHIVE:${#ARCHIVE} - 1} == "/" ]]; then
+	ARCHIVE="${ARCHIVE}${FACILITY}/${INST}"
+else
+	ARCHIVE="${ARCHIVE}/${FACILITY}/${INST}"
+fi
+
+#
+# Ready to Begin...! :-D
+#
+
+echo -e -n "\n*** Updating ITEMS Sample ID"
+echo -e " for Run Numbers:\n\n\t[${RUN_NUMBERS}]\n"
+echo "to New Sample ID [${ITEMS_NEW}]."
+
+echo -e -n "\nUsing STC \"${STC_SERVICE}\" Service "
+echo "on \"${STC_HOST}:${STC_PORT}\"."
+
+CHECK_PROCEED
+
+#
+# Prepare Raw Data Run Directory and Re-Submit Run for Translation to NeXus
+#
+# usage: RESUBMIT_RUN "${rundir}"
+#
+# - Re-Submit SMS Raw Data Files to STC for Re-Translation...!
+#
+RESUBMIT_RUN()
+{
+	# Run Directory
+	if [[ "#$1#" == '##' ]]; then
+		echo -e "\nERROR: No Run Directory Specified for Re-Submit Run!"
+		echo -e "\nContinuing with Next Run Number..."
+		return 15
+	fi
+	local _rundir="$1"
+	shift
+
+	#
+	# Re-Submit SMS Raw Data Files to STC for Re-Translation...!
+	#
+	# Use "ADARACat" to Account for Any Intervening/Sent Paused Data...
+	#
+
+	echo -e -n "\nReady to Re-Submit SMS Raw Data Files "
+	echo -e "for Run ${run} to STC for Re-Translation:"
+
+	echo -e -n "\n\t-> Changing ITEMS Sample Meta-Data for Run ${run}"
+	echo -e "to \"${ITEMS_NEW}\"..."
+
+	if [[ -n ${SEND_PAUSED_DATA} ]]; then
+		echo -e -n "\nADARA Cat \"Send Paused Data\" Set to: "
+		echo "[${SEND_PAUSED_DATA}]"
+	fi
+
+	echo -e -n "\nUsing STC \"${STC_SERVICE}\" Service "
+	echo "on \"${STC_HOST}:${STC_PORT}\"."
+
+	CHECK_PROCEED
+
+	echo -e -n "\nRunning: ${ADARA_CAT} ${SEND_PAUSED_DATA} "
+	echo "--run=\"${run}\" --dir=\"${rundir}\" \\"
+	echo -e "\t| ${NC} ${STC_HOST} ${STC_PORT}"
+
+	${ADARA_CAT} ${SEND_PAUSED_DATA} --run="${run}" --dir="${rundir}" \
+		| ${NC} ${STC_HOST} ${STC_PORT}
+	ckstc=$?
+
+	echo
+
+	if [[ ${ckstc} != 0 ]]; then
+		echo -e -n "\nERROR Re-Submitting SMS Raw Data Files to STC "
+		echo "for Run ${run}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		return 17
+	fi
+
+	#
+	# Now Verify the Differences Between the Original and New NeXus Files
+	#
+
+	# Prompt User for NeXus Diff Comparison...
+	local _ckdonxdiff
+	CHECK_PROCEED \
+		"Do You Want To Verify the Differences in the NeXus Files"
+	_ckdonxdiff=$?
+
+	if [[ ${_ckdonxdiff} == 0 ]]; then
+
+		# NeXus Diff the Original and New NeXus Files...
+
+		local _nexus="nexus/${INST}_${run}.nxs.h5"
+
+		echo -e "\n${NXDIFF} -L -S -l \\"
+		echo -e "\t${ARCHIVE}/${IPTS}/${_nexus} \\"
+		echo -e "\t${ARCHIVE}/${IPTS}/${_nexus}.ORIG"
+
+		${NXDIFF} -L -S -l \
+			"${ARCHIVE}/${IPTS}/${_nexus}" \
+			"${ARCHIVE}/${IPTS}/${_nexus}.ORIG"
+
+	fi
+
+	#
+	# Now Check FindNeXus and the Catalog to Ensure the Run Translated...
+	#
+
+	# Prompt User for FindNeXus Catalog Check...
+	local _cknotify
+	CHECK_PROCEED \
+		"Do You Want To Use FindNeXus to Verify the Run Translated"
+	_cknotify=$?
+
+	if [[ ${_cknotify} == 0 ]]; then
+
+		echo -e "\n${FINDNEXUS} -i ${INST} ${run}"
+		echo
+
+		${FINDNEXUS} -i ${INST} ${run}
+		local _ckfindnexus=$?
+
+		if [[ ${_ckfindnexus} != 0 ]]; then
+			echo -e -n "\nERROR Checking FindNeXus to Verify"
+			echo " the Proposal Move for Run ${run}!"
+			echo -e "\n\t${FINDNEXUS} -i ${INST} ${run}"
+			CHECK_PROCEED
+			echo -e "\nContinuing..."
+			# No Need to Give Up/Return Here, Just FindNeXus Check...
+		fi
+
+	fi
+
+	#
+	# Now Send Email Notification of Re-Translation to Catalog Admins
+	# (So They can Remove Any *Duplicate* Database Records...)
+	#
+
+	# Prompt User for Email Notification to Catalog Admins...
+	local _cknotify
+	CHECK_PROCEED \
+		"Do You Want To Notify the Catalog Admins of the Change"
+	_cknotify=$?
+
+	if [[ ${_cknotify} == 0 ]]; then
+
+		local _subject="[ADARA Fix ITEMS]:"
+		_subject="${_subject} ${FACILITY} ${INST} Run ${run}"
+		_subject="${_subject} Changed ITEMS Sample ID"
+		_subject="${_subject} to ${ITEMS_NEW}"
+
+		echo -e "\n${MAILER} -s \\"
+		echo -e "\"${_subject}\" \\"
+		echo -e "\t${NOTIFY_EMAIL_LIST}"
+
+		${MAILER} -s "${_subject}" \
+			${NOTIFY_EMAIL_LIST} <<NotifyEmailContent
+This is an Automated Email Notification from the "ADARA Fix ITEMS" script.
+
+The ${FACILITY} ${INST} Run ${run} has been *Re-Translated*
+to Change the ITEMS Sample ID for the Run to:
+
+	${ITEMS_NEW}
+
+Please Verify This Update to the ${FACILITY} Catalog Database, as needed.
+
+Thank You! :-D
+
+   - ADARA Fix ITEMS
+
+NotifyEmailContent
+
+		local _ckmail=$?
+
+		if [[ ${_ckmail} != 0 ]]; then
+			echo -e -n "\nERROR Sending Email Notification"
+			echo " to Catalog Admins for Run ${run}!"
+			echo -e "\n\tTo: ${NOTIFY_EMAIL_LIST}"
+			echo -e "\n\tSubject: ${_subject}"
+			CHECK_PROCEED
+			echo -e "\nContinuing..."
+			# No Need to Give Up/Return Here, Just Catalog Admins Notify...
+		fi
+
+		echo -e "\nEmail Notification Sent to Catalog Admins:"
+		echo -e "\n\t${NOTIFY_EMAIL_LIST}"
+
+	fi
+
+	#
+	# Done with This Run...
+	#
+
+	echo -e "\nDone Re-Submitting/Updating Run ${run}."
+
+	return 0
+}
+
+#
+# Determine Existing Run With Desired ITEMS Sample Meta-Data for ID...
+#
+
+echo -e "\nPlease Enter the Run Number for a ${INST} Run with the"
+echo -e -n "Desired ITEMS Meta-Data for Sample ID ${ITEMS_NEW}: "
+read SourceRun
+
+echo -e -n "\nSource Run Number for ITEMS Sample ID ${ITEMS_NEW}"
+echo -e " is Set to [${SourceRun}]."
+
+SourceDir=`${LS} -d ${SMS_DATA}/*/*-run-${SourceRun} 2>&1`
+
+if [[ -d ${SourceDir} ]]; then
+	echo -e "\nFound Local Source Run Raw Data Directory at:\n"
+	echo -e "   ${SourceDir}"
+	CHECK_PROCEED
+else
+	echo -e "\nError Locating Local Source Run Raw Data Directory"
+	echo -e "for Run Number ${SourceRun}...!\n"
+	${LS} -d ${SMS_DATA}/*/*-run-${SourceRun}
+	echo -e "\nBailing..."
+	exit 99
+fi
+
+# Locate the "Last" ADARA Output Stream File for the *Source* Run...
+
+index=1
+
+echo -e -n "\nLocating Last Data File "
+echo "for Source Run ${SourceRun}."
+src_datafile=`${LS} "${SourceDir}" \
+	| ${GREP} -E \
+		--regexp "^m[0-9]+-f[0-9]+-run-${run}.adara$" \
+		--regexp "^f[0-9]+-run-${run}.adara$" \
+	| ${TAIL} -${index} | ${HEAD} -1`
+ckdatafile=$?
+
+if [[ ${ckdatafile} != 0 ]]; then
+	echo -e -n "\nERROR Locating Last "
+	echo "ADARA Output Stream File for Source Run ${SourceRun}!"
+	echo -e "\nBailing..."
+	exit 98
+fi
+
+echo -e -n "\nFound Last ADARA Output Stream File for Run ${run}:"
+echo -e "\t[${datafile}]"
+
+# Determine Device ID for IPTS-ITEMS PV Logs...
+
+DEVICE=`${ADARA_PARSER} --showddp "${SourceDir}/${src_datafile}" \
+	| ${GREP} -B 6 "IPTS" | grep "Device " | ${AWK} '{print $2}'`
+
+echo -e -n "\nIPTS-ITEMS Device Extracted from Raw Data Stream Files as:"
+echo -e " [${DEVICE}]"
+CHECK_PROCEED
+
+# Extract Raw Data File with ITEMS Sample Meta-Data PV Value Updates...
+
+echo -e "\nExtracting Raw Data File with Sample Meta-Data..."
+
+${ADARA_MUNGE} "${SourceDir}/${src_datafile}" \
+	--savefile "m00000001-f00000002-add00000001-run-XXXXXX.adara" \
+	--savepkts 8388864 --savepkts 8389120 --savepkts 8389376 \
+	--deviceid ${DEVICE} 1>/dev/null 2>munge.out
+
+${Less} munge.out
+
+${ADARA_PARSER} --showddp \
+	m00000001-f00000002-add00000001-run-XXXXXX.adara | ${Less}
+
+${RM} munge.out
+
+CHECK_PROCEED
+
+${MV} m00000001-f00000002-add00000001-run-XXXXXX.adara \
+	~/${ITEMS_NEW}.m00000001-f00000002-add00000001-run-XXXXXX.adara
+
+#
+# Process Each Run Number in Turn...
+#
+
+for run in ${RUN_NUMBERS} ; do
+
+	echo -e "\nProcessing Run Number: ${run}"
+
+	#
+	# Find the SMS Raw Data Files for This Run...! ;-D
+	#
+
+	rundir=`${LS} -d ${SMS_DATA}/*/*-run-${run} 2>&1`
+	ckrundir=$?
+
+	if [[ ${ckrundir} != 0 ]]; then
+		echo -e "\nERROR Locating SMS Raw Data Directory for Run ${run}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	echo -e "\nFound SMS Raw Data Directory for Run ${run}:\n\t[${rundir}]"
+
+	#
+	# Locate Last ADARA Output Stream File for Run...
+	#
+
+	index=1
+
+	echo -e -n "\nLocating Last Data File for Run ${run}."
+	datafile=`${LS} "${rundir}" \
+		| ${GREP} -E \
+			--regexp "^m[0-9]+-f[0-9]+-run-${run}.adara$" \
+			--regexp "^f[0-9]+-run-${run}.adara$" \
+		| ${TAIL} -${index} | ${HEAD} -1`
+	ckdatafile=$?
+
+	if [[ ${ckdatafile} != 0 ]]; then
+		echo -e -n "\nERROR Locating Last "
+		echo "ADARA Output Stream File for Run ${run}!"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	# Make Sure We Only Got *1* Data File...! ;-D
+	ckone=`echo "${datafile}" | ${WC} | ${AWK} '{print $1}'`
+
+	if [[ ${ckone} != 1 ]]; then
+		echo -e -n "\nERROR: Multiple Output Stream Files Found "
+		echo "for Run ${run}!"
+		echo -e "\n${datafile}\n"
+		CHECK_PROCEED
+		echo -e "\nContinuing with Next Run Number..."
+		continue
+	fi
+
+	echo -e -n "\nFound Last ADARA Output Stream File for Run ${run}:"
+	echo -e "\t[${datafile}]"
+
+	# Snag the IPTS Proposal from This Raw Data File...
+
+	IPTS=`${GREP} --text "proposal_id" "${rundir}/${datafile}" \
+		| ${AWK} -F "[<>]" '{print $3}'`
+
+	ckipts=$?
+
+	if [[ ${ckipts} != 0 ]]; then
+		echo -e -n "\nERROR Extracting IPTS Proposal "
+		echo "from Stream File for Run ${run}!"
+		echo -e "\n\t[${IPTS}]"
+		### Try the "2nd" or "Next to Last" File... (Increase Index)
+		CHECK_PROCEED \
+			"Do You Want To Increment The File Index and Retry"
+		_ckincrindex=$?
+		if [[ ${_ckincrindex} != 0 ]]; then
+			echo -e "\nContinuing with Next Run Number..."
+			continue
+		fi
+	else
+		echo -e "\nFound IPTS Proposal in Stream File: [${IPTS}]"
+	fi
+
+	#
+	# Fix ITEMS Sample ID Meta-Data...! ;-D
+	#
+
+	cd ${rundir} ; ls -l
+
+	# Extract Mode Index and File Index from Raw Data File Name...
+
+	mode=`echo "${datafile}" | ${AWK} -F "[-]" '{print $1}'`
+
+	fileNo=`echo "${datafile}" | ${AWK} -F "[mf-]" '{printf("%d", $4)}'`
+
+	flast=`echo "${fileNo}" | ${AWK} '{printf("f%08d", $1)}'`
+
+	flast_plus_1=`echo "$(( ${fileNo} + 1 ))" \
+		| ${AWK} '{printf("f%08d", $1)}'`
+
+	flast_plus_2=`echo "$(( ${fileNo} + 2 ))" \
+		| ${AWK} '{printf("f%08d", $1)}'`
+
+	# Install New ITEMS Sample Meta-Data Addendum File as "Last + 1" File
+
+	echo -e "\nInstalling ITEMS Sample Meta-Data Addendum as Last + 1 File:"
+	echo -e "\t${mode}-${flast_plus_1}-run-${run}.adara"
+
+	${CP} ~/${ITEMS_NEW}.m00000001-f00000002-add00000001-run-XXXXXX.adara .
+
+	${MV} ${ITEMS_NEW}.m00000001-f00000002-add00000001-run-XXXXXX.adara \
+		${mode}-${flast_plus_1}-run-${run}.adara
+
+	# Extract Run End Packet from Last into "Last + 2" File
+
+	echo -e "\nExtract Run End Packet from Last into Last + 2 File:"
+	echo -e "\t${mode}-${flast_plus_2}-run-${run}.adara"
+
+	${ADARA_MUNGE} ${mode}-${flast}-run-${run}.adara \
+		--savefile ${mode}-${flast_plus_2}-run-${run}.adara \
+		--savestop 1>/dev/null 2>munge.out
+	
+	${Less} munge.out
+
+	echo -e "\nNew Last Raw Data File (Last + 2):"
+	echo -e "\t${mode}-${flast_plus_2}-run-${run}.adara"
+	echo
+
+	${ADARA_PARSER} ${mode}-${flast_plus_2}-run-${run}.adara
+
+	${RM} munge.out
+
+	CHECK_PROCEED
+
+	# Backup and Strip Run End from Last Raw Data File...
+
+	echo -e "\nBackup and Strip Run End from Last Raw Data File:"
+	echo -e "\t${mode}-${flast}-run-${run}.adara"
+
+	${MV} ${mode}-${flast}-run-${run}.adara \
+		${mode}-${flast}-run-${run}.adara.BACKUP-$$
+
+	${ADARA_MUNGE} \
+		${mode}-${flast}-run-${run}.adara.BACKUP-$$ \
+		--skipstop 1>${mode}-${flast}-run-${run}.adara \
+		2>munge.out
+	
+	${Less} munge.out
+
+	echo -e "\nBefore:\n"
+
+	${ADARA_PARSER} \
+		${mode}-${flast}-run-${run}.adara.BACKUP-$$ \
+		| tail -20
+
+	echo -e "\nAfter:\n"
+
+	${ADARA_PARSE} ${mode}-${flast}-run-${run}.adara \
+		| tail -20
+
+	${RM} munge.out
+
+	CHECK_PROCEED \
+		"Do You Want To Submit the Run Directory for ReScan...?"
+	_ckresubmit=$?
+
+	if [[ ${_ckresubmit} == 0 ]]; then
+
+		### Save Copy of Original NeXus as *.ORIG...
+
+		echo -e "\nPlease Save a Copy of Original NeXus as *.ORIG..."
+
+		_nexus="nexus/${INST}_${run}.nxs.h5"
+
+		echo -e "\n${MV} ${ARCHIVE}/${IPTS}/${_nexus} \\"
+		echo -e "\t${ARCHIVE}/${IPTS}/${_nexus}.ORIG"
+
+		CHECK_PROCEED
+		_cksubmit=$?
+
+		if [[ ${_cksubmit} == 0 ]]; then
+
+			# RescanRunDir Approach...
+
+			# ${RM} translation_completed
+
+			# caput -S ${BL}:SMS:StorageManager:RescanRunDir `pwd` ; smslog
+
+			# ${LS} -l
+
+			# Re-Submit Modified Run for Translation to NeXus...
+			RESUBMIT_RUN "${rundir}"
+
+			# Check Resulting NeXus Data File...
+
+			echo -e "\nFrom archive-accessible host, please check:"
+
+			echo -e "\nls -l ${ARCHIVE}/${IPTS}/${_nexus}"
+
+			echo -e "\nnxls ${ARCHIVE}/${IPTS}/${_nexus} \\"
+			echo -e "    -p /entry/sample -v -l"
+
+			CHECK_PROCEED
+		fi
+
+	fi
+
+done
+
+#
+# Done
+#
+
+echo -e "\nDone.\n"
+
