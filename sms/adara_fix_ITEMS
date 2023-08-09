@@ -96,6 +96,7 @@ Less="/usr/bin/less"
 AWK="/usr/bin/awk"
 SSH="/usr/bin/ssh"
 NC="/usr/bin/nc"
+RM="/usr/bin/rm"
 WC="/usr/bin/wc"
 GREP="/bin/grep"
 SED="/bin/sed"
@@ -476,7 +477,7 @@ RESUBMIT_RUN()
 	echo -e -n "\nReady to Re-Submit SMS Raw Data Files "
 	echo -e "for Run ${run} to STC for Re-Translation:"
 
-	echo -e -n "\n\t-> Changing ITEMS Sample Meta-Data for Run ${run}"
+	echo -e -n "\n\t-> Changing ITEMS Sample Meta-Data for Run ${run} "
 	echo -e "to \"${ITEMS_NEW}\"..."
 
 	if [[ -n ${SEND_PAUSED_DATA} ]]; then
@@ -642,7 +643,8 @@ SourceDir=`${LS} -d ${SMS_DATA}/*/*-run-${SourceRun} 2>&1`
 
 if [[ -d ${SourceDir} ]]; then
 	echo -e "\nFound Local Source Run Raw Data Directory at:\n"
-	echo -e "   ${SourceDir}"
+	echo -e "   ${SourceDir}\n"
+	${LS} -lt "${SourceDir}"
 	CHECK_PROCEED
 else
 	echo -e "\nError Locating Local Source Run Raw Data Directory"
@@ -660,8 +662,8 @@ echo -e -n "\nLocating Last Data File "
 echo "for Source Run ${SourceRun}."
 src_datafile=`${LS} "${SourceDir}" \
 	| ${GREP} -E \
-		--regexp "^m[0-9]+-f[0-9]+-run-${run}.adara$" \
-		--regexp "^f[0-9]+-run-${run}.adara$" \
+		--regexp "^m[0-9]+-f[0-9]+-run-${SourceRun}.adara$" \
+		--regexp "^f[0-9]+-run-${SourceRun}.adara$" \
 	| ${TAIL} -${index} | ${HEAD} -1`
 ckdatafile=$?
 
@@ -672,10 +674,14 @@ if [[ ${ckdatafile} != 0 ]]; then
 	exit 98
 fi
 
-echo -e -n "\nFound Last ADARA Output Stream File for Run ${run}:"
-echo -e "\t[${datafile}]"
+echo -e "\nFound Last ADARA Output Stream File for Source Run ${SourceRun}:"
+echo -e "\t[${src_datafile}]"
 
 # Determine Device ID for IPTS-ITEMS PV Logs...
+
+echo
+${ADARA_PARSER} --showddp "${SourceDir}/${src_datafile}" \
+	| ${GREP} -B 6 "IPTS"
 
 DEVICE=`${ADARA_PARSER} --showddp "${SourceDir}/${src_datafile}" \
 	| ${GREP} -B 6 "IPTS" | grep "Device " | ${AWK} '{print $2}'`
@@ -693,7 +699,7 @@ ${ADARA_MUNGE} "${SourceDir}/${src_datafile}" \
 	--savepkts 8388864 --savepkts 8389120 --savepkts 8389376 \
 	--deviceid ${DEVICE} 1>/dev/null 2>munge.out
 
-${Less} munge.out
+${Less} +"/Save Packet" munge.out
 
 ${ADARA_PARSER} --showddp \
 	m00000001-f00000002-add00000001-run-XXXXXX.adara | ${Less}
@@ -702,8 +708,15 @@ ${RM} munge.out
 
 CHECK_PROCEED
 
+echo -e "\nSaving ITEMS Sample Meta-Data Raw Data Addendum File to \$HOME:"
+
 ${MV} m00000001-f00000002-add00000001-run-XXXXXX.adara \
 	~/${ITEMS_NEW}.m00000001-f00000002-add00000001-run-XXXXXX.adara
+
+echo
+${LS} -l ~/${ITEMS_NEW}.m00000001-f00000002-add00000001-run-XXXXXX.adara
+
+CHECK_PROCEED
 
 #
 # Process Each Run Number in Turn...
@@ -729,13 +742,17 @@ for run in ${RUN_NUMBERS} ; do
 
 	echo -e "\nFound SMS Raw Data Directory for Run ${run}:\n\t[${rundir}]"
 
+	${LS} -lt "${rundir}" | ${HEAD} -n 20
+
+	CHECK_PROCEED
+
 	#
 	# Locate Last ADARA Output Stream File for Run...
 	#
 
 	index=1
 
-	echo -e -n "\nLocating Last Data File for Run ${run}."
+	echo -e "\nLocating Last Data File for Run ${run}."
 	datafile=`${LS} "${rundir}" \
 		| ${GREP} -E \
 			--regexp "^m[0-9]+-f[0-9]+-run-${run}.adara$" \
@@ -766,6 +783,8 @@ for run in ${RUN_NUMBERS} ; do
 	echo -e -n "\nFound Last ADARA Output Stream File for Run ${run}:"
 	echo -e "\t[${datafile}]"
 
+	CHECK_PROCEED
+
 	# Snag the IPTS Proposal from This Raw Data File...
 
 	IPTS=`${GREP} --text "proposal_id" "${rundir}/${datafile}" \
@@ -789,11 +808,13 @@ for run in ${RUN_NUMBERS} ; do
 		echo -e "\nFound IPTS Proposal in Stream File: [${IPTS}]"
 	fi
 
+	CHECK_PROCEED
+
 	#
 	# Fix ITEMS Sample ID Meta-Data...! ;-D
 	#
 
-	cd ${rundir} ; ls -l
+	cd ${rundir}
 
 	# Extract Mode Index and File Index from Raw Data File Name...
 
@@ -819,6 +840,8 @@ for run in ${RUN_NUMBERS} ; do
 	${MV} ${ITEMS_NEW}.m00000001-f00000002-add00000001-run-XXXXXX.adara \
 		${mode}-${flast_plus_1}-run-${run}.adara
 
+	CHECK_PROCEED
+
 	# Extract Run End Packet from Last into "Last + 2" File
 
 	echo -e "\nExtract Run End Packet from Last into Last + 2 File:"
@@ -828,7 +851,7 @@ for run in ${RUN_NUMBERS} ; do
 		--savefile ${mode}-${flast_plus_2}-run-${run}.adara \
 		--savestop 1>/dev/null 2>munge.out
 	
-	${Less} munge.out
+	${Less} +"/Saving Run Stop Packet" munge.out
 
 	echo -e "\nNew Last Raw Data File (Last + 2):"
 	echo -e "\t${mode}-${flast_plus_2}-run-${run}.adara"
@@ -853,17 +876,16 @@ for run in ${RUN_NUMBERS} ; do
 		--skipstop 1>${mode}-${flast}-run-${run}.adara \
 		2>munge.out
 	
-	${Less} munge.out
+	${Less} +"/Skipping Run Stop Packet" munge.out
 
 	echo -e "\nBefore:\n"
 
-	${ADARA_PARSER} \
-		${mode}-${flast}-run-${run}.adara.BACKUP-$$ \
+	${ADARA_PARSER} ${mode}-${flast}-run-${run}.adara.BACKUP-$$ \
 		| tail -20
 
 	echo -e "\nAfter:\n"
 
-	${ADARA_PARSE} ${mode}-${flast}-run-${run}.adara \
+	${ADARA_PARSER} ${mode}-${flast}-run-${run}.adara \
 		| tail -20
 
 	${RM} munge.out
