@@ -532,6 +532,14 @@ RESUBMIT_RUN()
 			"${ARCHIVE}/${IPTS}/${_nexus}" \
 			"${ARCHIVE}/${IPTS}/${_nexus}.ORIG"
 
+		echo -e "\nYou can Also Compare the /entry/sample/ Groups via:"
+		echo -e "\nnxls -p /entry/sample -v -l \\"
+		echo -e "\t${ARCHIVE}/${IPTS}/${_nexus}.ORIG > AAA ; \\"
+		echo -e "nxls -p /entry/sample -v -l \\"
+		echo -e "\t${ARCHIVE}/${IPTS}/${_nexus} > BBB ; \\"
+		echo -e "diff AAA BBB | less ; \\"
+		echo -e "/bin/rm AAA BBB"
+
 	fi
 
 	#
@@ -923,12 +931,12 @@ for run in ${RUN_NUMBERS} ; do
 
 			# Check Resulting NeXus Data File...
 
-			echo -e "\nFrom archive-accessible host, please check:"
+			# echo -e "\nFrom archive-accessible host, please check:"
 
-			echo -e "\nls -l ${ARCHIVE}/${IPTS}/${_nexus}"
+			# echo -e "\nls -l ${ARCHIVE}/${IPTS}/${_nexus}"
 
-			echo -e "\nnxls ${ARCHIVE}/${IPTS}/${_nexus} \\"
-			echo -e "    -p /entry/sample -v -l"
+			# echo -e "\nnxls ${ARCHIVE}/${IPTS}/${_nexus} \\"
+			# echo -e "    -p /entry/sample -v -l"
 
 			CHECK_PROCEED
 		fi
