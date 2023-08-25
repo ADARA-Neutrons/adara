@@ -9,7 +9,8 @@ stc_stc_SOURCES = stc/main.cpp stc/NxGen.cpp stc/StreamParser.cpp \
     stc/h5nx.cpp stc/ComBusTransMon.cpp combus/ComBus.cpp \
 	stc/UserIdLdap.cpp $(POSIX_PARSER)
 
-stc_stc_CPPFLAGS = -Istc $(libxml_CPPFLAGS) $(activemq_CPPFLAGS) \
+stc_stc_CPPFLAGS = -Istc -Istc/nexus \
+		$(libxml_CPPFLAGS) $(activemq_CPPFLAGS) \
 		$(apr_CPPFLAGS) $(COMMON_CPPFLAGS) $(HDF5_CPPFLAGS) \
 		$(AM_CPPFLAGS) -DSYSLOG_LOGGING
 
@@ -24,7 +25,8 @@ stc_stc_LDADD = -lboost_system -lboost_filesystem \
 
 stc_retrieveUnmapped_SOURCES = stc/retrieveUnmapped.cpp stc/h5nx.cpp
 
-stc_retrieveUnmapped_CPPFLAGS = $(COMMON_CPPFLAGS) $(HDF5_CPPFLAGS) \
+stc_retrieveUnmapped_CPPFLAGS = -Istc -Istc/nexus \
+		$(COMMON_CPPFLAGS) $(HDF5_CPPFLAGS) \
 		$(AM_CPPFLAGS)
 
 stc_retrieveUnmapped_CXXFLAGS = $(AM_CXXFLAGS)
