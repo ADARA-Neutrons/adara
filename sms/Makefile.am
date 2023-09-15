@@ -16,10 +16,12 @@ sms_smsd_SOURCES = sms/smsd.cc \
 		sms/EventFd.cc sms/utils.cc $(POSIX_PARSER)
 sms_smsd_CPPFLAGS = $(activemq_CPPFLAGS) $(apr_CPPFLAGS) \
 		$(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) \
-		$(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) \
-		-I/home/controls/Accelerator -DLOGCXX_LOGGING
-sms_smsd_LDFLAGS = $(EPICS_LDFLAGS) $(liblog4cxx_LDFLAGS) $(AM_LDFLAGS)
-sms_smsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS) $(liblog4cxx_LIBS) \
+		$(log4cpp_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) \
+		-I/home/controls/Accelerator -DLOG4C_LOGGING
+sms_smsd_LDFLAGS = $(EPICS_LDFLAGS) \
+		$(log4cpp_LDFLAGS) $(liblog4cxx_LDFLAGS) $(AM_LDFLAGS)
+sms_smsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS) \
+		$(log4cpp_LIBS) $(liblog4cxx_LIBS) \
 		-lboost_signals \
 		-lboost_program_options -lboost_filesystem -lboost_system \
 		-lboost_thread-mt -lpthread
@@ -35,11 +37,13 @@ sms_test_storage_test_SOURCES = sms/test/storage-test.cc \
 		sms/EventFd.cc sms/utils.cc $(POSIX_PARSER)
 sms_test_storage_test_CPPFLAGS = -Isms $(activemq_CPPFLAGS) $(apr_CPPFLAGS)\
 		$(COMMON_CPPFLAGS) \
-		$(EPICS_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) \
+		$(EPICS_CPPFLAGS) \
+		$(log4cpp_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) \
 		-I/home/controls/Accelerator
-sms_test_storage_test_LDFLAGS = $(EPICS_LDFLAGS) $(liblog4cxx_LDFLAGS) \
+sms_test_storage_test_LDFLAGS = $(EPICS_LDFLAGS) \
+		$(log4cpp_LDFLAGS) $(liblog4cxx_LDFLAGS) \
 		$(AM_LDFLAGS)
 sms_test_storage_test_LDADD = $(EPICS_LIBS) $(activemq_LIBS) \
-		$(liblog4cxx_LIBS) -lboost_signals \
+		$(log4cpp_LIBS) $(liblog4cxx_LIBS) -lboost_signals \
 		-lboost_filesystem -lboost_system -lboost_thread-mt \
 		-lpthread
