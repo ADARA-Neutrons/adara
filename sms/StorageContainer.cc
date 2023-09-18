@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
+LOGGER("SMS.StorageContainer");
 
 #include <string>
 #include <sstream>
@@ -1789,6 +1789,8 @@ StorageContainer::StorageContainer(
 	m_active(true), m_translated(false), m_manual(false),
 	m_requeueCount(0), m_saved_size(0)
 {
+	LOGGER_INIT();
+
 	m_maxTime.tv_sec = 0; // EPICS Time...!
 	m_maxTime.tv_nsec = 0;
 

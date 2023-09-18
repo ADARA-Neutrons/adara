@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
+LOGGER("SMS.DataSource");
 
 #include <stdexcept>
 #include <sstream>
@@ -856,6 +856,8 @@ DataSource::DataSource( const std::string &name,
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
 	m_save_input_stream(save_input_stream)
 {
+	LOGGER_INIT();
+
 	// Snag an SMSControl Instance Handle _Exactly Once_...! ;-o
 	m_ctrl = SMSControl::getInstance();
 

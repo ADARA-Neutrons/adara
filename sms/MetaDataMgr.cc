@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.MetaDataMgr"));
+LOGGER("SMS.MetaDataMgr");
 
 #include <sstream>
 #include <string>
@@ -37,6 +37,8 @@ RateLimitedLogging::History RLLHistory_MetaDataMgr;
 
 MetaDataMgr::MetaDataMgr() : m_nextMappedDevId(1)
 {
+	LOGGER_INIT();
+
 	m_connection = StorageManager::onPrologue(
 				boost::bind( &MetaDataMgr::onPrologue, this, _1 ) );
 }

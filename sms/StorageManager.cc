@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
+LOGGER("SMS.StorageManager");
 
 #include <string>
 #include <fstream>
@@ -415,6 +415,8 @@ boost::thread StorageManager::m_ioThread;
 
 void StorageManager::config(const boost::property_tree::ptree &conf)
 {
+	LOGGER_INIT();
+
 	m_baseDir = conf.get<std::string>("storage.basedir", "");
 	if (!m_baseDir.length()) {
 		m_baseDir = conf.get<std::string>("sms.basedir");

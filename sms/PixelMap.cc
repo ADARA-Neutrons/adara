@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
+LOGGER("SMS.PixelMap");
 
 #include <fstream>
 #include <utility>
@@ -905,6 +905,8 @@ PixelMap::PixelMap(const std::string &path,
 	m_useOrigPixelMappingPkt(useOrigPixelMappingPkt),
 	m_numBanks(0)
 {
+	LOGGER_INIT();
+
 	std::auto_ptr<TempMap> map;
 	TempMap::iterator it, end;
 	std::set<uint32_t> banks;

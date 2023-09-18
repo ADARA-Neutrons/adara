@@ -1,7 +1,7 @@
 
 #include "../sms/Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("ADARA-Gen"));
+LOGGER("ADARA-Gen");
 
 #include <iostream>
 #include <vector>
@@ -596,6 +596,8 @@ static void block_signals(void)
 
 int main(int argc, char **argv)
 {
+	LOGGER_INIT();
+
 	parse_options(argc, argv);
 
 	block_signals();

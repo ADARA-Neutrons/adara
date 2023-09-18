@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.EventFd"));
+LOGGER("SMS.EventFd");
 
 #include <stdexcept>
 #include <sstream>
@@ -31,6 +31,8 @@ EventFd::EventFd( bool nonBlocking )
 EventFd::EventFd( callback cb )
 	: m_ready(NULL)
 {
+	LOGGER_INIT();
+
 	SMSControl *ctrl = SMSControl::getInstance();
 	m_nonBlocking = true;
 	init( EFD_NONBLOCK );

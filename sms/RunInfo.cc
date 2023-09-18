@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.RunInfo"));
+LOGGER("SMS.RunInfo");
 
 #include <string>
 #include <sstream>
@@ -407,6 +407,8 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 	m_runNumber(0), m_lastRunNumber(0),
 	m_packetValid(false), m_packet(NULL), m_packetSize(0)
 {
+	LOGGER_INIT();
+
 	std::string prefix(m_ctrl->getPVPrefix());
 	prefix += ":RunInfo:";
 

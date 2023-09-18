@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.SMSControlPV"));
+LOGGER("SMS.SMSControlPV");
 
 #include <sstream>
 
@@ -179,12 +179,16 @@ static gddAppFuncTableStatus getPassThruEnums(gdd &in)
 
 smsPV::smsPV() : m_interested(false)
 {
+	LOGGER_INIT();
+
 	initReadTable();
 }
 
 smsPV::smsPV(const std::string &name) :
 	m_pv_name(name), m_interested(false)
 {
+	LOGGER_INIT();
+
 	initReadTable();
 }
 

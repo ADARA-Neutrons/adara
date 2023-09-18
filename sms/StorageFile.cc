@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.StorageFile"));
+LOGGER("SMS.StorageFile");
 
 #include <string>
 
@@ -57,6 +57,8 @@ off_t StorageFile::m_max_file_size = 200 * 1024 * 1024;
 
 void StorageFile::config(const boost::property_tree::ptree &conf)
 {
+	LOGGER_INIT();
+
 	std::string val = conf.get<std::string>("storage.filesize", "");
 	if (val.length()) {
 		try {

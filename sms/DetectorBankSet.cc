@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.DetectorBankSet"));
+LOGGER("SMS.DetectorBankSet");
 
 #include <string>
 #include <sstream>
@@ -805,6 +805,8 @@ private:
 DetectorBankSet::DetectorBankSet(const boost::property_tree::ptree & conf)
 	: m_packet(NULL)
 {
+	LOGGER_INIT();
+
 	boost::property_tree::ptree::const_iterator it;
 	std::string conf_prefix("bankset ");
 	size_t b, e, plen = conf_prefix.length();

@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
+LOGGER("SMS.LiveClient");
 
 #include <sstream>
 #include <string>
@@ -39,6 +39,8 @@ double LiveClient::m_hello_timeout = 30.0;
 
 void LiveClient::config(const boost::property_tree::ptree &conf)
 {
+	LOGGER_INIT();
+
 	m_hello_timeout = conf.get<double>("livestream.hello_timeout", 30.0);
 
 	std::string size = conf.get<std::string>("livestream.maxsend", "2M");

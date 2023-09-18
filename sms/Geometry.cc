@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.Geometry"));
+LOGGER("SMS.Geometry");
 
 #include <boost/bind.hpp>
 #include <fstream>
@@ -14,6 +14,8 @@ static LoggerPtr logger(Logger::getLogger("SMS.Geometry"));
 
 Geometry::Geometry(const std::string &path)
 {
+	LOGGER_INIT();
+
 	uint32_t payloadSize, *fields;
 	size_t contentsSize;
 	struct timespec ts;

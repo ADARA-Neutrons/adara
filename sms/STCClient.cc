@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.STCClient"));
+LOGGER("SMS.STCClient");
 
 #include <string>
 #include <sstream>
@@ -50,6 +50,8 @@ STCClient::STCClient( int fd, StorageContainer::SharedPtr &run,
 	m_read(NULL), m_write(NULL), m_timer(NULL),
 	m_disp(STCClientMgr::CONNECTION_LOSS), m_reason("")
 {
+	LOGGER_INIT();
+
 	INFO("Initiating Translation of " << m_run->runNumber()
 		<< " SendPausedData=" << m_send_paused_data);
 

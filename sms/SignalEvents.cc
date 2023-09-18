@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.SignalEvents"));
+LOGGER("SMS.SignalEvents");
 
 #include <unistd.h>
 #include <errno.h>
@@ -17,6 +17,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.SignalEvents"));
 SignalEvents::SignalEvents()
 	: m_read(NULL), m_fd(-1)
 {
+	LOGGER_INIT();
 }
 
 SignalEvents::~SignalEvents()
