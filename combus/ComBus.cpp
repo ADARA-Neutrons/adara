@@ -17,11 +17,11 @@
 
 #include <syslog.h>
 
-#elif defined(LOGCXX_LOGGING)
+#elif defined(LOG4C_LOGGING)
 
 #include "../sms/Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("ADARA.ComBus"));
+LOGGER("ADARA.ComBus");
 
 #endif
 
@@ -286,6 +286,10 @@ Connection::Connection( std::string &a_domain,
     m_connection(0), m_session(0),
     m_reconnect_thread(0), m_reconn_retry(2), m_status_thread(0)
 {
+#if defined(LOG4C_LOGGING)
+    LOGGER_INIT();
+#endif
+
     exceptionLog("ComBus Connection() Entry", INFO_LOG);
 
     if ( g_inst )
@@ -1496,7 +1500,7 @@ Connection::exceptionLog( string a_msg, ADARA::ComBus::LogStatus a_status )
             m_log_err_prefix.c_str(), a_msg.c_str() );
     }
 
-#elif defined(LOGCXX_LOGGING)
+#elif defined(LOG4C_LOGGING)
 
     // Log4cxx Logging...
     if ( a_status == INFO_LOG )
