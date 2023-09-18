@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.Control"));
+LOGGER("SMS.Control");
 
 #include <string>
 #include <sstream>
@@ -155,6 +155,7 @@ public:
 	void changed(void)
 	{
 		std::string logLevelStr = value();
+#ifdef USE_LOG4CXX_LOGGING
 		if ( !logLevelStr.compare("OFF") )
 			log4cxx::Logger::getRootLogger()
 				->setLevel(log4cxx::Level::getOff());
@@ -192,6 +193,30 @@ public:
 			clock_gettime(CLOCK_REALTIME, &now);
 			update(logLevel->toString(), &now);
 		}
+#elif USE_LOG4CPP_LOGGING
+		try
+		{
+			log4cpp::Priority::Value logLevel =
+				log4cpp::Priority::getPriorityValue( logLevelStr );
+			log4cpp::Category::setRootPriority( logLevel );
+		}
+		catch ( std::invalid_argument &ia )
+		{
+			ERROR("LogLevelPV::changed(): Unknown LogLevel String"
+				<< " [" << logLevelStr << "]"
+				<< " - Ignoring, Reverting to Former LogLevel...");
+			// Restore Log4Cpp LogLevel String PV to Current LogLevel...
+			log4cpp::Priority::Value logLevel =
+				log4cpp::Category::getRootPriority();
+			const std::string &logName =
+				log4cpp::Priority::getPriorityName( logLevel );
+			ERROR("LogLevelPV::changed(): Setting LogLevel String PV to"
+				<< " [" << logName << "]");
+			struct timespec now;
+			clock_gettime(CLOCK_REALTIME, &now);
+			update(logName, &now);
+		}
+#endif
 	}
 };
 
@@ -339,6 +364,8 @@ SMSControl *SMSControl::m_singleton = NULL;
 
 void SMSControl::config(const boost::property_tree::ptree &conf)
 {
+	LOGGER_INIT();
+
 	m_version = conf.get<std::string>("sms.version");
 
 	std::string base = conf.get<std::string>("sms.basedir");
@@ -1146,10 +1173,20 @@ SMSControl::SMSControl() :
 	m_pvVersion->update(m_version, &now);
 
 	// Initialize Log4CXX LogLevel String PV...
+#ifdef USE_LOG4CXX_LOGGING
 	LevelPtr logLevel = log4cxx::Logger::getRootLogger()->getLevel();
 	DEBUG("SMSControl(): Starting LogLevel is"
 		<< " [" << logLevel->toString() << "]");
 	m_pvLogLevel->update(logLevel->toString(), &now);
+#elif USE_LOG4CPP_LOGGING
+	log4cpp::Priority::Value logLevel =
+		log4cpp::Category::getRootPriority();
+	const std::string &logName =
+		log4cpp::Priority::getPriorityName( logLevel );
+	DEBUG("SMSControl(): Starting LogLevel is"
+		<< " [" << logName << "]");
+	m_pvLogLevel->update(logName, &now);
+#endif
 
 	// Initialize the System Summary Status/Reason...
 
