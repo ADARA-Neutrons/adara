@@ -39,7 +39,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS"));
+LOGGER("SMS");
 
 #include <iostream>
 #include <stdexcept>
@@ -53,11 +53,18 @@ static LoggerPtr logger(Logger::getLogger("SMS"));
 #include <grp.h>
 #include <pwd.h>
 
+#ifdef USE_LOG4CXX_LOGGING
 #include <log4cxx/propertyconfigurator.h>
 #include <log4cxx/consoleappender.h>
 #include <log4cxx/patternlayout.h>
 #include <log4cxx/logmanager.h>
-#include <log4cxx/logger.h>
+#endif
+
+#ifdef USE_LOG4CPP_LOGGING
+#include "log4cpp/PropertyConfigurator.hh"
+#include "log4cpp/OstreamAppender.hh"
+#include "log4cpp/BasicLayout.hh"
+#endif
 
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
@@ -246,11 +253,13 @@ static void block_signals(void)
 	pthread_sigmask(SIG_BLOCK, &all, NULL);
 }
 
+#ifdef USE_LOG4CXX_LOGGING
 static void verify_log4cxx_config(void)
 {
 	LoggerPtr root = Logger::getRootLogger();
 	AppenderList appenders = root->getAllAppenders();
 	AppenderList::iterator ait, end = appenders.end();
+
 	bool missing_layout = false, console_present = false;
 	bool had_appender = false;
 
@@ -295,6 +304,61 @@ static void verify_log4cxx_config(void)
 		root->addAppender(console_appender);
 	}
 }
+#endif
+
+#ifdef USE_LOG4CPP_LOGGING
+static void verify_log4cpp_config(void)
+{
+	log4cpp::Category &root = log4cpp::Category::getRoot();
+	log4cpp::AppenderSet appenders = root.getAllAppenders();
+	log4cpp::AppenderSet::iterator ait, end = appenders.end();
+
+	bool missing_layout = false, console_present = false;
+	bool had_appender = false;
+
+	/* Loop through the root appenders and verify that there is a
+	 * layout for each one to avoid a segfault when we try to use it.
+	 * While we're looking, note if we see a console appender, as
+	 * we always want a copy of messages to go to the console during
+	 * startup.
+	 */
+	for (ait = appenders.begin(); ait != end; ++ait) {
+		log4cpp::Appender *a = *ait;
+
+		// Does this even make sense to check...? ;-D
+		if (!a->requiresLayout()) {
+			std::cerr << "LayoutAppender " << a->getName()
+				<< " is missing its layout" << std::endl;
+			missing_layout = true;
+		}
+
+		if (!a->getName().compare("console"))
+			console_present = true;
+
+		had_appender = true;
+	}
+
+	if (!had_appender) {
+		std::cerr << "No log appenders configured, aborting"
+			<< std::endl;
+		exit(1);
+	}
+
+	if (missing_layout)
+		exit(1);
+
+	if (console_present)
+		return;
+
+	/* No console present, add one temporarily */
+	if (create_temp_logger) {
+		console_appender =
+			new log4cpp::OstreamAppender("console", &std::cout);
+		console_appender->setLayout(new BasicLayout());
+		root.addAppender(console_appender);
+	}
+}
+#endif
 
 static void remove_temp_logger(void)
 {
@@ -304,8 +368,13 @@ static void remove_temp_logger(void)
 
 		DEBUG("remove_temp_logger()");
 
+#ifdef USE_LOG4CXX_LOGGING
 		LoggerPtr root = Logger::getRootLogger();
 		root->removeAppender(console_appender);
+#elif USE_LOG4CPP_LOGGING
+		log4cpp::Category &root = Category::getRoot();
+		root.removeAppender(console_appender);
+#endif
 
 		/* Not strictly necessary, but avoid using it in the future;
 		 * it was destroyed when we removed it from the root logger.
@@ -435,6 +504,8 @@ static void close_std_files(void)
 
 int main(int argc, char **argv)
 {
+	LOGGER_INIT();
+
 	ptree::ptree conf;
 
 	parse_options(argc, argv);
@@ -444,8 +515,30 @@ int main(int argc, char **argv)
 	 * also want to spit out error messages to the console before
 	 * becoming a daemon.
 	 */
+#ifdef USE_LOG4CXX_LOGGING
+
 	PropertyConfigurator::configure(log_conf);
 	verify_log4cxx_config();
+
+#elif USE_LOG4CPP_LOGGING
+
+	try
+	{
+		log4cpp::PropertyConfigurator::configure(log_conf);
+	}
+	catch ( log4cpp::ConfigureFailure &e )
+	{
+		std::cerr << "log4cpp Initialization Exception"
+			<< " Reading Logging Configuration File: "
+			<< log_conf
+			<< " - " << e.what()
+			<< std::endl;
+		exit(1);
+	}
+
+	verify_log4cpp_config();
+
+#endif
 
 	std::string version_str =
 		" SMSD Version " + SMSD_VERSION
