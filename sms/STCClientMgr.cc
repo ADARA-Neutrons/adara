@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.STCClientMgr"));
+LOGGER("SMS.STCClientMgr");
 
 #include <string>
 #include <sstream>
@@ -102,6 +102,8 @@ STCClientMgr::STCClientMgr() :
 	m_connections(0), m_queueMode(BALANCE), m_sendNext(OLDEST),
 	m_currentRun(0)
 {
+	LOGGER_INIT();
+
 	m_sigevent.sigev_notify = SIGEV_SIGNAL;
 	m_sigevent.sigev_signo = m_signalEvents->allocateRTsig(
 		boost::bind(&STCClientMgr::lookupComplete, this, _1));
@@ -430,13 +432,13 @@ void STCClientMgr::startConnect(void)
 		<< " Name=" << m_node
 		<< " Service=" << m_service
 		<< " Hints: Family=" << m_gai_hints.ai_family
-			<< " (" << ( AF_INET6 ) << ")"
+			<< " (" << (long) ( AF_INET6 ) << ")"
 		<< " Socktype=" << m_gai_hints.ai_socktype
-			<< " (" << ( SOCK_STREAM ) << ")"
+			<< " (" << (long) ( SOCK_STREAM ) << ")"
 		<< " Protocol=" << m_gai_hints.ai_protocol
-			<< " (" << ( IPPROTO_TCP ) << ")"
+			<< " (" << (long) ( IPPROTO_TCP ) << ")"
 		<< " Flags=" << m_gai_hints.ai_flags
-			<< " (" << ( AI_CANONNAME | AI_V4MAPPED ) << ")");
+			<< " (" << (long) ( AI_CANONNAME | AI_V4MAPPED ) << ")");
 
 	// Make Sure Something is Still Listening for Us...! ;-D
 	if ( !(m_signalEvents->valid()) ) {
