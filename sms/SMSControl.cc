@@ -118,6 +118,8 @@ uint32_t SMSControl::m_monitorTOFMask;
 uint32_t SMSControl::m_chopperTOFBits;
 uint32_t SMSControl::m_chopperTOFMask;
 
+bool SMSControl::m_enablePixelMapping;
+
 uint32_t SMSControl::m_verbose;
 
 class PopPulseBufferPV : public smsInt32PV {
@@ -513,6 +515,11 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 	m_chopperTOFMask = ((uint32_t) -1) >> (32 - m_chopperTOFBits);
 	INFO("Setting Chopper TOF Mask to 0x"
 		<< std::hex << m_chopperTOFMask << std::dec << ".");
+
+	m_enablePixelMapping =
+		conf.get<bool>("sms.enable_pixel_mapping", true);
+	INFO("Setting Enable Pixel Mapping Flag to "
+		<< ( ( m_enablePixelMapping ) ? "True" : "False" ));
 
 	m_verbose = conf.get<uint32_t>("sms.verbose", 0);
 	INFO("Setting SMS Verbose Value to " << m_verbose << ".");
@@ -1122,6 +1129,11 @@ SMSControl::SMSControl() :
 							+ "ChopperTOFBits", 0, INT32_MAX,
 						/* AutoSave */ true));
 
+	m_pvEnablePixelMapping = boost::shared_ptr<smsBooleanPV>(new
+						smsBooleanPV(m_pvPrefix + ":Control:"
+							+ "EnablePixelMapping",
+						/* AutoSave */ true));
+
 	m_pvVerbose = boost::shared_ptr<smsUint32PV>(new
 						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "Verbose", 0, INT32_MAX,
@@ -1160,6 +1172,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvIgnoreInterleavedSawtooth);
 	addPV(m_pvMonitorTOFBits);
 	addPV(m_pvChopperTOFBits);
+	addPV(m_pvEnablePixelMapping);
 	addPV(m_pvVerbose);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
@@ -1273,6 +1286,9 @@ SMSControl::SMSControl() :
 	// Initialize Chopper TOF Bits PV...
 	m_pvChopperTOFBits->update( m_chopperTOFBits, &now);
 
+	// Initialize Enable Pixel Mapping Flag...
+	m_pvEnablePixelMapping->update( m_enablePixelMapping, &now );
+
 	// Initialize SMS Verbose Value PV...
 	m_pvVerbose->update( m_verbose, &now);
 
@@ -1384,6 +1400,12 @@ SMSControl::SMSControl() :
 		m_chopperTOFMask = ((uint32_t) -1) >> (32 - m_chopperTOFBits);
 		INFO("Setting Chopper TOF Mask to 0x"
 			<< std::hex << m_chopperTOFMask << std::dec << ".");
+	}
+
+	if ( StorageManager::getAutoSavePV(
+			m_pvEnablePixelMapping->getName(), bvalue, ts ) ) {
+		m_enablePixelMapping = bvalue;
+		m_pvEnablePixelMapping->update(bvalue, &ts);
 	}
 
 	if ( StorageManager::getAutoSavePV(
@@ -4404,6 +4426,13 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 			INFO("Setting Chopper TOF Mask to 0x"
 				<< std::hex << m_chopperTOFMask << std::dec << ".");
 		}
+		// Enable Pixel Mapping
+		bool btmp = m_pvEnablePixelMapping->value();
+		if ( btmp != m_enablePixelMapping ) {
+			m_enablePixelMapping = btmp;
+			DEBUG("pulseEvents(): Setting EnablePixelMapping to "
+				<< m_enablePixelMapping);
+		}
 	}
 
 	ADARA::Event translated;
@@ -4466,11 +4495,20 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				// Already Mapped to Logical PixelId at Data Source...!
 				if (is_mapped) {
 					// PixelId Already Is Logical...!
-					logical = phys;
-					// Just Lookup Bank from Logical PixelId...
-					if (m_pixelMap->mapEventBank(base_phys, bank)) {
-						pulse->m_flags |=
-							ADARA::MAPPING_ERROR;
+					// (Use *base_phys* w/Any State Bits Stripped Out)
+					logical = base_phys;
+					// If Pixel Mapping is Enabled, Do Bank Lookup...
+					if (m_enablePixelMapping) {
+						// Just Lookup Bank from Logical PixelId...
+						if (m_pixelMap->mapEventBank(logical, bank)) {
+							pulse->m_flags |=
+								ADARA::MAPPING_ERROR;
+						}
+					}
+					// Else If Pixel Mapping is Disabled,
+					// Just Assume *One* Bank ID == 1...
+					else {
+						bank = 1;
 					}
 					bank += PixelMap::REAL_BANK_OFFSET;
 				}
@@ -4478,9 +4516,21 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				// Map Physical PixelId to Logical PixelId
 				// and Identify Detector Bank...
 				else {
-					if (m_pixelMap->mapEvent(base_phys, logical, bank)) {
-						pulse->m_flags |=
-							ADARA::MAPPING_ERROR;
+					// If Pixel Mapping is Enabled, Do Pixel/Bank Lookup...
+					if (m_enablePixelMapping) {
+						if (m_pixelMap->mapEvent(
+								base_phys, logical, bank)) {
+							pulse->m_flags |=
+								ADARA::MAPPING_ERROR;
+						}
+					}
+					// Else If Pixel Mapping is Disabled,
+					// Just Map Physical to Logical (Identical),
+					// And Assume *One* Bank ID == 1...
+					else {
+						// (Use *base_phys* w/Any State Bits Stripped Out)
+						logical = base_phys;
+						bank = 1;
 					}
 					bank += PixelMap::REAL_BANK_OFFSET;
 				}
