@@ -518,7 +518,7 @@ void SMSControl::config(const boost::property_tree::ptree &conf)
 
 	m_enablePixelMapping =
 		conf.get<bool>("sms.enable_pixel_mapping", true);
-	INFO("Setting Enable Pixel Mapping Flag to "
+	ERROR("Setting Enable Pixel Mapping Flag to "
 		<< ( ( m_enablePixelMapping ) ? "True" : "False" ));
 
 	m_verbose = conf.get<uint32_t>("sms.verbose", 0);
@@ -4430,7 +4430,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		bool btmp = m_pvEnablePixelMapping->value();
 		if ( btmp != m_enablePixelMapping ) {
 			m_enablePixelMapping = btmp;
-			DEBUG("pulseEvents(): Setting EnablePixelMapping to "
+			ERROR("pulseEvents(): Setting EnablePixelMapping to "
 				<< m_enablePixelMapping);
 		}
 	}
