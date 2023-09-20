@@ -1021,6 +1021,9 @@ private:
 	static uint32_t m_chopperTOFBits;
 	static uint32_t m_chopperTOFMask;
 
+	boost::shared_ptr<smsBooleanPV> m_pvEnablePixelMapping;
+	static bool m_enablePixelMapping;
+
 	boost::shared_ptr<smsUint32PV> m_pvVerbose;
 	static uint32_t m_verbose;
 

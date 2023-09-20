@@ -348,6 +348,14 @@ option_label[$num_options]="[Number of Chopper TOF Bits]"
 num_options=$(( num_options + 1 ))
 
 option_id_type[$num_options]="ctrl"
+option_name[$num_options]="enable_pixel_mapping"
+option_pv[$num_options]="Control:EnablePixelMapping"
+option_value_type[$num_options]="BOOL_VALUE(true/false)"
+option_default[$num_options]="true"
+option_label[$num_options]="[Enable Pixel Mapping Per Neutron Event]"
+num_options=$(( num_options + 1 ))
+
+option_id_type[$num_options]="ctrl"
 option_name[$num_options]="verbose"
 option_pv[$num_options]="Control:Verbose"
 option_value_type[$num_options]="UINT32_VALUE(verbose_logging_level)"
@@ -1795,6 +1803,7 @@ if [[ "$command" == "status" \
 		caget $WAIT ${PRE}:${SMS}:Control:BeamMonitorTOFBits
 		caget $WAIT ${PRE}:${SMS}:Control:ChopperTOFBits
 		caget $WAIT ${PRE}:${SMS}:Control:AlwaysSendBMConfig
+		caget $WAIT ${PRE}:${SMS}:Control:EnablePixelMapping
 		caget $WAIT ${PRE}:${SMS}:Control:Verbose
 
 		echo
