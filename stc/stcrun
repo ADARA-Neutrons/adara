@@ -37,9 +37,12 @@ for log in $files ; do
 	gzck=`echo $log | grep '.gz$' | wc | awk '{print $1}'`
 
 	if [[ $gzck == 1 ]]; then
-		zcat "$log" | grep "Run: ${runNumber} " | EXTRACT_PID
+		zcat "$log" \
+			| grep -e "Run: ${runNumber} " -e "Run: ${runNumber}$" \
+			| EXTRACT_PID
 	else
-		grep "Run: ${runNumber} " "$log" | EXTRACT_PID
+		grep -e "Run: ${runNumber} " -e "Run: ${runNumber}$" "$log" \
+			| EXTRACT_PID
 	fi
 
 done
