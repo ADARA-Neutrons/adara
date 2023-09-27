@@ -11,6 +11,7 @@ ADARA Port to RedHat9 - Installation Notes, September 2023
    -> readline-devel.x86_64
    -> autoconf.noarch automake.noarch libtool.x86_64
    -> hdf5.x86_64 hdf5-devel.x86_64
+   -> boost.x86_64 boost-devel.x86_64
    -> log4cpp.x86_64 log4cpp-devel.x86_64 log4cpp-doc.x86_64
 
 - Replacing Log4cxx with Log4cpp
