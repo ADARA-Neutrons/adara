@@ -15,8 +15,9 @@ LOGGER("SMS.DataSource");
 #include <fcntl.h>
 #include <time.h>
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/make_shared.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"

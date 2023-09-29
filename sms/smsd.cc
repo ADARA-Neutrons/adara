@@ -66,6 +66,7 @@ LOGGER("SMS");
 #include "log4cpp/BasicLayout.hh"
 #endif
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/program_options.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <boost/property_tree/ini_parser.hpp>

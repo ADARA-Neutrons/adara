@@ -9,7 +9,7 @@ LOGGER("SMS.BeamMonitorConfig");
 #include <stdint.h>
 #include <time.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAUtils.h"

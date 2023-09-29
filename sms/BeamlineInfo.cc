@@ -1,5 +1,6 @@
-#include <boost/bind.hpp>
 #include <stdint.h>
+
+#include <boost/bind/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAUtils.h"

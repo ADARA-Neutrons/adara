@@ -10,7 +10,7 @@ LOGGER("SMS.LiveServer");
 #include <netdb.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "EPICS.h"
 #include "StorageManager.h"

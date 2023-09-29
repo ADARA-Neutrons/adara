@@ -12,6 +12,7 @@ LOGGER("SMS.Control");
 #include <stdint.h>
 #include <ctype.h>
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/lexical_cast.hpp>
 #include <boost/make_shared.hpp>
 

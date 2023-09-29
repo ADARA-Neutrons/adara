@@ -11,7 +11,7 @@ LOGGER("SMS.LiveClient");
 #include <sys/sendfile.h>
 #include <stdint.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"

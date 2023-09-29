@@ -3,8 +3,11 @@
 #include <sstream>
 #include <activemq/commands/Command.h>
 #include <decaf/io/EOFException.h>
+
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/thread/locks.hpp>
 #include <boost/lexical_cast.hpp>
+
 #include <unistd.h>
 #include <cctype>
 #include <string>

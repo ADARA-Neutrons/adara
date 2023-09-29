@@ -1,6 +1,7 @@
 #ifndef __ADARA_PACKETS_H
 #define __ADARA_PACKETS_H
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/smart_ptr.hpp>
 
 #include <stdint.h>

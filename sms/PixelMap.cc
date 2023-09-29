@@ -17,7 +17,7 @@ LOGGER("SMS.PixelMap");
 #include <string.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAUtils.h"

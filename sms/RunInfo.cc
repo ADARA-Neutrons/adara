@@ -11,7 +11,7 @@ LOGGER("SMS.RunInfo");
 #include <gddApps.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"

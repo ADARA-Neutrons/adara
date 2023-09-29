@@ -9,7 +9,7 @@ LOGGER("SMS.ComBusSMSMon");
 #include <stdint.h>
 #include <string.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "StorageManager.h"
 #include "SMSControl.h"

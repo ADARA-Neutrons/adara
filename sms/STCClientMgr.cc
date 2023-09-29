@@ -14,7 +14,7 @@ LOGGER("SMS.STCClientMgr");
 #include <netdb.h>
 #include <time.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"

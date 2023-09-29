@@ -7,7 +7,7 @@ LOGGER("SMS.SignalEvents");
 #include <errno.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "EPICS.h"
 #include "ReadyAdapter.h"

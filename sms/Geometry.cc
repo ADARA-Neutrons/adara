@@ -3,7 +3,8 @@
 
 LOGGER("SMS.Geometry");
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
+
 #include <fstream>
 #include <stdint.h>
 

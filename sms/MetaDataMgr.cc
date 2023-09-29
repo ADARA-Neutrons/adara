@@ -10,8 +10,9 @@ LOGGER("SMS.MetaDataMgr");
 #include <stdint.h>
 #include <string.h>
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/make_shared.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAPackets.h"

@@ -1,9 +1,11 @@
 #ifndef __STORAGE_CONTAINER_H
 #define __STORAGE_CONTAINER_H
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/smart_ptr.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/signals2.hpp>
+
 #include <time.h>
 #include <stdint.h>
 #include <string>

@@ -10,7 +10,7 @@ LOGGER("SMS.DetectorBankSet");
 #include <stdint.h>
 #include <time.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAPackets.h"

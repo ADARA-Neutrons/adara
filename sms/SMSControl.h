@@ -1,6 +1,7 @@
 #ifndef __SMS_CONTROL_H
 #define __SMS_CONTROL_H
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/thread/mutex.hpp>

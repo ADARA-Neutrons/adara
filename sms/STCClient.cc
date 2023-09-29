@@ -12,6 +12,7 @@ LOGGER("SMS.STCClient");
 #include <sys/socket.h>
 #include <stdint.h>
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
