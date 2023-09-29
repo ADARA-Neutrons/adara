@@ -7,12 +7,104 @@ ADARA Port to RedHat9 - Installation Notes, September 2023
    -> python3-devel.x86_64 rpcgen.x86_64
    -> libtirpc-devel.x86_64
       => apparently missing "rpc/rpc.h",
-	  set "TIRPC=YES" in configure/CONFIG_SITE (EPICS "asyn" Module)
+      set "TIRPC=YES" in configure/CONFIG_SITE (EPICS "asyn" Module)
    -> readline-devel.x86_64
    -> autoconf.noarch automake.noarch libtool.x86_64
    -> hdf5.x86_64 hdf5-devel.x86_64
    -> boost.x86_64 boost-devel.x86_64
+   -> libuuid-devel.x86_64
    -> log4cpp.x86_64 log4cpp-devel.x86_64 log4cpp-doc.x86_64
+
+   -> ActiveMQ-CPP Version 3.9.3
+      => download source from:
+         http://archive.apache.org/dist/activemq/activemq-cpp/3.9.3/
+         * activemq-cpp-library-3.9.3-src.tar.gz (2271157)
+         * unpack into /usr/local/src/activemq-cpp-library-3.9.3
+         (cd /usr/local/src/ ; zcat *-src.tar.gz | sudo tar xvf -)
+      => patch src/main/decaf/internal/net/ssl/openssl/OpenSSLSocket.cpp
+         * replace extension->value->data with the
+         ASN1_STRING_data(X509_EXTENSION_get_data(extension))
+         * replace extension->value->length (twice) with the
+         ASN1_STRING_length(X509_EXTENSION_get_data(extension))
+         (as per "https://users.activemq.apache.narkive.com/Nbj6Ap3w/
+            activemq-cpp-3-9-4-fails-to-build-fedora-rawhide-
+            openssl-1-1-0e-related" post)
+      => install supporting packages:
+         cppunit.x86_64 cppunit-devel.x86_64 apr-devel.x86_64
+         doxygen.x86_64
+      => configure, make, make install
+      => sudo /bin/cp -i \
+         /usr/local/src/activemq-cpp-library-3.9.3/activemq-cpp.pc \
+         /usr/lib64/pkgconfig/
+
+- Latest G++ Compiler Warnings Treated as Error...
+   -> sms/*.cc: error: catching polymorphic type ‘...' by value
+   [-Werror=catch-value=] -> catch (po::unknown_option e)
+      => Almost always catch exceptions by const &. –Jesper Juhl,
+      StackOverflow May 26, 2020 at 20:06  :-D
+      => DONE. Committed to ADARA Git repo.
+   -> sms/*.cc: error: ‘template<class> class std::auto_ptr’ is deprecated:
+      => use 'std::unique_ptr' instead [-Werror=deprecated-declarations]
+      => DONE. Committed to ADARA Git repo.
+   -> EPICS 3.14.12.6 - GCC Bug from Versions 6.4 to 9.0 (and Beyond... ;-Q)
+      => epics/base/rel3.14.12.6_20230825/include/gddI.h:89:69:
+         error: implicitly-declared ‘constexpr aitTimeStamp&
+         aitTimeStamp::operator=(const aitTimeStamp&)’
+         is deprecated [-Werror=deprecated-copy]
+      => No Way to "Fix", as Even in Later GCC Versions it _Still_ shows
+         as a Warning, and ADARA is Built with -Werror -Wno-deprecated
+      => Rather than go in and try to Fix all the Ancient EPICS References,
+         just insert some Gruesome GCC Pragmas around EPICS #include... ;-b
+         * #pragma GCC diagnostic ignored "-Wdeprecated-copy"
+         * #include <casdef.h>, #include <cadef.h>, #include <fdManager.h>
+         * #pragma GCC diagnostic pop
+      => Also Another Deprecated GCC Issue -
+         error: ‘void* memcpy(void*, const void*, size_t)’ writing to an
+         object of type ‘class gdd’ with no trivial copy-assignment;
+         use copy-assignment or copy-initialization instead
+         [-Werror=class-memaccess]
+         * #pragma GCC diagnostic ignored "-Wclass-memaccess"
+         * #include <casdef.h>
+         * #pragma GCC diagnostic pop
+      => DONE. Committed to ADARA Git repo.
+   -> ActiveMQ-CPP, Same error: ‘template<class> class std::auto_ptr’
+      is deprecated: use 'std::unique_ptr' instead
+      [-Werror=deprecated-declarations]
+      => Rather than fiddle with modifying the ActiveMQ-CPP Library
+         that I already had to Snarf & Build from Source, Just Pragma Away!
+         * #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+         * #include <activemq/*>
+         * #pragma GCC diagnostic pop
+      => DONE. Committed to ADARA Git repo.
+   -> Fix "Fall Through" Switch Cases in ADARA/sms/utils.cc parse_size()
+      => apparently it's no longer kosher to have "Fall Through" Cases in
+         a Switch statement, in the latest GCC incarnation... ;-)
+         * so, since it was "on purpose" in parse_size(), just add
+           a "[[fallthrough]];" directive to tell GCC to leave us the
+           heck alone, lol... ;-D
+         * Amazingly, This Worked. ;-D
+      => DONE. Committed to ADARA Git repo.
+   -> Account for infamous Boost Bind Global Placeholders... ;-Q
+      => /usr/include/boost/bind.hpp:36:1: note: ‘#pragma message:
+         The practice of declaring the Bind placeholders (_1, _2, ...)
+         in the global namespace is deprecated. Please use
+         <boost/bind/bind.hpp> + using namespace boost::placeholders,
+         or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the
+         current behavior.’
+      => thoroughly stepped through each ADARA source file and header
+         to identify all the places where this issue has cropped up now
+         on Rhel9, and in each case either:
+         * change from #include <boost/bind.hpp> to instead
+           #include <boost/bind/bind.hpp>, which does not put the
+           boost:: placeholders in global namespace.
+         * add the diabolical Boost Pragma Define
+           #define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
+      => Thanks for the confirmation of this mess from StackOverflow and
+         specifically the answer from petke on Jan 20, 2021 at 16:04,
+         https://stackoverflow.com/questions/53203970/
+         why-boostbind-insists-pulling-boostplaceholders-into-
+         global-namespace ;-Q
+      => DONE. Committed to ADARA Git repo.
 
 - Replacing Log4cxx with Log4cpp
 
