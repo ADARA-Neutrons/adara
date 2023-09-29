@@ -4,7 +4,10 @@
 // Note: Assumes #including File has #included sms/Logging.h for Logging...
 
 #include <boost/function.hpp>
+
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <fdManager.h>
+#pragma GCC diagnostic pop
 
 class ReadyAdapter : public fdReg {
 public:

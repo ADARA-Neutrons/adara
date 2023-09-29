@@ -13,8 +13,12 @@
 #include <bitset>
 #include <set>
 
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#pragma GCC diagnostic ignored "-Wclass-memaccess"
 #include <casdef.h>
 #include <cadef.h>
+#pragma GCC diagnostic pop
+#pragma GCC diagnostic pop
 
 #include "ADARA.h"
 #include "ADARAUtils.h"

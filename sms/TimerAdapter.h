@@ -1,7 +1,10 @@
 #ifndef __TIMER_ADAPTER_H
 #define __TIMER_ADAPTER_H
 
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <fdManager.h>
+#pragma GCC diagnostic pop
+
 #include <epicsTimer.h>
 
 #include "ADARAUtils.h"

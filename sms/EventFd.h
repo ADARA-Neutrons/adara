@@ -2,7 +2,11 @@
 #define __EVENT_FD_H
 
 #include <boost/function.hpp>
+
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #include <fdManager.h>
+#pragma GCC diagnostic pop
+
 #include <stdint.h>
 
 #include "ReadyAdapter.h"
