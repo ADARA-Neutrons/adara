@@ -26,12 +26,16 @@ uint64_t parse_size(const std::string &val)
 	switch(*end) {
 	case 'p': case 'P': /* petabytes */
 		tmp = checked_multiply(tmp, 1024);
+		[[fallthrough]];
 	case 't': case 'T': /* terabytes */
 		tmp = checked_multiply(tmp, 1024);
+		[[fallthrough]];
 	case 'g': case 'G': /* gigabytes */
 		tmp = checked_multiply(tmp, 1024);
+		[[fallthrough]];
 	case 'm': case 'M': /* megabytes */
 		tmp = checked_multiply(tmp, 1024);
+		[[fallthrough]];
 	case 'k': case 'K': /* kilobytes */
 		tmp = checked_multiply(tmp, 1024);
 		end++;
