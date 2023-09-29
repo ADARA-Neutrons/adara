@@ -116,7 +116,7 @@ static void parse_options(int argc, char **argv)
 	try {
 		po::store(po::parse_command_line(argc, argv, desc), vm);
 		po::notify(vm);
-	} catch (po::unknown_option e) {
+	} catch (po::unknown_option &e) {
 		std::cerr << argv[0] << ": " << e.what() << std::endl
 			<< std::endl << desc << std::endl;
 		exit(2);
@@ -200,7 +200,7 @@ static void load_config(const char *pname, ptree::ptree &conf,
 {
 	try {
 		ptree::read_ini(config_file, conf);
-	} catch (ptree::ini_parser_error e) {
+	} catch (ptree::ini_parser_error &e) {
 		std::cerr << pname << ": Unable to parse configuration file"
 			<< std::endl;
 		std::cerr << pname << ": " << e.what() << std::endl;
@@ -568,7 +568,7 @@ int main(int argc, char **argv)
 	/* Try to Configure the SMS Daemon... (Catch Exceptions Dagnabbit.) */
 	try {
 		load_config(argv[0], conf, version_str);
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		ERROR("Failed to Start (Load Config): " << e.what());
 		exit(1);
 	} catch (...) {
@@ -588,7 +588,7 @@ int main(int argc, char **argv)
 		STCClientMgr::init();
 
 		SMSControl::late_config(conf);
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		ERROR("Failed to Start (Init): " << e.what());
 		exit(1);
 	} catch (...) {
@@ -599,7 +599,7 @@ int main(int argc, char **argv)
 	try {
 		StorageManager::lateInit();
 		remove_temp_logger();
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		ERROR("Failed to Start (Late Init): " << e.what());
 		release_parent(CHILD_INIT_FAILED);
 		exit(1);
@@ -626,7 +626,7 @@ int main(int argc, char **argv)
 				errno = 0;
 			}
 		}
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		ERROR("Dying on an Unexpected/Unhandled Exception: " << e.what());
 		exit(1);
 	} catch (...) {
