@@ -63,7 +63,7 @@ void StorageFile::config(const boost::property_tree::ptree &conf)
 	if (val.length()) {
 		try {
 			m_max_file_size = parse_size(val);
-		} catch (std::runtime_error e) {
+		} catch (std::runtime_error &e) {
 			std::string msg("config(): Unable to parse max file size: ");
 			msg += e.what();
 			ERROR(msg);
@@ -75,7 +75,7 @@ void StorageFile::config(const boost::property_tree::ptree &conf)
 	if (val.length()) {
 		try {
 			m_max_sync_distance = parse_size(val);
-		} catch (std::runtime_error e) {
+		} catch (std::runtime_error &e) {
 			std::string msg("config(): Unable to parse sync distance: ");
 			msg += e.what();
 			ERROR(msg);
@@ -961,7 +961,7 @@ StorageFile::SharedPtr StorageFile::importFile(OwnerPtr owner,
 	// (Whine Loudly Tho... ;-D)
 	try {
 		f->open(O_RDONLY);
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		std::string msg("importFile(");
 		msg += path;
 		msg += ") Open Error: ";
@@ -1056,7 +1056,7 @@ bool StorageFile::catFile(StorageFile::SharedPtr src)
 	// Open Source File & Retrieve File Descriptor...
 	try {
 		src_fd = src->get_fd();
-	} catch (std::runtime_error re) {
+	} catch (std::runtime_error &re) {
 		ERROR("catFile():"
 			<< " [" << m_path << "]"
 			<< " Unable to Open Source File "

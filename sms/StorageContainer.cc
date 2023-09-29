@@ -2418,7 +2418,7 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 			purged += size;
 
 			fit = files.erase(fit);
-		} catch (fs::filesystem_error err) {
+		} catch (fs::filesystem_error &err) {
 			WARN("Error purging container: " << err.what());
 			++fit;
 			continue;
@@ -2456,7 +2456,7 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 			if ( ctrl->verbose() > 2 ) {
 				DEBUG("Removed container " << base);
 			}
-		} catch(fs::filesystem_error err) {
+		} catch(fs::filesystem_error &err) {
 			WARN("Error removing container: " << err.what());
 			path_deleted = false;
 		}

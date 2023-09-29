@@ -630,7 +630,7 @@ void SMSControl::addSource(const std::string &name,
 	std::string val = info.get<std::string>("readsize", "4M");
 	try {
 		chunk_size = parse_size(val);
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		std::string msg("Unable to parse read size for source '");
 		msg += name;
 		msg += "': ";
@@ -2837,7 +2837,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 					m_currentRunNumber, m_runInfo->getPropId() );
 			}
 			// Logic Error...! ;-O
-			catch ( std::logic_error e ) {
+			catch ( std::logic_error &e ) {
 				ERROR("Failed to Start Run " << m_currentRunNumber
 					<< " - LOGIC Error! (" << e.what() << ")");
 				// Run Didn't Start, Clear Run Number
@@ -2859,7 +2859,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 				return false;
 			}
 			// RunTime Error... ;-b
-			catch ( std::runtime_error e ) {
+			catch ( std::runtime_error &e ) {
 				ERROR("Transient RunTime Error Trying to Start Run "
 					<< m_currentRunNumber
 					<< " - " << e.what() << ", retry_count=" << try_count);
@@ -2958,7 +2958,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 				StorageManager::stopRecording( (*ts) ); // Wallclock Time
 			}
 			// Logic Error...! ;-O
-			catch ( std::logic_error e ) {
+			catch ( std::logic_error &e ) {
 				ERROR("Failed to Stop Run " << save_current_run_number
 					<< " - LOGIC Error! (" << e.what() << ")");
 				// Run Failed to Stop...!
@@ -2974,7 +2974,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 				return false;
 			}
 			// RunTime Error... ;-b
-			catch ( std::runtime_error e ) {
+			catch ( std::runtime_error &e ) {
 				ERROR("Transient RunTime Error Trying to Stop Run "
 					<< save_current_run_number
 					<< " - " << e.what() << ", retry_count=" << try_count);
@@ -5298,7 +5298,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 
 		buildFastMetaPackets(pulse);
 
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		ERROR( ( m_recording ? "[RECORDING] " : "" )
 			<< "Failed to record pulse: "
 			<< " id=0x" << std::hex << pulse->m_id.first

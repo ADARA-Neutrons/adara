@@ -35,7 +35,7 @@ void STCClient::config(const boost::property_tree::ptree &conf)
 	std::string chunk = conf.get<std::string>("stcclient.maxsend", "2M");
 	try {
 		m_max_send_chunk = parse_size(chunk);
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		std::string msg("Unable to parse STC max send: ");
 		msg += e.what();
 		throw std::runtime_error(msg);
@@ -301,7 +301,7 @@ void STCClient::writable(void)
 			{
 				m_file_fd = f->get_fd();
 			}
-			catch ( std::runtime_error re )
+			catch ( std::runtime_error &re )
 			{
 				// Decode Any Mode Index from the File Index
 				// (SMS After 1.7.0)
@@ -710,7 +710,7 @@ void STCClient::readable(void)
 				 << " log_info=(" << log_info << ")");
 		}
 	}
-	catch (ADARA::invalid_packet e) {
+	catch (ADARA::invalid_packet &e) {
 		std::stringstream ss;
 		ss << "Got invalid packet from STC: " << e.what();
 		ERROR( ss.str() );

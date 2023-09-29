@@ -73,7 +73,7 @@ public:
 		if ( poolsize.length() && poolsize.compare("(unset)") ) {
 			try {
 				maxSize = parse_size(poolsize);
-			} catch (std::runtime_error e) {
+			} catch (std::runtime_error &e) {
 				std::string msg("Unable to parse storage pool size: ");
 				msg += e.what();
 				DEBUG("PoolsizePV changed(): " << msg);
@@ -458,7 +458,7 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 		if (m_poolsize.length()) {
 			try {
 				maxSize = parse_size(m_poolsize);
-			} catch (std::runtime_error e) {
+			} catch (std::runtime_error &e) {
 				std::string msg("Unable to parse storage pool size: ");
 				msg += e.what();
 				throw std::runtime_error(msg);
@@ -3142,7 +3142,7 @@ bool StorageManager::parseAutoSaveFile(void)
 				std::pair<std::string, std::string>(
 					pv_time, pv_value_out );
 		}
-		catch (std::runtime_error e) {
+		catch (std::runtime_error &e) {
 			ERROR("parseAutoSaveFile():"
 				<< " Exception Parsing AutoSave File"
 				<< " [" << m_autosave_filename << "]"
@@ -3638,7 +3638,7 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 	daily_deleted = true;
 	try {
 		fs::remove(fs::path(dir));
-	} catch (fs::filesystem_error e) {
+	} catch (fs::filesystem_error &e) {
 		daily_deleted = false;
 	}
 
@@ -3751,7 +3751,7 @@ static void removeIndexDir(fs::path *indexDir)
 	try {
 		DEBUG("removeIndexDir " << *indexDir);
 		fs::remove_all(*indexDir);
-	} catch (fs::filesystem_error err) {
+	} catch (fs::filesystem_error &err) {
 		WARN("Error removing index: " << err.what());
 	}
 

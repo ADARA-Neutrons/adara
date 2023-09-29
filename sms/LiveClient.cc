@@ -46,7 +46,7 @@ void LiveClient::config(const boost::property_tree::ptree &conf)
 	std::string size = conf.get<std::string>("livestream.maxsend", "2M");
 	try {
 		m_max_send_chunk = parse_size(size);
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		std::string msg("Unable to parse livestream max send size: ");
 		msg += e.what();
 		ERROR("config(): " << msg);
@@ -321,7 +321,7 @@ void LiveClient::writable(void)
 			{
 				m_file_fd = f->get_fd();
 			}
-			catch ( std::runtime_error re )
+			catch ( std::runtime_error &re )
 			{
 				std::string cname;
 				StorageContainer::SharedPtr c;
@@ -1017,7 +1017,7 @@ void LiveClient::readable(void)
 			delete this;
 			return;
 		}
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		/* Rate-limited logging of LiveClient read exception? */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_LiveClient,
