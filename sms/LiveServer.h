@@ -35,7 +35,7 @@ private:
 	static std::string m_service;
 	static std::string m_host;
 
-	std::auto_ptr<TimerAdapter<LiveServer> > m_listen_timer;
+	std::unique_ptr<TimerAdapter<LiveServer> > m_listen_timer;
 
 	static double m_listen_retry;
 

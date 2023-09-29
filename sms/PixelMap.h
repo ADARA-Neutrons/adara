@@ -60,7 +60,7 @@ public:
 	}
 
 private:
-	std::auto_ptr<TempMap> readMap(const std::string &path);
+	std::unique_ptr<TempMap> readMap(const std::string &path);
 
 	boost::shared_array<uint8_t> genAltPacket(TempMap *map,
 		uint32_t &packetSize);

@@ -1193,10 +1193,10 @@ Connection::postWorkflow( MessageBase &a_msg )
 
         try
         {
-            auto_ptr<cms::Queue> q( m_session->createQueue(
+            unique_ptr<cms::Queue> q( m_session->createQueue(
                 "POSTPROCESS.DATA_READY" ));
 
-            auto_ptr<cms::MessageProducer> producer(
+            unique_ptr<cms::MessageProducer> producer(
                 m_session->createProducer( q.get()) );
 
             cmsmsg = m_session->createTextMessage();
