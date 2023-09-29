@@ -7,7 +7,6 @@ LOGGER("SMS.EventFd");
 #include <sstream>
 #include <memory>
 
-#include <fdManager.h>
 #include <sys/eventfd.h>
 #include <stdint.h>
 #include <errno.h>
