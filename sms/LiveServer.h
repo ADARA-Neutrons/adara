@@ -35,7 +35,12 @@ private:
 	static std::string m_service;
 	static std::string m_host;
 
-	std::unique_ptr<TimerAdapter<LiveServer> > m_listen_timer;
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+	std::unique_ptr<TimerAdapter<LiveServer> >
+#else
+	std::auto_ptr<TimerAdapter<LiveServer> >
+#endif
+		m_listen_timer;
 
 	static double m_listen_retry;
 

@@ -1,9 +1,13 @@
 #ifndef __TIMER_ADAPTER_H
 #define __TIMER_ADAPTER_H
 
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
 #pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#endif
 #include <fdManager.h>
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
 #pragma GCC diagnostic pop
+#endif
 
 #include <epicsTimer.h>
 

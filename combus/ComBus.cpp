@@ -1196,11 +1196,19 @@ Connection::postWorkflow( MessageBase &a_msg )
 
         try
         {
-            unique_ptr<cms::Queue> q( m_session->createQueue(
-                "POSTPROCESS.DATA_READY" ));
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+            unique_ptr<cms::Queue>
+#else
+            auto_ptr<cms::Queue>
+#endif
+                q( m_session->createQueue( "POSTPROCESS.DATA_READY" ) );
 
-            unique_ptr<cms::MessageProducer> producer(
-                m_session->createProducer( q.get()) );
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+            unique_ptr<cms::MessageProducer>
+#else
+            auto_ptr<cms::MessageProducer>
+#endif
+                producer( m_session->createProducer( q.get() ) );
 
             cmsmsg = m_session->createTextMessage();
             a_msg.serialize( *cmsmsg );

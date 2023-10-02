@@ -25,10 +25,19 @@ LOGGER("SMS.PixelMap");
 #include "SMSControl.h"
 #include "StorageManager.h"
 
-std::unique_ptr<PixelMap::TempMap> PixelMap::readMap(
-		const std::string &path)
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+std::unique_ptr<PixelMap::TempMap>
+#else
+std::auto_ptr<PixelMap::TempMap>
+#endif
+	PixelMap::readMap(const std::string &path)
 {
-	std::unique_ptr<TempMap> map(new TempMap);
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+	std::unique_ptr<TempMap>
+#else
+	std::auto_ptr<TempMap>
+#endif
+		map(new TempMap);
 
 	std::set<uint32_t> output_pixels;
 
@@ -908,7 +917,13 @@ PixelMap::PixelMap(const std::string &path,
 {
 	LOGGER_INIT();
 
-	std::unique_ptr<TempMap> map;
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+	std::unique_ptr<TempMap>
+#else
+	std::auto_ptr<TempMap>
+#endif
+		map;
+
 	TempMap::iterator it, end;
 	std::set<uint32_t> banks;
 	uint32_t max_logical = 0;

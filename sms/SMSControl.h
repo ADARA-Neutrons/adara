@@ -14,12 +14,16 @@
 #include <bitset>
 #include <set>
 
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
 #pragma GCC diagnostic ignored "-Wdeprecated-copy"
 #pragma GCC diagnostic ignored "-Wclass-memaccess"
+#endif
 #include <casdef.h>
 #include <cadef.h>
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
 #pragma GCC diagnostic pop
 #pragma GCC diagnostic pop
+#endif
 
 #include "ADARA.h"
 #include "ADARAUtils.h"
