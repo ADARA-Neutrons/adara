@@ -27,5 +27,5 @@ PVStreamer_pvsd_pvsd_LDFLAGS = $(EPICS_LDFLAGS)
 PVStreamer_pvsd_pvsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS) \
     $(apr_LIBS) $(libxml_LIBS) \
     -lboost_filesystem -lboost_system -lboost_program_options \
-    -lboost_thread-mt -lrt
+    -lboost_thread -lrt
 

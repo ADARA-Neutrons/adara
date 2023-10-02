@@ -44,7 +44,7 @@ HEADERS  += \
     ../../combus/ComBusDefs.h \
     style.h
 
-unix:LIBS += -lboost_thread-mt -lboost_program_options -lactivemq-cpp
+unix:LIBS += -lboost_thread -lboost_program_options -lactivemq-cpp
 
 FORMS    += \
     AMQConfigDialog.ui \

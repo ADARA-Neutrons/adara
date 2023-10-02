@@ -21,7 +21,7 @@ dasmon_server_dasmond_CPPFLAGS = -Idasmon/common -Icombus \
 dasmon_server_dasmond_CXXFLAGS = $(AM_CXXFLAGS) -Wno-unused-but-set-variable
 
 # TODO pick up most of these from autoconf
-dasmon_server_dasmond_LDADD = -lboost_program_options -lboost_thread-mt \
+dasmon_server_dasmond_LDADD = -lboost_program_options -lboost_thread \
 			-L/usr/pgsql-14/lib/ \
 			-lboost_filesystem -lpq $(activemq_LIBS) $(apr_LIBS) \
 			$(libxml_LIBS)
