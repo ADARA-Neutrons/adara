@@ -22,7 +22,6 @@ sms_smsd_LDFLAGS = $(EPICS_LDFLAGS) \
 		$(log4cpp_LDFLAGS) $(liblog4cxx_LDFLAGS) $(AM_LDFLAGS)
 sms_smsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS) \
 		$(log4cpp_LIBS) $(liblog4cxx_LIBS) \
-		-lboost_signals \
 		-lboost_program_options -lboost_filesystem -lboost_system \
 		-lboost_thread-mt -lpthread
 
@@ -44,6 +43,7 @@ sms_test_storage_test_LDFLAGS = $(EPICS_LDFLAGS) \
 		$(log4cpp_LDFLAGS) $(liblog4cxx_LDFLAGS) \
 		$(AM_LDFLAGS)
 sms_test_storage_test_LDADD = $(EPICS_LIBS) $(activemq_LIBS) \
-		$(log4cpp_LIBS) $(liblog4cxx_LIBS) -lboost_signals \
+		$(log4cpp_LIBS) $(liblog4cxx_LIBS) \
 		-lboost_filesystem -lboost_system -lboost_thread-mt \
 		-lpthread
+
