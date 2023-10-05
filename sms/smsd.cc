@@ -257,12 +257,18 @@ static void block_signals(void)
 #ifdef USE_LOG4CXX_LOGGING
 static void verify_log4cxx_config(void)
 {
+	std::cerr << "LOGGER:"
+		<< " Using Log4Cxx Logging." << std::endl;
+
 	LoggerPtr root = Logger::getRootLogger();
 	AppenderList appenders = root->getAllAppenders();
 	AppenderList::iterator ait, end = appenders.end();
 
 	bool missing_layout = false, console_present = false;
 	bool had_appender = false;
+
+	std::cerr << "LOGGER:"
+		<< " " << appenders.size() << " Appenders Found." << std::endl;
 
 	/* Loop through the root appenders and verify that there is a
 	 * layout for each one to avoid a segfault when we try to use it.
@@ -273,32 +279,52 @@ static void verify_log4cxx_config(void)
 	for (ait = appenders.begin(); ait != end; ++ait) {
 		Appender *a = *ait;
 
+		std::cerr << "LOGGER:"
+			<< " Appender " << a->getName() << " found." << std::endl;
+
 		if (a->getLayout() == NULL) {
-			std::cerr << "Appender " << a->getName()
+			std::cerr << "LOGGER:"
+				<< " Appender " << a->getName()
 				<< " is missing its layout" << std::endl;
 			missing_layout = true;
 		}
 
-		if (dynamic_cast<ConsoleAppender *>(a))
+		if (dynamic_cast<ConsoleAppender *>(a)) {
+			std::cerr << "LOGGER:"
+				<< " Appender " << a->getName()
+				<< " is a Console." << std::endl;
 			console_present = true;
+		}
 
 		had_appender = true;
 	}
 
+	std::cerr << "LOGGER:" << " All Appenders Checked." << std::endl;
+
 	if (!had_appender) {
-		std::cerr << "No log appenders configured, aborting"
+		std::cerr << "LOGGER:"
+			<< " No log appenders configured, aborting"
 			<< std::endl;
 		exit(1);
 	}
 
-	if (missing_layout)
+	if (missing_layout) {
+		std::cerr << "LOGGER:"
+			<< " Missing Appender Layout, aborting" << std::endl;
 		exit(1);
+	}
 
-	if (console_present)
+	if (console_present) {
+		std::cerr << "LOGGER:"
+			<< " Console is Present - Done." << std::endl;
 		return;
+	}
 
 	/* No console present, add one temporarily */
 	if (create_temp_logger) {
+		std::cerr << "LOGGER:"
+			<< " No Console Found"
+			<< " - Creating Temporary Logger." << std::endl;
 		static const LogString pattern(LOG4CXX_STR("%c %p: %m%n"));
 		LayoutPtr layout(new PatternLayout(pattern));
 		console_appender = new ConsoleAppender(layout);
@@ -310,12 +336,18 @@ static void verify_log4cxx_config(void)
 #ifdef USE_LOG4CPP_LOGGING
 static void verify_log4cpp_config(void)
 {
+	std::cerr << "LOGGER:"
+		<< " Using Log4Cpp Logging." << std::endl;
+
 	log4cpp::Category &root = log4cpp::Category::getRoot();
 	log4cpp::AppenderSet appenders = root.getAllAppenders();
 	log4cpp::AppenderSet::iterator ait, end = appenders.end();
 
 	bool missing_layout = false, console_present = false;
 	bool had_appender = false;
+
+	std::cerr << "LOGGER:"
+		<< " " << appenders.size() << " Appenders Found." << std::endl;
 
 	/* Loop through the root appenders and verify that there is a
 	 * layout for each one to avoid a segfault when we try to use it.
@@ -326,33 +358,53 @@ static void verify_log4cpp_config(void)
 	for (ait = appenders.begin(); ait != end; ++ait) {
 		log4cpp::Appender *a = *ait;
 
+		std::cerr << "LOGGER:"
+			<< " Appender " << a->getName() << " found." << std::endl;
+
 		// Does this even make sense to check...? ;-D
 		if (!a->requiresLayout()) {
-			std::cerr << "LayoutAppender " << a->getName()
+			std::cerr << "LOGGER:"
+				<< " LayoutAppender " << a->getName()
 				<< " is missing its layout" << std::endl;
 			missing_layout = true;
 		}
 
-		if (!a->getName().compare("console"))
+		if (!a->getName().compare("console")) {
+			std::cerr << "LOGGER:"
+				<< " Appender " << a->getName()
+				<< " is a Console." << std::endl;
 			console_present = true;
+		}
 
 		had_appender = true;
 	}
 
+	std::cerr << "LOGGER:" << " All Appenders Checked." << std::endl;
+
 	if (!had_appender) {
-		std::cerr << "No log appenders configured, aborting"
+		std::cerr << "LOGGER:"
+			<< " No log appenders configured, aborting"
 			<< std::endl;
 		exit(1);
 	}
 
-	if (missing_layout)
+	if (missing_layout) {
+		std::cerr << "LOGGER:"
+			<< " Missing Appender Layout, aborting" << std::endl;
 		exit(1);
+	}
 
-	if (console_present)
+	if (console_present) {
+		std::cerr << "LOGGER:"
+			<< " Console is Present - Done." << std::endl;
 		return;
+	}
 
 	/* No console present, add one temporarily */
 	if (create_temp_logger) {
+		std::cerr << "LOGGER:"
+			<< " No Console Found"
+			<< " - Creating Temporary Logger." << std::endl;
 		console_appender =
 			new log4cpp::OstreamAppender("console", &std::cout);
 		console_appender->setLayout(new BasicLayout());
@@ -367,7 +419,7 @@ static void remove_temp_logger(void)
 	 */
 	if (console_appender) {
 
-		DEBUG("remove_temp_logger()");
+		DEBUG("LOGGER: remove_temp_logger() - Removing Temporary Logger.");
 
 #ifdef USE_LOG4CXX_LOGGING
 		LoggerPtr root = Logger::getRootLogger();
@@ -516,6 +568,10 @@ int main(int argc, char **argv)
 	 * also want to spit out error messages to the console before
 	 * becoming a daemon.
 	 */
+
+	std::cerr << "LOGGER:"
+		<< " Configuring Logging from " << log_conf << std::endl;
+
 #ifdef USE_LOG4CXX_LOGGING
 
 	PropertyConfigurator::configure(log_conf);
@@ -529,7 +585,8 @@ int main(int argc, char **argv)
 	}
 	catch ( log4cpp::ConfigureFailure &e )
 	{
-		std::cerr << "log4cpp Initialization Exception"
+		std::cerr << "LOGGER:"
+			<< " Log4Cpp Initialization Exception"
 			<< " Reading Logging Configuration File: "
 			<< log_conf
 			<< " - " << e.what()
@@ -540,6 +597,9 @@ int main(int argc, char **argv)
 	verify_log4cpp_config();
 
 #endif
+
+	std::cerr << "LOGGER:"
+		<< " Logging Initialized." << std::endl;
 
 	std::string version_str =
 		" SMSD Version " + SMSD_VERSION
