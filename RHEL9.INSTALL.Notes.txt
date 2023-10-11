@@ -109,15 +109,36 @@ ADARA Port to RedHat9 - Installation Notes, September 2023
       => wrap the new #pragmas, auto_ptr -> unique_ptr and fallthrough with:
          #if defined(__GNUC__) && __GNUC_PREREQ(11,0)
       => also, turns out we were unnecessarily linking with Old Boost Libs
-	  that we don't actually need, or have gone away/changed names... ;-D
-	     * -lboost_signals was for old Boost.Signals, we switched to the
+         that we don't actually need, or have gone away/changed names... ;-D
+         * -lboost_signals was for old Boost.Signals, we switched to the
            "New" Boost.Signals2 library back in 2013, lololol... ;-D
          * turns out -lboost_thread-mt has been equivalent to -lboost_thread
            for Ages now as well, since well before boost-devel-1.53 (Rhel7)
-		   so we can unilaterally just switch to -lboost_thread, lol... ;-D
+           so we can unilaterally just switch to -lboost_thread, lol... ;-D
            - Rhel7: lrwxrwxrwx 1 root root 21 Apr 5 2020
              /usr/lib64/libboost_thread.so -> libboost_thread-mt.so
              (which is Good because Boost doesn't use Pkg-Config... ;-b)
+         * formerly in Rhel7 we were also linking with the multi-threaded
+           version of the boost_regex library, -lboost_regex-mt, but
+           the latest modern version of Boost doesn't even _Have_ a
+           multi-threaded version of the boost_regex library... ;-b
+           - looks like our use of Boost Regex in the ADARA/STC is all
+             "local" and so no worries of multi-threadedness are present.
+           - just replace the "-lboost_regex-mt" with "-lboost_regex".
+             Confirming this all works without incident using the
+             ADARA Test Harness on Rhel7. ;-)
+   -> Duh. :-Q  Made Everything PIE for Rhel9... ;-Q
+      => updated _Every_ *_CPPFLAGS AutoMake define to now include: -fPIE
+         so *Everything* will now be built using the PIE binary format
+         * e.g. to eliminate these compiler errors:
+           /usr/bin/ld: stc/stc-NxGen.o: relocation R_X86_64_32 against
+           `.rodata.str1.8' can not be used when making a PIE object;
+           recompile with -fPIE
+      => added apropos comment along with this happy change:
+         Adding -fPIE Everywhere to Enable Building on Rhel9 & GCC 11.3.1
+         Which, Along with HDF5 and its Compilation Flag:
+            -specs=/usr/lib/rpm/redhat/redhat-hardened-ld
+         Has Apparently Forced Us to Build Everything with PIE Format... ;-Q
 
 - Replacing Log4cxx with Log4cpp
 
@@ -136,6 +157,15 @@ Installed latest log4cpp RPMs on Rhel7 and Rhel9, now beginning tedious process 
    -> https://log4cpp.sourceforge.net/api/classlog4cpp_1_1SyslogAppender.html
 
    -> https://log4cpp.sourceforge.net/
+
+   -> Looks like everything "Works" with Log4Cpp in Rhel7 now, but it requires some changes to the age-old SMS "logging.conf" file, to add a "Root Appender" with proper pattern layout formatting, e.g.:
+
+   log4j.rootCategory=DEBUG, rootAppender
+   log4j.appender.rootAppender=org.apache.log4j.ConsoleAppender
+   log4j.appender.rootAppender.layout=org.apache.log4j.PatternLayout
+   log4j.appender.rootAppender.layout.ConversionPattern=%d %p %c - %m%n
+
+   -> Committed this change to the SNSTestData/ADARA/sms SVN Repo for the ADARA Test Harness use. Comparable changes may likely be required across the production beamline deployments.
 
 - In a funny little named pipe "buffer size fix" install script in ADARA, I got this error:
 
