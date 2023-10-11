@@ -14,12 +14,20 @@ sms_smsd_SOURCES = sms/smsd.cc \
 		sms/Markers.cc sms/BeamMonitorConfig.cc sms/DetectorBankSet.cc \
 		sms/ComBusSMSMon.cc combus/ComBus.cpp \
 		sms/EventFd.cc sms/utils.cc $(POSIX_PARSER)
-sms_smsd_CPPFLAGS = $(activemq_CPPFLAGS) $(apr_CPPFLAGS) \
+
+# Adding -fPIE Everywhere to Enable Building on Rhel9 & GCC 11.3.1
+# Which, Along with HDF5 and its Compilation Flag:
+#    -specs=/usr/lib/rpm/redhat/redhat-hardened-ld
+# Has Apparently Forced Us to Build Everything with PIE Format... ;-Q
+sms_smsd_CPPFLAGS = -fPIE \
+		$(activemq_CPPFLAGS) $(apr_CPPFLAGS) \
 		$(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) \
 		$(log4cpp_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) \
 		-I/home/controls/Accelerator -DLOG4C_LOGGING
+
 sms_smsd_LDFLAGS = $(EPICS_LDFLAGS) \
 		$(log4cpp_LDFLAGS) $(liblog4cxx_LDFLAGS) $(AM_LDFLAGS)
+
 sms_smsd_LDADD = $(EPICS_LIBS) $(activemq_LIBS) \
 		$(log4cpp_LIBS) $(liblog4cxx_LIBS) \
 		-lboost_program_options -lboost_filesystem -lboost_system \
@@ -34,14 +42,22 @@ sms_test_storage_test_SOURCES = sms/test/storage-test.cc \
 		sms/SignalEvents.cc sms/BeamMonitorConfig.cc \
 		sms/DetectorBankSet.cc sms/ComBusSMSMon.cc combus/ComBus.cpp \
 		sms/EventFd.cc sms/utils.cc $(POSIX_PARSER)
-sms_test_storage_test_CPPFLAGS = -Isms $(activemq_CPPFLAGS) $(apr_CPPFLAGS)\
+
+# Adding -fPIE Everywhere to Enable Building on Rhel9 & GCC 11.3.1
+# Which, Along with HDF5 and its Compilation Flag:
+#    -specs=/usr/lib/rpm/redhat/redhat-hardened-ld
+# Has Apparently Forced Us to Build Everything with PIE Format... ;-Q
+sms_test_storage_test_CPPFLAGS = -fPIE \
+		-Isms $(activemq_CPPFLAGS) $(apr_CPPFLAGS)\
 		$(COMMON_CPPFLAGS) \
 		$(EPICS_CPPFLAGS) \
 		$(log4cpp_CPPFLAGS) $(liblog4cxx_CPPFLAGS) $(AM_CPPFLAGS) \
 		-I/home/controls/Accelerator
+
 sms_test_storage_test_LDFLAGS = $(EPICS_LDFLAGS) \
 		$(log4cpp_LDFLAGS) $(liblog4cxx_LDFLAGS) \
 		$(AM_LDFLAGS)
+
 sms_test_storage_test_LDADD = $(EPICS_LIBS) $(activemq_LIBS) \
 		$(log4cpp_LIBS) $(liblog4cxx_LIBS) \
 		-lboost_filesystem -lboost_system -lboost_thread \

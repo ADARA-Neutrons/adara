@@ -11,7 +11,12 @@ dasmon_server_dasmond_SOURCES = dasmon/server/main.cpp dasmon/server/StreamAnaly
         dasmon/server/engine/muParserBytecode.cpp dasmon/server/engine/muParserBase.cpp \
         $(POSIX_PARSER)
 
-dasmon_server_dasmond_CPPFLAGS = -Idasmon/common -Icombus \
+# Adding -fPIE Everywhere to Enable Building on Rhel9 & GCC 11.3.1
+# Which, Along with HDF5 and its Compilation Flag:
+#    -specs=/usr/lib/rpm/redhat/redhat-hardened-ld
+# Has Apparently Forced Us to Build Everything with PIE Format... ;-Q
+dasmon_server_dasmond_CPPFLAGS = -fPIE \
+			-Idasmon/common -Icombus \
 			-Idasmon/server/engine $(libxml_CPPFLAGS) \
 			-I/usr/pgsql-14/include \
 			$(activemq_CPPFLAGS) $(apr_CPPFLAGS) \
