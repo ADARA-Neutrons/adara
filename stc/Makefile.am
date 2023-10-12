@@ -24,7 +24,7 @@ stc_stc_CXXFLAGS = $(AM_CXXFLAGS) -Wno-unused-but-set-variable
 
 # TODO pick up most of these from autoconf
 stc_stc_LDADD = -lboost_system -lboost_filesystem \
-		-lboost_program_options -lboost_thread -lboost_regex-mt \
+		-lboost_program_options -lboost_thread -lboost_regex \
 		$(activemq_LIBS) $(apr_LIBS) $(libxml_LIBS) \
 		$(HDF5_LDFLAGS) -lldap -llber
 
