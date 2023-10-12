@@ -5,6 +5,8 @@
 
 #include <map>
 #include <vector>
+
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/thread/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>

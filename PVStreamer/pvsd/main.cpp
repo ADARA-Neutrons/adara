@@ -38,7 +38,10 @@
 // 
 
 #include <iostream>
+
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/program_options.hpp>
+
 #include <syslog.h>
 #include <stdint.h>
 #include <signal.h>
