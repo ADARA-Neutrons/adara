@@ -372,21 +372,6 @@ namespace mu
 
 
   //---------------------------------------------------------------------------
-  /** \brief Copy constructor. 
-      \throw nothrow
-  */
-  ParserCallback::ParserCallback(const ParserCallback &ref)
-  {
-    m_pFun       = ref.m_pFun;
-    m_iArgc      = ref.m_iArgc;
-    m_bAllowOpti = ref.m_bAllowOpti;
-    m_iCode      = ref.m_iCode;
-    m_iType      = ref.m_iType;
-    m_iPri       = ref.m_iPri;
-    m_eOprtAsct  = ref.m_eOprtAsct;
-  }
-
-  //---------------------------------------------------------------------------
   /** \brief Clone this instance and return a pointer to the new instance. */
   ParserCallback* ParserCallback::Clone() const
   {
