@@ -14,6 +14,10 @@ ADARA Port to RedHat9 - Installation Notes, September 2023
    -> boost.x86_64 boost-devel.x86_64
    -> libuuid-devel.x86_64
    -> log4cpp.x86_64 log4cpp-devel.x86_64 log4cpp-doc.x86_64
+   -> postgresql14.x86_64 postgresql14-devel.x86_64
+      postgresql14-libs.x86_64
+      => requires adding pgdg-redhat-14.repo to /etc/yum.repos.d/,
+      along with the key in /etc/pki/rpm-gpg/RPM-GPG-KEY-PGDG
 
    -> ActiveMQ-CPP Version 3.9.3
       => download source from:
