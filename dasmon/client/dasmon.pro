@@ -4,7 +4,7 @@
 #
 #-------------------------------------------------
 
-QT       += core gui
+QT       += core gui widgets
 
 TARGET = dasmon
 TEMPLATE = app
@@ -21,7 +21,8 @@ INCLUDEPATH +=  ../common \
                 ../server/engine \
                 ../../common
 
-unix:INCLUDEPATH += /usr/include/activemq-cpp \
+unix:INCLUDEPATH += /usr/local/include/activemq-cpp-3.9.3 \
+				/usr/include/activemq-cpp \
                 /usr/include/apr-1
 
 SOURCES += main.cpp \
