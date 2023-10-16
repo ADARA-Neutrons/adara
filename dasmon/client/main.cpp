@@ -37,7 +37,13 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 // 
 
+#include <QtGlobal>
+#if QT_VERSION >= 0x050000
+#include <QApplication>
+#else
 #include <QtGui/QApplication>
+#endif
+
 #include <iostream>
 #include <string>
 #include <boost/program_options.hpp>
