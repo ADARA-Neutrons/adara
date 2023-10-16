@@ -157,6 +157,30 @@ ADARA Port to RedHat9 - Installation Notes, September 2023
             -specs=/usr/lib/rpm/redhat/redhat-hardened-ld
          Has Apparently Forced Us to Build Everything with PIE Format... ;-Q
 
+- DASMON GUI Client - QT4 vs QT5 Inconsistencies... ;-Q
+   -> make sure "qmake" is in your $PATH:
+      => in Rhel7.9/QT4 it's: /usr/lib64/qt4/bin/qmake
+      => in RHel9.2/QT5 it's: /usr/lib64/qt5/bin/qmake
+   -> fatal error: QtGui/QApplication: No such file or directory
+      #include <QtGui/QApplication>
+      => QApplication is now in QWidgets... ;-b
+         * so added "QT += widgets" in dasmon/client/dasmon.pro
+   -> fatal error: activemq/core/ActiveMQConnectionFactory.h:
+      No such file or directory
+      #include <activemq/core/ActiveMQConnectionFactory.h>
+      => so added updated "/usr/local/include/activemq-cpp-3.9.3" path
+         to unix:INCLUDEPATH in dasmon/client/dasmon.pro
+   -> error: ‘class QHeaderView’ has no member named ‘setResizeMode’;
+      did you mean ‘ResizeMode’?
+      ...horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+      => added "#if QT_VERSION >= 0x050000 ... setSectionResizeMode()"
+         * requires "#include <QtGlobal>" header for QT_VERSION... ;-b
+   -> error: ‘UnicodeUTF8’ is not a member of ‘QApplication’
+      windowTitle.toLatin1().data(), 0, QApplication::UnicodeUTF8));
+      => no longer needed, added "#if QT_VERSION >= 0x050000 ... <omit>"
+   -> All Committed to ADARA Git Repo.
+      => Test compiled on Old Jeeem Rhel7.9...
+
 - Replacing Log4cxx with Log4cpp
 
 Installed latest log4cpp RPMs on Rhel7 and Rhel9, now beginning tedious process of parameterizing *All* the Logging in the ADARA/SMS to work with _Either_ logging library... ;-b
