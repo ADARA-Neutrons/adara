@@ -12,7 +12,14 @@
 
 #include <QtCore/QVariant>
 #include <QtGui/QAction>
+
+#include <QtGlobal>
+#if QT_VERSION >= 0x050000
+#include <QApplication>
+#else
 #include <QtGui/QApplication>
+#endif
+
 #include <QtGui/QButtonGroup>
 #include <QtGui/QGridLayout>
 #include <QtGui/QHBoxLayout>
@@ -634,58 +641,64 @@ public:
         QMetaObject::connectSlotsByName(MainWindow);
     } // setupUi
 
+#if QT_VERSION >= 0x050000
+#define QApplicationUnicodeUTF8 ""
+#else
+#define QApplicationUnicodeUTF8 ", QApplication::UnicodeUTF8"
+#endif
+
     void retranslateUi(QMainWindow *MainWindow)
     {
-        MainWindow->setWindowTitle(QApplication::translate("MainWindow", "SNS DAS Monitor", 0, QApplication::UnicodeUTF8));
-        actionSMS_Connection->setText(QApplication::translate("MainWindow", "SMS Connection...", 0, QApplication::UnicodeUTF8));
+        MainWindow->setWindowTitle(QApplication::translate("MainWindow", "SNS DAS Monitor", 0 QApplicationUnicodeUTF8));
+        actionSMS_Connection->setText(QApplication::translate("MainWindow", "SMS Connection...", 0 QApplicationUnicodeUTF8));
 #ifndef QT_NO_TOOLTIP
-        actionSMS_Connection->setToolTip(QApplication::translate("MainWindow", "Set SMS hostname and port", 0, QApplication::UnicodeUTF8));
+        actionSMS_Connection->setToolTip(QApplication::translate("MainWindow", "Set SMS hostname and port", 0 QApplicationUnicodeUTF8));
 #endif // QT_NO_TOOLTIP
-        actionActiveMQ->setText(QApplication::translate("MainWindow", "ActiveMQ...", 0, QApplication::UnicodeUTF8));
-        actionRules->setText(QApplication::translate("MainWindow", "Rules...", 0, QApplication::UnicodeUTF8));
-        actionAbout->setText(QApplication::translate("MainWindow", "About...", 0, QApplication::UnicodeUTF8));
-        runStatusLabel->setText(QApplication::translate("MainWindow", "Recording", 0, QApplication::UnicodeUTF8));
-        scanStatusLabel->setText(QApplication::translate("MainWindow", "No Scan", 0, QApplication::UnicodeUTF8));
-        pauseStatusLabel->setText(QApplication::translate("MainWindow", "------", 0, QApplication::UnicodeUTF8));
-        signalStatusLabel->setText(QApplication::translate("MainWindow", "------", 0, QApplication::UnicodeUTF8));
-        label_23->setText(QApplication::translate("MainWindow", "Duration:", 0, QApplication::UnicodeUTF8));
-        label_17->setText(QApplication::translate("MainWindow", "Proton Charge:", 0, QApplication::UnicodeUTF8));
-        label_19->setText(QApplication::translate("MainWindow", "Count Rate:", 0, QApplication::UnicodeUTF8));
-        label_21->setText(QApplication::translate("MainWindow", "Pulse Frequency:", 0, QApplication::UnicodeUTF8));
-        label_12->setText(QApplication::translate("MainWindow", "Stream Rate (KB/s):", 0, QApplication::UnicodeUTF8));
-        label_2->setText(QApplication::translate("MainWindow", "Run Number:", 0, QApplication::UnicodeUTF8));
-        label_3->setText(QApplication::translate("MainWindow", "Scan Number:", 0, QApplication::UnicodeUTF8));
-        label_29->setText(QApplication::translate("MainWindow", "Start Time:", 0, QApplication::UnicodeUTF8));
-        label_7->setText(QApplication::translate("MainWindow", "Run Title:", 0, QApplication::UnicodeUTF8));
-        label_24->setText(QApplication::translate("MainWindow", "Identifier:", 0, QApplication::UnicodeUTF8));
-        label_31->setText(QApplication::translate("MainWindow", "Sample Information", 0, QApplication::UnicodeUTF8));
-        label_32->setText(QApplication::translate("MainWindow", "Run Information", 0, QApplication::UnicodeUTF8));
-        facilityInfoLabel->setText(QApplication::translate("MainWindow", "Beam Information", 0, QApplication::UnicodeUTF8));
-        label->setText(QApplication::translate("MainWindow", "Facility:", 0, QApplication::UnicodeUTF8));
-        label_4->setText(QApplication::translate("MainWindow", "Beam ID:", 0, QApplication::UnicodeUTF8));
-        label_5->setText(QApplication::translate("MainWindow", "Beam Name:", 0, QApplication::UnicodeUTF8));
-        label_6->setText(QApplication::translate("MainWindow", "Beam Name (long)", 0, QApplication::UnicodeUTF8));
-        label_11->setText(QApplication::translate("MainWindow", "Proposal ID:", 0, QApplication::UnicodeUTF8));
-        label_25->setText(QApplication::translate("MainWindow", "Name:", 0, QApplication::UnicodeUTF8));
-        label_26->setText(QApplication::translate("MainWindow", "Environment:", 0, QApplication::UnicodeUTF8));
-        label_27->setText(QApplication::translate("MainWindow", "Formula:", 0, QApplication::UnicodeUTF8));
-        label_28->setText(QApplication::translate("MainWindow", "Nature:", 0, QApplication::UnicodeUTF8));
-        label_30->setText(QApplication::translate("MainWindow", "Total Counts:", 0, QApplication::UnicodeUTF8));
-        label_9->setText(QApplication::translate("MainWindow", "Total Charge:", 0, QApplication::UnicodeUTF8));
-        tabWidget->setTabText(tabWidget->indexOf(runInfoTab), QApplication::translate("MainWindow", "Info", 0, QApplication::UnicodeUTF8));
-        tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("MainWindow", "Signals", 0, QApplication::UnicodeUTF8));
-        tabWidget->setTabText(tabWidget->indexOf(tab_4), QApplication::translate("MainWindow", "Status", 0, QApplication::UnicodeUTF8));
-        tabWidget->setTabText(tabWidget->indexOf(tab_5), QApplication::translate("MainWindow", "Log", 0, QApplication::UnicodeUTF8));
+        actionActiveMQ->setText(QApplication::translate("MainWindow", "ActiveMQ...", 0 QApplicationUnicodeUTF8));
+        actionRules->setText(QApplication::translate("MainWindow", "Rules...", 0 QApplicationUnicodeUTF8));
+        actionAbout->setText(QApplication::translate("MainWindow", "About...", 0 QApplicationUnicodeUTF8));
+        runStatusLabel->setText(QApplication::translate("MainWindow", "Recording", 0 QApplicationUnicodeUTF8));
+        scanStatusLabel->setText(QApplication::translate("MainWindow", "No Scan", 0 QApplicationUnicodeUTF8));
+        pauseStatusLabel->setText(QApplication::translate("MainWindow", "------", 0 QApplicationUnicodeUTF8));
+        signalStatusLabel->setText(QApplication::translate("MainWindow", "------", 0 QApplicationUnicodeUTF8));
+        label_23->setText(QApplication::translate("MainWindow", "Duration:", 0 QApplicationUnicodeUTF8));
+        label_17->setText(QApplication::translate("MainWindow", "Proton Charge:", 0 QApplicationUnicodeUTF8));
+        label_19->setText(QApplication::translate("MainWindow", "Count Rate:", 0 QApplicationUnicodeUTF8));
+        label_21->setText(QApplication::translate("MainWindow", "Pulse Frequency:", 0 QApplicationUnicodeUTF8));
+        label_12->setText(QApplication::translate("MainWindow", "Stream Rate (KB/s):", 0 QApplicationUnicodeUTF8));
+        label_2->setText(QApplication::translate("MainWindow", "Run Number:", 0 QApplicationUnicodeUTF8));
+        label_3->setText(QApplication::translate("MainWindow", "Scan Number:", 0 QApplicationUnicodeUTF8));
+        label_29->setText(QApplication::translate("MainWindow", "Start Time:", 0 QApplicationUnicodeUTF8));
+        label_7->setText(QApplication::translate("MainWindow", "Run Title:", 0 QApplicationUnicodeUTF8));
+        label_24->setText(QApplication::translate("MainWindow", "Identifier:", 0 QApplicationUnicodeUTF8));
+        label_31->setText(QApplication::translate("MainWindow", "Sample Information", 0 QApplicationUnicodeUTF8));
+        label_32->setText(QApplication::translate("MainWindow", "Run Information", 0 QApplicationUnicodeUTF8));
+        facilityInfoLabel->setText(QApplication::translate("MainWindow", "Beam Information", 0 QApplicationUnicodeUTF8));
+        label->setText(QApplication::translate("MainWindow", "Facility:", 0 QApplicationUnicodeUTF8));
+        label_4->setText(QApplication::translate("MainWindow", "Beam ID:", 0 QApplicationUnicodeUTF8));
+        label_5->setText(QApplication::translate("MainWindow", "Beam Name:", 0 QApplicationUnicodeUTF8));
+        label_6->setText(QApplication::translate("MainWindow", "Beam Name (long)", 0 QApplicationUnicodeUTF8));
+        label_11->setText(QApplication::translate("MainWindow", "Proposal ID:", 0 QApplicationUnicodeUTF8));
+        label_25->setText(QApplication::translate("MainWindow", "Name:", 0 QApplicationUnicodeUTF8));
+        label_26->setText(QApplication::translate("MainWindow", "Environment:", 0 QApplicationUnicodeUTF8));
+        label_27->setText(QApplication::translate("MainWindow", "Formula:", 0 QApplicationUnicodeUTF8));
+        label_28->setText(QApplication::translate("MainWindow", "Nature:", 0 QApplicationUnicodeUTF8));
+        label_30->setText(QApplication::translate("MainWindow", "Total Counts:", 0 QApplicationUnicodeUTF8));
+        label_9->setText(QApplication::translate("MainWindow", "Total Charge:", 0 QApplicationUnicodeUTF8));
+        tabWidget->setTabText(tabWidget->indexOf(runInfoTab), QApplication::translate("MainWindow", "Info", 0 QApplicationUnicodeUTF8));
+        tabWidget->setTabText(tabWidget->indexOf(tab), QApplication::translate("MainWindow", "Signals", 0 QApplicationUnicodeUTF8));
+        tabWidget->setTabText(tabWidget->indexOf(tab_4), QApplication::translate("MainWindow", "Status", 0 QApplicationUnicodeUTF8));
+        tabWidget->setTabText(tabWidget->indexOf(tab_5), QApplication::translate("MainWindow", "Log", 0 QApplicationUnicodeUTF8));
         QTableWidgetItem *___qtablewidgetitem = monitorTable->horizontalHeaderItem(0);
-        ___qtablewidgetitem->setText(QApplication::translate("MainWindow", "Monitor ID", 0, QApplication::UnicodeUTF8));
+        ___qtablewidgetitem->setText(QApplication::translate("MainWindow", "Monitor ID", 0 QApplicationUnicodeUTF8));
         QTableWidgetItem *___qtablewidgetitem1 = monitorTable->horizontalHeaderItem(1);
-        ___qtablewidgetitem1->setText(QApplication::translate("MainWindow", "Count Rate", 0, QApplication::UnicodeUTF8));
-        combusStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
-        dasmonStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
-        smsStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0, QApplication::UnicodeUTF8));
-        exitButton->setText(QApplication::translate("MainWindow", "Exit", 0, QApplication::UnicodeUTF8));
-        menuConfigure->setTitle(QApplication::translate("MainWindow", "Configure", 0, QApplication::UnicodeUTF8));
-        menuHelp->setTitle(QApplication::translate("MainWindow", "Help", 0, QApplication::UnicodeUTF8));
+        ___qtablewidgetitem1->setText(QApplication::translate("MainWindow", "Count Rate", 0 QApplicationUnicodeUTF8));
+        combusStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0 QApplicationUnicodeUTF8));
+        dasmonStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0 QApplicationUnicodeUTF8));
+        smsStatusLabel->setText(QApplication::translate("MainWindow", "!!!", 0 QApplicationUnicodeUTF8));
+        exitButton->setText(QApplication::translate("MainWindow", "Exit", 0 QApplicationUnicodeUTF8));
+        menuConfigure->setTitle(QApplication::translate("MainWindow", "Configure", 0 QApplicationUnicodeUTF8));
+        menuHelp->setTitle(QApplication::translate("MainWindow", "Help", 0 QApplicationUnicodeUTF8));
     } // retranslateUi
 
 };
