@@ -208,6 +208,8 @@ Installed latest log4cpp RPMs on Rhel7 and Rhel9, now beginning tedious process 
 
    -> Committed this change to the SNSTestData/ADARA/sms SVN Repo for the ADARA Test Harness use. Comparable changes may likely be required across the production beamline deployments.
 
+   -> Dagnabbit, one more Log4Cpp issue, on Rhel9, where the latest GCC/G++ Compiler 11.3.1 is yet a step more pedantic and is somehow losing track of _Which_ Logger is Which. This only happens for the infamous ReadyAdapter class, which is header-only based. When the SMSControl class tries to create a ReadyAdapter, the class somehow does _Not_ inherit the "correct" stupid static global "logger" reference from SMSControl, but instead some other as-yet-uninitialized "logger" that's NULL (0x0) and therefore causes an unavoidable segmentation violation. ;-Q  The easiest solution for this is to simply split ReadyAdapter.h into a proper *.cc source file, so it can create its _Own_ Log4Cpp stupid static global "logger" instance, and be sure to initialize it before use. ;-D  This worked and was the "least grotesque" alternative to occur to me at the time. Lol... ;-D
+
 - In a funny little named pipe "buffer size fix" install script in ADARA, I got this error:
 
    $ cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
