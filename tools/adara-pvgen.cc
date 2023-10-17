@@ -23,8 +23,9 @@ LOGGER("ADARA-PVGen");
 #define caNetAddrSock
 
 #include "ADARA.h"
-#include "ReadyAdapter.h"
 #include "ADARAUtils.h"
+
+#include "../sms/ReadyAdapter.h"
 
 #include <fdManager.h>
 #include <epicsTimer.h>
