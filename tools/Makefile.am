@@ -23,7 +23,7 @@ tools_adara_parser_LDADD = -lboost_program_options
 
 # ADARA Gen
 
-tools_adara_gen_SOURCES = tools/adara-gen.cc
+tools_adara_gen_SOURCES = tools/adara-gen.cc sms/ReadyAdapter.cc
 
 tools_adara_gen_CPPFLAGS = -fPIE \
 		$(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) \
@@ -40,7 +40,7 @@ tools_adara_gen_LDADD = $(EPICS_LIBS) \
 
 # ADARA PVGen
 
-tools_adara_pvgen_SOURCES = tools/adara-pvgen.cc
+tools_adara_pvgen_SOURCES = tools/adara-pvgen.cc sms/ReadyAdapter.cc
 
 tools_adara_pvgen_CPPFLAGS = -fPIE \
 		$(COMMON_CPPFLAGS) $(EPICS_CPPFLAGS) \

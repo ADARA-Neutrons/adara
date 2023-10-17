@@ -13,7 +13,7 @@ sms_smsd_SOURCES = sms/smsd.cc \
 		sms/BeamlineInfo.cc sms/MetaDataMgr.cc sms/FastMeta.cc \
 		sms/Markers.cc sms/BeamMonitorConfig.cc sms/DetectorBankSet.cc \
 		sms/ComBusSMSMon.cc combus/ComBus.cpp \
-		sms/EventFd.cc sms/utils.cc $(POSIX_PARSER)
+		sms/ReadyAdapter.cc sms/EventFd.cc sms/utils.cc $(POSIX_PARSER)
 
 # Adding -fPIE Everywhere to Enable Building on Rhel9 & GCC 11.3.1
 # Which, Along with HDF5 and its Compilation Flag:
@@ -41,7 +41,7 @@ sms_test_storage_test_SOURCES = sms/test/storage-test.cc \
 		sms/BeamlineInfo.cc sms/DataSource.cc sms/PixelMap.cc \
 		sms/SignalEvents.cc sms/BeamMonitorConfig.cc \
 		sms/DetectorBankSet.cc sms/ComBusSMSMon.cc combus/ComBus.cpp \
-		sms/EventFd.cc sms/utils.cc $(POSIX_PARSER)
+		sms/ReadyAdapter.cc sms/EventFd.cc sms/utils.cc $(POSIX_PARSER)
 
 # Adding -fPIE Everywhere to Enable Building on Rhel9 & GCC 11.3.1
 # Which, Along with HDF5 and its Compilation Flag:
