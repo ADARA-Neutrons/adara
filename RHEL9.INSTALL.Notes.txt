@@ -1,6 +1,21 @@
 
 ADARA Port to RedHat9 - Installation Notes, September 2023
 
+- Yikes MASSIVE H5Diff Slowdown on Large String Arrays...!! ;-Q
+   -> from the ADARA Test Harness, REF_M_927800 Test Case
+      => ./nxDiff -L -S \
+            ./GoldenData/BluishData/nexus/REF_M_927800_Devel.nxs.h5 \
+            /data/SNS/REF_M/IPTS-0000/nexus/REF_M_927800.nxs.h5
+         (offending PV Log path is: /entry/DASlogs/J1/value_strings)
+      => Runs Correctly but Takes *A WHOLE DAY* to Complete...!! ;-O
+         Command exited with non-zero status 42
+         84533.21u 4.90s 23:32:57 99% (0t+0ds+0av+118084mx)k 1213552i+616o
+            (3mj+89489mn)pf 0swp
+         Results: Diff=0 Omit=0 Add=0 Ign=6 Tot=0
+            [PASSED NXdiff Bluish (REF_M_927800_Devel.nxs.h5 OneShot)]
+   -> this occurs with "h5diff" in hdf5-1.12.1-7.el9.1.x86_64
+      => works fine/fast in Rhel7 with hdf5-1.8.12-13.el7.x86_64
+
 - Packages to Install:
 
    -> swig.x86_64
