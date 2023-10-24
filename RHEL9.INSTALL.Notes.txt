@@ -1,6 +1,44 @@
 
 ADARA Port to RedHat9 - Installation Notes, September 2023
 
+- Minor RSyslog Tweaks, for Desired Timestamp Formatting...
+   -> in Rhel9 Rsyslog Version 8.2102.0, the Error Log "messages" that get
+      snarfed by the /etc/rsyslog.d/adaraMailer.conf config into the
+      /etc/rsyslog.pipes/criticalMessages named pipe do _Not_ have the
+      handy-dandy default timestamp formatting like regular log messages...
+      => modify the Age-Old adaraMailer.conf, first off to eliminate the
+         evil old "Legacy Obsolete" formatting cruft, but also to be able
+         to specify the default "TraditionalFileFormat" formatting.
+      => go from the "Original" adaraMailer.conf for Rhel7:
+
+   # Critical ADARA SMS Messages - Email Notification
+   :msg, contains, "ERROR SMS"          |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "PVSD ERROR"         |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "STC Error"          |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "STC failed"         |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "Unexpected input"   |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "OversizePkt"        |/etc/rsyslog.pipes/criticalMessages
+
+      => to the "New & Improved" adaraMailer.conf for Rhel9:
+
+   # Capture Critical ADARA SMS Messages for ADARA Summary/Monitor Analysis
+
+   if $msg contains "ERROR SMS"
+           or $msg contains "PVSD ERROR"
+           or $msg contains "STC Error"
+           or $msg contains "STC failed"
+           or $msg contains "Unexpected input"
+           or $msg contains "OversizePkt" then {
+       action(type="ompipe" pipe="/etc/rsyslog.pipes/criticalMessages"
+           Template="RSYSLOG_TraditionalFileFormat")
+   }
+
+   -> It Works! ;-D
+   -> Also, had to modify the "adara_summary" Log File Analyzer to
+      filter out the additional "[PID]" on the base application string,
+      i.e. take the "stc[12345]:" back to just "stc", lol... ;-D
+      => committed to Git. :-)
+
 - Yikes MASSIVE H5Diff Slowdown on Large String Arrays...!! ;-Q
    -> from the ADARA Test Harness, REF_M_927800 Test Case
       => ./nxDiff -L -S \
