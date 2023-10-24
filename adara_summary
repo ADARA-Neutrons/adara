@@ -543,6 +543,10 @@ PARSE_LOG()
 	base_app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
 	#echo "base_app=[$base_app]"
 
+	# Strip Off Any [PID] in the Base Application String... (RHEL9 ;-b)
+	base_app=`echo "$base_app" | awk -F "[][]" '{print $1}'`
+	#echo "PID-stripped base_app=[$base_app]"
+
 	known=0
 
 	# Flag Any "Alternate" or Additional SMSD Apps... (e.g. "-mon")
