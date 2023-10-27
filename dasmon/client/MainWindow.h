@@ -17,7 +17,7 @@
 #include <QMutex>
 #include <QLineEdit>
 
-#define DASMON_GUI_VERSION "1.5.5"
+#define DASMON_GUI_VERSION "1.5.6"
 
 
 namespace Ui {
