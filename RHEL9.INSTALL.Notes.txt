@@ -93,6 +93,10 @@ ADARA Port to RedHat9 - Installation Notes, September 2023
       => sudo /bin/cp -i \
          /usr/local/src/activemq-cpp-library-3.9.3/activemq-cpp.pc \
          /usr/lib64/pkgconfig/
+      => add libactivemq-cpp.so.19 to system library path:
+         * sudo vi /etc/ld.so.conf.d/activemq-cpp-library-3.9.3.conf
+           -> /usr/local/lib/
+         * sudo ldconfig
 
 - Latest G++ Compiler Warnings Treated as Error...
    -> sms/*.cc: error: catching polymorphic type ‘...' by value
