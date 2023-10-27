@@ -1,6 +1,7 @@
 #ifndef __STORAGE_FILE
 #define __STORAGE_FILE
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/smart_ptr.hpp>
 #include <boost/noncopyable.hpp>
 #include <boost/signals2.hpp>

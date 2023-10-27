@@ -5,7 +5,15 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/algorithm/string.hpp>
+
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#endif
 #include <cadef.h>
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+#pragma GCC diagnostic pop
+#endif
+
 #include <syslog.h>
 
 #include "TraceException.h"

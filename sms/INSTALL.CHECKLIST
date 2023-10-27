@@ -437,68 +437,89 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	# Create Production EPICS Releases
 
-	# EPICS Base
+	### Not This Way, Use git-release.sh Instead...!
+	###
+	#### EPICS Base
 
-	# Determine Official EPICS Base Version
-	# e.g. #define EPICS_VERSION_STRING "EPICS 3.14.12.6"
-	grep EPICS_VERSION_STRING \
-		/home/controls/epics/base/master/include/epicsVersion.h
+	#### Determine Official EPICS Base Version
+	#### e.g. #define EPICS_VERSION_STRING "EPICS 3.14.12.6"
+	###grep EPICS_VERSION_STRING \
+	###	/home/controls/epics/base/master/include/epicsVersion.h
 
-	# Determine Latest Modification Date for EPICS Base
-	# e.g. Date:   Mon Feb 12 11:34:21 2018 -0500
-	#    -> YYYYMMDD = 20180212
-	git log /home/controls/epics/base/master | head
+	#### Determine Latest Modification Date for EPICS Base
+	#### e.g. Date:   Mon Feb 12 11:34:21 2018 -0500
+	####    -> YYYYMMDD = 20180212
+	###git log /home/controls/epics/base/master | head
 
-	# Construct EPICS Base Release Name:
-	# "rel" + EPICS_VERSION_STRING + "_" + YYYYMMDD
-	#    -> "rel3.14.12.6_20180212"
+	#### Construct EPICS Base Release Name:
+	#### "rel" + EPICS_VERSION_STRING + "_" + YYYYMMDD
+	####    -> "rel3.14.12.6_20180212"
 
-	mkdir -p /home/controls/prod/epics/base
+	###ls -l /home/controls/prod/epics/base
 
-	cp -rp /home/controls/epics/base/master \
-		/home/controls/prod/epics/base/rel3.14.12.6_20180212
+	###mkdir -p /home/controls/prod/epics/base
 
-	# EPICS Extensions
+	###cp -rp /home/controls/epics/base/master \
+	###	/home/controls/prod/epics/base/rel3.14.12.6_20180212
 
-	# Determine Official EPICS Extensions Version
-	#    -> at the moment, it's "1.3", undocumented... ;-b
+	### DO THIS:
+	git-release.sh -e base rel3.14.12.6_20230825
 
-	# Determine Latest Modification Date for EPICS Extensions
-	# e.g. Date:   Wed Aug 14 11:38:20 2019 -0400
-	#    -> YYYYMMDD = 20190814
-	git log /home/controls/epics/extensions/master | head
+	### Not This Way, Use git-release.sh Instead...!
+	###
+	#### EPICS Extensions
 
-	# Construct EPICS Extensions Release Name:
-	# "rel1.3" + "_" + YYYYMMDD
-	#    -> "rel1.3_20190814"
+	#### Determine Official EPICS Extensions Version
+	####    -> at the moment, it's "1.3", undocumented... ;-b
 
-	mkdir -p /home/controls/prod/epics/extensions
+	#### Determine Latest Modification Date for EPICS Extensions
+	#### e.g. Date:   Wed Aug 14 11:38:20 2019 -0400
+	####    -> YYYYMMDD = 20190814
+	###git log /home/controls/epics/extensions/master | head
 
-	cp -rp /home/controls/epics/extensions/master \
-		/home/controls/prod/epics/extensions/rel1.3_20190814
+	#### Construct EPICS Extensions Release Name:
+	#### "rel1.3" + "_" + YYYYMMDD
+	####    -> "rel1.3_20190814"
 
-	# EPICS BaseV4
+	###ls -l /home/controls/prod/epics/extensions
 
-	# Determine Official EPICS BaseV4 Version
-	# e.g. EPICS V4 Release 4.6.0 C++ Bundle Read-Me
-	#    -> just use Major/Minor Release Numbers: "4.6"
-	grep Release /home/controls/epics/basev4/master/README.md
+	###mkdir -p /home/controls/prod/epics/extensions
 
-	# Determine Latest Modification Date for EPICS BaseV4
-	# e.g. Date:   Thu Nov 15 11:07:42 2018 -0500
-	#    -> YYYYMMDD = 20181115
-	git log /home/controls/epics/basev4/master | head
+	###cp -rp /home/controls/epics/extensions/master \
+	###	/home/controls/prod/epics/extensions/rel1.3_20190814
 
-	# Construct EPICS BaseV4 Release Name:
-	# "rel" + EPICS_V4_Release + "_" + YYYYMMDD
-	#    -> "rel4.6_20181115"
+	### DO THIS:
+	git-release.sh -e extensions rel1.4_20230825
 
-	mkdir -p /home/controls/prod/epics/basev4
+	### Not This Way, Use git-release.sh Instead...!
+	###
+	#### EPICS BaseV4
 
-	cp -rp /home/controls/epics/basev4/master \
-		/home/controls/prod/epics/basev4/rel4.6_20181115
+	#### Determine Official EPICS BaseV4 Version
+	#### e.g. EPICS V4 Release 4.6.0 C++ Bundle Read-Me
+	####    -> just use Major/Minor Release Numbers: "4.6"
+	###grep Release /home/controls/epics/basev4/master/README.md
 
-8. ADARA Production EPICS Soft Links Setup:
+	#### Determine Latest Modification Date for EPICS BaseV4
+	#### e.g. Date:   Thu Nov 15 11:07:42 2018 -0500
+	####    -> YYYYMMDD = 20181115
+	###git log /home/controls/epics/basev4/master | head
+
+	#### Construct EPICS BaseV4 Release Name:
+	#### "rel" + EPICS_V4_Release + "_" + YYYYMMDD
+	####    -> "rel4.6_20181115"
+
+	###ls -l /home/controls/prod/epics/basev4
+
+	###mkdir -p /home/controls/prod/epics/basev4
+
+	###cp -rp /home/controls/epics/basev4/master \
+	###	/home/controls/prod/epics/basev4/rel4.6_20181115
+
+	### DO THIS:
+	git-release.sh -e basev4 rel4.6_20230825
+
+8. ADARA Production EPICS Soft Links Setup (if not already done for SMS):
 
 	ls -l /home/controls/prod/ADARA
 
@@ -508,17 +529,17 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	(rm /home/controls/prod/ADARA/EpicsBaseLink)
 
-	ln -s /home/controls/prod/epics/base/rel3.14.12.6_20180212 \
+	ln -s /home/controls/prod/epics/base/rel3.14.12.6_20230825 \
 		/home/controls/prod/ADARA/EpicsBaseLink
 
 	(rm /home/controls/prod/ADARA/EpicsBaseV4Link)
 
-	ln -s /home/controls/prod/epics/basev4/rel4.6_20181115 \
+	ln -s /home/controls/prod/epics/basev4/rel4.6_20230825 \
 		/home/controls/prod/ADARA/EpicsBaseV4Link
 
 	(rm /home/controls/prod/ADARA/EpicsExtensionsLink)
 
-	ln -s /home/controls/prod/epics/extensions/rel1.3_20190814 \
+	ln -s /home/controls/prod/epics/extensions/rel1.4_20230825 \
 		/home/controls/prod/ADARA/EpicsExtensionsLink
 
 	ls -l /home/controls/prod/ADARA

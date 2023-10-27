@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.Markers"));
+LOGGER("SMS.Markers");
 
 #include <string>
 #include <sstream>
@@ -101,6 +101,8 @@ Markers::Markers( SMSControl *ctrl, bool notesCommentAutoReset ) :
 	m_useFirstNotesComment(false),
 	m_runNumber(0), m_lastRunNumber(0), m_scanIndex(0), m_lastScanIndex(0)
 {
+	LOGGER_INIT();
+
 	std::string prefix(ctrl->getPVPrefix());
 
 	m_pausedPV.reset( new MarkerPausedPV( prefix + ":Paused", this ) );

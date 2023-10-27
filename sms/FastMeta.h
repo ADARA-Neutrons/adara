@@ -1,8 +1,10 @@
 #ifndef __FAST_META_H
 #define __FAST_META_H
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
+
 #include <stdint.h>
 #include <string>
 #include <map>

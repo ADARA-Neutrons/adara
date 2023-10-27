@@ -72,7 +72,7 @@ def determine_subdirectories(file_path):
 	return source_dir, ipts_dir, new_subdir
 
 
-def determine_source_and_target_directories(source_dir, ipts_dir, target_dir, proposal, new_subdir, run_number):
+def determine_source_and_target_directories(beamline, source_dir, ipts_dir, target_dir, proposal, new_subdir, run_number):
 	"""
 	Determines source and target directories for copying.
 	"""
@@ -91,8 +91,11 @@ def determine_source_and_target_directories(source_dir, ipts_dir, target_dir, pr
 		# expand away tilde if present.
 		target_dir = os.path.expanduser(target_dir)
 	else:
-		target_dir = '/SNS/SNAP'
-	
+		if beamline in ['CG1D']:
+			target_dir = f'/HFIR/{beamline}'
+		else:
+			target_dir = f'/SNS/{beamline}'
+
 	# Proposal is already in path. Don't need it in subdir.
 	image_subdir = new_subdir.replace(proposal + '/', '')
 	print('\n\nIn determine_source_and_target_directories():new_subdir {} proposal: {} image_subdir: {}\n\n'.format(new_subdir, proposal, image_subdir))
@@ -102,19 +105,25 @@ def determine_source_and_target_directories(source_dir, ipts_dir, target_dir, pr
 	print('\n\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
 	return initial_image_dir, new_image_dir
 
-def determine_raw_tpx3_directories(target_dir, proposal, run_number):
+def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number):
 	"""
 	Determines source and target directories for copying.
 	"""
-	# tpx3_base = '/mcp-cg1d/tpx3files'
-	tpx3_base = '/mcp-tpx3/tpx3files'
+	if beamline in ['CG1D']:
+		tpx3_base = '/mcp-cg1d'
+	else:
+		# tpx3_base = '/mcp-cg1d/tpx3files'
+		tpx3_base = '/mcp-tpx3/tpx3files'
 	initial_tpx3_dir = "{}/{}/Run_{}".format(tpx3_base, proposal, run_number) 
 
 	if target_dir is not None:
 		# expand away tilde if present.
 		target_dir = os.path.expanduser(target_dir)
 	else:
-		target_dir = '/SNS/SNAP'
+		if beamline in ['CG1D']:
+			target_dir = f'/HFIR/{beamline}'
+		else:
+			target_dir = f'/SNS/{beamline}'
 	# new_tpx3_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
 	new_tpx3_dir = "{}/{}/images/mcp/Run_{}/tpx3".format(target_dir, proposal, run_number) 
 	
@@ -265,11 +274,11 @@ def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_p
 	return source_files, target_files
 
 
-def copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, include_tiff_files=True):
+def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, include_tiff_files=True):
 	"""
 	Copies image files for the specified run.
 	"""
-	print('\n\nIn copy_images().\nproposal: {}\nrun_number: {}\n\n'.format(proposal, run_number, tiff_file_path, tiff_file_name))
+	print('\n\nIn copy_images().\nbeamline: {}\nproposal: {}\nrun_number: {}\n\n'.format(beamline, proposal, run_number, tiff_file_path, tiff_file_name))
 
 	# Determine proper subdirectories.
 	source_dir, ipts_dir, new_subdir = determine_subdirectories(tiff_file_path)
@@ -277,7 +286,7 @@ def copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, ti
 	if include_tiff_files:
 		try:
 			# Determine source and target directories.
-			initial_image_dir, new_image_dir = determine_source_and_target_directories(source_dir, ipts_dir, target_dir, proposal, new_subdir, run_number)
+			initial_image_dir, new_image_dir = determine_source_and_target_directories(beamline, source_dir, ipts_dir, target_dir, proposal, new_subdir, run_number)
 					
 			# Identify target files (for use in cataloging). Wait for file count to be stable for at least 60.0 seconds.
 			# target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
@@ -295,7 +304,7 @@ def copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, ti
 
 	# ---------------------
 	# Handle raw tpx3 files
-	initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(target_dir, proposal, run_number)
+	initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number)
 	# Identify target tpx files. Wait for file count to be stable for at least 60.0 seconds.
 	source_files, target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=False)
 
@@ -364,6 +373,7 @@ def process_args(arg_list):
 	"""
 	Process command line arguments.
 	"""
+	beamline = None
 	proposal = None
 	run_number = None
 	source_dir = None
@@ -384,6 +394,8 @@ def process_args(arg_list):
 			value = ""
 		print("key=%s" % key)
 		print("value=%s" % value)
+		if key == "beamline":
+			beamline = value
 		if key == "proposal":
 			proposal = value
 		elif key == "run_number":
@@ -400,7 +412,7 @@ def process_args(arg_list):
 			tpx_file_path = value
 
 
-	return proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path
+	return beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path
 
 
 def do_pre_post_timepix3(arg_list):
@@ -411,12 +423,16 @@ def do_pre_post_timepix3(arg_list):
 	try:
 		print('\n\nPre-Post-Processing for Timepix3.\n\n')
 
-		proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path = process_args(arg_list)
+		beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path = process_args(arg_list)
 
 		parms_present = all (p is not None for p in [proposal, run_number, tiff_file_path, tiff_file_name])
 
 		if parms_present is not None:
-			files_to_catalog = copy_images(proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, include_tiff_files=True)
+			if beamline in ['CG1D']:
+				include_tiff_files = False
+			else:
+				include_tiff_files = True
+			files_to_catalog = copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, include_tiff_files=include_tiff_files)
 			catalog_images(files_to_catalog)
 		else:
 			print('\n\nERROR: Not all parameters present.\n\n')

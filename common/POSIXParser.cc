@@ -8,7 +8,8 @@
 
 // Need to reconcile different Logging Libraries between SMS and STC...! ;-b
 // #include "Logging.h"
-// static LoggerPtr logger(Logger::getLogger("SMS.POSIXParser"));
+// LOGGER("SMS.POSIXParser");
+// Call LOGGER_INIT();
 
 using namespace ADARA;
 

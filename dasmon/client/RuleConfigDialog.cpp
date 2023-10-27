@@ -25,14 +25,22 @@ RuleConfigDialog::RuleConfigDialog( MainWindow &a_parent) :
     QStringList headers;
     headers << "En/Stat" << "Rule ID" << "Rule Expression" << "Description";
     ui->ruleTable->setHorizontalHeaderLabels( headers );
+#if QT_VERSION >= 0x050000
+    ui->ruleTable->horizontalHeader()->setSectionResizeMode( QHeaderView::ResizeToContents );
+#else
     ui->ruleTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+#endif
     ui->ruleTable->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
     ui->ruleTable->horizontalHeader()->show();
 
     headers.clear();
     headers << "En/Stat" << "Signal ID" << "Rule ID" << "Source" << "Level" << "Message" << "Description";
     ui->signalTable->setHorizontalHeaderLabels( headers );
+#if QT_VERSION >= 0x050000
+    ui->signalTable->horizontalHeader()->setSectionResizeMode( QHeaderView::ResizeToContents );
+#else
     ui->signalTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+#endif
     ui->signalTable->horizontalHeader()->setDefaultAlignment(Qt::AlignLeft);
     ui->signalTable->horizontalHeader()->show();
 

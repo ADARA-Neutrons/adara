@@ -1,8 +1,10 @@
 #ifndef __BEAMLINE_INFO_H
 #define __BEAMLINE_INFO_H
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/noncopyable.hpp>
 #include <boost/signals2.hpp>
+
 #include <stdint.h>
 #include <string>
 

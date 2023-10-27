@@ -156,7 +156,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.7.1"
+DEPLOY_VERSION="1.7.2"
 
 TMP_DIR="/tmp"
 
@@ -951,6 +951,30 @@ if [ $need_build == 1 ]; then
 		fi
 
 		/bin/ls -l "$tag_archive/adara_fix_ipts" |& tee -a $LOG
+
+	fi
+
+	# SMS ADARA Fix ITEMS Script (if present, added in v1.8.3...)
+
+	if [[ -e sms/adara_fix_ITEMS && -x sms/adara_fix_ITEMS ]]; then
+
+		echo -e -n "\nCopying SMS ADARA Fix ITEMS Script " | tee -a $LOG
+		echo -e "into Archive Release Tag:\n" | tee -a $LOG
+
+		cp -i -p sms/adara_fix_ITEMS "$tag_archive" |& tee -a $LOG
+
+		copy_ok=$?
+
+		if [ $copy_ok != 0 ]; then
+			echo -e -n "\nError Copying ADARA Fix ITEMS Script " \
+				| tee -a $LOG
+			echo -e "into Release Tag Directory! ($copy_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -21
+		fi
+
+		/bin/ls -l "$tag_archive/adara_fix_ITEMS" |& tee -a $LOG
 
 	fi
 

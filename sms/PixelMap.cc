@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
+LOGGER("SMS.PixelMap");
 
 #include <fstream>
 #include <utility>
@@ -17,7 +17,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
 #include <string.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAUtils.h"
@@ -25,9 +25,19 @@ static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
 #include "SMSControl.h"
 #include "StorageManager.h"
 
-std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+std::unique_ptr<PixelMap::TempMap>
+#else
+std::auto_ptr<PixelMap::TempMap>
+#endif
+	PixelMap::readMap(const std::string &path)
 {
-	std::auto_ptr<TempMap> map(new TempMap);
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+	std::unique_ptr<TempMap>
+#else
+	std::auto_ptr<TempMap>
+#endif
+		map(new TempMap);
 
 	std::set<uint32_t> output_pixels;
 
@@ -905,7 +915,15 @@ PixelMap::PixelMap(const std::string &path,
 	m_useOrigPixelMappingPkt(useOrigPixelMappingPkt),
 	m_numBanks(0)
 {
-	std::auto_ptr<TempMap> map;
+	LOGGER_INIT();
+
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+	std::unique_ptr<TempMap>
+#else
+	std::auto_ptr<TempMap>
+#endif
+		map;
+
 	TempMap::iterator it, end;
 	std::set<uint32_t> banks;
 	uint32_t max_logical = 0;

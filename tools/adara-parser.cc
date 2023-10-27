@@ -1636,7 +1636,7 @@ void Parser::parse(int argc, char **argv)
 		po::store(po::command_line_parser(argc, argv).
 			options(cmdline_options).positional(p).run(), vm);
 		po::notify(vm);
-	} catch (po::unknown_option e) {
+	} catch (po::unknown_option &e) {
 		std::cerr << argv[0] << ": " << e.what() << std::endl
 			<< std::endl << opts << std::endl;
 		exit(2);

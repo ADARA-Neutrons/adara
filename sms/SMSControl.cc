@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.Control"));
+LOGGER("SMS.Control");
 
 #include <string>
 #include <sstream>
@@ -12,6 +12,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.Control"));
 #include <stdint.h>
 #include <ctype.h>
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/lexical_cast.hpp>
 #include <boost/make_shared.hpp>
 
@@ -157,6 +158,7 @@ public:
 	void changed(void)
 	{
 		std::string logLevelStr = value();
+#ifdef USE_LOG4CXX_LOGGING
 		if ( !logLevelStr.compare("OFF") )
 			log4cxx::Logger::getRootLogger()
 				->setLevel(log4cxx::Level::getOff());
@@ -194,6 +196,30 @@ public:
 			clock_gettime(CLOCK_REALTIME, &now);
 			update(logLevel->toString(), &now);
 		}
+#elif USE_LOG4CPP_LOGGING
+		try
+		{
+			log4cpp::Priority::Value logLevel =
+				log4cpp::Priority::getPriorityValue( logLevelStr );
+			log4cpp::Category::setRootPriority( logLevel );
+		}
+		catch ( std::invalid_argument &ia )
+		{
+			ERROR("LogLevelPV::changed(): Unknown LogLevel String"
+				<< " [" << logLevelStr << "]"
+				<< " - Ignoring, Reverting to Former LogLevel...");
+			// Restore Log4Cpp LogLevel String PV to Current LogLevel...
+			log4cpp::Priority::Value logLevel =
+				log4cpp::Category::getRootPriority();
+			const std::string &logName =
+				log4cpp::Priority::getPriorityName( logLevel );
+			ERROR("LogLevelPV::changed(): Setting LogLevel String PV to"
+				<< " [" << logName << "]");
+			struct timespec now;
+			clock_gettime(CLOCK_REALTIME, &now);
+			update(logName, &now);
+		}
+#endif
 	}
 };
 
@@ -341,6 +367,8 @@ SMSControl *SMSControl::m_singleton = NULL;
 
 void SMSControl::config(const boost::property_tree::ptree &conf)
 {
+	LOGGER_INIT();
+
 	m_version = conf.get<std::string>("sms.version");
 
 	std::string base = conf.get<std::string>("sms.basedir");
@@ -603,7 +631,7 @@ void SMSControl::addSource(const std::string &name,
 	std::string val = info.get<std::string>("readsize", "4M");
 	try {
 		chunk_size = parse_size(val);
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		std::string msg("Unable to parse read size for source '");
 		msg += name;
 		msg += "': ";
@@ -1159,10 +1187,20 @@ SMSControl::SMSControl() :
 	m_pvVersion->update(m_version, &now);
 
 	// Initialize Log4CXX LogLevel String PV...
+#ifdef USE_LOG4CXX_LOGGING
 	LevelPtr logLevel = log4cxx::Logger::getRootLogger()->getLevel();
 	DEBUG("SMSControl(): Starting LogLevel is"
 		<< " [" << logLevel->toString() << "]");
 	m_pvLogLevel->update(logLevel->toString(), &now);
+#elif USE_LOG4CPP_LOGGING
+	log4cpp::Priority::Value logLevel =
+		log4cpp::Category::getRootPriority();
+	const std::string &logName =
+		log4cpp::Priority::getPriorityName( logLevel );
+	DEBUG("SMSControl(): Starting LogLevel is"
+		<< " [" << logName << "]");
+	m_pvLogLevel->update(logName, &now);
+#endif
 
 	// Initialize the System Summary Status/Reason...
 
@@ -2800,7 +2838,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 					m_currentRunNumber, m_runInfo->getPropId() );
 			}
 			// Logic Error...! ;-O
-			catch ( std::logic_error e ) {
+			catch ( std::logic_error &e ) {
 				ERROR("Failed to Start Run " << m_currentRunNumber
 					<< " - LOGIC Error! (" << e.what() << ")");
 				// Run Didn't Start, Clear Run Number
@@ -2822,7 +2860,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 				return false;
 			}
 			// RunTime Error... ;-b
-			catch ( std::runtime_error e ) {
+			catch ( std::runtime_error &e ) {
 				ERROR("Transient RunTime Error Trying to Start Run "
 					<< m_currentRunNumber
 					<< " - " << e.what() << ", retry_count=" << try_count);
@@ -2921,7 +2959,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 				StorageManager::stopRecording( (*ts) ); // Wallclock Time
 			}
 			// Logic Error...! ;-O
-			catch ( std::logic_error e ) {
+			catch ( std::logic_error &e ) {
 				ERROR("Failed to Stop Run " << save_current_run_number
 					<< " - LOGIC Error! (" << e.what() << ")");
 				// Run Failed to Stop...!
@@ -2937,7 +2975,7 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 				return false;
 			}
 			// RunTime Error... ;-b
-			catch ( std::runtime_error e ) {
+			catch ( std::runtime_error &e ) {
 				ERROR("Transient RunTime Error Trying to Stop Run "
 					<< save_current_run_number
 					<< " - " << e.what() << ", retry_count=" << try_count);
@@ -5261,7 +5299,7 @@ void SMSControl::recordPulse(PulsePtr &pulse)
 
 		buildFastMetaPackets(pulse);
 
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		ERROR( ( m_recording ? "[RECORDING] " : "" )
 			<< "Failed to record pulse: "
 			<< " id=0x" << std::hex << pulse->m_id.first

@@ -205,6 +205,8 @@ if [[ ${DO_END} == 1 ]]; then
 	GREP_CMD="${GREP_CMD} -e \"Terminal\""
 fi
 
+echo "Grep Command = [${GREP_CMD}]"
+
 #
 # Capture STC Logs for Given Run Number on Selected STC Hosts
 #

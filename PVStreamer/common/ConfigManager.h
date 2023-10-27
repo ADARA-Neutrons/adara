@@ -3,8 +3,11 @@
 
 
 #include <map>
+
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/thread/mutex.hpp>
 #include <boost/shared_ptr.hpp>
+
 #include <string>
 
 #include "DeviceDescriptor.h"

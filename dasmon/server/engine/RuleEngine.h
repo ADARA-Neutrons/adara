@@ -92,7 +92,6 @@ private:
     {
     public:
         Value();
-        Value( const Value &a_src );
         Value( bool a_value );
         Value( uint8_t a_value );
         Value( int8_t a_value );

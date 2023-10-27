@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.MetaDataMgr"));
+LOGGER("SMS.MetaDataMgr");
 
 #include <sstream>
 #include <string>
@@ -10,8 +10,9 @@ static LoggerPtr logger(Logger::getLogger("SMS.MetaDataMgr"));
 #include <stdint.h>
 #include <string.h>
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/make_shared.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAPackets.h"
@@ -37,6 +38,8 @@ RateLimitedLogging::History RLLHistory_MetaDataMgr;
 
 MetaDataMgr::MetaDataMgr() : m_nextMappedDevId(1)
 {
+	LOGGER_INIT();
+
 	m_connection = StorageManager::onPrologue(
 				boost::bind( &MetaDataMgr::onPrologue, this, _1 ) );
 }

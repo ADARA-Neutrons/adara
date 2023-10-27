@@ -20,6 +20,7 @@ NOW_SYSTEM_FILES="/SNSlocal/sms/conf/* \
 	/etc/rsyslog.d/stclog.conf \
 	/etc/services \
 	/etc/xinetd.d/stc* \
+	/etc/systemd/system/stc* \
 	/usr/local/bin/stc* \
 	/etc/logrotate.d/stc_log \
 	/home/dasmon/dasmond.cfg \

@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("FastMeta"));
+LOGGER("FastMeta");
 
 #include <fstream>
 #include <string>
@@ -26,6 +26,8 @@ using namespace boost::property_tree;
 
 void FastMeta::addDevices(const ptree &conf)
 {
+	LOGGER_INIT();
+
 	std::string name, prefix("fastmeta ");
 	size_t b, e, plen = prefix.length();
 	ptree::const_iterator it;

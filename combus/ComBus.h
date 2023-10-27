@@ -5,12 +5,18 @@
 
 #include <map>
 #include <vector>
+
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/thread/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
+
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
 #include <activemq/core/ActiveMQConnectionFactory.h>
 #include <activemq/core/ActiveMQConnection.h>
 #include <activemq/library/ActiveMQCPP.h>
+#pragma GCC diagnostic pop
+
 #include <cms/Connection.h>
 #include <cms/Session.h>
 #include <cms/ExceptionListener.h>
@@ -21,7 +27,7 @@
 namespace ADARA {
 namespace ComBus {
 
-const std::string VERSION = "2.3.8";
+const std::string VERSION = "2.3.9";
 
 enum LogStatus {
     INFO_LOG    =   0x0,

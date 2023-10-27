@@ -1,0 +1,316 @@
+
+ADARA Port to RedHat9 - Installation Notes, September 2023
+
+- Minor RSyslog Tweaks, for Desired Timestamp Formatting...
+   -> in Rhel9 Rsyslog Version 8.2102.0, the Error Log "messages" that get
+      snarfed by the /etc/rsyslog.d/adaraMailer.conf config into the
+      /etc/rsyslog.pipes/criticalMessages named pipe do _Not_ have the
+      handy-dandy default timestamp formatting like regular log messages...
+      => modify the Age-Old adaraMailer.conf, first off to eliminate the
+         evil old "Legacy Obsolete" formatting cruft, but also to be able
+         to specify the default "TraditionalFileFormat" formatting.
+      => go from the "Original" adaraMailer.conf for Rhel7:
+
+   # Critical ADARA SMS Messages - Email Notification
+   :msg, contains, "ERROR SMS"          |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "PVSD ERROR"         |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "STC Error"          |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "STC failed"         |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "Unexpected input"   |/etc/rsyslog.pipes/criticalMessages
+   :msg, contains, "OversizePkt"        |/etc/rsyslog.pipes/criticalMessages
+
+      => to the "New & Improved" adaraMailer.conf for Rhel9:
+
+   # Capture Critical ADARA SMS Messages for ADARA Summary/Monitor Analysis
+
+   if $msg contains "ERROR SMS"
+           or $msg contains "PVSD ERROR"
+           or $msg contains "STC Error"
+           or $msg contains "STC failed"
+           or $msg contains "Unexpected input"
+           or $msg contains "OversizePkt" then {
+       action(type="ompipe" pipe="/etc/rsyslog.pipes/criticalMessages"
+           Template="RSYSLOG_TraditionalFileFormat")
+   }
+
+   -> It Works! ;-D
+   -> Also, had to modify the "adara_summary" Log File Analyzer to
+      filter out the additional "[PID]" on the base application string,
+      i.e. take the "stc[12345]:" back to just "stc", lol... ;-D
+      => committed to Git. :-)
+
+- Yikes MASSIVE H5Diff Slowdown on Large String Arrays...!! ;-Q
+   -> from the ADARA Test Harness, REF_M_927800 Test Case
+      => ./nxDiff -L -S \
+            ./GoldenData/BluishData/nexus/REF_M_927800_Devel.nxs.h5 \
+            /data/SNS/REF_M/IPTS-0000/nexus/REF_M_927800.nxs.h5
+         (offending PV Log path is: /entry/DASlogs/J1/value_strings)
+      => Runs Correctly but Takes *A WHOLE DAY* to Complete...!! ;-O
+         Command exited with non-zero status 42
+         84533.21u 4.90s 23:32:57 99% (0t+0ds+0av+118084mx)k 1213552i+616o
+            (3mj+89489mn)pf 0swp
+         Results: Diff=0 Omit=0 Add=0 Ign=6 Tot=0
+            [PASSED NXdiff Bluish (REF_M_927800_Devel.nxs.h5 OneShot)]
+   -> this occurs with "h5diff" in hdf5-1.12.1-7.el9.1.x86_64
+      => works fine/fast in Rhel7 with hdf5-1.8.12-13.el7.x86_64
+
+- Packages to Install:
+
+   -> swig.x86_64
+   -> python3-devel.x86_64 rpcgen.x86_64
+   -> libtirpc-devel.x86_64
+      => apparently missing "rpc/rpc.h",
+      set "TIRPC=YES" in configure/CONFIG_SITE (EPICS "asyn" Module)
+   -> readline-devel.x86_64
+   -> autoconf.noarch automake.noarch libtool.x86_64
+   -> hdf5.x86_64 hdf5-devel.x86_64
+   -> boost.x86_64 boost-devel.x86_64
+   -> libuuid-devel.x86_64
+   -> log4cpp.x86_64 log4cpp-devel.x86_64 log4cpp-doc.x86_64
+   -> postgresql14.x86_64 postgresql14-devel.x86_64
+      postgresql14-libs.x86_64
+      => requires adding pgdg-redhat-14.repo to /etc/yum.repos.d/,
+      along with the key in /etc/pki/rpm-gpg/RPM-GPG-KEY-PGDG
+
+   -> ActiveMQ-CPP Version 3.9.3
+      => download source from:
+         http://archive.apache.org/dist/activemq/activemq-cpp/3.9.3/
+         * activemq-cpp-library-3.9.3-src.tar.gz (2271157)
+         * unpack into /usr/local/src/activemq-cpp-library-3.9.3
+         (cd /usr/local/src/ ; zcat *-src.tar.gz | sudo tar xvf -)
+      => patch src/main/decaf/internal/net/ssl/openssl/OpenSSLSocket.cpp
+         * replace extension->value->data with the
+         ASN1_STRING_data(X509_EXTENSION_get_data(extension))
+         * replace extension->value->length (twice) with the
+         ASN1_STRING_length(X509_EXTENSION_get_data(extension))
+         (as per "https://users.activemq.apache.narkive.com/Nbj6Ap3w/
+            activemq-cpp-3-9-4-fails-to-build-fedora-rawhide-
+            openssl-1-1-0e-related" post)
+      => install supporting packages:
+         cppunit.x86_64 cppunit-devel.x86_64 apr-devel.x86_64
+         doxygen.x86_64
+      => configure, make, make install
+      => sudo /bin/cp -i \
+         /usr/local/src/activemq-cpp-library-3.9.3/activemq-cpp.pc \
+         /usr/lib64/pkgconfig/
+
+- Latest G++ Compiler Warnings Treated as Error...
+   -> sms/*.cc: error: catching polymorphic type ‘...' by value
+   [-Werror=catch-value=] -> catch (po::unknown_option e)
+      => Almost always catch exceptions by const &. –Jesper Juhl,
+      StackOverflow May 26, 2020 at 20:06  :-D
+      => DONE. Committed to ADARA Git repo.
+   -> sms/*.cc: error: ‘template<class> class std::auto_ptr’ is deprecated:
+      => use 'std::unique_ptr' instead [-Werror=deprecated-declarations]
+      => DONE. Committed to ADARA Git repo.
+   -> EPICS 3.14.12.6 - GCC Bug from Versions 6.4 to 9.0 (and Beyond... ;-Q)
+      => epics/base/rel3.14.12.6_20230825/include/gddI.h:89:69:
+         error: implicitly-declared ‘constexpr aitTimeStamp&
+         aitTimeStamp::operator=(const aitTimeStamp&)’
+         is deprecated [-Werror=deprecated-copy]
+      => No Way to "Fix", as Even in Later GCC Versions it _Still_ shows
+         as a Warning, and ADARA is Built with -Werror -Wno-deprecated
+      => Rather than go in and try to Fix all the Ancient EPICS References,
+         just insert some Gruesome GCC Pragmas around EPICS #include... ;-b
+         * #pragma GCC diagnostic ignored "-Wdeprecated-copy"
+         * #include <casdef.h>, #include <cadef.h>, #include <fdManager.h>
+         * #pragma GCC diagnostic pop
+      => NOTE: The same issue popped up a couple times in the ADARA code
+         which we _Can_ (and Should!) fix, so I fixed it. :-D
+         * as pointed out so nicely on StackOverflow:
+           https://stackoverflow.com/questions/62689847/
+           c-g-compiler-error-definition-of-implicitly-declared
+         * "You actually don't need a copy constructor nor an overloaded
+           assignment operator in your class. Since your class doesn't
+           have any allocated pointers or members that can't be serviced
+           with a shallow copy, the default copy constructor and default
+           assignment operator generated by the compiler will do
+           nicely."
+         * So I simply _Removed_ the unnecessary Copy Constructors
+           from the Header Files and Class Implementation, and It Works!
+      => Also Another Deprecated GCC Issue -
+         error: ‘void* memcpy(void*, const void*, size_t)’ writing to an
+         object of type ‘class gdd’ with no trivial copy-assignment;
+         use copy-assignment or copy-initialization instead
+         [-Werror=class-memaccess]
+         * #pragma GCC diagnostic ignored "-Wclass-memaccess"
+         * #include <casdef.h>
+         * #pragma GCC diagnostic pop
+      => DONE. Committed to ADARA Git repo.
+   -> ActiveMQ-CPP, Same error: ‘template<class> class std::auto_ptr’
+      is deprecated: use 'std::unique_ptr' instead
+      [-Werror=deprecated-declarations]
+      => Rather than fiddle with modifying the ActiveMQ-CPP Library
+         that I already had to Snarf & Build from Source, Just Pragma Away!
+         * #pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+         * #include <activemq/*>
+         * #pragma GCC diagnostic pop
+      => DONE. Committed to ADARA Git repo.
+   -> Fix "Fall Through" Switch Cases in ADARA/sms/utils.cc parse_size()
+      => apparently it's no longer kosher to have "Fall Through" Cases in
+         a Switch statement, in the latest GCC incarnation... ;-)
+         * so, since it was "on purpose" in parse_size(), just add
+           a "[[fallthrough]];" directive to tell GCC to leave us the
+           heck alone, lol... ;-D
+         * Amazingly, This Worked. ;-D
+      => DONE. Committed to ADARA Git repo.
+   -> Account for infamous Boost Bind Global Placeholders... ;-Q
+      => /usr/include/boost/bind.hpp:36:1: note: ‘#pragma message:
+         The practice of declaring the Bind placeholders (_1, _2, ...)
+         in the global namespace is deprecated. Please use
+         <boost/bind/bind.hpp> + using namespace boost::placeholders,
+         or define BOOST_BIND_GLOBAL_PLACEHOLDERS to retain the
+         current behavior.’
+      => thoroughly stepped through each ADARA source file and header
+         to identify all the places where this issue has cropped up now
+         on Rhel9, and in each case either:
+         * change from #include <boost/bind.hpp> to instead
+           #include <boost/bind/bind.hpp>, which does not put the
+           boost:: placeholders in global namespace.
+         * add the diabolical Boost Pragma Define
+           #define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
+      => Thanks for the confirmation of this mess from StackOverflow and
+         specifically the answer from petke on Jan 20, 2021 at 16:04,
+         https://stackoverflow.com/questions/53203970/
+         why-boostbind-insists-pulling-boostplaceholders-into-
+         global-namespace ;-Q
+      => DONE. Committed to ADARA Git repo.
+   -> Note: to keep ADARA building on the old Rhel7.9 systems, we need to:
+      => wrap the new #pragmas, auto_ptr -> unique_ptr and fallthrough with:
+         #if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+      => also, turns out we were unnecessarily linking with Old Boost Libs
+         that we don't actually need, or have gone away/changed names... ;-D
+         * -lboost_signals was for old Boost.Signals, we switched to the
+           "New" Boost.Signals2 library back in 2013, lololol... ;-D
+         * turns out -lboost_thread-mt has been equivalent to -lboost_thread
+           for Ages now as well, since well before boost-devel-1.53 (Rhel7)
+           so we can unilaterally just switch to -lboost_thread, lol... ;-D
+           - Rhel7: lrwxrwxrwx 1 root root 21 Apr 5 2020
+             /usr/lib64/libboost_thread.so -> libboost_thread-mt.so
+             (which is Good because Boost doesn't use Pkg-Config... ;-b)
+         * formerly in Rhel7 we were also linking with the multi-threaded
+           version of the boost_regex library, -lboost_regex-mt, but
+           the latest modern version of Boost doesn't even _Have_ a
+           multi-threaded version of the boost_regex library... ;-b
+           - looks like our use of Boost Regex in the ADARA/STC is all
+             "local" and so no worries of multi-threadedness are present.
+           - just replace the "-lboost_regex-mt" with "-lboost_regex".
+             Confirming this all works without incident using the
+             ADARA Test Harness on Rhel7. ;-)
+   -> Duh. :-Q  Made Everything PIE for Rhel9... ;-Q
+      => updated _Every_ *_CPPFLAGS AutoMake define to now include: -fPIE
+         so *Everything* will now be built using the PIE binary format
+         * e.g. to eliminate these compiler errors:
+           /usr/bin/ld: stc/stc-NxGen.o: relocation R_X86_64_32 against
+           `.rodata.str1.8' can not be used when making a PIE object;
+           recompile with -fPIE
+      => added apropos comment along with this happy change:
+         Adding -fPIE Everywhere to Enable Building on Rhel9 & GCC 11.3.1
+         Which, Along with HDF5 and its Compilation Flag:
+            -specs=/usr/lib/rpm/redhat/redhat-hardened-ld
+         Has Apparently Forced Us to Build Everything with PIE Format... ;-Q
+
+- DASMON GUI Client - QT4 vs QT5 Inconsistencies... ;-Q
+   -> make sure "qmake" is in your $PATH:
+      => in Rhel7.9/QT4 it's: /usr/lib64/qt4/bin/qmake
+      => in RHel9.2/QT5 it's: /usr/lib64/qt5/bin/qmake
+   -> fatal error: QtGui/QApplication: No such file or directory
+      #include <QtGui/QApplication>
+      => QApplication is now in QWidgets... ;-b
+         * so added "QT += widgets" in dasmon/client/dasmon.pro
+   -> fatal error: activemq/core/ActiveMQConnectionFactory.h:
+      No such file or directory
+      #include <activemq/core/ActiveMQConnectionFactory.h>
+      => so added updated "/usr/local/include/activemq-cpp-3.9.3" path
+         to unix:INCLUDEPATH in dasmon/client/dasmon.pro
+   -> error: ‘class QHeaderView’ has no member named ‘setResizeMode’;
+      did you mean ‘ResizeMode’?
+      ...horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+      => added "#if QT_VERSION >= 0x050000 ... setSectionResizeMode()"
+         * requires "#include <QtGlobal>" header for QT_VERSION... ;-b
+   -> error: ‘UnicodeUTF8’ is not a member of ‘QApplication’
+      windowTitle.toLatin1().data(), 0, QApplication::UnicodeUTF8));
+      => no longer needed, added "#if QT_VERSION >= 0x050000 ... <omit>"
+   -> All Committed to ADARA Git Repo.
+      => Test compiled on Old Jeeem Rhel7.9...
+
+- Replacing Log4cxx with Log4cpp
+
+Installed latest log4cpp RPMs on Rhel7 and Rhel9, now beginning tedious process of parameterizing *All* the Logging in the ADARA/SMS to work with _Either_ logging library... ;-b
+
+   -> So far so good, replaced the main Log4cxx "LoggerPtr" declaration in every file with a new generalized "LOGGER()" macro. DONE.
+
+   -> Investigating the intricate ADARA autoconf/automake configuration to see about adding the option to build with Log4cpp instead of Log4cxx... ;-]  Updated ADARA Configure and Makefile inputs to choose between available Log4Cpp (preferred now) and LibLog4Cxx, and generate new -D compiler flags to instruct the source code for the desired/selected option (USE_LOG4CPP_LOGGING and USE_LOG4CXX_LOGGING). DONE.
+
+   -> I also see some diabolical Appenders being defined in the ADARA ComBus library (wrapper onto the ActiveMQ messaging system, for Workflow/Cataloging and Web App communication), which will need to be overhauled to provide alternate Log4cpp support, too. ;-}
+
+   -> Started working my way through the ADARA SMS and ComBus source files, swapping out LibLog4Cxx-specific code for the new macros, etc. Slow progress, about half of it builds again now... ;-D  DONE.
+
+   -> https://github.com/msly/codemanage/blob/master/A%20useful%20log4cpp%20example.cpp
+
+   -> https://log4cpp.sourceforge.net/api/classlog4cpp_1_1SyslogAppender.html
+
+   -> https://log4cpp.sourceforge.net/
+
+   -> Looks like everything "Works" with Log4Cpp in Rhel7 now, but it requires some changes to the age-old SMS "logging.conf" file, to add a "Root Appender" with proper pattern layout formatting, e.g.:
+
+   log4j.rootCategory=DEBUG, rootAppender
+   log4j.appender.rootAppender=org.apache.log4j.ConsoleAppender
+   log4j.appender.rootAppender.layout=org.apache.log4j.PatternLayout
+   log4j.appender.rootAppender.layout.ConversionPattern=%d %p %c - %m%n
+
+   -> Committed this change to the SNSTestData/ADARA/sms SVN Repo for the ADARA Test Harness use. Comparable changes may likely be required across the production beamline deployments.
+
+   -> Dagnabbit, one more Log4Cpp issue, on Rhel9, where the latest GCC/G++ Compiler 11.3.1 is yet a step more pedantic and is somehow losing track of _Which_ Logger is Which. This only happens for the infamous ReadyAdapter class, which is header-only based. When the SMSControl class tries to create a ReadyAdapter, the class somehow does _Not_ inherit the "correct" stupid static global "logger" reference from SMSControl, but instead some other as-yet-uninitialized "logger" that's NULL (0x0) and therefore causes an unavoidable segmentation violation. ;-Q  The easiest solution for this is to simply split ReadyAdapter.h into a proper *.cc source file, so it can create its _Own_ Log4Cpp stupid static global "logger" instance, and be sure to initialize it before use. ;-D  This worked and was the "least grotesque" alternative to occur to me at the time. Lol... ;-D
+
+- In a funny little named pipe "buffer size fix" install script in ADARA, I got this error:
+
+   $ cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+   /tmp/big_err_pipe.c:15:1: warning: return type defaults to 'int' [-Wimplicit-int]
+      15 | main()
+         | ^~~~
+
+Simple fix, add the "int" type for main(). Committed to ADARA Git Repo. :-D
+
+- Now on to Actual ADARA Compilation on Rhel9, Yay! :-D  First thing I tripped over is that there aren't any NeXus rpms for Rhel9, they stopped at Rhel7 apparently. But as it happens, this is kinda an "easy one" since all we use are a small handful of Header files (napi.h, nexus/NeXusFile.hpp and nexus/NeXusStream.hpp) and so I just decided to snarf those into the ADARA/STC source directory to be self-contained. This works pretty well, and everything builds. Looks like these headers are GNU LGPL licensed, so that should be Ok to redistribute, right...? ;-D  Installed the two HDF5 packages for Rhel9, "hdf5.x86_64" and "hdf5-devel.x86_64" to proceed with the ADARA build. DONE.
+
+- Found some ancient EPICS 3.14.12.6 C++ code that won't compile "as is" under the latest Rhel9 GCC version 11.3.1. Exchanged some emails to Matt Pearson and Steve Hartman, and have some simple suggestions to work around this without much effort. Will give them a try and see which approach is most backwards-compatible for our existing Rhel7 setups. ;-D  Thankfully, the epics-base patch, that Matt provided a reference to, works great in both Rhel7 and Rhel9. Applied patch to our EPICS Base 3.14 repo on trac.sns.gov.  DONE.
+
+   -> More Ancient EPICS Build Issues, this time with some C++17 dynamic exception deprecation in some old BaseV4 example C++ programs. Did some research and found a simple C++ Version Dependent solution, to use "noexcept(false)" in place of the dynamic exception declarations. Committed to our BaseV4 "mirror" on trac.sns.gov. :-D  DONE.
+
+   -> Missing the "SWIG" package for EPICS Extensions on Rhel9 on STC4 VM, yum installed "swig.x86_64". :-D  DONE.
+
+   -> For EPICS Extensions, there's no "python.x86_64" installed (or available!) for our Rhel9 systems at SNS. Lol... ;-D  I'll ask Linux IT. ;-D  Ahhh... the package in Rhel9 is actually explicitly Python3, as in "python3.x86_64"... I'm sure this will be fraught with peril, but I'll give that a try... ;-D  Actually, the only "missing" package was "python3-devel.x86_64". Let's see if this works. ;-D  Meh, well it built...! ;-D  Oh, also need "rpcgen.x86_64" package for Extensions (used to be included in glibc-common). DONE.
+
+   -> For EPICS "asyn" Module (in /home/controls/epics/asyn/master), needed to install the "libtirpc-devel.x86_64" package for rpc/rpc.h header. ;-)  Also need to set "TIRPC=YES" in configure/CONFIG_SITE to be able to _Find_ the rpc/rpc.h header hiding under /usr/include/tirpc/... ;-}  DONE.
+
+   -> For EPICS "sscan" Module (in /home/controls/epics/sscan/master), similarly needed to tweak the _Makefile_ to cram in the "-I/usr/include/tirpc" header search directory, not quite as easy as a configure/CONFIG.SITE setting. Though in this case the manual direct hack to the Makefile paths will be happily backwards compatible for old Rhel7 systems that don't have TIRPC. :-D  It Worked! Committed to "sscan" Git repo on trac.sns.gov. :-)  DONE.
+
+   -> Ok, the EPICS Builds for Rhel9 are going pretty well now. I have created 3 New EPICS Git Repo Release Tags to ensure that future Rhel9 deployments will build and work normally:
+
+      => EPICS Base rel3.14.12.6_20230825
+
+      => EPICS BaseV4 rel4.6_20230825
+
+      => EPICS Extensions rel1.4_20230825
+
+   -> These can be "git-release.sh -e [base|basev4|extensions] <release>" installed. :-D  Updated *All* the ADARA "INSTALL" Recipes to provide more bulletproof instructions for deploying these EPICS Releases on a new beamline system. :-)  DONE.
+
+- Quirky "git diff" and "git show" behavior, where Color Escape sequences were not properly interpreted, leaving lots of "ESC[<N>m" gibberish in the output. Found out that for this latest Git version, it is handy to set the "LESS" environment variable to simply "-R", as in:
+
+   export LESS="-R"
+
+   -> This provided true Color Diff output in a terminal shell. Yay! :-D
+
+- Due to the changes with eliminating the "master" subdirectory under /home/controls/share/ (replacing it with a soft link to "."), the "setup_controls.sh" script (for setting up a brand new beamline) was broken. There was a place where the /home/controls/share/master/ directory level depth was taken into account, and Zach had "fixed" the Makefile in share/scripts to skip the now-missing subdirectory level. I will patch the setup_controls.sh script to automagically generate an appropriate "master" soft link. ;-D  DONE.
+
+- The latest version of Git 2.39.3 (versus the old Rhel 7.9 at version 1.8.3.1) produces a whine about the share/master Git repo being checked out owned by user "controls" instead of "me" (y8y):
+
+   $ git status -v 
+   fatal: detected dubious ownership in repository at '/home/controls/share/master'
+   To add an exception for this directory, call:
+
+       git config --global --add safe.directory /home/controls/share/master
+
+   -> I did some research online, and confirmed that this is "O.K." since we really want the checked-out Git repos (including the .git/ repo directory) to be owned by user "controls" and not any regular user. So we will have to do this on All our repos going forward... ;-)
+

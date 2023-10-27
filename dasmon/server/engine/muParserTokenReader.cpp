@@ -145,7 +145,13 @@ namespace mu
   */
   ParserTokenReader* ParserTokenReader::Clone(ParserBase *a_pParent) const
   {
-    std::auto_ptr<ParserTokenReader> ptr(new ParserTokenReader(*this));
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+    std::unique_ptr<ParserTokenReader>
+#else
+    std::auto_ptr<ParserTokenReader>
+#endif
+		ptr(new ParserTokenReader(*this));
+
     ptr->SetParent(a_pParent);
     return ptr.release();
   }

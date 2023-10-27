@@ -1,7 +1,7 @@
 
 #include "../sms/Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("ADARA-Gen"));
+LOGGER("ADARA-Gen");
 
 #include <iostream>
 #include <vector>
@@ -18,14 +18,15 @@ static LoggerPtr logger(Logger::getLogger("ADARA-Gen"));
 
 #include <boost/program_options.hpp>
 #include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #define epicsAssertAuthor "Dave Dillow <dillowda@ornl.gov>"
 #define caNetAddrSock
 
 #include "ADARA.h"
-#include "ReadyAdapter.h"
 #include "ADARAUtils.h"
+
+#include "../sms/ReadyAdapter.h"
 
 #include <fdManager.h>
 #include <epicsTimer.h>
@@ -539,11 +540,11 @@ static void parse_options(int argc, char **argv)
 	try {
 		po::store(po::parse_command_line(argc, argv, desc), vm);
 		po::notify(vm);
-	} catch (po::unknown_option e) {
+	} catch (po::unknown_option &e) {
 		std::cerr << argv[0] << ": " << e.what() << std::endl
 			<< std::endl << desc << std::endl;
 		exit(2);
-	} catch (po::invalid_option_value e) {
+	} catch (po::invalid_option_value &e) {
 		std::cerr << argv[0] << ": " << e.what() << std::endl
 			<< std::endl << desc << std::endl;
 		exit(2);
@@ -596,6 +597,8 @@ static void block_signals(void)
 
 int main(int argc, char **argv)
 {
+	LOGGER_INIT();
+
 	parse_options(argc, argv);
 
 	block_signals();

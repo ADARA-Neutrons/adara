@@ -29,9 +29,17 @@ AC_ARG_ENABLE([adara_pvgen],
     AS_HELP_STRING([--disable-adara-pvgen], [Disable building adara-pvgen]))
 
 AS_IF([test "x$enable_sms" != "xno"], [
-	PKG_CHECK_EXISTS([liblog4cxx >= 0.10], [], [
-		enable_sms=no
-		AC_WARN(Disabling SMS due to missing dependencies)
+	PKG_CHECK_EXISTS([log4cpp >= 1.1], [
+			enable_log4cpp=yes
+			enable_liblog4cxx=no
+		], [
+		PKG_CHECK_EXISTS([liblog4cxx >= 0.10], [
+				enable_log4cpp=no
+				enable_liblog4cxx=yes
+			], [
+			enable_sms=no
+			AC_WARN(Disabling SMS due to missing dependencies)
+		])
 	])
 ])
 
@@ -173,7 +181,14 @@ AS_IF([test "x$enable_stc" != "xno" -o "x$enable_dasmon_server" != "xno"], [
 ])
 
 AS_IF([test "x$enable_sms" != "xno"], [
-	PKG_CHECK_MODULES([liblog4cxx], [liblog4cxx >= 0.10])
+	AS_IF([test "x$enable_log4cpp" != "xno"], [
+		PKG_CHECK_MODULES([log4cpp], [log4cpp >= 1.1])
+		log4cpp_CFLAGS="$log4cpp_CFLAGS -DUSE_LOG4CPP_LOGGING"
+	])
+	AS_IF([test "x$enable_liblog4cxx" != "xno"], [
+		PKG_CHECK_MODULES([liblog4cxx], [liblog4cxx >= 0.10])
+		liblog4cxx_CFLAGS="$liblog4cxx_CFLAGS -DUSE_LOG4CXX_LOGGING"
+	])
 ])
 
 AM_CONDITIONAL([BUILD_SMS], [test "x$enable_sms" != "xno"])
