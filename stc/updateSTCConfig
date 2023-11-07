@@ -26,7 +26,7 @@ STC_JENKINS_DEVEL="/TESTING/JENKINS/SNS/stcdata_devel/stc_config.xml"
 
 USAGE()
 {
-	echo -e "\nusage: updateConfig [--diff] \\"
+	echo -e "\nusage: updateSTCConfig [--diff] \\"
 	echo "   [ --prod | --test | --dummy | \\"
 	echo "      --hfir | --hfir-test | \\"
 	echo "      --devel | --master | --testing | \\"
@@ -147,7 +147,9 @@ for config in $CONFIGS ; do
 
 		echo -e "Comparing to $label STC Config in:\n\n\t$path\n"
 
-		( echo -e "\n$path\n" ; diff ./stc_config.xml "$path" ; echo ) \
+		( echo -e "\n$path\n" ; diff ./stc_config.xml "$path" ; echo ; \
+				echo -e "---------------------------\n" ; \
+				/bin/ls -l ./stc_config.xml "$path" ; echo ) \
 			| less -x4
 
 		echo
