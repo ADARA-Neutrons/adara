@@ -11,7 +11,7 @@ DASMOND_SYSTEM_FILES="/home/dasmon/dasmond.cfg \
 	/etc/crontab \
 	/etc/rsyslog.conf \
 	/etc/rsyslog.d/adaraMailer.conf \
-	/etc/rsyslog.d/dasmon.conf \
+	/etc/rsyslog.d/*dasmon.conf \
 	/etc/X11/xinit/xinitrc.dasmon \
 	/etc/init/dasmongui.conf \
 	/etc/systemd/system/dasmongui.service \
