@@ -1,0 +1,189 @@
+#!/bin/bash
+
+#
+# Update Production-Deployed STC Pre-Post-Processing Script Files
+#
+
+STC_DEVEL="/TESTING/SNS/stcdata_devel"
+STC_HFIR="/HFIR/stcdata_hfir"
+
+STC_SSH="ssh -AY stc1.ornl.gov"
+#STC_SSH="ssh -AY stc2.ornl.gov"
+#STC_SSH="ssh -AY stc3.ornl.gov"
+
+USAGE()
+{
+	echo -e "\nusage: updateSTCPPP [--diff]"
+	echo
+	echo "where:"
+	echo
+	echo " --diff           = don't actually update STC Scripts, Diff Only"
+	echo
+}
+
+DIFFONLY=0
+
+found=0
+
+for opt in $@ ; do
+
+	if [[ ${opt} == "--diff" ]]; then
+		DIFFONLY=1
+		found=1
+	fi
+
+	if [[ ${found} == 0 ]]; then
+		echo -e "\nError: Unknown Option \"${opt}\"... Bailing out..."
+		USAGE
+		exit -2
+	fi
+
+done
+
+CHECK_PPP()
+{
+	script="$1"
+	shift
+
+	path="$1"
+	shift
+
+	if [[ ${DIFFONLY} == 1 ]]; then
+
+		echo -e "Comparing ${script} to STC PPP in:\n\n\t${path}/\n"
+
+		( echo -e "\n${path}/${script}\n" ; \
+				diff "${script}" "${path}/${script}" ; echo ; \
+				echo -e "---------------------------\n" ; \
+				/bin/ls -l "${script}" "${path}/${script}" ; echo ) \
+			| less -x4
+
+		echo
+
+	else
+
+		echo -e "Updating ${script} versus STC PPP in:\n\n\t${path}/\n"
+
+		repo_temp="${script}-repo-temp.$$"
+		echo -e "Using Temporary Repository Script as:\n\t${repo_temp}\n"
+		cp "${script}" "${repo_temp}"
+
+		sys_temp="${script}-sys-temp.$$"
+		echo -e "Using Temporary STC PPP Script as:\n\t${sys_temp}\n"
+		cp "${path}/${script}" "${sys_temp}"
+
+		xxdiff \
+			--title1 "[Repository ${script}]" \
+				"${repo_temp}" \
+			--title2 "[System Deployed ${script} in ${path}/]" \
+				"${sys_temp}"
+
+		# Check for Repository File Differences...
+		diff "${script}" "${repo_temp}" > /dev/null 2>&1
+		ckrepodiff=$?
+
+		if [[ $ckrepodiff != 0 ]]; then
+
+			( echo -e "\nRepository Temporary File Differed!\n" ; \
+					echo "< ${script}" ; \
+					echo "> ${repo_temp}" ; \
+					echo ; diff "${script}" "${repo_temp}" ; echo ; \
+					echo -e "---------------------------\n" ; \
+					/bin/ls -l "${script}" "${repo_temp}" ; echo ) \
+				| less -x4
+
+			echo -e -n "Update Repository Script:\n\n(yes/No/quit)? "
+
+			read deploy_ck
+			deploy_ck=`echo "$deploy_ck" | tr '[:upper:]' '[:lower:]'`
+
+			if [[ "#$deploy_ck#" == '#y#' \
+					|| "#$deploy_ck#" == '#yes#' ]]; then
+				cp "${repo_temp}" "${script}"
+			elif [[ "#$deploy_ck#" == '#q#' \
+					|| "#$deploy_ck#" == '#quit#' ]]; then
+				echo -e -n "\nExiting Update Config Script"
+				echo -e " at User's Request.\n"
+				/bin/rm "${repo_temp}" "${sys_temp}"
+				exit 0
+			else
+				echo -e "\nOk, Leaving Deployed Repository Script As Is.\n"
+			fi
+	
+		else
+
+			echo -e "No Change to Repository Script File:\n\n\t${script}\n"
+
+		fi
+
+		# Check for System File Differences...
+		diff "${path}/${script}" "${sys_temp}" > /dev/null 2>&1
+		cksysdiff=$?
+
+		if [[ $cksysdiff != 0 ]]; then
+
+			( echo -e "\nSTC PPP Temporary File Differed!\n" ; \
+					echo "< ${path}/${script}" ; \
+					echo "> ${sys_temp}" ; \
+					echo ; diff "${path}/${script}" "${sys_temp}" ; echo ; \
+					echo -e "---------------------------\n" ; \
+					/bin/ls -l "${path}/${script}" "${sys_temp}" ; echo ) \
+				| less -x4
+
+			echo -e "Update STC PPP Script ${script} in:\n\n\t${path}/\n\n"
+			echo -e -n "(yes/No/quit)? "
+
+			read deploy_ck
+			deploy_ck=`echo "$deploy_ck" | tr '[:upper:]' '[:lower:]'`
+
+			if [[ "#$deploy_ck#" == '#y#' \
+					|| "#$deploy_ck#" == '#yes#' ]]; then
+				# Need ${SSH_STC} Here...???
+				cp "${sys_temp}" "${path}/"
+			elif [[ "#$deploy_ck#" == '#q#' \
+					|| "#$deploy_ck#" == '#quit#' ]]; then
+				echo -e -n "\nExiting Update Config Script"
+				echo -e " at User's Request.\n"
+				/bin/rm "${repo_temp}" "${sys_temp}"
+				exit 0
+			else
+				echo -e "\nOk, Leaving Deployed STC PPP Script As Is.\n"
+			fi
+	
+		else
+
+			echo -e "No Change to STC PPP File:\n\n\t${path}/${script}\n"
+
+		fi
+
+		# Clean Up...
+		/bin/rm "${repo_temp}" "${sys_temp}"
+
+		# Continue...
+		echo -e -n "Continue (Yes/quit)? "
+		read cont_ck
+		cont_ck=`echo "$cont_ck" | tr '[:upper:]' '[:lower:]'`
+		if [[ "#$cont_ck#" == '#q#' \
+				|| "#$cont_ck#" == '#quit#' ]]; then
+			echo -e -n "\nExiting Update Config Script"
+			echo -e " at User's Request.\n"
+			exit 0
+		fi
+
+	fi
+}
+
+# Update/Check Each STC PPP Script in Turn...
+
+CHECK_PPP stc_pre_post_dummy.bash ${STC_DEVEL}
+
+CHECK_PPP stc_pre_post_imaging.bash ${STC_DEVEL}
+
+CHECK_PPP stc_pre_post_imaging.py ${STC_DEVEL}
+
+CHECK_PPP stc_pre_post_timepix3.py ${STC_DEVEL}
+
+CHECK_PPP stc_pre_post_mobile_timepix3.py ${STC_DEVEL}
+
+CHECK_PPP stc_pre_post_graffiti.bash ${STC_HFIR}
+
