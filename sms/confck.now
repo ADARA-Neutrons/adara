@@ -510,8 +510,8 @@ SMS_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog SMSD${ALT} Config" "Deployed" \
-		./sms${ALT}/smsd${ALT}_syslog.conf \
-			/etc/rsyslog.d/smsd${ALT}_syslog.conf
+		./sms${ALT}/90_smsd${ALT}.conf \
+			/etc/rsyslog.d/90_smsd${ALT}.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -748,7 +748,7 @@ PVSD_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog PVSD Config" "Deployed" \
-		./pvsd/pvsd_syslog.conf /etc/rsyslog.d/pvsd_syslog.conf
+		./pvsd/90_pvsd.conf /etc/rsyslog.d/90_pvsd.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -1066,7 +1066,7 @@ DASMON_CONFCK()
 
 	if [[ -f dasmond/dasmon_syslog.conf ]]; then
 		DIFF_FILE "Saved RSyslog DASMON Config" "System" \
-			dasmond/dasmon_syslog.conf /etc/rsyslog.d/dasmon.conf
+			dasmond/90_dasmon.conf /etc/rsyslog.d/90_dasmon.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
 			(( _nerrors++ ))
@@ -1251,41 +1251,42 @@ if [[ $UPDATE == 1 ]]; then
 	fi
 	echo
 
-	# Check/Create Local DASMON User and Home Area for Config
-	if [[ ! -d ${DASMON_HOME} ]]; then
-		echo -e "Home Directory for DASMON User Not Found...!\n"
-		${LS} -l ${DASMON_HOME}
-		echo -e -n "\nCreate Home Directory for DASMON? [yes|No] "
-		read ckUpdate
-		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
-		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			${SUDO} ${MKDIR} ${DASMON_HOME}
-		fi
-	fi
-	if [[ ! -d ${DASMON_HOME}/${DASMON_USER} ]]; then
-		echo -e "DASMON User Directory Not Found...!\n"
-		${LS} -l ${DASMON_HOME}/${DASMON_USER}
-		echo -e -n "\nCreate DASMON User and Home Directory? [yes|No] "
-		read ckUpdate
-		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
-		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			${SUDO} useradd -b ${DASMON_HOME} -u ${DASMON_UID} -m -U \
-				-s /sbin/nologin ${DASMON_USER}
-			${SUDO} ${CHMOD} og+rx ${DASMON_HOME}/${DASMON_USER}
-			${LS} -ld ${DASMON_HOME}/${DASMON_USER}
-			${GREP} ${DASMON_USER} /etc/passwd
-			${GREP} ${DASMON_USER} /etc/group
-			# Go Ahead and Create Base DASMON GUI Client Config
-			# (It probably matches what's in the Git Repo anyway...! ;-D)
-			${SUDO} ${SH} -c 'echo -e "[rules]\\n[signals]" \
-				> ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg'
-			${LS} -l ${DASMON_HOME}/${DASMON_USER}
-			/bin/cat ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg
-		fi
-	fi
-
-	# Check/Create DASMON RSyslog Log File...
 	if [[ $DO_DASMON_CONFCK == 1 ]]; then
+
+		# Check/Create Local DASMON User and Home Area for Config
+		if [[ ! -d ${DASMON_HOME} ]]; then
+			echo -e "Home Directory for DASMON User Not Found...!\n"
+			${LS} -l ${DASMON_HOME}
+			echo -e -n "\nCreate Home Directory for DASMON? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				${SUDO} ${MKDIR} ${DASMON_HOME}
+			fi
+		fi
+		if [[ ! -d ${DASMON_HOME}/${DASMON_USER} ]]; then
+			echo -e "DASMON User Directory Not Found...!\n"
+			${LS} -l ${DASMON_HOME}/${DASMON_USER}
+			echo -e -n "\nCreate DASMON User and Home Directory? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				${SUDO} useradd -b ${DASMON_HOME} -u ${DASMON_UID} -m -U \
+					-s /sbin/nologin ${DASMON_USER}
+				${SUDO} ${CHMOD} og+rx ${DASMON_HOME}/${DASMON_USER}
+				${LS} -ld ${DASMON_HOME}/${DASMON_USER}
+				${GREP} ${DASMON_USER} /etc/passwd
+				${GREP} ${DASMON_USER} /etc/group
+				# Go Ahead and Create Base DASMON GUI Client Config
+				# (It probably matches what's in the Git Repo anyway! ;-D)
+				${SUDO} ${SH} -c 'echo -e "[rules]\\n[signals]" \
+					> ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg'
+				${LS} -l ${DASMON_HOME}/${DASMON_USER}
+				/bin/cat ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg
+			fi
+		fi
+
+		# Check/Create DASMON RSyslog Log File...
 		${LS} -l "${DASMOND_LOG}"
 		log_perms=`${LS} -l "${DASMOND_LOG}" | ${AWK} '{print $1}'`
 		log_group=`${LS} -l "${DASMOND_LOG}" | ${AWK} '{print $4}'`
@@ -1312,6 +1313,7 @@ if [[ $UPDATE == 1 ]]; then
 			fi
 		fi
 		echo
+
 	fi
 
 	# Check/Create RSyslog Pipes...
@@ -1368,7 +1370,7 @@ if [[ $UPDATE == 1 ]]; then
 
 			echo "MAILTO=idac_adara_notify@email.ornl.gov" >> $cron_file
 
-			echo -e -n "\n# Handle \"Local\" STS Deployments" >> $cronfile
+			echo -e -n "\n# Handle \"Local\" STS Deployments" >> $cron_file
 			echo " (and STS Config ConfCk... :-)" >> $cron_file
 			echo -e "\nLOCAL_DATA=/SNSlocal" >> $cron_file
 
@@ -1463,7 +1465,7 @@ if [[ $UPDATE == 1 ]]; then
 
 			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
 			echo -n "0 8 * * *" >> $cron_file
-			echo -n " ${ADARA_DIR}/adara_monitor" \
+			echo -n " /SNS/users/$USER/gitsrc/ADARA/adara_monitor" \
 				>> $cron_file
 			echo " --oneshot" >> $cron_file
 			echo >> $cron_file
@@ -1471,12 +1473,15 @@ if [[ $UPDATE == 1 ]]; then
 				>> $cron_file
 			echo " > /dev/null 2>&1" >> $cron_file
 
-			echo -e "\n# DASMON" >> $cron_file
-			echo -n "0-59/10 * * * *" >> $cron_file
-			echo " /SNS/users/$USER/stuff/exec/dasmond_mon" >> $cron_file
-			echo -n "#0 8,17 * * *" >> $cron_file
-			echo " /home/controls/config-dasmon/confck --quiet" \
-				>> $cron_file
+			if [[ $DO_DASMON_CONFCK == 1 ]]; then
+				echo -e "\n# DASMON" >> $cron_file
+				echo -n "0-59/10 * * * *" >> $cron_file
+				echo " /SNS/users/$USER/stuff/exec/dasmond_mon" \
+					>> $cron_file
+				echo -n "#0 8,17 * * *" >> $cron_file
+				echo " /home/controls/config-dasmon/confck --quiet" \
+					>> $cron_file
+			fi
 
 			echo -e "\n# For Long Running NOWN Runs..." >> $cron_file
 			echo -n "###0 0 * * *" >> $cron_file

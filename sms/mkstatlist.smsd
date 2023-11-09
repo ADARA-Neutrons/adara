@@ -9,6 +9,7 @@ SMSD_SYSTEM_FILES="/SNSlocal/sms/conf/* \
 	/etc/rsyslog.conf \
 	/etc/rsyslog.d/adaraMailer.conf \
 	/etc/rsyslog.d/smsd_syslog.conf \
+	/etc/rsyslog.d/90_sms*.conf \
 	/usr/local/bin/rsyslogMailer \
 	/etc/crontab \
 	/etc/cron.d/epics_rsyslog_mailer \

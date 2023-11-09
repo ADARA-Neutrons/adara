@@ -8,7 +8,7 @@ SMSD_SYSTEM_FILES="/SNSlocal/sms-mon/conf/* \
 	/etc/systemd/system/smsd-mon.service \
 	/etc/rsyslog.conf \
 	/etc/rsyslog.d/adaraMailer.conf \
-	/etc/rsyslog.d/smsd-mon_syslog.conf \
+	/etc/rsyslog.d/*smsd-mon*.conf \
 	/usr/local/bin/rsyslogMailer \
 	/etc/crontab \
 	/etc/cron.d/epics_rsyslog_mailer \
