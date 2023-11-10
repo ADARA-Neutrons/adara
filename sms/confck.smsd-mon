@@ -483,7 +483,7 @@ CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
-		./sms${ALT}/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+		./sms${ALT}/50_adaraMailer.conf /etc/rsyslog.d/50_adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -492,8 +492,8 @@ CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog SMSD${ALT} Config" "Deployed" \
-		./sms${ALT}/smsd${ALT}_syslog.conf \
-			/etc/rsyslog.d/smsd${ALT}_syslog.conf
+		./sms${ALT}/51_smsd${ALT}.conf \
+			/etc/rsyslog.d/51_smsd${ALT}.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))

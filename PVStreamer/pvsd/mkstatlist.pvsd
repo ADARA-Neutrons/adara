@@ -5,7 +5,7 @@ STAT_LIST="./stat_list"
 PVSD_SYSTEM_FILES="/usr/local/bin/pvsd \
 	/etc/init.d/pvsd \
 	/etc/rsyslog.conf \
-	/etc/rsyslog.d/adaraMailer.conf \
+	/etc/rsyslog.d/*adaraMailer.conf \
 	/etc/rsyslog.d/*pvsd*.conf \
 	/usr/local/bin/rsyslogMailer \
 	/etc/crontab \

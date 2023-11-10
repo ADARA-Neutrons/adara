@@ -248,7 +248,7 @@ CONFCK()
 
 	if [[ -f ./dasmond/dasmon_syslog.conf ]]; then
 		DIFF_FILE "Saved RSyslog DASMON Config" "System" \
-			./dasmond/dasmon_syslog.conf /etc/rsyslog.d/dasmon.conf
+			./dasmond/51_dasmond.conf /etc/rsyslog.d/51_dasmond.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
 			(( _nerrors++ ))
@@ -258,7 +258,7 @@ CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
-		./dasmond/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+		./dasmond/50_adaraMailer.conf /etc/rsyslog.d/50_adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))

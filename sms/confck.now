@@ -501,7 +501,7 @@ SMS_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
-		./sms${ALT}/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+		./sms${ALT}/50_adaraMailer.conf /etc/rsyslog.d/50_adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -510,8 +510,8 @@ SMS_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog SMSD${ALT} Config" "Deployed" \
-		./sms${ALT}/90_smsd${ALT}.conf \
-			/etc/rsyslog.d/90_smsd${ALT}.conf
+		./sms${ALT}/51_smsd${ALT}.conf \
+			/etc/rsyslog.d/51_smsd${ALT}.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -739,7 +739,7 @@ PVSD_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
-		./pvsd/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+		./pvsd/50_adaraMailer.conf /etc/rsyslog.d/50_adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -748,7 +748,7 @@ PVSD_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog PVSD Config" "Deployed" \
-		./pvsd/90_pvsd.conf /etc/rsyslog.d/90_pvsd.conf
+		./pvsd/51_pvsd.conf /etc/rsyslog.d/51_pvsd.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -1066,7 +1066,7 @@ DASMON_CONFCK()
 
 	if [[ -f dasmond/dasmon_syslog.conf ]]; then
 		DIFF_FILE "Saved RSyslog DASMON Config" "System" \
-			dasmond/90_dasmon.conf /etc/rsyslog.d/90_dasmon.conf
+			dasmond/51_dasmond.conf /etc/rsyslog.d/51_dasmond.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
 			(( _nerrors++ ))
@@ -1076,7 +1076,7 @@ DASMON_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
-		dasmond/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+		dasmond/50_adaraMailer.conf /etc/rsyslog.d/50_adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
