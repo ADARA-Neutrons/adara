@@ -13,15 +13,18 @@ STC_SSH="ssh -AY stc1.ornl.gov"
 
 USAGE()
 {
-	echo -e "\nusage: updateSTCPPP [--diff]"
+	echo -e "\nusage: updateSTCPPP [--diff] [--noprompt]"
 	echo
 	echo "where:"
 	echo
 	echo " --diff           = don't actually update STC Scripts, Diff Only"
+	echo " --noprompt       = don't prompt for each next PPP script check"
 	echo
 }
 
 DIFFONLY=0
+
+NOPROMPT=0
 
 found=0
 
@@ -29,6 +32,11 @@ for opt in $@ ; do
 
 	if [[ ${opt} == "--diff" ]]; then
 		DIFFONLY=1
+		found=1
+	fi
+
+	if [[ ${opt} == "--noprompt" ]]; then
+		NOPROMPT=1
 		found=1
 	fi
 
@@ -160,14 +168,16 @@ CHECK_PPP()
 		/bin/rm "${repo_temp}" "${sys_temp}"
 
 		# Continue...
-		echo -e -n "Continue (Yes/quit)? "
-		read cont_ck
-		cont_ck=`echo "$cont_ck" | tr '[:upper:]' '[:lower:]'`
-		if [[ "#$cont_ck#" == '#q#' \
-				|| "#$cont_ck#" == '#quit#' ]]; then
-			echo -e -n "\nExiting Update Config Script"
-			echo -e " at User's Request.\n"
-			exit 0
+		if [[ ${NOPROMPT} == 0 ]]; then
+			echo -e -n "Continue (Yes/quit)? "
+			read cont_ck
+			cont_ck=`echo "$cont_ck" | tr '[:upper:]' '[:lower:]'`
+			if [[ "#$cont_ck#" == '#q#' \
+					|| "#$cont_ck#" == '#quit#' ]]; then
+				echo -e -n "\nExiting Update Config Script"
+				echo -e " at User's Request.\n"
+				exit 0
+			fi
 		fi
 
 	fi
