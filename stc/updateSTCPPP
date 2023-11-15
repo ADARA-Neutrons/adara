@@ -99,7 +99,7 @@ CHECK_PPP()
 
 			if [[ "#$deploy_ck#" == '#y#' \
 					|| "#$deploy_ck#" == '#yes#' ]]; then
-				cp "${repo_temp}" "${script}"
+				cp -i "${repo_temp}" "${script}"
 			elif [[ "#$deploy_ck#" == '#q#' \
 					|| "#$deploy_ck#" == '#quit#' ]]; then
 				echo -e -n "\nExiting Update Config Script"
@@ -130,7 +130,7 @@ CHECK_PPP()
 					/bin/ls -l "${path}/${script}" "${sys_temp}" ; echo ) \
 				| less -x4
 
-			echo -e "Update STC PPP Script ${script} in:\n\n\t${path}/\n\n"
+			echo -e "Update STC PPP Script ${script} in:\n\n\t${path}/\n"
 			echo -e -n "(yes/No/quit)? "
 
 			read deploy_ck
@@ -139,7 +139,7 @@ CHECK_PPP()
 			if [[ "#$deploy_ck#" == '#y#' \
 					|| "#$deploy_ck#" == '#yes#' ]]; then
 				# Need ${SSH_STC} Here...???
-				cp "${sys_temp}" "${path}/"
+				cp -i "${sys_temp}" "${path}/${script}"
 			elif [[ "#$deploy_ck#" == '#q#' \
 					|| "#$deploy_ck#" == '#quit#' ]]; then
 				echo -e -n "\nExiting Update Config Script"
