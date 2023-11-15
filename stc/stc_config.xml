@@ -860,5 +860,37 @@
 		</element>
 	</command>
 
+	<!-- Pre-Post-Auto-Reduction Command Interface for TAx/HB3 Graffiti -->
+	<command>
+		<name>GraffitiCommand</name>
+		<path>/HFIR/stcdata_hfir/stc_pre_post_graffiti.bash</path>
+		<!-- Graffiti Generation Conditional PV Check -->
+		<condition>
+			<name>Graffiti Generation Mode</name>
+			<pattern>:CS:Graffiti:Generate$</pattern>
+			<value>1</value><!-- Graffiti Data File Generation Activated -->
+		</condition>
+		<element>
+			<pattern>:CS:Graffiti:PVList$</pattern>
+			<name>PVList</name>
+		</element>
+		<element>
+			<pattern>^SampleName$</pattern>
+			<name>SampleName</name>
+		</element>
+		<element>
+			<pattern>^SampleNature$</pattern>
+			<name>SampleNature</name>
+		</element>
+		<element>
+			<pattern>:CS:IPTS:Members$</pattern>
+			<name>Members</name>
+		</element>
+		<element>
+			<pattern>:CS:IPTS:Contact$</pattern>
+			<name>Contact</name>
+		</element>
+	</command>
+
 </stc_config>
 
