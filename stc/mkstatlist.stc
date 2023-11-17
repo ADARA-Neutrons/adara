@@ -5,6 +5,7 @@ STAT_LIST="./stat_list"
 STC_SYSTEM_FILES="/etc/xinetd.d/stc* \
 	/etc/systemd/system/stc* \
 	/usr/local/bin/stc* \
+	/usr/local/bin/nxls* \
 	/etc/cron.d/stc_rsyslog_mailer \
 	/etc/rsyslog.conf \
 	/etc/rsyslog.d/*adaraMailer.conf \
