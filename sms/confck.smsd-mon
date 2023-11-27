@@ -217,14 +217,14 @@ DIFF_DIR()
 	# Make sure there's something to check...  :)
 	#
 
-	local _nfiles1=`ls -l "${_dir1}/" | wc | ${AWK} '{print $1}'`
+	local _nfiles1=`${LS} -l "${_dir1}/" | wc | ${AWK} '{print $1}'`
 	_nfiles1=$(( _nfiles1 - 1 ))
 
 	if [[ ${_nfiles1} -lt 1 ]]; then
 		echo "Note: Empty Directory:  [${_dir1}]"
 	fi
 
-	local _nfiles2=`ls -l "${_dir2}/" | wc | ${AWK} '{print $1}'`
+	local _nfiles2=`${LS} -l "${_dir2}/" | wc | ${AWK} '{print $1}'`
 	_nfiles2=$(( _nfiles2 - 1 ))
 
 	if [[ ${_nfiles2} -lt 1 ]]; then
@@ -257,13 +257,13 @@ DIFF_DIR()
 
 			echo -e "\nDiffing Link "${_dir1}"/"$base"@:"
 
-			local _lsdir1=`ls -l "${_dir1}/$base"`
+			local _lsdir1=`${LS} -l "${_dir1}/$base"`
 			if [[ -n "${_lsdir1}" ]]; then
 				echo "${_lsdir1}" \
 					| ${SED} "s@${_dir1}/$base@\n\t${_dir1}/$base\n\t\t@"
 			fi
 
-			local _lsdir2=`ls -l "${_dir2}/$base"`
+			local _lsdir2=`${LS} -l "${_dir2}/$base"`
 			if [[ -n "${_lsdir2}" ]]; then
 				echo "${_lsdir2}" \
 					| ${SED} "s@${_dir2}/$base@\n\t${_dir2}/$base\n\t\t@"
