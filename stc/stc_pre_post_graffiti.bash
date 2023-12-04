@@ -1,5 +1,20 @@
 #!/bin/bash
 
+# Globals
+
+NXLS="/usr/local/bin/nxls"
+
+BASENAME="/usr/bin/basename"
+MKDIR="/usr/bin/mkdir"
+TOUCH="/usr/bin/touch"
+GREP="/usr/bin/grep"
+AWK="/usr/bin/awk"
+CAT="/usr/bin/cat"
+SED="/usr/bin/sed"
+LS="/usr/bin/ls"
+MV="/usr/bin/mv"
+RM="/usr/bin/rm"
+
 # Command Script Entry - Announce Our Existence...
 
 echo -e "STC Pre-Post-Processing Graffiti Command Script Entry."
@@ -8,7 +23,7 @@ echo -e "   [$0]"
 
 echo -e "   [$@]"
 
-script=`basename "$0"`
+script=`${BASENAME} "$0"`
 
 # Parse Command Line Parameters...
 
@@ -29,8 +44,8 @@ for arg in "$@" ; do
 
 	#echo -e "arg=$arg"
 
-	key=`echo "$arg" | awk -F = '{print $1}'`
-	value=`echo "$arg" | awk -F = '{print $2}'`
+	key=`echo "$arg" | ${AWK} -F = '{print $1}'`
+	value=`echo "$arg" | ${AWK} -F = '{print $2}'`
 
 	#echo "arg=$arg, key=$key, value=$value"
 
@@ -107,59 +122,157 @@ nexus="${nexus_path}/${nexus_name}"
 echo -e "\nNeXus Source Data File = [${nexus}]"
 
 echo
-ls -l "${nexus}"
+${LS} -l "${nexus}"
 
+#
+# Extraction Methods
+#
+
+GET_NEXUS_STR()
+{
+	local _path="$1"
+	shift
+
+	local _label="$*"
+
+	local _str=`${NXLS} ${nexus} -p /entry/${_path} -l -s --terse \
+		| ${SED} "s/\"//g"`
+
+	# Replace "%20" White Space Encodings...
+	_str=`echo "${_str}" | ${SED} "s/%20/ /g"`
+
+	if [[ -z ${_str} ]]; then
+		_date="Error Extracting ${_label} from NeXus"
+	fi
+
+	echo "${_str}"
+}
+
+GET_NEXUS_VAL()
+{
+	local _path="$1"
+	shift
+
+	local _label="$*"
+
+	local _val=`${NXLS} ${nexus} -p /entry/${_path} -l -s --terse`
+
+	if [[ -z ${_val} ]]; then
+		_date="Error Extracting ${_label} from NeXus"
+	fi
+
+	echo "${_val}"
+}
+
+GET_DATE()
+{
+	local _date_time="$1"
+	shift
+
+	local _label="$*"
+
+	local _date=`echo "${_date_time}" | ${AWK} -F "T" '{print $1}'`
+
+	if [[ -z ${_date} ]]; then
+		_date="Error Extracting ${_label} from NeXus"
+	fi
+
+	echo "${_date}"
+}
+
+GET_TIME()
+{
+	local _date_time="$1"
+	shift
+
+	local _label="$*"
+
+	local _time=`echo "${_date_time}" | ${AWK} -F "[T.]" '{print $2}'`
+
+	if [[ -z ${_time} ]]; then
+		_time="Error Extracting ${_label} from NeXus"
+	fi
+
+	echo "${_time}"
+}
+
+#
 # Extract Required Header Fields from NeXus...
+#
 
-run_start_date="TODO Extract Run Start Date from NeXus..."
+# Run Start Date and Time
+start_time=`GET_NEXUS_STR "start_time" "Run Start Date and Time"`
+run_start_date=`GET_DATE "${start_time}" "Run Start Date"`
+run_start_time=`GET_TIME "${start_time}" "Run Start Time"`
 
-run_start_time="TODO Extract Run Start Time from NeXus..."
+# Run Stop Date and Time
+end_time=`GET_NEXUS_STR "end_time" "Run Stop Date and Time"`
+run_stop_date=`GET_DATE "${end_time}" "Run Stop Date"`
+run_stop_time=`GET_TIME "${end_time}" "Run Stop Time"`
 
-run_stop_date="TODO Extract Run Start Date from NeXus..."
+# Experiment Title
+experiment_title=`GET_NEXUS_STR "experiment_title" "Experiment Title"`
 
-run_stop_time="TODO Extract Run Start Time from NeXus..."
-
-experiment_title="TODO Extract IPTS Title from NeXus..."
-
+# Experiment Number
 experiment_number="No Such Thing in EPICS/ADARA..."
 
+# SpICE Command
 spice_command="TODO What is this?"
 
+# BuiltIn Command
 builtin_command="TODO What is this?"
 
-scan_title="TODO Extract Run Title from NeXus..."
+# Scan (Run) Title
+scan_title=`GET_NEXUS_STR "title" "Scan (Run) Title"`
 
+# Monochromator
 monochromator="TODO What is this?"
 
+# Analyzer
 analyzer="TODO What is this?"
 
+# Sense (Ain't Got None)
 sense="TODO What is this?"
 
+# Collimation
 collimation="TODO What is this?"
 
+# Sample Mosaic
 samplemosaic="TODO What is this?"
 
+# Lattice Constants
 latticeconstants="TODO Extract Sample Meta-Data from NeXus..."
 
+# UB Matrix
 ubmatrix="TODO Extract UB Matrix from NeXus..."
 
+# Mode
 mode="TODO What is this?"
 
+# Plane Normal
 plane_normal="TODO What is this?"
 
+# UB Conf
 ubconf="TODO What is this?"
 
+# Def X
 def_x="TODO What is this?"
 
+# Def Y
 def_y="TODO What is this?"
 
-total_counts="TODO Extract Total Counts from NeXus..."
+# Total Counts
+total_counts=`GET_NEXUS_VAL "total_counts" "Sum of (Total) Counts"`
 
+# Center of Mass
 center_of_mass="TODO What is this?"
 
+# Full Width Half Max (With a Twist of Lemon)
 full_width_half_max="TODO What is this?"
 
+#
 # Construct Graffiti Data File Path/Name
+#
 
 graffiti_path="/${facility}/${beamline}/${ipts}/graffiti"
 echo -e "\ngraffiti_path = [${graffiti_path}]"
@@ -173,10 +286,10 @@ scratch="${scratch_dir}/${graffiti_name}.$$"
 
 echo -e "\nGraffiti Scratch File = [${scratch}]"
 
-touch "${scratch}"
+${TOUCH} "${scratch}"
 
 echo
-ls -l "${scratch}"
+${LS} -l "${scratch}"
 
 #
 # Populate Graffiti Header...
@@ -285,17 +398,17 @@ echo "# ${run_stop_time}  ${run_stop_date}   scan completed." \
 
 echo -e "\nGraffiti Scratch File:\n"
 
-/bin/cat "${scratch}"
+${CAT} "${scratch}"
 
 echo
-ls -l "${scratch}"
+${LS} -l "${scratch}"
 
 # Move Graffiti Scratch File to File Archive
 
 status=0
 
 if [[ ! -d "${graffiti_path}" ]]; then
-	mkdir -p "${graffiti_path}"
+	${MKDIR} -p "${graffiti_path}"
 	if [[ $? != 0 ]]; then
 		echo -e "\nError Creating Graffiti Directory...!"
 		status=1
@@ -305,24 +418,24 @@ if [[ ! -d "${graffiti_path}" ]]; then
 	fi
 else
 	echo -e "\nGraffiti Archive Path Exists:\n"
-	ls -ld "${graffiti_path}"
+	${LS} -ld "${graffiti_path}"
 fi
 
 if [[ ${status} == 0 ]]; then
-	mv "${scratch}" "${graffiti_path}/${graffiti_name}"
+	${MV} "${scratch}" "${graffiti_path}/${graffiti_name}"
 	if [[ $? != 0 ]]; then
 		echo -e "\nError Moving Graffiti Data File to File Archive...!"
 		status=2
 	else
 		echo -e "\nGraffiti Data File ${graffiti_name} Moved to Archive:\n"
-		ls -l "${graffiti_path}/${graffiti_name}"
+		${LS} -l "${graffiti_path}/${graffiti_name}"
 	fi
 fi
 
 # Clean Up Scratch Graffiti File, If Unable to Archive...
 if [[ ${status} != 0 ]]; then
 	echo -e "\nFailed to Archive Graffiti Data File - Removing Scratch..."
-	/bin/rm "${scratch}"
+	${RM} "${scratch}"
 fi
 
 # Do Nothing and Exit...
