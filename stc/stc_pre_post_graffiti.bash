@@ -164,6 +164,52 @@ GET_NEXUS_VAL()
 	echo "${_val}"
 }
 
+GET_NEXUS_ARRAY()
+{
+	local _path="$1"
+	shift
+
+	local _arr_name="$1"
+	shift
+
+	local _arr_size="$1"
+	shift
+
+	local _label="$*"
+
+	# Extract Array Values from NeXus...
+
+	local _val_arr=`GET_NEXUS_VAL "${_path}" "${_label}"`
+
+	if [[ -z ${_val_arr} || ${val_arr} =~ ^Error ]]; then
+		echo "Error Extracting ${_label} Array from NeXus...!"
+		return
+	fi
+
+	# Append Values to Array...
+
+	local _val=0
+
+	local _i=0
+
+	for _val in ${_val_arr} ; do
+
+		eval "${_arr_name}[${_i}]=\"${_val}\""
+
+		# Increment Value Array Index...
+		_i=$(( _i + 1 ))
+
+	done
+
+	# Capture Size of Array
+
+	local _size="${_i}"
+
+	eval "${_arr_size}=\"${_size}\""
+
+	echo -e "\nSuccess Extracting ${_label} Array from NeXus."
+}
+
 GET_DATE()
 {
 	local _date_time="$1"
@@ -271,6 +317,103 @@ center_of_mass="TODO What is this?"
 full_width_half_max="TODO What is this?"
 
 #
+# Extract Multi-Column Data Section Arrays...
+#
+
+# Split PVList into Individual PV Names...
+
+declare -A PVNames
+
+PVList_clean=`echo "${PVList}" | ${SED} "s/,//g"`
+
+i=0
+
+for pv in ${PVList_clean} ; do
+
+	echo "pv = [${pv}]"
+
+	PVNames[${i}]="${pv}"
+
+	# Increment PVNames Index...
+	i=$(( i + 1 ))
+
+done
+
+nPVNames="${i}"
+
+# Test GET_NEXUS_ARRAY...
+
+i=0
+
+GET_NEXUS_ARRAY "DASlogs/${PVNames[${i}]}" \
+	Array1 ArraySize1 "Test Array Get"
+
+echo -e "\nArray1 = [${Array1[@]}]"
+
+echo
+for (( i=0 ; i < ArraySize1 ; i++ )) ; do
+	echo "Array1[${i}] = [${Array1[${i}]}]"
+done
+
+echo -e "\nArraySize1 = [${ArraySize1}]"
+
+# Extract Value and Time Arrays for Each PV...
+
+echo -e "\nPVNames[${nPVNames}] Array =\n\n[${PVNames[@]}]\n"
+
+# Capture Value and Time Array for Each PVName Instance...
+
+for (( i=0 ; i < nPVNames ; i++ )) ; do
+
+	echo -e "\nPVNames[${i}] = [${PVNames[${i}]}]"
+
+	# Value Array...
+
+	valueArr="PVValueArr${i}"
+	eval "declare -A ${valueArr}"
+
+	valueArrSz="PVValueArrSize${i}"
+	eval "declare -A ${valueArrSz}"
+
+	GET_NEXUS_ARRAY "DASlogs/${PVNames[${i}]}/value" \
+		${valueArr} ${valueArrSz} "${PVNames[${i}]} Value Array"
+
+	eval "echo -e \"\\n${valueArr} = [\${${valueArr}[@]}]\""
+
+	eval "size=\${${valueArrSz}}"
+
+	echo -e "\n${valueArrSz} = [${size}]"
+
+	echo
+	for (( j=0 ; j < size ; j++ )) ; do
+		eval "echo \"${valueArr}[${j}] = [\${${valueArr}[${j}]}]\""
+	done
+
+	# Time Array...
+
+	timeArr="PVTimeArr${i}"
+	eval "declare -A ${timeArr}"
+
+	timeArrSz="PVTimeArrSize${i}"
+	eval "declare -A ${timeArrSz}"
+
+	GET_NEXUS_ARRAY "DASlogs/${PVNames[${i}]}/time" \
+		${timeArr} ${timeArrSz} "${PVNames[${i}]} Value Array"
+
+	eval "echo -e \"\\n${timeArr} = [\${${timeArr}[@]}]\""
+
+	eval "size=\${${timeArrSz}}"
+
+	echo -e "\n${timeArrSz} = [${size}]"
+
+	echo
+	for (( j=0 ; j < size ; j++ )) ; do
+		eval "echo \"${timeArr}[${j}] = [\${${timeArr}[${j}]}]\""
+	done
+
+done
+
+#
 # Construct Graffiti Data File Path/Name
 #
 
@@ -374,8 +517,110 @@ echo "# def_y = ${def_y}" >> "${scratch}"
 # Dump Multi-Column Data Section
 #
 
-# . . .
-echo "[Multi-Column Data Section Goes Here...]" >> "${scratch}"
+# Dump Column Labels...
+
+echo -n "#   Pt." >> "${scratch}"
+
+### Later... printf " %12s" "time" >> "${scratch}"
+
+for (( i=0 ; i < nPVNames ; i++ )) ; do
+
+	# "Clean" the PVName Path to Eliminate the Cruft...
+	pvname=`echo "${PVNames[${i}]}" \
+		| ${SED} -e "s/${beamline}://" \
+			-e "s/Mot://" \
+			-e "s/.RBV//"`
+
+	printf " %12s" "${pvname}" >> "${scratch}"
+
+	# For Now... ;-D
+	printf " %12s" "(time)" >> "${scratch}"
+
+done
+
+echo >> "${scratch}"
+
+# Determine Max Number of Elements...
+
+num=0
+
+for (( i=0 ; i < nPVNames ; i++ )) ; do
+
+	# Value Array...
+
+	valueArrSz="PVValueArrSize${i}"
+
+	eval "size=\${${valueArrSz}}"
+
+	if [[ ${size} -gt ${num} ]]; then
+		num=${size}
+	fi
+
+	# Time Array...
+
+	timeArrSz="PVTimeArrSize${i}"
+
+	eval "size=\${${timeArrSz}}"
+
+	if [[ ${size} -gt ${num} ]]; then
+		num=${size}
+	fi
+
+done
+
+echo -e "\nMax Number of Multi-Column Elements = ${num}."
+
+# For Now Just Dump Time and Value Array for Each PVName Instance...
+
+for (( pt=0 ; pt < num ; pt++ )) ; do
+
+	ptp1=$(( pt + 1 ))
+
+	printf " %6d" "${ptp1}" >> "${scratch}"
+
+	for (( i=0 ; i < nPVNames ; i++ )) ; do
+
+		# Value Array...
+
+		valueArr="PVValueArr${i}"
+
+		valueArrSz="PVValueArrSize${i}"
+
+		eval "size=\${${valueArrSz}}"
+
+		if [[ ${pt} -lt ${size} ]]; then
+
+			eval "value=\${${valueArr}[${pt}]}"
+
+			printf " %12g" "${value}" >> "${scratch}"
+
+		else
+			printf " %12s" "" >> "${scratch}"
+		fi
+
+		# Time Array...
+
+		timeArr="PVTimeArr${i}"
+
+		timeArrSz="PVTimeArrSize${i}"
+
+		eval "size=\${${timeArrSz}}"
+
+		if [[ ${pt} -lt ${size} ]]; then
+
+			eval "time=\${${timeArr}[${pt}]}"
+
+			printf " %12d" "${time}" >> "${scratch}"
+
+		else
+			printf " %12s" "" >> "${scratch}"
+		fi
+
+	done
+
+	echo >> "${scratch}"
+
+done
 
 #
 # Dump Graffiti Footer...
