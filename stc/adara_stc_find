@@ -14,8 +14,11 @@
 STC1="stc1.ornl.gov"
 STC2="stc2.ornl.gov"
 STC3="stc3.ornl.gov"
+STC4="stc4.ornl.gov"
+STC5="stc5.ornl.gov"
+STC6="stc6.ornl.gov"
 
-STC_NEW="${STC1} ${STC2} ${STC3}"
+STC_NEW="${STC1} ${STC2} ${STC3} ${STC4} ${STC5} ${STC6}"
 
 STC1_OLD="sns-stc1.sns.gov"
 STC2_OLD="sns-stc2.sns.gov"
@@ -40,7 +43,7 @@ WC="/usr/bin/wc"
 USAGE()
 {
 	echo -e "\nusage: adara_stc_find <RunNumber> \\"
-	echo "    [--stc1|--stc2|--stc3|--stc] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc4|--stc5|--stc6|--stc] \\"
 	echo "    [--stc1-old|--stc2-old|--stc-old] \\"
 	echo "    [--stc-all (default)] \\"
 	echo "    [--all][--last (default)] \\"
@@ -112,6 +115,15 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--stc3#' ]]; then
 		STC_HOSTS="${STC_HOSTS} ${STC3}"
 		echo -e "\nAdding STC3 Host to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--stc4#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC4}"
+		echo -e "\nAdding STC4 Host to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--stc5#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC5}"
+		echo -e "\nAdding STC5 Host to Hosts List:\n\n[${STC_HOSTS} ]"
+	elif [[ "#$key#" == '#--stc6#' ]]; then
+		STC_HOSTS="${STC_HOSTS} ${STC6}"
+		echo -e "\nAdding STC6 Host to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc#' ]]; then
 		STC_HOSTS="${STC_HOSTS} ${STC_NEW}"
 		echo -e "\nAdding STC VMs to Hosts List:\n\n[${STC_HOSTS} ]"
@@ -271,9 +283,16 @@ done
 #
 # Sort Logs in Time...
 #
+# First Column by Month "-k 1M"
+# Second Column by Numeric "-k 2n"
+#
+# Logs are of the form:
+#
+# Nov 16 12:34:56 . . .
+# Dec  2 11:22:33 . . .
+#
 
-SORT_LOGS=`echo -e "${LOGS}" | ${SORT}`
-
+SORT_LOGS=`echo -e "${LOGS}" | ${SORT} -k 1M -k 2n`
 #echo -e "\nSORT_LOGS=[${SORT_LOGS}]"
 
 #
