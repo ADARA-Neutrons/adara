@@ -470,6 +470,17 @@ SMS_CONFCK()
 		echo "Directories/Files are the Same."
 	fi
 
+	# Also Check/Copy the Mantid IDF (geometry.xml) into:
+	#    /home/controls/${BEAMLINE}/
+	DIFF_FILE "Mantid IDF/Geometry.XML File" "Deployed" \
+		./sms${ALT}/conf/geometry.xml /home/controls/${BEAMLINE}/geometry.xml
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
 	# Deprecated SysV Startup File...
 	DIFF_FILE "SMSD${ALT} Init Script" "Deployed" \
 		./sms${ALT}/smsd${ALT}.initscript /etc/init.d/smsd${ALT}.XXX
@@ -620,7 +631,7 @@ SMS_CONFCK()
 	${RM} -f /tmp/systemctl.enabled.smsd${ALT}.$$
 	if [ $? != 0 ]; then
 		echo \
-	   "Failure Deleting Temporary SystemCtl Enabled File for SMSD${ALT}!"
+		"Failure Deleting Temporary SystemCtl Enabled File for SMSD${ALT}!"
 		(( _nerrors++ ))
 	fi
 	# Enable SMSD Local Run Level...
