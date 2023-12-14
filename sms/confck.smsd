@@ -452,9 +452,9 @@ CONFCK()
 	fi
 
 	# Also Check/Copy the Mantid IDF (geometry.xml) into:
-	#    /home/control/${BEAMLINE}/
+	#    /home/controls/${BEAMLINE}/
 	DIFF_FILE "Mantid IDF/Geometry.XML File" "Deployed" \
-		./sms${ALT}/conf/geometry.xml /home/control/${BEAMLINE}/geometry.xml
+		./sms${ALT}/conf/geometry.xml /home/controls/${BEAMLINE}/geometry.xml
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
