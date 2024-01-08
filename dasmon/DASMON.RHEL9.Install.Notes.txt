@@ -1,0 +1,58 @@
+
+ADARA/DASMON Upgrade from RHel7 to RHel9, January 2024
+
+$ for i in bl1a-dasmon bl1b-dasmon bl2-dasmon bl3-dasmon bl4a-dasmon bl4b-dasmon ; do echo $i ; eval $i uptime ; eval $i redhat ; eval $i grep dasmon /etc/group ; echo ; done
+
+$ sudo yum install swig.x86_64 python3-devel.x86_64 rpcgen.x86_64 libtirpc-devel.x86_64 readline-devel.x86_64 autoconf.noarch automake.noarch libtool.x86_64 hdf5.x86_64 hdf5-devel.x86_64 boost.x86_64 boost-devel.x86_64 libuuid-devel.x86_64 log4cpp.x86_64 log4cpp-devel.x86_64 log4cpp-doc.x86_64 cppunit.x86_64 cppunit-devel.x86_64 apr-devel.x86_64 doxygen.x86_64
+
+$ mkdir /tmp/share ; git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/master ; echo ; export EPICS_MASTER=true ; sc ; peg EPICS
+
+$ /tmp/share/master/scripts/setup_controls.sh blxxx
+
+$ sc ; peg EPICS
+
+$ /tmp/share/master/scripts/setup_controls.sh blxxx
+
+$ vi /home/controls/epics/asyn/master/configure/CONFIG_SITE
+	-> set "TIRPC=YES"
+
+$ /tmp/share/master/scripts/setup_controls.sh blxxx
+	-> (7 + 4) x "y"
+
+$ cd /usr/local/src/ ; zcat ~/activemq-cpp-library-3.9.3-src.patched.tar.gz | sudo tar xvf -
+
+$ cd activemq-cpp-library-3.9.3/ ; configure ; make
+	-> go get a cup of coffee, and a doughnut... ;-D
+
+$ sudo make install ; sudo /bin/cp -i /usr/local/src/activemq-cpp-library-3.9.3/activemq-cpp.pc /usr/lib64/pkgconfig/ ; sudo vi /etc/ld.so.conf.d/activemq-cpp-library-3.9.3.conf ; sudo ldconfig
+	-> /usr/local/lib/ goes into activemq-cpp-library-3.9.3.conf
+
+$ git-release.sh -e base rel3.14.12.6_20230825
+
+$ git-release.sh -e extensions rel1.4_20230825
+	-> wait 20 seconds, then 4 x "y"
+
+$ git-release.sh -e basev4 rel4.6_20230825
+
+$ ls -l /home/controls/prod/ADARA ; mkdir /home/controls/prod/ADARA ; ls -l /home/controls/prod/ADARA ; echo ; ln -s /home/controls/prod/epics/base/rel3.14.12.6_20230825 /home/controls/prod/ADARA/EpicsBaseLink ; ln -s /home/controls/prod/epics/basev4/rel4.6_20230825 /home/controls/prod/ADARA/EpicsBaseV4Link ; ln -s /home/controls/prod/epics/extensions/rel1.4_20230825 /home/controls/prod/ADARA/EpicsExtensionsLink ; echo ; ls -l /home/controls/prod/ADARA ; echo
+
+$ export EPICS_MASTER="" ; sc ; peg EPICS ; echo ; umask 0002 ; ls -ld /home/controls ; echo ; ls -l /home/controls/config-dasmon/
+
+$ git clone git+ssh://trac.sns.gov/var/repos/config /home/controls/config-dasmon/
+
+$ cd /home/controls/config-dasmon/ ; git status
+
+$ git checkout blxxx-dasmon ; git pull ; git diff ; git status
+
+$ ./confck ; ./confck --update ; ./confck ; git status ; sudo chown dasmon /home/dasmon/dasmond.cfg ; sudo chgrp dasmon /home/dasmon/dasmond.cfg ; ./confck ; git status ; echo ; ll /home/controls/ ; echo
+
+$ pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
+
+$ ./deploy_adara dasmon
+	-> 20231027/v1.8.3
+	-> DASMON Re-Deployment for RHel9 Upgrade.
+
+$ sudo systemctl status dasmond ; sudo systemctl start dasmond ; sudo systemctl enable dasmond ; sudo systemctl status dasmond ; dasmondt ; echo ; psg dasmond
+
+$ pushd ; git status ; git add deploy/adara_fix_ITEMS ; git commit -m "Adding adara_fix_ITEMS Deploy Link" deploy/adara_fix_ITEMS ; git push ; ./confck ; git status
+
