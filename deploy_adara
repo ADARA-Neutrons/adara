@@ -288,7 +288,7 @@ elif [ $IS_PVSD == 1 ]; then
 	# Note: the $BEAMLINE and $BL environment variable are set in:
 	#    /home/controls/etc/profile.d/01_<beamline>.sh
 	# as sourced from:
-	#    /home/controls/share/master/scripts/managed/bash_profile.sh
+	#    /home/controls/share/scripts/managed/bash_profile.sh
 	# as sourced from:
 	#    /etc/profile.d/epics.sh
 	# :-D
