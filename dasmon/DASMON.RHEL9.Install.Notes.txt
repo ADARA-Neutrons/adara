@@ -5,18 +5,18 @@ $ for i in bl1a-dasmon bl1b-dasmon bl2-dasmon bl3-dasmon bl4a-dasmon bl4b-dasmon
 
 $ sudo yum install swig.x86_64 python3-devel.x86_64 rpcgen.x86_64 libtirpc-devel.x86_64 readline-devel.x86_64 autoconf.noarch automake.noarch libtool.x86_64 hdf5.x86_64 hdf5-devel.x86_64 boost.x86_64 boost-devel.x86_64 libuuid-devel.x86_64 log4cpp.x86_64 log4cpp-devel.x86_64 log4cpp-doc.x86_64 cppunit.x86_64 cppunit-devel.x86_64 apr-devel.x86_64 doxygen.x86_64
 
-$ mkdir /tmp/share ; git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/master ; echo ; export EPICS_MASTER=true ; sc ; peg EPICS
+$ mkdir /tmp/share ; git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/main ; echo ; export EPICS_MASTER=true ; sc ; peg EPICS
 
-$ /tmp/share/master/scripts/setup_controls.sh blxxx
+$ /tmp/share/main/scripts/setup_controls.sh blxxx
 
 $ sc ; peg EPICS
 
-$ /tmp/share/master/scripts/setup_controls.sh blxxx
+$ /tmp/share/main/scripts/setup_controls.sh blxxx
 
 $ vi /home/controls/epics/asyn/master/configure/CONFIG_SITE
 	-> set "TIRPC=YES"
 
-$ /tmp/share/master/scripts/setup_controls.sh blxxx
+$ /tmp/share/main/scripts/setup_controls.sh blxxx
 	-> (7 + 4) x "y"
 
 $ cd /usr/local/src/ ; zcat ~/activemq-cpp-library-3.9.3-src.patched.tar.gz | sudo tar xvf -

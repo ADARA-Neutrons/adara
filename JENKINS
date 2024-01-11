@@ -114,7 +114,7 @@ Jenkins Project Information:
       Build the basic SMS and STC software for Jenkins testing
       (by the ADARA Test Suite, supposedly... :-).
       (This version of the test uses the new "configfile" API,
-      now merged back into master... :-D)
+      now merged back into main... :-D)
 
    X Restrict where this project can be run
 
@@ -124,7 +124,7 @@ Jenkins Project Information:
       Git:
           Repository URL: git+ssh://trac.sns.gov/var/repos/ADARA
           Name: origin
-          Branch Specifier: origin/master
+          Branch Specifier: origin/main
 
    X Build periodically
 

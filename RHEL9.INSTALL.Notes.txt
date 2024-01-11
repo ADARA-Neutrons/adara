@@ -308,13 +308,13 @@ Simple fix, add the "int" type for main(). Committed to ADARA Git Repo. :-D
 
 - Due to the changes with eliminating the "master" subdirectory under /home/controls/share/ (replacing it with a soft link to "."), the "setup_controls.sh" script (for setting up a brand new beamline) was broken. There was a place where the /home/controls/share/master/ directory level depth was taken into account, and Zach had "fixed" the Makefile in share/scripts to skip the now-missing subdirectory level. I will patch the setup_controls.sh script to automagically generate an appropriate "master" soft link. ;-D  DONE.
 
-- The latest version of Git 2.39.3 (versus the old Rhel 7.9 at version 1.8.3.1) produces a whine about the share/master Git repo being checked out owned by user "controls" instead of "me" (y8y):
+- The latest version of Git 2.39.3 (versus the old Rhel 7.9 at version 1.8.3.1) produces a whine about the share Git repo being checked out owned by user "controls" instead of "me" (y8y):
 
    $ git status -v 
-   fatal: detected dubious ownership in repository at '/home/controls/share/master'
+   fatal: detected dubious ownership in repository at '/home/controls/share'
    To add an exception for this directory, call:
 
-       git config --global --add safe.directory /home/controls/share/master
+       git config --global --add safe.directory /home/controls/share
 
    -> I did some research online, and confirmed that this is "O.K." since we really want the checked-out Git repos (including the .git/ repo directory) to be owned by user "controls" and not any regular user. So we will have to do this on All our repos going forward... ;-)
 

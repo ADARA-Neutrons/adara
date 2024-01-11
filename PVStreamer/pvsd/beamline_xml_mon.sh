@@ -10,7 +10,7 @@
 set -o pipefail
 
 # Source Local EPICS Beamline Environment (e.g. $BEAMLINE):
-. /home/controls/share/master/scripts/beamline_profile.sh
+. /home/controls/share/scripts/beamline_profile.sh
 
 #LOG_HOME="/SNS/users/$USER"
 LOG_HOME="$HOME"

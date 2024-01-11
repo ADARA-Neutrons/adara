@@ -1431,7 +1431,7 @@ if [[ $UPDATE == 1 ]]; then
 				>> $cron_file
 			echo "#EPICS_CA_AUTO_ADDR_LIST=NO" >> $cron_file
 			echo -n "0 8,17 * * *" >> $cron_file
-			echo -n " /home/controls/share/master/scripts/" >> $cron_file
+			echo -n " /home/controls/share/scripts/" >> $cron_file
 			echo -n "check_beamline_xml --quiet --noprompt" >> $cron_file
 			if [[ -n "$BEAMLINE" ]]; then
 				echo " /home/controls/$BEAMLINE/beamline.xml" >> $cron_file
