@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-LOGGER("SMS.ReadyAdapter")
+LOGGER("SMS.ReadyAdapter");
 
 #include <boost/function.hpp>
 
