@@ -555,13 +555,14 @@
 			<pattern>^Analyzer$</pattern>
 			<value_string>3He Analyzer</value_string><!-- 2 -->
 			<element>
-				<pattern>He3State$</pattern>
+				<!-- pattern>He3State$</pattern -->
+				<pattern>:3HePA:AFP:Polarization$</pattern>
 				<name>AnalyzerState</name>
 			</element>
-			<element>
+			<!-- Omit For Now... element>
 				<pattern>He3_Veto$</pattern>
 				<name>AnalyzerVeto</name>
-			</element>
+			</element -->
 		</condition>
 		<!-- (Unnecessary?) Polarizer State Conditional Links... -->
 		<!-- "Reflection Polarizer" Conditional Polarizer Element -->
