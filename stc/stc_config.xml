@@ -559,10 +559,12 @@
 				<pattern>:3HePA:AFP:Polarization$</pattern>
 				<name>AnalyzerState</name>
 			</element>
-			<!-- Omit For Now... element>
-				<pattern>He3_Veto$</pattern>
+			<element>
+				<!-- pattern>He3_Veto$</pattern -->
+				<!-- TEMPORARY FIX FOR MATHIEU 1.12.2024 -->
+				<pattern>PolarizerLabel$</pattern>
 				<name>AnalyzerVeto</name>
-			</element -->
+			</element>
 		</condition>
 		<!-- (Unnecessary?) Polarizer State Conditional Links... -->
 		<!-- "Reflection Polarizer" Conditional Polarizer Element -->
