@@ -555,14 +555,11 @@
 			<pattern>^Analyzer$</pattern>
 			<value_string>3He Analyzer</value_string><!-- 2 -->
 			<element>
-				<!-- pattern>He3State$</pattern -->
-				<pattern>:3HePA:AFP:Polarization$</pattern>
+				<pattern>He3State$</pattern>
 				<name>AnalyzerState</name>
 			</element>
 			<element>
-				<!-- pattern>He3_Veto$</pattern -->
-				<!-- TEMPORARY FIX FOR MATHIEU 1.12.2024 -->
-				<pattern>PolarizerLabel$</pattern>
+				<pattern>He3_Veto$</pattern>
 				<name>AnalyzerVeto</name>
 			</element>
 		</condition>
