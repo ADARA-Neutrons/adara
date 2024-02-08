@@ -573,7 +573,8 @@ PARSE_LOG()
 
 		# Strip Off STC PID and Error Prefix...
 		if [[ "$log" =~ \
-				${base_app}:${S}\[[0-9]+\]${S}STC${S}Error: ]]; then
+				${base_app}[]0-9[]*:${S}\[[0-9]+\]${S}STC${S}Error: ]]; \
+		then
 			pid=`echo "$log" | awk '{print $3}'`
 			log=`echo "$log" | \
 			awk '{for(i=6;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
@@ -1081,7 +1082,7 @@ PARSE_LOG()
 		known=1
 
 		# Strip Off SMS Error Prefix...
-		if [[ "$log" =~ ${base_app}:${S}ERROR ]]; then
+		if [[ "$log" =~ ${base_app}[]0-9[]*:${S}ERROR ]]; then
 			log=`echo "$log" | \
 			awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
@@ -1626,7 +1627,7 @@ PARSE_LOG()
 		known=1
 
 		# Strip Off PVSD ERROR Prefix...
-		if [[ "$log" =~ ${base_app}:${S}PVSD${S}ERROR ]]; then
+		if [[ "$log" =~ ${base_app}[]0-9[]*:${S}PVSD${S}ERROR ]]; then
 			log=`echo "$log" | \
 			awk '{for(i=5;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
