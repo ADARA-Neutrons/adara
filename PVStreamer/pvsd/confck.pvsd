@@ -209,7 +209,7 @@ CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
-		./pvsd/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+		./pvsd/50_adaraMailer.conf /etc/rsyslog.d/50_adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -218,7 +218,7 @@ CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog PVSD Config" "Deployed" \
-		./pvsd/pvsd_syslog.conf /etc/rsyslog.d/pvsd_syslog.conf
+		./pvsd/51_pvsd.conf /etc/rsyslog.d/51_pvsd.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -290,7 +290,7 @@ CONFCK()
 		(( _nerrors++ ))
 	fi
 	# Create PVSD Local Run Level...
-	if [[ ${_check_update} == 1 ]]; then
+	if [[ $UPDATE == 1 && ${_check_update} == 1 ]]; then
 		echo -n "Create PVSD Local Run Level? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
@@ -467,7 +467,7 @@ if [[ $UPDATE == 1 ]]; then
 				>> $cron_file
 			echo " --quiet" >> $cron_file
 			echo -n "0 8,17 * * *" >> $cron_file
-			echo -n " /home/controls/share/master/scripts/" >> $cron_file
+			echo -n " /home/controls/share/scripts/" >> $cron_file
 			echo -n "check_beamline_xml --quiet --noprompt" >> $cron_file
 			if [[ -n "$BEAMLINE" ]]; then
 				echo " /home/controls/$BEAMLINE/beamline.xml" >> $cron_file

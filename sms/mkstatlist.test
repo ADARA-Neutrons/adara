@@ -3,7 +3,6 @@
 STAT_LIST="./stat_list"
 
 NOW_SYSTEM_FILES="/SNSlocal/sms/conf/* \
-	/home/controls/${BEAMLINE}/geometry.xml \
 	/etc/init.d/smsd \
 	/etc/init.d/smsd.XXX \
 	/etc/systemd/system/smsd.service \

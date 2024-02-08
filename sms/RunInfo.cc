@@ -27,8 +27,8 @@ RateLimitedLogging::History RLLHistory_RunInfo;
 
 class RunInfoResetPV : public smsTriggerPV {
 public:
-	RunInfoResetPV(const std::string &prefix, RunInfo *master) :
-		smsTriggerPV(prefix + "Reset"), m_master(master),
+	RunInfoResetPV(const std::string &prefix, RunInfo *primary) :
+		smsTriggerPV(prefix + "Reset"), m_primary(primary),
 		m_unlocked(true) {}
 
 	void lock(void) { m_unlocked = false; }
@@ -36,10 +36,10 @@ public:
 
 	bool allowUpdate(const gdd &) { return m_unlocked; }
 
-	void triggered(struct timespec *ts) { m_master->reset(ts); }
+	void triggered(struct timespec *ts) { m_primary->reset(ts); }
 
 private:
-	RunInfo *m_master;
+	RunInfo *m_primary;
 	bool m_unlocked;
 };
 

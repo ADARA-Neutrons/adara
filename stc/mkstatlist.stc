@@ -5,11 +5,12 @@ STAT_LIST="./stat_list"
 STC_SYSTEM_FILES="/etc/xinetd.d/stc* \
 	/etc/systemd/system/stc* \
 	/usr/local/bin/stc* \
+	/usr/local/bin/nxls* \
 	/etc/cron.d/stc_rsyslog_mailer \
 	/etc/rsyslog.conf \
-	/etc/rsyslog.d/adaraMailer.conf \
-	/etc/rsyslog.d/adaramailer.conf \
-	/etc/rsyslog.d/stclog.conf \
+	/etc/rsyslog.d/*adaraMailer.conf \
+	/etc/rsyslog.d/*adaramailer.conf \
+	/etc/rsyslog.d/*stc*.conf \
 	/etc/services \
 	/usr/local/bin/rsyslogMailer \
 	/etc/logrotate.d/stc_log"

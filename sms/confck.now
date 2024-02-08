@@ -232,14 +232,14 @@ DIFF_DIR()
 	# Make sure there's something to check...  :)
 	#
 
-	local _nfiles1=`ls -l "${_dir1}/" | wc | ${AWK} '{print $1}'`
+	local _nfiles1=`${LS} -l "${_dir1}/" | wc | ${AWK} '{print $1}'`
 	_nfiles1=$(( _nfiles1 - 1 ))
 
 	if [[ ${_nfiles1} -lt 1 ]]; then
 		echo "Note: Empty Directory:  [${_dir1}]"
 	fi
 
-	local _nfiles2=`ls -l "${_dir2}/" | wc | ${AWK} '{print $1}'`
+	local _nfiles2=`${LS} -l "${_dir2}/" | wc | ${AWK} '{print $1}'`
 	_nfiles2=$(( _nfiles2 - 1 ))
 
 	if [[ ${_nfiles2} -lt 1 ]]; then
@@ -272,13 +272,13 @@ DIFF_DIR()
 
 			echo -e "\nDiffing Link "${_dir1}"/"$base"@:"
 
-			local _lsdir1=`ls -l "${_dir1}/$base"`
+			local _lsdir1=`${LS} -l "${_dir1}/$base"`
 			if [[ -n "${_lsdir1}" ]]; then
 				echo "${_lsdir1}" \
 					| ${SED} "s@${_dir1}/$base@\n\t${_dir1}/$base\n\t\t@"
 			fi
 
-			local _lsdir2=`ls -l "${_dir2}/$base"`
+			local _lsdir2=`${LS} -l "${_dir2}/$base"`
 			if [[ -n "${_lsdir2}" ]]; then
 				echo "${_lsdir2}" \
 					| ${SED} "s@${_dir2}/$base@\n\t${_dir2}/$base\n\t\t@"
@@ -470,6 +470,17 @@ SMS_CONFCK()
 		echo "Directories/Files are the Same."
 	fi
 
+	# Also Check/Copy the Mantid IDF (geometry.xml) into:
+	#    /home/controls/${BEAMLINE}/
+	DIFF_FILE "Mantid IDF/Geometry.XML File" "Deployed" \
+		./sms${ALT}/conf/geometry.xml /home/controls/${BEAMLINE}/geometry.xml
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
 	# Deprecated SysV Startup File...
 	DIFF_FILE "SMSD${ALT} Init Script" "Deployed" \
 		./sms${ALT}/smsd${ALT}.initscript /etc/init.d/smsd${ALT}.XXX
@@ -501,7 +512,7 @@ SMS_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
-		./sms${ALT}/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+		./sms${ALT}/50_adaraMailer.conf /etc/rsyslog.d/50_adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -510,8 +521,8 @@ SMS_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog SMSD${ALT} Config" "Deployed" \
-		./sms${ALT}/smsd${ALT}_syslog.conf \
-			/etc/rsyslog.d/smsd${ALT}_syslog.conf
+		./sms${ALT}/51_smsd${ALT}.conf \
+			/etc/rsyslog.d/51_smsd${ALT}.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -620,7 +631,7 @@ SMS_CONFCK()
 	${RM} -f /tmp/systemctl.enabled.smsd${ALT}.$$
 	if [ $? != 0 ]; then
 		echo \
-	   "Failure Deleting Temporary SystemCtl Enabled File for SMSD${ALT}!"
+		"Failure Deleting Temporary SystemCtl Enabled File for SMSD${ALT}!"
 		(( _nerrors++ ))
 	fi
 	# Enable SMSD Local Run Level...
@@ -739,7 +750,7 @@ PVSD_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
-		./pvsd/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+		./pvsd/50_adaraMailer.conf /etc/rsyslog.d/50_adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -748,7 +759,7 @@ PVSD_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog PVSD Config" "Deployed" \
-		./pvsd/pvsd_syslog.conf /etc/rsyslog.d/pvsd_syslog.conf
+		./pvsd/51_pvsd.conf /etc/rsyslog.d/51_pvsd.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -1066,7 +1077,7 @@ DASMON_CONFCK()
 
 	if [[ -f dasmond/dasmon_syslog.conf ]]; then
 		DIFF_FILE "Saved RSyslog DASMON Config" "System" \
-			dasmond/dasmon_syslog.conf /etc/rsyslog.d/dasmon.conf
+			dasmond/51_dasmond.conf /etc/rsyslog.d/51_dasmond.conf
 		if [ $? != 0 ]; then
 			echo "Files Differed...!"
 			(( _nerrors++ ))
@@ -1076,7 +1087,7 @@ DASMON_CONFCK()
 	fi
 
 	DIFF_FILE "RSyslog ADARA Mailer Config" "Deployed" \
-		dasmond/adaraMailer.conf /etc/rsyslog.d/adaraMailer.conf
+		dasmond/50_adaraMailer.conf /etc/rsyslog.d/50_adaraMailer.conf
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -1251,41 +1262,42 @@ if [[ $UPDATE == 1 ]]; then
 	fi
 	echo
 
-	# Check/Create Local DASMON User and Home Area for Config
-	if [[ ! -d ${DASMON_HOME} ]]; then
-		echo -e "Home Directory for DASMON User Not Found...!\n"
-		${LS} -l ${DASMON_HOME}
-		echo -e -n "\nCreate Home Directory for DASMON? [yes|No] "
-		read ckUpdate
-		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
-		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			${SUDO} ${MKDIR} ${DASMON_HOME}
-		fi
-	fi
-	if [[ ! -d ${DASMON_HOME}/${DASMON_USER} ]]; then
-		echo -e "DASMON User Directory Not Found...!\n"
-		${LS} -l ${DASMON_HOME}/${DASMON_USER}
-		echo -e -n "\nCreate DASMON User and Home Directory? [yes|No] "
-		read ckUpdate
-		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
-		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			${SUDO} useradd -b ${DASMON_HOME} -u ${DASMON_UID} -m -U \
-				-s /sbin/nologin ${DASMON_USER}
-			${SUDO} ${CHMOD} og+rx ${DASMON_HOME}/${DASMON_USER}
-			${LS} -ld ${DASMON_HOME}/${DASMON_USER}
-			${GREP} ${DASMON_USER} /etc/passwd
-			${GREP} ${DASMON_USER} /etc/group
-			# Go Ahead and Create Base DASMON GUI Client Config
-			# (It probably matches what's in the Git Repo anyway...! ;-D)
-			${SUDO} ${SH} -c 'echo -e "[rules]\\n[signals]" \
-				> ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg'
-			${LS} -l ${DASMON_HOME}/${DASMON_USER}
-			/bin/cat ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg
-		fi
-	fi
-
-	# Check/Create DASMON RSyslog Log File...
 	if [[ $DO_DASMON_CONFCK == 1 ]]; then
+
+		# Check/Create Local DASMON User and Home Area for Config
+		if [[ ! -d ${DASMON_HOME} ]]; then
+			echo -e "Home Directory for DASMON User Not Found...!\n"
+			${LS} -l ${DASMON_HOME}
+			echo -e -n "\nCreate Home Directory for DASMON? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				${SUDO} ${MKDIR} ${DASMON_HOME}
+			fi
+		fi
+		if [[ ! -d ${DASMON_HOME}/${DASMON_USER} ]]; then
+			echo -e "DASMON User Directory Not Found...!\n"
+			${LS} -l ${DASMON_HOME}/${DASMON_USER}
+			echo -e -n "\nCreate DASMON User and Home Directory? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				${SUDO} useradd -b ${DASMON_HOME} -u ${DASMON_UID} -m -U \
+					-s /sbin/nologin ${DASMON_USER}
+				${SUDO} ${CHMOD} og+rx ${DASMON_HOME}/${DASMON_USER}
+				${LS} -ld ${DASMON_HOME}/${DASMON_USER}
+				${GREP} ${DASMON_USER} /etc/passwd
+				${GREP} ${DASMON_USER} /etc/group
+				# Go Ahead and Create Base DASMON GUI Client Config
+				# (It probably matches what's in the Git Repo anyway! ;-D)
+				${SUDO} ${SH} -c 'echo -e "[rules]\\n[signals]" \
+					> ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg'
+				${LS} -l ${DASMON_HOME}/${DASMON_USER}
+				/bin/cat ${DASMON_HOME}/${DASMON_USER}/dasmond.cfg
+			fi
+		fi
+
+		# Check/Create DASMON RSyslog Log File...
 		${LS} -l "${DASMOND_LOG}"
 		log_perms=`${LS} -l "${DASMOND_LOG}" | ${AWK} '{print $1}'`
 		log_group=`${LS} -l "${DASMOND_LOG}" | ${AWK} '{print $4}'`
@@ -1312,6 +1324,7 @@ if [[ $UPDATE == 1 ]]; then
 			fi
 		fi
 		echo
+
 	fi
 
 	# Check/Create RSyslog Pipes...
@@ -1368,7 +1381,7 @@ if [[ $UPDATE == 1 ]]; then
 
 			echo "MAILTO=idac_adara_notify@email.ornl.gov" >> $cron_file
 
-			echo -e -n "\n# Handle \"Local\" STS Deployments" >> $cronfile
+			echo -e -n "\n# Handle \"Local\" STS Deployments" >> $cron_file
 			echo " (and STS Config ConfCk... :-)" >> $cron_file
 			echo -e "\nLOCAL_DATA=/SNSlocal" >> $cron_file
 
@@ -1429,7 +1442,7 @@ if [[ $UPDATE == 1 ]]; then
 				>> $cron_file
 			echo "#EPICS_CA_AUTO_ADDR_LIST=NO" >> $cron_file
 			echo -n "0 8,17 * * *" >> $cron_file
-			echo -n " /home/controls/share/master/scripts/" >> $cron_file
+			echo -n " /home/controls/share/scripts/" >> $cron_file
 			echo -n "check_beamline_xml --quiet --noprompt" >> $cron_file
 			if [[ -n "$BEAMLINE" ]]; then
 				echo " /home/controls/$BEAMLINE/beamline.xml" >> $cron_file
@@ -1463,7 +1476,7 @@ if [[ $UPDATE == 1 ]]; then
 
 			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
 			echo -n "0 8 * * *" >> $cron_file
-			echo -n " ${ADARA_DIR}/adara_monitor" \
+			echo -n " /SNS/users/$USER/gitsrc/ADARA/adara_monitor" \
 				>> $cron_file
 			echo " --oneshot" >> $cron_file
 			echo >> $cron_file
@@ -1471,12 +1484,15 @@ if [[ $UPDATE == 1 ]]; then
 				>> $cron_file
 			echo " > /dev/null 2>&1" >> $cron_file
 
-			echo -e "\n# DASMON" >> $cron_file
-			echo -n "0-59/10 * * * *" >> $cron_file
-			echo " /SNS/users/$USER/stuff/exec/dasmond_mon" >> $cron_file
-			echo -n "#0 8,17 * * *" >> $cron_file
-			echo " /home/controls/config-dasmon/confck --quiet" \
-				>> $cron_file
+			if [[ $DO_DASMON_CONFCK == 1 ]]; then
+				echo -e "\n# DASMON" >> $cron_file
+				echo -n "0-59/10 * * * *" >> $cron_file
+				echo " /SNS/users/$USER/stuff/exec/dasmond_mon" \
+					>> $cron_file
+				echo -n "#0 8,17 * * *" >> $cron_file
+				echo " /home/controls/config-dasmon/confck --quiet" \
+					>> $cron_file
+			fi
 
 			echo -e "\n# For Long Running NOWN Runs..." >> $cron_file
 			echo -n "###0 0 * * *" >> $cron_file

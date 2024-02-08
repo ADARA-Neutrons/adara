@@ -81,7 +81,7 @@ LOGGER("SMS");
 #define CHILD_INIT_SUCCESS	1
 #define CHILD_INIT_FAILED	2
 
-std::string SMSD_VERSION = "1.8.3";
+std::string SMSD_VERSION = "1.8.4";
 
 namespace po = boost::program_options;
 namespace ptree = boost::property_tree;

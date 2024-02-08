@@ -427,9 +427,9 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	mkdir /tmp/share
 
-	git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/master
+	git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/main
 
-	/tmp/share/master/scripts/setup_controls.sh
+	/tmp/share/main/scripts/setup_controls.sh
 	   - Note: Prompts for User Password for Sudo Commands...
 	   - script can be re-executed repeatedly after fixing any errors... :-)
 
@@ -657,7 +657,7 @@ A. Jeeem's Production ADARA EPICS Setup in $HOME/.bashrc:
 	export PATH="...:$epicspath:..."
 
 	# Additional EPICS Python Cruft...
-	export PYTHONPATH="${PYTHONPATH}:/home/controls/share/master/python"
+	export PYTHONPATH="${PYTHONPATH}:/home/controls/share/python"
 	export PYTHONPATH="${PYTHONPATH}:${EPICS_BASEV4}/pvaPy/lib/python/2.7/linux-x86_64"
 	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/cothread"
 	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy"

@@ -7,7 +7,7 @@
 
 using namespace log4cxx;
 
-#define LOGGER(_name)	static LoggerPtr logger(Logger::getLogger(_name))
+#define LOGGER(_name)	static LoggerPtr logger(Logger::getLogger(_name));
 
 #define LOGGER_INIT()	{}
 

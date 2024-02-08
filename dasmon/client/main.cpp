@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     string  config_label;
     string  domain;
     bool    kiosk = false;
-    bool    master = false;
+    bool    main = false;
 
     namespace po = boost::program_options;
     po::options_description options( "dasmon options" );
@@ -76,7 +76,7 @@ int main(int argc, char *argv[])
             ("broker_pass,p", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
             ("config_label,c", po::value<string>( &config_label )->default_value( "" ), "use specific dasmon config file label\n(e.g. ~/.config/sns/dasmon-gui-<LABEL>.conf)")
             ("kiosk,k", "run in kiosk mode" )
-            ("master,m", "run as master display instance (proc id = 0)")
+            ("main,m", "run as main display instance (proc id = 0)")
             ;
 
     po::variables_map opt_map;
@@ -100,14 +100,14 @@ int main(int argc, char *argv[])
     if ( opt_map.count( "kiosk" ))
         kiosk = true;
 
-    if ( opt_map.count( "master" ))
-        master = true;
+    if ( opt_map.count( "main" ))
+        main = true;
 
     QApplication a(argc, argv);
 
     try
     {
-        MainWindow main_window( domain, broker_uri, broker_user, broker_pass, config_label, kiosk, master );
+        MainWindow main_window( domain, broker_uri, broker_user, broker_pass, config_label, kiosk, main );
         main_window.show();
 
         res = a.exec();

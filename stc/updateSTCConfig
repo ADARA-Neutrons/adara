@@ -19,17 +19,17 @@ STC_DUMMY="/TESTING/SNS/stcdata_dummy/stc_config.xml"
 STC_HFIR="/HFIR/stcdata_hfir/stc_config.xml"
 STC_HFIR_TEST="/HFIR/stcdata_hfir_test/stc_config.xml"
 STC_DEVEL="/TESTING/SNS/stcdata_devel/stc_config.xml"
-STC_MASTER="/TESTING/SNS/stcdata_master/stc_config.xml"
+STC_MAIN="/TESTING/SNS/stcdata_main/stc_config.xml"
 STC_TESTING="/TESTING/SNS/stcdata/stc_config.xml"
 STC_JENKINS="/TESTING/JENKINS/SNS/stcdata/stc_config.xml"
 STC_JENKINS_DEVEL="/TESTING/JENKINS/SNS/stcdata_devel/stc_config.xml"
 
 USAGE()
 {
-	echo -e "\nusage: updateConfig [--diff] \\"
+	echo -e "\nusage: updateSTCConfig [--diff] \\"
 	echo "   [ --prod | --test | --dummy | \\"
 	echo "      --hfir | --hfir-test | \\"
-	echo "      --devel | --master | --testing | \\"
+	echo "      --devel | --main | --testing | \\"
 	echo "      --jenkins | --jenkins-devel | --all ]"
 	echo
 	echo "where:"
@@ -42,9 +42,9 @@ USAGE()
 	echo " --hfir           = update Production HFIR STC Config"
 	echo " --hfir-test      = update Production HFIR TEST STC Config"
 	echo " --devel          = update ADARA Test Harness Devel STC Config"
-	echo " --master         = update ADARA Test Harness Master STC Config"
+	echo " --main           = update ADARA Test Harness Main STC Config"
 	echo " --testing        = update ADARA Test Harness Generic STC Config"
-	echo " --jenkins        = update Jenkins Testing Master STC Config"
+	echo " --jenkins        = update Jenkins Testing Main STC Config"
 	echo " --jenkins-devel  = update Jenkins Testing Devel STC Config"
 	echo
 }
@@ -62,7 +62,7 @@ for opt in $@ ; do
 
 	if [[ $opt == "--all" && $DIFFONLY == 0 ]]; then
 		echo -e "\nAre you _Sure_ you want to Update 'All' STC Configs...?"
-		echo -e "\nThis could Break Production and/or Master Jenkins Tests!"
+		echo -e "\nThis could Break Production and/or Main Jenkins Tests!"
 		echo -en "\nContinue Updating Configs (yes/No/quit)? "
 
 		read cont_ck
@@ -107,8 +107,8 @@ for opt in $@ ; do
 		CONFIGS="$CONFIGS DEVEL=$STC_DEVEL"
 		found=1
 	fi
-	if [[ $opt == "--master" || $opt == "--all" ]]; then
-		CONFIGS="$CONFIGS MASTER=$STC_MASTER"
+	if [[ $opt == "--main" || $opt == "--all" ]]; then
+		CONFIGS="$CONFIGS MAIN=$STC_MAIN"
 		found=1
 	fi
 	if [[ $opt == "--testing" || $opt == "--all" ]]; then
@@ -147,7 +147,9 @@ for config in $CONFIGS ; do
 
 		echo -e "Comparing to $label STC Config in:\n\n\t$path\n"
 
-		( echo -e "\n$path\n" ; diff ./stc_config.xml "$path" ; echo ) \
+		( echo -e "\n$path\n" ; diff ./stc_config.xml "$path" ; echo ; \
+				echo -e "---------------------------\n" ; \
+				/bin/ls -l ./stc_config.xml "$path" ; echo ) \
 			| less -x4
 
 		echo

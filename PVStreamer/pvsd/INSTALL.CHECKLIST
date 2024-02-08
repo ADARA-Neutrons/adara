@@ -318,7 +318,7 @@ please set your shell "umask" as follows before proceeding! ;-D
 		PATH=/home/controls/epics/base/master/bin/linux-x86_64:/home/controls/epics/basev4/master/pvAccessCPP/bin/linux-x86_64/:/home/controls/epics/extensions/master/bin/linux-x86_64:/home/controls/epics/extensions/master/bin:/usr/local/SNS/bin:/usr/local/bin:/usr/bin:/bin:/usr/local/sbin:/sbin:/usr/sbin
 		0-59/10 * * * * /SNS/users/$USER/stuff/exec/pvsd_mon.sh
 		0 8,17 * * * /home/controls/config-dassrv1/confck --quiet
-		0 8,17 * * * /home/controls/share/master/scripts/check_beamline_xml --quiet /home/controls/blXXX/beamline.xml
+		0 8,17 * * * /home/controls/share/scripts/check_beamline_xml --quiet /home/controls/blXXX/beamline.xml
 		MAILTO=idac_support@email.ornl.gov
 		0 * * * * /usr/local/bin/beamline_xml_mon.sh --quiet
 
@@ -373,9 +373,9 @@ please set your shell "umask" as follows before proceeding! ;-D
 
 	mkdir /tmp/share
 
-	git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/master
+	git clone git+ssh://trac.sns.gov/var/repos/share /tmp/share/main
 
-	/tmp/share/master/scripts/setup_controls.sh
+	/tmp/share/main/scripts/setup_controls.sh
 	   - Note: Prompts for User Password for Sudo Commands...
 	   - script can be re-executed repeatedly after fixing any errors... :-)
 
@@ -597,7 +597,7 @@ A. Jeeem's Production ADARA EPICS Setup in $HOME/.bashrc:
 	export PATH="...:$epicspath:..."
 
 	# Additional EPICS Python Cruft...
-	export PYTHONPATH="${PYTHONPATH}:/home/controls/share/master/python"
+	export PYTHONPATH="${PYTHONPATH}:/home/controls/share/python"
 	export PYTHONPATH="${PYTHONPATH}:${EPICS_BASEV4}/pvaPy/lib/python/2.7/linux-x86_64"
 	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/cothread"
 	export PYTHONPATH="${PYTHONPATH}:${EPICS_EXTENSIONS}/src/pcaspy"

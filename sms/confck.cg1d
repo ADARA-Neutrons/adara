@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# SMS Config Check
+# *COMBINED* SMS and STC Config Check
 #
 # Compare Git Repo Config Files to Deployed...
 #
@@ -31,8 +31,7 @@ elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
 fi
 
 # For "Alternate" or Secondary SMS Deployments...
-#ALT=""
-ALT="-mon"
+ALT=""
 
 # ADARA Git Repo
 if [[ -z "$ADARA_DIR" ]]; then
@@ -46,6 +45,7 @@ fi
 # Default Update/Installation Target Definitions
 SYSTEMCTL="/usr/bin/systemctl"
 SMSD_LOG="/var/log/smsd${ALT}.log"
+STC_LOG="/var/log/stc.log"
 MESSAGES_LOG="/var/log/messages"
 RSYSLOG_PIPES="/etc/rsyslog.pipes"
 MKNOD="/usr/bin/mknod"
@@ -54,6 +54,8 @@ SNSLOCAL="/SNSlocal"
 RSYSLOG_CACHE="${SNSLOCAL}/rsyslog.cache"
 ADARA_BINARIES="/home/controls/config-daq1${ALT}/deploy"
 ADARA_LINKS="/usr/local/bin"
+STC_BINARIES="/home/controls/config-daq1${ALT}/deploy"
+STC_LINKS="/usr/sbin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
 Editor="/usr/bin/vim"
@@ -73,6 +75,7 @@ LN="/usr/bin/ln"
 CP="/bin/cp"
 LS="/bin/ls"
 RM="/bin/rm"
+SH="/bin/sh"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config-daq1${ALT}/
@@ -452,6 +455,17 @@ CONFCK()
 		echo "Directories/Files are the Same."
 	fi
 
+	# Also Check/Copy the Mantid IDF (geometry.xml) into:
+	#    /home/controls/${BEAMLINE}/
+	DIFF_FILE "Mantid IDF/Geometry.XML File" "Deployed" \
+		./sms${ALT}/conf/geometry.xml /home/controls/${BEAMLINE}/geometry.xml
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
 	# Deprecated SysV Startup File...
 	DIFF_FILE "SMSD${ALT} Init Script" "Deployed" \
 		./sms${ALT}/smsd${ALT}.initscript /etc/init.d/smsd${ALT}.XXX
@@ -680,8 +694,163 @@ else
 fi
 
 if [[ ${_ckconfck} != 0 ]]; then
-	echo -e "*** ConfCk FAILED...!\n"
+	echo -e "*** SMS ConfCk FAILED...!\n"
+elif [[ $QUIET == 0 ]]; then
+	echo -e "SMS ConfCk Passed.\n\n---------"
 fi
+
+# STC Config Check
+
+diff_cnt=0
+
+#
+# Search the Given Directory for Files...
+#
+
+CONFIG_DIFF_DIR()
+{
+	local _file="$1"
+
+	if [[ -d ${_file} ]]; then
+
+		echo "[${_file}]:"
+
+		if [ "${_file}" == "deploy" ]; then
+			echo -e "Ignoring 'deploy' directory.\n"
+		elif [ "${_file}" == "dasmon" ]; then
+			echo -e "Ignoring 'dasmon' directory.\n"
+		elif [ "${_file}" == "dasmond" ]; then
+			echo -e "Ignoring 'dasmond' directory.\n"
+		elif [ "${_file}" == "pvsd" ]; then
+			echo -e "Ignoring 'pvsd' directory.\n"
+		elif [ "${_file}" == "sms" ]; then
+			echo -e "Ignoring 'sms' directory.\n"
+		else
+
+			for f in ${_file}/* ; do
+
+				CONFIG_DIFF_DIR $f
+
+			done
+
+		fi
+
+	elif [[ -e ${_file} ]]; then
+
+		if [ "${_file}" == "README" ]; then
+			echo -e "Ignoring README.\n"
+		elif [ "${_file}" == "confck" ]; then
+			echo -e "Ignoring confck.\n"
+		elif [ "${_file}" == "pvsd.deployment.history.txt" ]; then
+			echo -e "Ignoring pvsd.deployment.history.txt.\n"
+		elif [ "${_file}" == "stc.deployment.history.txt" ]; then
+			echo -e "Ignoring stc.deployment.history.txt.\n"
+		elif [ "${_file}" == "dasmon.deployment.history.txt" ]; then
+			echo -e "Ignoring dasmon.deployment.history.txt.\n"
+		elif [ "${_file}" == "stat_list" ]; then
+			echo -e "Ignoring Stat List File: stat_list.\n"
+		else
+
+			# File Diff
+
+			echo "${DIFF} ${_file} /${_file}"
+			${DIFF} "${_file}" "/${_file}"
+
+
+			if [ $? != 0 ] ; then
+				diff_cnt=$(( $diff_cnt + 1 ))
+				# Update the Deployed System File or Git Repo File Version
+				if [[ $UPDATE == 1 ]]; then
+					echo -e "\nPush/Deploy the System File (\"sys\"),"
+					echo -e \
+						"   or Pull/Update the Git Repo File (\"repo\"),"
+					echo -n "   or Do Nothing (\"nothing\")?"
+					echo -n " [sys|repo|Nothing]: "
+					read ckUpdate
+					ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+					# Push Latest Git Repo Version to System
+					if [[ "$ckUpdate" == "s" \
+							|| "$ckUpdate" == "sys" ]]; then
+						echo "Deploying Latest Repo File to System:"
+						${SUDO} ${CP} -i "${_file}" "/${_file}"
+					# Pull Latest System Version into Git Repo
+					elif [[ "$ckUpdate" == "r" \
+							|| "$ckUpdate" == "repo" ]]; then
+						echo \
+						   "Updating Repo with Latest Deployed System File:"
+						${CP} -i "/${_file}" "${_file}"
+						git add "${_file}"
+						git commit \
+						   -m "Update Config Repo with Latest System File" \
+							"${_file}"
+					# Do Nothing.
+					else
+						echo "Doing Nothing, as Requested."
+					fi
+				fi
+			fi
+
+			# File Stat Diff
+
+			DIFF_STAT "CONFIG_DIFF_DIR File" "/${_file}" "${STAT_LIST}"
+
+			if [ $? != 0 ] ; then
+				diff_cnt=$(( $diff_cnt + 1 ))
+			fi
+
+			echo
+
+		fi
+
+	fi
+}
+
+STC_CONFCK()
+{
+    local _status=0
+
+	#
+	# Start the Search from the Top Level (Current) Directory...
+	#
+
+	echo
+	echo -n "Comparing Deployed Configuration"
+	echo " to Current Git Repository Versions:"
+	echo
+
+	for f in * ; do
+
+		CONFIG_DIFF_DIR $f
+
+	done
+
+	#
+	# Done.
+	#
+
+	echo "$diff_cnt Files Differed."
+	echo
+
+	return $diff_cnt
+}
+
+if [[ $UPDATE == 1 ]]; then
+	STC_CONFCK
+	_ckSTCconfck=$?
+else
+	doSTCConfCk=`STC_CONFCK 2>&1`
+	_ckSTCconfck=$?
+	if [[ ${_ckSTCconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doSTCConfCk\n"
+	fi
+fi
+
+if [[ ${_ckSTCconfck} != 0 ]]; then
+	echo -e "*** STC ConfCk FAILED...!\n"
+elif [[ $QUIET == 0 ]]; then
+	echo -e "STC ConfCk Passed.\n\n---------"
+fi
+
 
 # In Update Mode, Perform Other Assorted Install Operations, As Needed...
 if [[ $UPDATE == 1 ]]; then
@@ -703,6 +872,34 @@ if [[ $UPDATE == 1 ]]; then
 			${SUDO} ${CHGRP} users "${SMSD_LOG}"
 			${SUDO} ${CHMOD} g+rw "${SMSD_LOG}"
 			${LS} -l "${SMSD_LOG}"
+			# Restart RSyslog Service...?
+			${SUDO} ${SYSTEMCTL} status rsyslog
+			echo -n "Restart RSyslog Service? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				${SUDO} ${SYSTEMCTL} restart rsyslog
+				${SUDO} ${TAIL} "${MESSAGES_LOG}"
+			fi
+		fi
+	fi
+	echo
+
+	# Check/Create STC RSyslog Log File...
+	${LS} -l "${STC_LOG}"
+	log_perms=`${LS} -l "${STC_LOG}" | ${AWK} '{print $1}'`
+	log_group=`${LS} -l "${STC_LOG}" | ${AWK} '{print $4}'`
+	if [[ ! -f "${STC_LOG}"
+			|| "$log_perms" != "-rw-rw----"
+			|| "$log_group" != "users" ]]; then
+		echo -n "Create/Setup STC RSyslog Log File? [yes|No] "
+		read ckUpdate
+		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+			${SUDO} ${TOUCH} "${STC_LOG}"
+			${SUDO} ${CHGRP} users "${STC_LOG}"
+			${SUDO} ${CHMOD} g+rw "${STC_LOG}"
+			${LS} -l "${STC_LOG}"
 			# Restart RSyslog Service...?
 			${SUDO} ${SYSTEMCTL} status rsyslog
 			echo -n "Restart RSyslog Service? [yes|No] "
@@ -769,6 +966,12 @@ if [[ $UPDATE == 1 ]]; then
 			cron_file=`mktemp ./.confck.smsd${ALT}.crontab.edit.file.XXXXXX`
 
 			echo "MAILTO=idac_adara_notify@email.ornl.gov" >> $cron_file
+
+			echo -e -n "\n# Handle \"Local\" STS Deployments" >> $cron_file
+			echo " (and STS Config ConfCk... :-)" >> $cron_file
+			echo -e "\nLOCAL_DATA=/SNSlocal" >> $cron_file
+
+			echo -e "\n# SMS" >> $cron_file
 			echo "0-59/10 * * * * /SNS/users/$USER/stuff/exec/smsd_mon" \
 				>> $cron_file
 			echo -n "0 8,17 * * *" >> $cron_file
@@ -798,6 +1001,24 @@ if [[ $UPDATE == 1 ]]; then
 				echo " --config=\"${SNSLOCAL}/sms${ALT}/conf/smsd.conf\"" \
 					>> $cron_file
 			fi
+
+			echo -e "\n# STS" >> $cron_file
+			echo -n "0 8,17 * * * /home/controls/config-stc-config/confck" \
+				>> $cron_file
+			echo " --quiet" >> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-stc-config-test/confck --quiet" \
+				>> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-stc-config-hfir/confck --quiet" \
+				>> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo -n " /home/controls/config-stc-config-hfir-test/confck" \
+				>> $cron_file
+			echo " --quiet" >> $cron_file
+			echo -n "0 8,17 * * *" >> $cron_file
+			echo " /home/controls/config-stc-config-dummy/confck --quiet" \
+				>> $cron_file
 
 			echo "MAILTO=kohlja@ornl.gov" >> $cron_file
 			echo -n "0 8 * * *" >> $cron_file
@@ -856,6 +1077,26 @@ if [[ $UPDATE == 1 ]]; then
 	
 	done
 
+	# Check/Create STC User System Bin Soft Links...
+	for i in stc stc_test stc_dummy stc_hfir stc_hfir_test ; do
+
+		echo "Checking ADARA/STC User System Bin Soft Links for: [$i]"
+
+		${LS} -l "${STC_LINKS}/$i"
+		if [[ ! -x "${STC_LINKS}/$i" ]]; then
+			echo -n "Create ADARA/STC User System Bin Soft Link for [$i]?"
+			echo -n " [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				${SUDO} ${LN} -s "${STC_BINARIES}/$i" "${STC_LINKS}/$i"
+				${LS} -l "${STC_LINKS}/$i"
+			fi
+		fi
+		echo
+	
+	done
+
 	# Also Check/Create ADARA/SMSD-MON User Local Bin Soft Link... ;-D
 	if [[ -n ${ALT} ]]; then
 
@@ -895,9 +1136,34 @@ if [[ $UPDATE == 1 ]]; then
 
 fi
 
-if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
-	echo -e "Status = ${_ckconfck}\n"
+# Repeat Log Messages to Indicate Components Failing...!
+if [[ ${_ckconfck} != 0 \
+		|| ${_ckSTCconfck} != 0 ]]; then
+	echo -e "ERROR SUMMARY:\n"
+fi
+if [[ ${_ckconfck} != 0 ]]; then
+	echo -e "*** SMS ConfCk FAILED...!\n"
+fi
+if [[ ${_ckSTCconfck} != 0 ]]; then
+	echo -e "*** STC ConfCk FAILED...!\n"
 fi
 
-exit ${_ckconfck}
+if [[ ${_ckconfck} != 0 \
+		|| ${_ckSTCconfck} != 0 \
+		|| $QUIET == 0 ]]; then
+	echo -e "SMS Status = ${_ckconfck}\n"
+	echo -e "STC Status = ${_ckSTCconfck}\n"
+fi
+
+# Select Any Non-Zero Exit Status...
+if [[ ${_ckconfck} != 0 ]]; then
+	exit ${_ckconfck}
+elif [[ ${_ckSTCconfck} != 0 ]]; then
+	exit ${_ckSTCconfck}
+else
+	if [[ $QUIET == 0 ]]; then
+		echo -e "ALL ConfCk Cases Passed.\n"
+	fi
+	exit 0
+fi
 

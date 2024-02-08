@@ -46,7 +46,7 @@ USAGE()
 	echo "    [--config=./smsd.conf] \\"
 	echo "    [--stc1|--stc2|--stc3|--stc_host=<STC_HOST>] \\"
 	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
-	echo "    [--stc_devel|--stc_master] (ADARA Test Harness Use Only) \\"
+	echo "    [--stc_devel|--stc_main] (ADARA Test Harness Use Only) \\"
 	echo "    [--stc_port=<STCPort>] \\"
 	echo "    [--adara_add_run_end=<${ADARA_ADD_RUN_END}>] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
@@ -213,7 +213,7 @@ for arg in "$@" ; do
 			|| "#$key#" == '#--stc_hfir#'
 			|| "#$key#" == '#--stc_hfir_test#'
 			|| "#$key#" == '#--stc_devel#'
-			|| "#$key#" == '#--stc_master#' ]]; then
+			|| "#$key#" == '#--stc_main#' ]]; then
 		STC_SERVICE="${key}"
 		STC_SERVICE_NAME=`echo "${STC_SERVICE}" | ${SED} 's/^--//'`
 		echo -e "\nSetting STC Service to: [${STC_SERVICE_NAME}]"

@@ -35,7 +35,7 @@ using namespace std;
 
 
 MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user,
-                        const std::string &a_broker_pass, const std::string &a_config_label, bool a_kiosk, bool a_master )
+                        const std::string &a_broker_pass, const std::string &a_config_label, bool a_kiosk, bool a_main )
     : QMainWindow(0), ui(new Ui::MainWindow),
     m_init(true), m_kiosk(a_kiosk),
     m_refresh_proc_table(false), m_refresh_signal_table(false),
@@ -82,7 +82,7 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
         m_domain += ".";
 
     m_combus = new ADARA::ComBus::Connection( m_domain, "DASMON-GUI",
-        a_master ? 0 : getpid(),
+        a_main ? 0 : getpid(),
         m_broker_uri, m_broker_user, m_broker_pass, "", "" );
 
     updateMainWindowTitle();
