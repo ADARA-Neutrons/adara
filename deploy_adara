@@ -156,7 +156,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.7.2"
+DEPLOY_VERSION="1.8.0"
 
 TMP_DIR="/tmp"
 
@@ -165,6 +165,10 @@ INSTALL_BASE="/home/controls"
 ADARA_ARCHIVE="$INSTALL_BASE/prod/ADARA"
 
 EPICS_BASE="$ADARA_ARCHIVE/EpicsBaseLink"
+
+EPICS7_BASE="$ADARA_ARCHIVE/EpicsBase7Link"
+
+EPICS_PCAS="$ADARA_ARCHIVE/EpicsPcasLink"
 
 CONFIG_REPO="git+ssh://trac.sns.gov/var/repos/config"
 
@@ -491,15 +495,15 @@ echo -e "$log_desc" | tee -a $LOG
 
 # Make sure the parent ADARA Archive directory exists
 
-if [ ! -d "$ADARA_ARCHIVE" ]; then
+if [ ! -d "${ADARA_ARCHIVE}" ]; then
 
 	echo -e "\nADARA Archive Directory Not Found.\n" | tee -a $LOG
 
 	echo -e "Creating Parent ADARA Archive Directory:\n" \
 		| tee -a $LOG
-	echo -e "   $ADARA_ARCHIVE\n" | tee -a $LOG
+	echo -e "   ${ADARA_ARCHIVE}\n" | tee -a $LOG
 
-	mkdir -p "$ADARA_ARCHIVE" |& tee -a $LOG
+	mkdir -p "${ADARA_ARCHIVE}" |& tee -a $LOG
 
 	mkdir_ok=$?
 
@@ -510,60 +514,213 @@ if [ ! -d "$ADARA_ARCHIVE" ]; then
 		exit -5
 	fi
 
-	/bin/ls -ld "$ADARA_ARCHIVE" |& tee -a $LOG
+	/bin/ls -ld "${ADARA_ARCHIVE}" |& tee -a $LOG
 
-	# Now Display (Any) Production Deployed EPICS Builds
-	# and Prompt for One to Create the "EpicsBaseLink"...
+	# Are There Any EPICS3 Production Releases...?
 
-	prod_epics_base="$INSTALL_BASE/prod/epics/base"
+	prod_epics_base="${INSTALL_BASE}/prod/epics/base"
 
-	echo -e "\nNow You Must Choose a Production Deployed EPICS Build:\n" \
-		| tee -a $LOG
+	if [[ -d "${prod_epics_base}" ]]; then
 
-	/bin/ls -ld $prod_epics_base/* | sed s@$prod_epics_base/@@ \
-		|& tee -a $LOG
+		# Now Display (Any) Production Deployed EPICS3 Builds
+		# and Prompt for One to Create the "EpicsBaseLink"...
 
-	echo -e -n "\nPlease Enter the Desired " | tee -a $LOG
-	echo -e "Production EPICS Deployment Directory (or \"quit\"):\n" \
-		|& tee -a $LOG
+		echo -e "\nNow Choose a Production Deployed EPICS3 Build:\n" \
+			| tee -a $LOG
 
-	echo -n " > "
-	read epics_build
+		/bin/ls -ld ${prod_epics_base}/* | sed s@${prod_epics_base}/@@ \
+			|& tee -a $LOG
 
-	if [[ "#$epics_build#" == '##' || "#$epics_build#" == '#quit#' ]]; then
-		if [ "#$epics_build#" == '##' ]; then
-			echo -e "\nError: No EPICS Deployment Directory Specified.\n" \
-				| tee -a $LOG
+		echo -e -n "\nPlease Enter the Desired " | tee -a $LOG
+		echo -e "Production EPICS3 Deployment Directory (or \"quit\"):\n" \
+			| tee -a $LOG
+
+		echo -n " > "
+		read epics_build
+
+		if [[ "#${epics_build}#" == '##' \
+				|| "#${epics_build}#" == '#quit#' ]]; then
+			if [ "#${epics_build}#" == '##' ]; then
+				echo -e \
+				"\nError: No EPICS3 Deployment Directory Specified.\n" \
+					| tee -a $LOG
+			fi
+			echo -e \
+				"\nExiting Deploy Script at User's Request." | tee -a $LOG
+			exit 0
 		fi
-		echo -e "\nExiting Deploy Script at User's Request." | tee -a $LOG
-		exit 0
+
+		epics_path="${prod_epics_base}/${epics_build}"
+
+		if [ ! -d "${epics_path}" ]; then
+			echo -e \
+		"\nError: EPICS3 Production Deployment Directory Not Found!\n" \
+				| tee -a $LOG
+			echo -e "   ${epics_path}\n" | tee -a $LOG
+			/bin/ls -ld ${epics_path} |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -6
+		fi
+
+		echo -e \
+			"\nLinking Production EPICS3 Deployment Directory for ADARA:" \
+			| tee -a $LOG
+		echo -e "\n/bin/ln -s ${epics_path} ${EPICS_BASE}" | tee -a $LOG
+		/bin/ln -s "${epics_path}" "${EPICS_BASE}" |& tee -a $LOG
+
+		elink_ok=$?
+
+		if [ $elink_ok != 0 ]; then
+			echo -e \
+		"\nError Linking EPICS3 to Current Working Set! ($elink_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -7
+		fi
+
+		echo -e \
+		"\nSuccessfully Linked Production EPICS3 Deployment for ADARA:\n" \
+ 			| tee -a $LOG
+		/bin/ls -l "${EPICS_BASE}" |& tee -a $LOG
+
 	fi
 
-	epics_path="$prod_epics_base/$epics_build"
+	# Are There Any EPICS7 Production Releases...?
 
-	if [ ! -d "$epics_path" ]; then
-		echo -e \
-			"\nError: EPICS Production Deployment Directory Not Found!\n" \
+	prod_epics7_base="${INSTALL_BASE}/prod/common/base"
+
+	if [[ -d "${prod_epics7_base}" ]]; then
+
+		# Now Display (Any) Production Deployed EPICS7 Builds
+		# and Prompt for One to Create the "EpicsBase7Link"...
+
+		echo -e "\nNow Choose a Production Deployed EPICS7 Build:\n" \
 			| tee -a $LOG
-		echo -e "   $epics_path\n" | tee -a $LOG
-		/bin/ls -ld $epics_path | tee -a $LOG
-		echo -e "\nBailing Out..." | tee -a $LOG
-		exit -6
+
+		/bin/ls -ld ${prod_epics7_base}/* | sed s@${prod_epics7_base}/@@ \
+			|& tee -a $LOG
+
+		echo -e -n "\nPlease Enter the Desired " | tee -a $LOG
+		echo -e "Production EPICS7 Deployment Directory (or \"quit\"):\n" \
+			| tee -a $LOG
+
+		echo -n " > "
+		read epics7_build
+
+		if [[ "#${epics7_build}#" == '##' \
+				|| "#${epics7_build}#" == '#quit#' ]]; then
+			if [ "#${epics7_build}#" == '##' ]; then
+				echo -e \
+				"\nError: No EPICS7 Deployment Directory Specified.\n" \
+					| tee -a $LOG
+			fi
+			echo -e \
+				"\nExiting Deploy Script at User's Request." | tee -a $LOG
+			exit 0
+		fi
+
+		epics7_path="${prod_epics7_base}/${epics7_build}"
+
+		if [ ! -d "${epics7_path}" ]; then
+			echo -e \
+		"\nError: EPICS7 Production Deployment Directory Not Found!\n" \
+				| tee -a $LOG
+			echo -e "   ${epics7_path}\n" | tee -a $LOG
+			/bin/ls -ld ${epics7_path} |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -6
+		fi
+
+		echo -e \
+			"\nLinking Production EPICS7 Deployment Directory for ADARA:" \
+			| tee -a $LOG
+		echo -e "\n/bin/ln -s ${epics7_path} ${EPICS7_BASE}" | tee -a $LOG
+		/bin/ln -s "${epics7_path}" "${EPICS7_BASE}" |& tee -a $LOG
+
+		elink_ok=$?
+
+		if [ $elink_ok != 0 ]; then
+			echo -e \
+		"\nError Linking EPICS7 to Current Working Set! ($elink_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -7
+		fi
+
+		echo -e \
+		"\nSuccessfully Linked Production EPICS7 Deployment for ADARA:\n" \
+ 			| tee -a $LOG
+		/bin/ls -l "${EPICS7_BASE}" |& tee -a $LOG
+
 	fi
 
-	echo -e "\nLinking Production EPICS Deployment Directory for ADARA:" \
-		| tee -a $LOG
-	echo "/bin/ln -s $epics_path $EPICS_BASE" |& tee -a $LOG
-	/bin/ln -s "$epics_path" "$EPICS_BASE" |& tee -a $LOG
+	# Are There Any PCAS Production Releases...?
 
-	elink_ok=$?
+	prod_epics_pcas="${INSTALL_BASE}/prod/common/pcas"
 
-	if [ $elink_ok != 0 ]; then
-		echo -e \
-			"\nError Linking $exe to Current Working Set! ($elink_ok)\n" \
+	if [[ -d "${prod_epics_pcas}" ]]; then
+
+		# Now Display (Any) Production Deployed PCAS Builds
+		# and Prompt for One to Create the "EpicsPcasLink"...
+
+		echo -e "\nNow Choose a Production Deployed PCAS Build:\n" \
 			| tee -a $LOG
-		echo "Bailing Out..." | tee -a $LOG
-		exit -7
+
+		/bin/ls -ld ${prod_epics_pcas}/* | sed s@${prod_epics_pcas}/@@ \
+			|& tee -a $LOG
+
+		echo -e -n "\nPlease Enter the Desired " | tee -a $LOG
+		echo -e "Production PCAS Deployment Directory (or \"quit\"):\n" \
+			| tee -a $LOG
+
+		echo -n " > "
+		read pcas_build
+
+		if [[ "#${pcas_build}#" == '##' \
+				|| "#${pcas_build}#" == '#quit#' ]]; then
+			if [ "#${pcas_build}#" == '##' ]; then
+				echo -e \
+				"\nError: No PCAS Deployment Directory Specified.\n" \
+					| tee -a $LOG
+			fi
+			echo -e \
+				"\nExiting Deploy Script at User's Request." | tee -a $LOG
+			exit 0
+		fi
+
+		pcas_path="${prod_epics_pcas}/${pcas_build}"
+
+		if [ ! -d "${pcas_path}" ]; then
+			echo -e \
+		"\nError: PCAS Production Deployment Directory Not Found!\n" \
+				| tee -a $LOG
+			echo -e "   ${pcas_path}\n" | tee -a $LOG
+			/bin/ls -ld ${pcas_path} |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -6
+		fi
+
+		echo -e \
+			"\nLinking Production PCAS Deployment Directory for ADARA:" \
+			| tee -a $LOG
+		echo -e "\n/bin/ln -s ${pcas_path} ${EPICS_PCAS}" | tee -a $LOG
+		/bin/ln -s "${pcas_path}" "${EPICS_PCAS}" |& tee -a $LOG
+
+		elink_ok=$?
+
+		if [ $elink_ok != 0 ]; then
+			echo -e \
+			"\nError Linking PCAS to Current Working Set! ($elink_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -7
+		fi
+
+		echo -e \
+		"\nSuccessfully Linked Production PCAS Deployment for ADARA:\n" \
+ 			| tee -a $LOG
+		/bin/ls -l "${EPICS_PCAS}" |& tee -a $LOG
+
 	fi
 
 fi
@@ -675,9 +832,9 @@ if [ $need_build == 1 ]; then
 
 	cd "$TMP_DIR/ADARA"
 
-	pwd | tee -a $LOG
+	pwd |& tee -a $LOG
 
-	/bin/ls -l | tee -a $LOG
+	/bin/ls -l |& tee -a $LOG
 
 	# Check out the desired Release Tag
 
@@ -718,14 +875,20 @@ if [ $need_build == 1 ]; then
 	if [ $tagsubst_ok != 0 ]; then
 		echo -e "\nError Substituting Release Tag! ($tagsubst_ok)\n" \
 			| tee -a $LOG
-		/bin/ls "$TMP_DIR/ADARA/common/ADARA.h*" | tee -a $LOG
+		/bin/ls "$TMP_DIR/ADARA/common/ADARA.h*" |& tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -12
 	fi
 
-	# Build the ADARA software suite, using EPICS linked to in:
+	# Build the ADARA software suite, using EPICS3 linked to in:
 	#   EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"...
 	# -> e.g. "/home/controls/prod/epics/base/rel3.14.12.4_20140619"
+	# or:
+	#   EPICS7_BASE="/home/controls/prod/ADARA/EpicsBase7Link"...
+	# -> e.g. "/home/controls/prod/epics/base/rel7.0.7_20230322"
+	# and:
+	#   EPICS_PCAS="/home/controls/prod/ADARA/EpicsPcasLink"...
+	# -> e.g. "/home/controls/prod/common/pcas/rel4.13.3_20240201"
 
 	echo -e "\nBuilding the ADARA software suite." | tee -a $LOG
 
@@ -741,36 +904,146 @@ if [ $need_build == 1 ]; then
 		exit -13
 	fi
 
-	# Resolve Production EPICS Deployment Link... (Use Direct Path)
-	epics_base=`/usr/bin/readlink -f $EPICS_BASE`
-	readlink_ok=$?
-	if [ $readlink_ok != 0 ]; then
-		echo -e -n "\nError Resolving Production EPICS Deployment Link!" \
+	# Initialize WITH_EPICS command line configure options...
+	WITH_EPICS=""
+
+	# Is there an EPICS3 Deployment Link...?
+	if [[ -L "${EPICS_BASE}" ]]; then
+
+		# Resolve Production EPICS3 Deployment Link... (Use Direct Path)
+		epics_base=`/usr/bin/readlink -f ${EPICS_BASE}`
+		readlink_ok=$?
+		if [ $readlink_ok != 0 ]; then
+			echo -e -n \
+				"\nError Resolving Production EPICS3 Deployment Link!" \
+				| tee -a $LOG
+			echo -e " ($readlink_ok)\n" | tee -a $LOG
+			echo -e "   EPICS_BASE=[$EPICS_BASE]\n" | tee -a $LOG
+			echo -e "   -> [$epics_base]\n" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -133
+		fi
+
+		# Make Sure Production EPICS3 Deployment Directory Exists...
+		if [ ! -d "$epics_base" ]; then
+			echo -e \
+			"\nError: Invalid or Missing Production EPICS3 Deployment!\n" \
+				| tee -a $LOG
+			echo -e "   [$epics_base]\n" | tee -a $LOG
+			/bin/ls -ld "$epics_base" |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -136
+		fi
+	
+		# Add Any EPICS3 Base Path to WITH_EPICS configure options...
+		if [[ -n "${epics_base}" ]]; then
+			echo -e "\nFound EPICS3 Base Path, Add to Configure:\n" \
+				| tee -a $LOG
+			echo -e "   --with-epics=[${epics_base}]" \
+				| tee -a $LOG
+			WITH_EPICS="${WITH_EPICS} --with-epics=${epics_base}"
+		fi
+	else
+		echo -e "\nWarning: No Valid EPICS3 Deployment Link Found in:\n" \
 			| tee -a $LOG
-		echo -e " ($readlink_ok)\n" | tee -a $LOG
-		echo -e "   EPICS_BASE=[$EPICS_BASE]\n" | tee -a $LOG
-		echo -e "   -> [$epics_base]\n" | tee -a $LOG
-		echo "Bailing Out..." | tee -a $LOG
-		exit -133
+		echo -e "   [${EPICS_BASE}]\n" | tee -a $LOG
+		/bin/ls -l "${EPICS_BASE}" |& tee -a $LOG
 	fi
 
-	# Make Sure Production EPICS Deployment Directory Exists...
-	if [ ! -d "$epics_base" ]; then
-		echo -e \
-			"\nError: Invalid or Missing Production EPICS Deployment!\n" \
+	# Is there an EPICS7 Deployment Link...?
+	if [[ -L "${EPICS7_BASE}" ]]; then
+
+		# Resolve Production EPICS7 Deployment Link... (Use Direct Path)
+		epics7_base=`/usr/bin/readlink -f ${EPICS7_BASE}`
+		readlink_ok=$?
+		if [ $readlink_ok != 0 ]; then
+			echo -e -n \
+				"\nError Resolving Production EPICS7 Deployment Link!" \
+				| tee -a $LOG
+			echo -e " ($readlink_ok)\n" | tee -a $LOG
+			echo -e "   EPICS7_BASE=[$EPICS7_BASE]\n" | tee -a $LOG
+			echo -e "   -> [$epics7_base]\n" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -133
+		fi
+
+		# Make Sure Production EPICS7 Deployment Directory Exists...
+		if [ ! -d "$epics7_base" ]; then
+			echo -e \
+			"\nError: Invalid or Missing Production EPICS7 Deployment!\n" \
+				| tee -a $LOG
+			echo -e "   [$epics7_base]\n" | tee -a $LOG
+			/bin/ls -ld "$epics7_base" |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -136
+		fi
+	
+		# Add Any EPICS7 Base Path to WITH_EPICS configure options...
+		if [[ -n "${epics7_base}" ]]; then
+			echo -e "\nFound EPICS7 Base Path, Add to Configure:\n" \
+				| tee -a $LOG
+			echo -e "   --with-epics7=[${epics7_base}]" \
+				| tee -a $LOG
+			WITH_EPICS="${WITH_EPICS} --with-epics7=${epics7_base}"
+		fi
+	else
+		echo -e "\nWarning: No Valid EPICS7 Deployment Link Found in:\n" \
 			| tee -a $LOG
-		echo -e "   [$epics_base]\n" | tee -a $LOG
-		/bin/ls -ld "$epics_base" | tee -a $LOG
-		echo -e "\nBailing Out..." | tee -a $LOG
-		exit -136
+		echo -e "   [${EPICS7_BASE}]\n" | tee -a $LOG
+		/bin/ls -l "${EPICS7_BASE}" |& tee -a $LOG
 	fi
 
-	echo "./configure --with-epics=$epics_base" | tee -a $LOG
-	./configure --with-epics="$epics_base" |& tee -a $LOG
+	# Is there a PCAS Deployment Link...?
+	if [[ -L "${EPICS_PCAS}" ]]; then
+
+		# Resolve Production PCAS Deployment Link... (Use Direct Path)
+		epics_pcas=`/usr/bin/readlink -f ${EPICS_PCAS}`
+		readlink_ok=$?
+		if [ $readlink_ok != 0 ]; then
+			echo -e -n \
+				"\nError Resolving Production PCAS Deployment Link!" \
+				| tee -a $LOG
+			echo -e " ($readlink_ok)\n" | tee -a $LOG
+			echo -e "   EPICS_PCAS=[$EPICS_PCAS]\n" | tee -a $LOG
+			echo -e "   -> [$epicspcas]\n" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -133
+		fi
+
+		# Make Sure Production PCAS Deployment Directory Exists...
+		if [ ! -d "$epics_pcas" ]; then
+			echo -e \
+			"\nError: Invalid or Missing Production PCAS Deployment!\n" \
+				| tee -a $LOG
+			echo -e "   [$epics_pcas]\n" | tee -a $LOG
+			/bin/ls -ld "$epics_pcas" |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -136
+		fi
+	
+		# Add Any PCAS Base Path to WITH_EPICS configure options...
+		if [[ -n "${epics_pcas}" ]]; then
+			echo -e "\nFound PCAS Base Path, Add to Configure:\n" \
+				| tee -a $LOG
+			echo -e "   --with-pcas=[${epics_pcas}]" \
+				| tee -a $LOG
+			WITH_EPICS="${WITH_EPICS} --with-pcas=${epics_pcas}"
+		fi
+	else
+		echo -e "\nWarning: No Valid PCAS Deployment Link Found in:\n" \
+			| tee -a $LOG
+		echo -e "   [${EPICS_PCAS}]\n" | tee -a $LOG
+		/bin/ls -l "${EPICS_PCAS}" |& tee -a $LOG
+	fi
+
+	# Configure ADARA Build...
+
+	echo -e "\n./configure ${WITH_EPICS}\n" | tee -a $LOG
+	./configure ${WITH_EPICS} |& tee -a $LOG
 
 	configure_ok=$?
 
-	if [ $configure_ok != 0 ]; then
+	if [[ $configure_ok != 0 ]]; then
 		echo -e "\nError Configuring ADARA Software! ($configure_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
@@ -782,7 +1055,7 @@ if [ $need_build == 1 ]; then
 
 	build_ok=$?
 
-	if [ $build_ok != 0 ]; then
+	if [[ $build_ok != 0 ]]; then
 		echo -e "\nError Building Release Tag! ($build_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -15
