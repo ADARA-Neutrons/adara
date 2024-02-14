@@ -731,8 +731,19 @@ PVSD_CONFCK()
 		echo "Files are the Same."
 	fi
 
+	# Deprecated SysV Startup File...
 	DIFF_FILE "PVSD Init Script" "Deployed" \
-		./pvsd/pvsd.initscript /etc/init.d/pvsd
+		./pvsd/pvsd.initscript /etc/init.d/pvsd.XXX
+	if [ $? != 0 ]; then
+		echo "Files Differed...!"
+		(( _nerrors++ ))
+	else
+		echo "Files are the Same."
+	fi
+
+	# New SystemD Service Configuration...
+	DIFF_FILE "PVSD SystemD Service Config" "Deployed" \
+		./pvsd/pvsd.service /etc/systemd/system/pvsd.service
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
