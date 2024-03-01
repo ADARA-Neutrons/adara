@@ -148,17 +148,21 @@ PREVIOUS="AdaraMonitorPreviousMarker.$$.marker"
 
 DO_SUMMARY()
 {
-	echo
-
-	echo -n "Starting Summary: "
-	date
-
+	# Clear Any Existing Summary...
 	/bin/rm "${CACHE_DIR}/${SUMMARY}" > /dev/null 2>&1
 
 	# Leave "Previous" Breadcrumb for Next ADARA Summary... ;-D
 	# Note: Touch Marker File *Before* Creating the Summary, So We
 	# Don't Clear Any New Error Logs from _During_ the Summary...! ;-D
 	touch "${CACHE_DIR}/${PREVIOUS}"
+
+	# Start New Summary...
+	touch "${CACHE_DIR}/${SUMMARY}"
+
+	echo
+
+	echo -n "Starting Summary: " | tee -a "${CACHE_DIR}/${SUMMARY}"
+	date | tee -a "${CACHE_DIR}/${SUMMARY}"
 
 	# Remove Globbed File List If None Found...
 	shopt -s nullglob
@@ -171,7 +175,7 @@ DO_SUMMARY()
 
 	LAST_CACHE_STATE=`/bin/ls -ld "${CACHE_DIR}"`
 
-	${CAT} "${CACHE_DIR}/${SUMMARY}"
+	${CAT} "${CACHE_DIR}/${SUMMARY}" | grep -v "Starting Summary:"
 
 	LAST_TIME=`date +"%s"`
 
@@ -197,8 +201,8 @@ DO_SUMMARY()
 	
 	done
 
-	echo -n "Summary Done: "
-	date
+	echo -n "Summary Done: " | tee -a "${CACHE_DIR}/${SUMMARY}"
+	date | tee -a "${CACHE_DIR}/${SUMMARY}"
 
 	if [[ $do_autoexit == 1 ]]; then
 
