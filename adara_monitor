@@ -354,7 +354,11 @@ DO_CONNECT()
 
 	/bin/ls -l "${CACHE_DIR}/${SUMMARY}" | /usr/bin/sed -e "s@ /@\n    /@"
 
+	echo
+
 	${CAT} "${CACHE_DIR}/${SUMMARY}"
+
+	echo
 
 	cknone=`${GREP} "NO ERRORS/FILES" "${CACHE_DIR}/${SUMMARY}" \
 		| ${WC} | ${AWK} '{print $1}'`
@@ -418,7 +422,9 @@ DO_CMD()
 			echo
 			/bin/ls -l "${CACHE_DIR}/${SUMMARY}" \
 				| /usr/bin/sed -e "s@ /@\n    /@"
+			echo
 			/bin/cat "${CACHE_DIR}/${SUMMARY}"
+			echo
 		else
 			echo -e "${_nl}Refreshing ADARA Summary..."
 			DO_SUMMARY
