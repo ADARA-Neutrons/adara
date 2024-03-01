@@ -168,7 +168,7 @@ DO_SUMMARY()
 	shopt -s nullglob
 
 	${ADARA_SUMMARY} --terse --nostdin ${ALTOPT} "${CACHE_DIR}"/*.txt \
-		> "${CACHE_DIR}/${SUMMARY}"
+		>> "${CACHE_DIR}/${SUMMARY}"
 
 	# Restore Normal Shell Globbing...
 	shopt -u nullglob
