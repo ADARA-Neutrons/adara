@@ -9,8 +9,10 @@
 # Catch Errors Amidst Pipelines... ;-Q
 set -o pipefail
 
-# Source Local EPICS Beamline Environment (e.g. $BEAMLINE):
-. /home/controls/share/scripts/beamline_profile.sh
+# Source Controls Environment (for EPICS Beamline, e.g. $BEAMLINE):
+if [ -e /etc/profile.d/controls.sh ] ; then
+	source /etc/profile.d/controls.sh
+fi
 
 #LOG_HOME="/SNS/users/$USER"
 LOG_HOME="$HOME"
