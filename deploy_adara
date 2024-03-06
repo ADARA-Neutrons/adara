@@ -16,9 +16,15 @@
 #   - switch/create "deploy" soft link for the ADARA Daemon/Service Binary
 #   - (optionally restart the SMS Daemon Service...)
 #   - document the deployment using the "Config" Git repository
+#     (or in DAS 3.0 in the Beamline Inst "PVSD Config" Sub-Repo:
+#         /home/controls/inst/$BEAMLINE/pvsd/$BRANCH
+#     which when "Selected" is soft-linked into the Beamline Hostinfo Repo:
+#         /home/controls/common/hostinfo/$BEAMLINE/config/pvsd@
+#     As of Version 1.8.1, this deployment script handles this difference
+#     automagically. :-)
 #      -> determine which Beamline/STC Host we are on...
-#      -> clone a fresh copy of the Config Git repo (in /tmp)
-#      -> check out the correct Beamline/STC Branch
+#      -> clone a fresh copy of the Config Git repo (in /tmp) [DAS 2.*]
+#      -> check out the correct Beamline/STC Branch [DAS 2.*]
 #      -> update the "deployment.history.txt" file with a proper log
 #
 
@@ -156,19 +162,19 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.8.0"
+DEPLOY_VERSION="1.8.1"
 
 TMP_DIR="/tmp"
 
 INSTALL_BASE="/home/controls"
 
-ADARA_ARCHIVE="$INSTALL_BASE/prod/ADARA"
+ADARA_ARCHIVE="${INSTALL_BASE}/prod/ADARA"
 
-EPICS_BASE="$ADARA_ARCHIVE/EpicsBaseLink"
+EPICS_BASE="${ADARA_ARCHIVE}/EpicsBaseLink"
 
-EPICS7_BASE="$ADARA_ARCHIVE/EpicsBase7Link"
+EPICS7_BASE="${ADARA_ARCHIVE}/EpicsBase7Link"
 
-EPICS_PCAS="$ADARA_ARCHIVE/EpicsPcasLink"
+EPICS_PCAS="${ADARA_ARCHIVE}/EpicsPcasLink"
 
 CONFIG_REPO="git+ssh://trac.sns.gov/var/repos/config"
 
@@ -176,6 +182,18 @@ CONFIG_LINE=\
 "------------------------------------------------------------------"
 
 WAIT="-w 9"
+
+#
+# DAS 3.0 Defaults
+#
+
+HOME_CONTROLS="/home/controls"
+
+HOSTINFO="${HOME_CONTROLS}/common/hostinfo"
+
+PVSD_CONFIG="${HOSTINFO}/${BEAMLINE}/config/pvsd"
+
+# Awk and Log Stuff
 
 awkLineBreak=" \
 	{ \
@@ -250,6 +268,7 @@ fi
 
 # Determine the Beamline/STC Branch associated with this computer system
 
+# Note: ${CONFIG} Branch is Unused in DAS 3.0
 CONFIG="config"
 
 PV_PREFIX=""
@@ -368,12 +387,26 @@ else
 	HOST_TYPE="Beamline"
 fi
 
-echo -e -n "\nInstalling ADARA/$PROG " | tee -a $LOG
-echo "for $HOST_TYPE Host ($install_host)" | tee -a $LOG
-echo -e "in Config Repo Install Branch $install_branch." | tee -a $LOG
+#
+# Check for DAS 3.0 Deployment
+#
 
-echo -e "\nUsing Git Config Repository in: ${INSTALL_BASE}/${CONFIG}" \
-	| tee -a $LOG
+DAS="2"
+if [[ -L ${PVSD_CONFIG} ]]; then
+	echo -e "\nFound a DAS 3.0 PVSD Configuration Soft Link:\n"
+	/bin/ls -l "${PVSD_CONFIG}"
+	echo -e "\nProceeding with DAS 3.0 Deployment Handling."
+	DAS="3"
+fi
+
+echo -e -n "\nInstalling ADARA/$PROG " | tee -a $LOG
+echo "for ${HOST_TYPE} Host ($install_host)" | tee -a $LOG
+
+if [[ ${DAS} == "2" ]]; then
+	echo -e "in Config Repo Install Branch $install_branch." | tee -a $LOG
+	echo -e "\nUsing Git Config Repository in: ${INSTALL_BASE}/${CONFIG}" \
+		| tee -a $LOG
+fi
 
 if [[ -n "$PV_PREFIX" ]]; then
 	echo -e "\nUsing Beamline EPICS PV Prefix = [${PV_PREFIX}]." \
@@ -1459,148 +1492,195 @@ fi
 # Link New Archive Release Tag into Current Working Set for Beamline/STC
 #
 
-# Make sure the Git Config repository has been cloned for deployment
+#
+# DAS 2.*
+#
 
-adara_config="$INSTALL_BASE/$CONFIG"
+if [[ ${DAS} == "2" ]]; then
 
-if [ ! -d "$adara_config" ]; then
+	# Make sure the Git Config repository has been cloned for deployment
 
-	# Clone a fresh copy of the Git Config repository (in /home/controls)
+	adara_config="${INSTALL_BASE}/${CONFIG}"
 
-	echo -e "\nCloning Git Config repository (in $INSTALL_BASE):" \
-		| tee -a $LOG
+	if [ ! -d "${adara_config}" ]; then
 
-	echo "git clone $CONFIG_REPO $adara_config" | tee -a $LOG
-	git clone "$CONFIG_REPO" "$adara_config" |& tee -a $LOG
+		# Clone a fresh copy of the Git Config repository
+		# (in /home/controls)
 
-	clone_ok=$?
-
-	if [ $clone_ok != 0 ]; then
-		echo -e "\nError Cloning Git Config repository! ($clone_ok)\n" \
+		echo -e "\nCloning Git Config repository (in ${INSTALL_BASE}):" \
 			| tee -a $LOG
-		echo "Bailing Out..." | tee -a $LOG
-		exit -27
+
+		echo "git clone ${CONFIG_REPO} ${adara_config}" | tee -a $LOG
+		git clone "${CONFIG_REPO}" "${adara_config}" |& tee -a $LOG
+
+		clone_ok=$?
+
+		if [ $clone_ok != 0 ]; then
+			echo -e -n "\nError Cloning Git Config repository!" \
+				| tee -a $LOG
+			echo -e " ($clone_ok)\n" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -27
+		fi
+
 	fi
 
-fi
+	# Make sure the Proper Beamline/STC Branch is checked out in Config
 
-# Make sure the Proper Beamline/STC Branch is checked out in Config
+	echo -e "\nConfig ${HOST_TYPE} Repository:\n" | tee -a $LOG
 
-echo -e "\nConfig $HOST_TYPE Repository:\n" | tee -a $LOG
+	cd "${adara_config}/"
 
-cd "$adara_config"
+	pwd | tee -a $LOG
 
-pwd | tee -a $LOG
+	/bin/ls -l | tee -a $LOG
 
-/bin/ls -l | tee -a $LOG
+	# Check out the desired Beamline/STC Branch
 
-# Check out the desired Beamline/STC Branch
+	echo -e -n "\nChecking out the Config ${HOST_TYPE} Branch:" \
+		| tee -a $LOG
+	echo -e " $install_branch\n" | tee -a $LOG
 
-echo -e "\nChecking out the Config $HOST_TYPE Branch: $install_branch\n" \
-	| tee -a $LOG
+	echo "git checkout $install_branch" | tee -a $LOG
+	git checkout "$install_branch" |& tee -a $LOG
 
-echo "git checkout $install_branch" | tee -a $LOG
-git checkout "$install_branch" |& tee -a $LOG
+	tag_ok=$?
 
-tag_ok=$?
+	if [ $tag_ok != 0 ]; then
 
-if [ $tag_ok != 0 ]; then
-
-	echo -e \
-		"\nError Checking Out $HOST_TYPE Branch! ($tag_ok)\n" | tee -a $LOG
-
-	echo "Current Local and Remote Branches:" | tee -a $LOG
-	git branch -a |& tee -a $LOG
-
-	echo -e "\nWould you like to Create the Git $HOST_TYPE Install Branch:"
-	echo
-	echo "   $install_branch"
-	echo
-	echo -n "(yes/No/quit)? "
-
-	read mkbranch_ck
-	mkbranch_ck=`echo "$mkbranch_ck" | tr '[:upper:]' '[:lower:]'`
-
-	if [[ "#$mkbranch_ck#" == '#y#' || "#$mkbranch_ck#" == '#yes#' ]]; then
-
-		echo -e "\nCreating New Git $HOST_TYPE Install Branch:" \
+		echo -e -n "\nError Checking Out ${HOST_TYPE} Branch!" \
 			| tee -a $LOG
-		echo | tee -a $LOG
-		echo "   $install_branch" | tee -a $LOG
-		echo | tee -a $LOG
+		echo -e " ($tag_ok)\n" | tee -a $LOG
 
-		echo "git branch $install_branch" | tee -a $LOG
-		git branch "$install_branch" |& tee -a $LOG
-
-		mkbranch_ok=$?
-
-		if [ $mkbranch_ok != 0 ]; then
-			echo -e "\nError Creating $HOST_TYPE Install Branch!" \
-				| tee -a $LOG
-			echo -e " ($mkbranch_ok)\n" | tee -a $LOG
-			echo "   $install_branch" | tee -a $LOG
-			echo "Bailing Out..." | tee -a $LOG
-			exit -28
-		fi
-
-		echo -e -n "\nChecking out New Config $HOST_TYPE Branch: " \
-			| tee -a $LOG
-		echo -e "$install_branch\n" | tee -a $LOG
-
-		echo "git checkout $install_branch" | tee -a $LOG
-		git checkout "$install_branch" |& tee -a $LOG
-
-		newtag_ok=$?
-
-		if [ $newtag_ok != 0 ]; then
-			echo -e "\nError Checking Out New $HOST_TYPE Install Branch!" \
-				| tee -a $LOG
-			echo -e " ($newtag_ok)\n" | tee -a $LOG
-			echo "   $install_branch" | tee -a $LOG
-			echo "Bailing Out..." | tee -a $LOG
-			exit -29
-		fi
-
-		echo -e "\nPushing New Config $HOST_TYPE Branch to Origin:" \
-			| tee -a $LOG
-
-		echo
-		echo "git push origin $install_branch"
-		git push --set-upstream origin "$install_branch"
-
-		pushbranch_ok=$?
-
-		if [ $pushbranch_ok != 0 ]; then
-			echo -e \
-				"\nError Pushing $HOST_TYPE Install Branch to Origin!" \
-				| tee -a $LOG
-			echo -e " ($pushbranch_ok)\n" | tee -a $LOG
-			echo "   $install_branch"
-			echo "Bailing Out..." | tee -a $LOG
-			exit -30
-		fi
-
-		echo -e "\nNew Current Local and Remote Branches:" | tee -a $LOG
+		echo "Current Local and Remote Branches:" | tee -a $LOG
 		git branch -a |& tee -a $LOG
 
-		CHECK_PROCEED
+		echo -e -n "\nWould you like to Create the Git ${HOST_TYPE}"
+		echo -e " Install Branch:"
+		echo
+		echo "   $install_branch"
+		echo
+		echo -n "(yes/No/quit)? "
 
-	elif [[ "#$mkbranch_ck#" == '#n#' || "#$mkbranch_ck#" == '#no#' \
-		|| "#$mkbranch_ck#" == '#q#' || "#$mkbranch_ck#" == '#quit#' ]]; \
-	then
-		echo -e "\nExiting Deploy Script at User's Request." | tee -a $LOG
-		exit 0
+		read mkbranch_ck
+		mkbranch_ck=`echo "$mkbranch_ck" | tr '[:upper:]' '[:lower:]'`
 
-	else
-		echo "Bailing Out..." | tee -a $LOG
-		exit -31
+		if [[ "#$mkbranch_ck#" == '#y#' \
+				|| "#$mkbranch_ck#" == '#yes#' ]]; then
+
+			echo -e "\nCreating New Git ${HOST_TYPE} Install Branch:" \
+				| tee -a $LOG
+			echo | tee -a $LOG
+			echo "   $install_branch" | tee -a $LOG
+			echo | tee -a $LOG
+
+			echo "git branch $install_branch" | tee -a $LOG
+			git branch "$install_branch" |& tee -a $LOG
+
+			mkbranch_ok=$?
+
+			if [ $mkbranch_ok != 0 ]; then
+				echo -e "\nError Creating ${HOST_TYPE} Install Branch!" \
+					| tee -a $LOG
+				echo -e " ($mkbranch_ok)\n" | tee -a $LOG
+				echo "   $install_branch" | tee -a $LOG
+				echo "Bailing Out..." | tee -a $LOG
+				exit -28
+			fi
+
+			echo -e -n "\nChecking out New Config ${HOST_TYPE} Branch: " \
+				| tee -a $LOG
+			echo -e "$install_branch\n" | tee -a $LOG
+
+			echo "git checkout $install_branch" | tee -a $LOG
+			git checkout "$install_branch" |& tee -a $LOG
+
+			newtag_ok=$?
+
+			if [ $newtag_ok != 0 ]; then
+				echo -e -n "\nError Checking Out New ${HOST_TYPE}" \
+					| tee -a $LOG
+				echo -e " Install Branch!" | tee -a $LOG
+				echo -e " ($newtag_ok)\n" | tee -a $LOG
+				echo "   $install_branch" | tee -a $LOG
+				echo "Bailing Out..." | tee -a $LOG
+				exit -29
+			fi
+
+			echo -e "\nPushing New Config ${HOST_TYPE} Branch to Origin:" \
+				| tee -a $LOG
+
+			echo
+			echo "git push origin $install_branch"
+			git push --set-upstream origin "$install_branch"
+
+			pushbranch_ok=$?
+
+			if [ $pushbranch_ok != 0 ]; then
+				echo -e -n "\nError Pushing ${HOST_TYPE} Install Branch" \
+					| tee -a $LOG
+				echo -e " to Origin!" | tee -a $LOG
+				echo -e " ($pushbranch_ok)\n" | tee -a $LOG
+				echo "   $install_branch"
+				echo "Bailing Out..." | tee -a $LOG
+				exit -30
+			fi
+
+			echo -e "\nNew Current Local and Remote Branches:" \
+				| tee -a $LOG
+			git branch -a |& tee -a $LOG
+
+			CHECK_PROCEED
+
+		elif [[ "#$mkbranch_ck#" == '#n#' \
+				|| "#$mkbranch_ck#" == '#no#' \
+				|| "#$mkbranch_ck#" == '#q#' \
+				|| "#$mkbranch_ck#" == '#quit#' ]]; \
+		then
+			echo -e "\nExiting Deploy Script at User's Request." \
+				| tee -a $LOG
+			exit 0
+
+		else
+			echo "Bailing Out..." | tee -a $LOG
+			exit -31
+		fi
+
 	fi
+
+	# Set ADARA current working directory
+	adara_current="${INSTALL_BASE}/${CONFIG}/deploy"
+
+elif [[ ${DAS} == "3" ]]; then
+
+	# Set PVSD Config repository path
+	adara_config="${PVSD_CONFIG}"
+
+	# Set ADARA current working directory
+	adara_current="${PVSD_CONFIG}/deploy"
+
+	# Make sure the Proper Beamline/STC Repository is checked out
+
+	echo -e "\nConfig ${HOST_TYPE} Repository:\n" | tee -a $LOG
+
+	cd "${adara_config}/"
+
+	pwd | tee -a $LOG
+
+	/bin/ls -l | tee -a $LOG
+
+else
+
+	echo -e "\nError: Unknown DAS Installation Layout Type:\n" \
+		| tee -a $LOG
+	echo -e "   DAS Version = [${DAS}]\n" | tee -a $LOG
+	echo "Bailing Out..." | tee -a $LOG
+	exit -31
 
 fi
 
 # Make sure the parent ADARA current working set directory exists
 
-adara_current="$INSTALL_BASE/$CONFIG/deploy"
 adara_current_new=0
 
 if [ ! -d "$adara_current" ]; then
@@ -1744,9 +1824,15 @@ sleep 3
 # Commit the Current Working Set Changes to the Git Config Repository
 #
 
-echo -e \
-	"\nCommitting Current Working Set changes to $install_branch branch." \
-	| tee -a $LOG
+if [[ ${DAS} == "2" ]]; then
+	echo -e -n "\nCommitting Current Working Set changes" \
+		| tee -a $LOG
+	echo -e " to $install_branch branch." | tee -a $LOG
+elif [[ ${DAS} == "3" ]]; then
+	echo -e -n "\nCommitting Current Working Set changes" \
+		| tee -a $LOG
+	echo -e " to PVSD Config Repository." | tee -a $LOG
+fi
 
 pwd | tee -a $LOG
 
@@ -1817,11 +1903,17 @@ fi
 # Document the deployment using the "Config" Git repository
 #
 
-echo -e \
-	"\nDocument Deployment History File for $HOST_TYPE $install_branch." \
-	| tee -a $LOG
+if [[ ${DAS} == "2" ]]; then
+	echo -e -n "\nDocument Deployment History File for ${HOST_TYPE}" \
+		| tee -a $LOG
+	echo -e " $install_branch." | tee -a $LOG
+elif [[ ${DAS} == "3" ]]; then
+	echo -e -n "\nDocument Deployment History File for ${HOST_TYPE}" \
+		| tee -a $LOG
+	echo -e " in PVSD Config Repository." | tee -a $LOG
+fi
 
-cd "$adara_config"
+cd "${adara_config}/"
 
 pwd | tee -a $LOG
 
@@ -1842,7 +1934,11 @@ else
 	need_sms_subdir=1
 fi
 
-deploy_history="$INSTALL_BASE/$CONFIG/$deploy_history_base"
+if [[ ${DAS} == "2" ]]; then
+	deploy_history="${INSTALL_BASE}/${CONFIG}/$deploy_history_base"
+elif [[ ${DAS} == "3" ]]; then
+	deploy_history="${PVSD_CONFIG}/$deploy_history_base"
+fi
 
 # Make sure SMS Sub-Directory exists for Deployment History, as needed...
 
@@ -1854,9 +1950,9 @@ if [ $need_sms_subdir == 1 ]; then
 
 		echo -e "Creating SMS Config Sub-Directory:\n" \
 			| tee -a $LOG
-		echo "   $adara_config/sms" | tee -a $LOG
+		echo "   ${adara_config}/sms" | tee -a $LOG
 
-		mkdir -p "$adara_config/sms" |& tee -a $LOG
+		mkdir -p "${adara_config}/sms" |& tee -a $LOG
 
 		mkdir_ok=$?
 
@@ -1870,7 +1966,7 @@ if [ $need_sms_subdir == 1 ]; then
 
 		echo -e "\nNew SMS Config Sub-Directory to Commit:\n" | tee -a $LOG
 
-		/bin/ls -ld "$adara_config/sms" |& tee -a $LOG
+		/bin/ls -ld "${adara_config}/sms" |& tee -a $LOG
 		echo | tee -a $LOG
 
 		echo "git add sms" | tee -a $LOG
@@ -1897,7 +1993,7 @@ fi
 if [ ! -e "$deploy_history" ]; then
 
 	echo -e -n "\nCreating Deployment History File " | tee -a $LOG
-	echo "for $HOST_TYPE $install_branch." | tee -a $LOG
+	echo "for ${HOST_TYPE} $install_branch." | tee -a $LOG
 	echo -e "\n   $deploy_history\n" | tee -a $LOG
 
 	echo -e "\nADARA $PROG Deployment History ($install_branch)" \
@@ -1913,7 +2009,7 @@ if [ ! -e "$deploy_history" ]; then
 		exit -39
 	fi
 
-	echo -e "$CONFIG_LINE\n" >> "$deploy_history"
+	echo -e "${CONFIG_LINE}\n" >> "$deploy_history"
 
 	echo "git add $deploy_history_base" | tee -a $LOG
 	git add "$deploy_history_base" |& tee -a $LOG
@@ -1954,7 +2050,7 @@ sleep 3
 echo -e "\nAppending Current Deployment to History File:\n" | tee -a $LOG
 echo -e "   $deploy_history\n" | tee -a $LOG
 
-echo -e "$CONFIG_LINE\n" | tee -a $LOG
+echo -e "${CONFIG_LINE}\n" | tee -a $LOG
 
 date | tee -a $LOG
 date >> "$deploy_history"
@@ -1966,9 +2062,9 @@ echo "ADARA/$PROG Deployment by User: $gcos ($userid)." | tee -a $LOG
 echo "ADARA/$PROG Deployment by User: $gcos ($userid)." \
 	>> "$deploy_history"
 
-echo "$HOST_TYPE $install_branch on Host $install_host" | tee -a $LOG
-echo \
-	"$HOST_TYPE $install_branch on Host $install_host" >> "$deploy_history"
+echo "${HOST_TYPE} $install_branch on Host $install_host" | tee -a $LOG
+echo -n "${HOST_TYPE} $install_branch" >> "$deploy_history"
+echo " on Host $install_host" >> "$deploy_history"
 
 echo "Using ADARA Git Repository = $adara_repo" | tee -a $LOG
 echo "Using ADARA Git Repository = $adara_repo" >> "$deploy_history"
@@ -2009,8 +2105,8 @@ echo -e "   $adara_current\n" >> "$deploy_history"
 /bin/ls -l "$adara_current"/ |& tee -a $LOG
 /bin/ls -l "$adara_current"/ >> "$deploy_history"
 
-echo -e "\n$CONFIG_LINE\n" | tee -a $LOG
-echo -e "\n$CONFIG_LINE\n" >> "$deploy_history"
+echo -e "\n${CONFIG_LINE}\n" | tee -a $LOG
+echo -e "\n${CONFIG_LINE}\n" >> "$deploy_history"
 
 # Commit Current Deployment History Additions to Git
 
