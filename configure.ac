@@ -38,7 +38,7 @@ AS_IF([test "x$enable_sms" != "xno"], [
 				enable_liblog4cxx=yes
 			], [
 			enable_sms=no
-			AC_WARN(Disabling SMS due to missing dependencies)
+			AC_WARN(Disabling SMS due to missing Log4Cpp/Cxx dependencies)
 		])
 	])
 ])
