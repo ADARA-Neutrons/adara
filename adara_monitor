@@ -155,9 +155,11 @@ DO_SUMMARY()
 	# Note: Touch Marker File *Before* Creating the Summary, So We
 	# Don't Clear Any New Error Logs from _During_ the Summary...! ;-D
 	touch "${CACHE_DIR}/${PREVIOUS}"
+	chmod g+w "${CACHE_DIR}/${PREVIOUS}"
 
 	# Start New Summary...
 	touch "${CACHE_DIR}/${SUMMARY}"
+	chmod g+w "${CACHE_DIR}/${SUMMARY}"
 
 	echo
 
