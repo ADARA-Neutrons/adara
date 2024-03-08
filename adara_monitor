@@ -138,6 +138,8 @@ SUMMARY="AdaraMonitorSummary.$$.log"
 
 PREVIOUS="AdaraMonitorPreviousMarker.$$.marker"
 
+PREVIOUS_Existing="no"
+
 ##
 ## Functions:
 ##
@@ -155,7 +157,11 @@ DO_SUMMARY()
 	# Note: Touch Marker File *Before* Creating the Summary, So We
 	# Don't Clear Any New Error Logs from _During_ the Summary...! ;-D
 	touch "${CACHE_DIR}/${PREVIOUS}"
-	chmod g+w "${CACHE_DIR}/${PREVIOUS}"
+
+	# Make "Previous" Breadcrumb Group Readable, As Needed... ;-D
+	if [[ ${PREVIOUS_Existing} == "no" ]]; then
+		chmod g+w "${CACHE_DIR}/${PREVIOUS}"
+	fi
 
 	# Start New Summary...
 	touch "${CACHE_DIR}/${SUMMARY}"
@@ -343,6 +349,8 @@ DO_CONNECT()
 	fi
 
 	PREVIOUS="AdaraMonitorPreviousMarker.${_connPid}.marker"
+
+	PREVIOUS_Existing="yes"
 
 	echo -e "\nConnected to ADARA Monitor PID=[${_connPid}]:"
 	echo -e "\n   SUMMARY=[${SUMMARY}]"
