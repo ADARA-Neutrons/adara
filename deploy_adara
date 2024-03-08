@@ -19,7 +19,7 @@
 #     (or in DAS 3.0 in the Beamline Inst "PVSD Config" Sub-Repo:
 #         /home/controls/inst/$BEAMLINE/pvsd/$BRANCH
 #     which when "Selected" is soft-linked into the Beamline Hostinfo Repo:
-#         /home/controls/common/hostinfo/$BEAMLINE/config/pvsd@
+#         /home/controls/common/hostinfo/$BEAMLINE/config/[smsd|pvsd]@
 #     As of Version 1.8.1, this deployment script handles this difference
 #     automagically. :-)
 #      -> determine which Beamline/STC Host we are on...
@@ -190,6 +190,8 @@ WAIT="-w 9"
 HOME_CONTROLS="/home/controls"
 
 HOSTINFO="${HOME_CONTROLS}/common/hostinfo"
+
+SMSD_CONFIG="${HOSTINFO}/${BEAMLINE}/config/smsd"
 
 PVSD_CONFIG="${HOSTINFO}/${BEAMLINE}/config/pvsd"
 
@@ -392,11 +394,22 @@ fi
 #
 
 DAS="2"
-if [[ -L ${PVSD_CONFIG} ]]; then
-	echo -e "\nFound a DAS 3.0 PVSD Configuration Soft Link:\n"
-	/bin/ls -l "${PVSD_CONFIG}"
-	echo -e "\nProceeding with DAS 3.0 Deployment Handling."
-	DAS="3"
+if [ $IS_PVSD == 1 ]; then
+	if [[ -L ${PVSD_CONFIG} ]]; then
+		echo -e "\nFound a DAS 3.0 PVSD Configuration Soft Link:\n"
+		/bin/ls -l "${PVSD_CONFIG}"
+		echo -e "\nProceeding with DAS 3.0 Deployment Handling."
+		ADARA_CONFIG=${PVSD_CONFIG}
+		DAS="3"
+	fi
+else
+	if [[ -L ${SMSD_CONFIG} ]]; then
+		echo -e "\nFound a DAS 3.0 SMSD Configuration Soft Link:\n"
+		/bin/ls -l "${SMSD_CONFIG}"
+		echo -e "\nProceeding with DAS 3.0 Deployment Handling."
+		ADARA_CONFIG=${SMSD_CONFIG}
+		DAS="3"
+	fi
 fi
 
 echo -e -n "\nInstalling ADARA/$PROG " | tee -a $LOG
@@ -1653,11 +1666,11 @@ if [[ ${DAS} == "2" ]]; then
 
 elif [[ ${DAS} == "3" ]]; then
 
-	# Set PVSD Config repository path
-	adara_config="${PVSD_CONFIG}"
+	# Set ADARA Config repository path
+	adara_config="${ADARA_CONFIG}"
 
 	# Set ADARA current working directory
-	adara_current="${PVSD_CONFIG}/deploy"
+	adara_current="${ADARA_CONFIG}/deploy"
 
 	# Make sure the Proper Beamline/STC Repository is checked out
 
@@ -1937,7 +1950,7 @@ fi
 if [[ ${DAS} == "2" ]]; then
 	deploy_history="${INSTALL_BASE}/${CONFIG}/$deploy_history_base"
 elif [[ ${DAS} == "3" ]]; then
-	deploy_history="${PVSD_CONFIG}/$deploy_history_base"
+	deploy_history="${ADARA_CONFIG}/$deploy_history_base"
 fi
 
 # Make sure SMS Sub-Directory exists for Deployment History, as needed...
