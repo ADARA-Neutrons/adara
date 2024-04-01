@@ -51,7 +51,9 @@ MKNOD="/usr/bin/mknod"
 CRITICAL_MSGS="criticalMessages"
 SNSLOCAL="/SNSlocal"
 RSYSLOG_CACHE="${SNSLOCAL}/rsyslog.cache"
-ADARA_BINARIES="/home/controls/config-daq1${ALT}/deploy"
+# Note: Always Use Non-ALT ADARA Deploy Directory,
+# We Don't Separately Deploy for SMSD-MON... ;-)
+ADARA_BINARIES="/home/controls/config-daq1/deploy"
 ADARA_LINKS="/usr/local/bin"
 ACCEL_TIMING="/home/controls/Accelerator"
 ACCEL_TIMING_REPO="git+ssh://trac.sns.gov/var/repos/Accelerator"
@@ -451,15 +453,19 @@ CONFCK()
 		echo "Directories/Files are the Same."
 	fi
 
-	# Also Check/Copy the Mantid IDF (geometry.xml) into:
-	#    /home/controls/${BEAMLINE}/
-	DIFF_FILE "Mantid IDF/Geometry.XML File" "Deployed" \
-		./sms${ALT}/conf/geometry.xml /home/controls/${BEAMLINE}/geometry.xml
-	if [ $? != 0 ]; then
-		echo "Files Differed...!"
-		(( _nerrors++ ))
-	else
-		echo "Files are the Same."
+	# Only for Primary SMSD Deployment, _Not_ for SMSD-MON, etc...
+	if [[ -z ${ALT} ]]; then
+		# Also Check/Copy the Mantid IDF (geometry.xml) into:
+		#    /home/controls/${BEAMLINE}/
+		DIFF_FILE "Mantid IDF/Geometry.XML File" "Deployed" \
+			./sms/conf/geometry.xml \
+			/home/controls/${BEAMLINE}/geometry.xml
+		if [ $? != 0 ]; then
+			echo "Files Differed...!"
+			(( _nerrors++ ))
+		else
+			echo "Files are the Same."
+		fi
 	fi
 
 	# Deprecated SysV Startup File...
