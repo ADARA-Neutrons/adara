@@ -193,18 +193,25 @@ CHECK_BEAMLINE_XML_DIFF_ORIGIN()
 	# Determine Checked Out Branch for Remote/Origin Comparison...
 	local _branch=`git branch -a | grep "^* " | awk '{print $2}'`
 	local _status=$?
+	local _branch_err=""
 	if [[ "${_status}" != 0 ]]; then
 		_err="${_status}"
+		_branch_err="Error Determining Current Beamline Branch...!"
+		_branch_err="${_branch_err} Defer to \'master\'..."
 		# Defer to "master" Branch...
 		_branch="master"
 	fi
 	origin_branch="${_branch}"
 
 	# Now Check the Given Branch at the Remote/Origin...
-	git diff origin/${_branch} ${BEAMLINE_XML}
+	git diff origin/${origin_branch} ${BEAMLINE_XML}
 	local _status=$?
 	if [[ "${_status}" != 0 ]]; then
 		_err="${_status}"
+		if [[ -n "${_branch_err}" ]]; then
+			echo -e "\n${_branch_err}"
+		fi
+		echo -e "\nLocal Branch \"${origin_branch}\" Differs from Origin."
 	fi
 
 	return "${_err}"
@@ -234,8 +241,7 @@ CHECK_BEAMLINE_XML()
 		_err="${_status}"
 	fi
 	if [[ "${diffCkOrigin}" != "${diffCk}" ]]; then
-		echo -e -n "\nCommitted Local Changes Not Yet Pushed to Origin"
-		echo -e " (Branch \"${origin_branch}\"):\n"
+		echo -e "\nCommitted Local Changes Not Yet Pushed to Origin:"
 		echo "${diffCkOrigin}"
 	fi
 
