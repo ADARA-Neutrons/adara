@@ -285,6 +285,12 @@ else
 	HOST_PREFIX="bl"
 fi
 
+if [[ -n "${REDHAT}" ]]; then
+	echo -e "\nDeploying on a ${REDHAT} System." | tee -a $LOG
+else
+	echo -e "\nNot Deploying on a RedHat System." | tee -a $LOG
+fi
+
 # Determine the Beamline/STC Branch associated with this computer system
 
 # Note: ${CONFIG} Branch is Unused in DAS 3.0
