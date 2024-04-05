@@ -29,6 +29,23 @@
 #
 
 #
+# RedHat Deployment Notes - 4/5/2024
+#
+# We are transitioning all the DAQ1 Beamline Computers to RHel9 Now,
+# Building/Running with the Latest EPICS7 and PCAS Libraries,
+# but are leaving the DASSRV1 Systems on RHel7 for now,
+# so _Temporarily_ we will have *Both* EPICS3/RHel7 and EPICS7/RHel9
+# Coexisting on the Same /home/controls/ mounts for a while... ;-D
+#
+# Therefore, This Script Now Expects a ${REDHAT} Environment Variable:
+#
+#    - "RedHat7" or "RedHat9"
+#
+# When Set, This Will Skew the Selection of EPICS3 vs EPICS7/PCAS
+# for the build. ;-D
+# 
+
+#
 # What are we actually Deploying...? (Check Command Line Options... :-)
 #
 
@@ -162,7 +179,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.8.1"
+DEPLOY_VERSION="1.8.2"
 
 TMP_DIR="/tmp"
 
@@ -954,7 +971,7 @@ if [ $need_build == 1 ]; then
 	WITH_EPICS=""
 
 	# Is there an EPICS3 Deployment Link...?
-	if [[ -L "${EPICS_BASE}" ]]; then
+	if [[ -L "${EPICS_BASE}" && "${REDHAT}" != "RedHat9" ]]; then
 
 		# Resolve Production EPICS3 Deployment Link... (Use Direct Path)
 		epics_base=`/usr/bin/readlink -f ${EPICS_BASE}`
@@ -997,7 +1014,7 @@ if [ $need_build == 1 ]; then
 	fi
 
 	# Is there an EPICS7 Deployment Link...?
-	if [[ -L "${EPICS7_BASE}" ]]; then
+	if [[ -L "${EPICS7_BASE}" && "${REDHAT}" != "RedHat7" ]]; then
 
 		# Resolve Production EPICS7 Deployment Link... (Use Direct Path)
 		epics7_base=`/usr/bin/readlink -f ${EPICS7_BASE}`
@@ -1040,7 +1057,7 @@ if [ $need_build == 1 ]; then
 	fi
 
 	# Is there a PCAS Deployment Link...?
-	if [[ -L "${EPICS_PCAS}" ]]; then
+	if [[ -L "${EPICS_PCAS}" && "${REDHAT}" != "RedHat7" ]]; then
 
 		# Resolve Production PCAS Deployment Link... (Use Direct Path)
 		epics_pcas=`/usr/bin/readlink -f ${EPICS_PCAS}`
