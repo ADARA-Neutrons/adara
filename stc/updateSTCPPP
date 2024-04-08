@@ -7,7 +7,7 @@
 STC_DEVEL="/TESTING/SNS/stcdata_devel"
 STC_HFIR="/HFIR/stcdata_hfir"
 
-STC_SSH="ssh -AY stc1.ornl.gov"
+STC_SSH="ssh -AY stc4.ornl.gov"
 #STC_SSH="ssh -AY stc2.ornl.gov"
 #STC_SSH="ssh -AY stc3.ornl.gov"
 
