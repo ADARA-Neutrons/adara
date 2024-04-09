@@ -562,6 +562,11 @@ for dir in ${DIRS} ; do
 
 			LAST_RUN_ADD_END=1
 
+			echo "${ADARA_ADD_RUN_END} --inst=$INST --facility=${FACILITY} \
+				${STC_HOST} ${STC_SERVICE} \
+				--stc_port=${STC_PORT} \
+				${SMS_DATA_OPT} --run=${run}"
+
 			${ADARA_ADD_RUN_END} --inst=$INST --facility=${FACILITY} \
 				${STC_HOST} ${STC_SERVICE} \
 				--stc_port=${STC_PORT} \
