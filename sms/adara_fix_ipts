@@ -807,7 +807,7 @@ RESUBMIT_RUN()
 			"Update the Catalog to Remove the Original Data File Location"
 		_ckrmoldcat=$?
 	else
-		_ckrmoldcat=1		# Default to *Updating* the Catalog...
+		_ckrmoldcat=0		# Default to *Updating* the Catalog...
 	fi
 
 	# Did We Already Update the Catalog to Remove the Original Data File?
