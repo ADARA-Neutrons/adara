@@ -72,6 +72,16 @@ set -o pipefail
 # Initialize Log File...
 LOG=""
 
+# Set the Magic HOSTNAME Macro(s)...
+# - in a perfect world, they would just be "hostname -A" and "hostname",
+# as long as "hostname" produces a fully-qualified host name.
+# Either way, we should be good, as needed... ;-D
+
+HOSTNAME_A="hostname -A"
+#HOSTNAME_A="hostname"
+
+HOSTNAME="hostname"
+
 # Check Proceed Function
 CHECK_PROCEED()
 {
@@ -179,7 +189,7 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.8.2"
+DEPLOY_VERSION="1.8.3"
 
 TMP_DIR="/tmp"
 
@@ -243,20 +253,20 @@ echo -e "\nDeploying User: $gcos ($userid)." | tee -a $LOG
 # Determine if Installing on SNS or HFIR facility computer system...
 HOST_PREFIX=""
 
-hfir_hb_ck=`hostname -A | sed 's/ /\n/g' | grep '^hb' \
+hfir_hb_ck=`${HOSTNAME_A} | sed 's/ /\n/g' | grep '^hb' \
 	| wc | awk '{print $1}'`
 
-hfir_cg_ck=`hostname -A | sed 's/ /\n/g' | grep '^cg' \
+hfir_cg_ck=`${HOSTNAME_A} | sed 's/ /\n/g' | grep '^cg' \
 	| wc | awk '{print $1}'`
 
 # STC New VM Host Names: stc[123].ornl.gov
-stc_ck=`hostname -A | sed 's/ /\n/g' | grep -e '^stc' \
+stc_ck=`${HOSTNAME_A} | sed 's/ /\n/g' | grep -e '^stc' \
 	| wc | awk '{print $1}'`
 # STC Old Host Names: sns-stc[12].sns.gov [REMOVE ME LATER] 
-stc_old_ck=`hostname -A | sed 's/ /\n/g' | grep -e '^sns' \
+stc_old_ck=`${HOSTNAME_A} | sed 's/ /\n/g' | grep -e '^sns' \
 	| wc | awk '{print $1}'`
 
-now_ck=`hostname -A | sed 's/ /\n/g' | grep 'now[0-9]' \
+now_ck=`${HOSTNAME_A} | sed 's/ /\n/g' | grep 'now[0-9]' \
 	| wc | awk '{print $1}'`
 
 if [[ $hfir_hb_ck != 0 ]]; then
@@ -299,7 +309,7 @@ CONFIG="config"
 PV_PREFIX=""
 
 if [ $IS_STC == 1 ]; then
-	install_host=`hostname`
+	install_host=`${HOSTNAME}`
 	install_branch=`echo "$install_host" \
 		| sed -e "s/${HOST_PREFIX}.*-//" -e 's/\..*//'`
 	# Old Physical STC Servers [REMOVE ME LATER]
@@ -317,14 +327,14 @@ if [ $IS_STC == 1 ]; then
 	fi
 	HOST_TYPE="STC"
 elif [ $IS_PVSD == 1 ]; then
-	install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
+	install_host=`${HOSTNAME_A} | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
 		| head -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
 	install_suffix=`echo "$install_host" | sed 's/\..*//' \
 		| sed "s/${HOST_PREFIX}.*-//"`
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
 	if [[ -z $install_host || -z $install_branch ]]; then
-		install_host=`hostname`
+		install_host=`${HOSTNAME}`
 		install_branch=`echo "$install_host" | sed 's/\..*//'`
 		install_suffix="dassrv1"
 	fi
@@ -371,20 +381,20 @@ elif [ $IS_PVSD == 1 ]; then
 elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
 	# Don't Munge nED-on-Wheels Install... ;-D
 	if [[ $now_ck != 0 ]]; then
-		install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
+		install_host=`${HOSTNAME_A} | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
 			| head -1`
 		install_branch=`echo "$install_host" | sed 's/-.*//'`
 		install_suffix=`echo "$install_host" | sed 's/\..*//' \
 			| sed "s/${HOST_PREFIX}.*-//"`
 	else
-		install_host=`hostname -A | sed 's/ /\n/g' | grep 'dasmon' | head -1`
+		install_host=`${HOSTNAME_A} | sed 's/ /\n/g' | grep 'dasmon' | head -1`
 		install_branch=`echo "$install_host" | sed 's/-.*//'`
 		install_suffix=`echo "$install_host" | sed 's/\..*//' \
 			| sed "s/${install_branch}-//"`
 	fi
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
 	if [[ -z $install_host || -z $install_branch ]]; then
-		install_host=`hostname`
+		install_host=`${HOSTNAME}`
 		install_branch=`echo "$install_host" | sed 's/\..*//'`
 		install_suffix="dasmon"
 	fi
@@ -394,14 +404,14 @@ elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
 	fi
 	HOST_TYPE="DASMON"
 else
-	install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
+	install_host=`${HOSTNAME_A} | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
 		| head -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
 	install_suffix=`echo "$install_host" | sed 's/\..*//' \
 		| sed "s/${HOST_PREFIX}.*-//"`
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
 	if [[ -z $install_host || -z $install_branch ]]; then
-		install_host=`hostname`
+		install_host=`${HOSTNAME}`
 		install_branch=`echo "$install_host" | sed 's/\..*//'`
 	fi
 	if [[ "#$install_suffix#" != '##' \
