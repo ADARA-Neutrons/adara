@@ -45,15 +45,17 @@ int main()
 	attrs[1] = NULL;
 
 	// Search for Each User in Turn...
+	int err;
 	int j;
 	for ( j=0; j < 3 ; j++ )
 	{
 		// Search LDAP Server for User ID
-		if ( ldap_search_ext_s(ld, base, LDAP_SCOPE_SUBTREE, filter[j],
-				(char **)attrs, 0, NULL, NULL, NULL, LDAP_NO_LIMIT, &msg)
+		if ( (err=ldap_search_ext_s(ld, base, LDAP_SCOPE_SUBTREE, filter[j],
+				(char **)attrs, 0, NULL, NULL, NULL, LDAP_NO_LIMIT, &msg))
 					!= LDAP_SUCCESS)
 		{
-			ldap_perror( ld, "ldap_search_s" );
+			fprintf( stderr, "\nError in ldap_search_s(): %s\n",
+				ldap_err2string(err) );
 		}
 		printf( "Searched LDAP Server for filter[%d]=%s\n", j, filter[j] );
 
@@ -85,9 +87,10 @@ int main()
 	}
 
 	// End Session with LDAP Server
-	result = ldap_unbind_s(ld);
+	result = ldap_unbind_ext_s(ld, NULL, NULL);
 	if ( result != 0 ) {
-		fprintf( stderr, "ldap_unbind_s: %s\n", ldap_err2string(result) );
+		fprintf( stderr, "ldap_unbind_ext_s: %s\n",
+			ldap_err2string(result) );
 		return( -1 );
 	}
 	printf( "Ended Session with LDAP Server.\n" );
