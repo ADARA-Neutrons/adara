@@ -787,49 +787,102 @@ PVSD_CONFCK()
 		echo "Files are the Same."
 	fi
 
+	# Deprecated SystemV ChkConfig Usage, Now Using SystemD SystemCtl...
+
+	#echo
+	#echo "Comparing Saved ChkConfig PVSD ADARA Config to System:"
+	#echo
+
+	#local _check_update=0
+	#chkconfig --list pvsd > /tmp/chkconfig.pvsd.$$ 2>&1
+	#if [ $? != 0 ]; then
+	#	echo "Failure Retrieving System ChkConfig for PVSD...!"
+	#	_check_update=1
+	#	(( _nerrors++ ))
+	#else
+	#	echo "${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
+	#	${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
+	#	if [ $? != 0 ]; then
+	#		echo "System ChkConfig for PVSD Differed...!"
+	#		_check_update=1
+	#		(( _nerrors++ ))
+	#	else
+	#		echo "System ChkConfig for PVSD is the Same."
+	#	fi
+	#fi
+	#${RM} -f /tmp/chkconfig.pvsd.$$
+	#if [ $? != 0 ]; then
+	#	echo "Failure Deleting Temporary System ChkConfig File for PVSD...!"
+	#	(( _nerrors++ ))
+	#fi
+	## Create PVSD Local Run Level...
+	#if [[ ${_check_update} == 1 ]]; then
+	#	if [[ $UPDATE == 1 ]]; then
+	#		echo -n "Create PVSD Local Run Level? [yes|No] "
+	#		read ckUpdate
+	#		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+	#		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+	#			${SUDO} chkconfig --add pvsd
+	#			chkconfig --list pvsd
+	#			${SUDO} chkconfig pvsd on
+	#			chkconfig --list pvsd
+	#			${RM} -i ./pvsd/chkconfig.pvsd
+	#			chkconfig --list pvsd > ./pvsd/chkconfig.pvsd 2>&1
+	#		fi
+	#	else
+	#		echo -n "*** PVSD Must Be Added to the"
+	#		echo " System ChkConfig Run Level!"
+	#	fi
+	#fi
+
+	# Compare SystemD SystemCtl Enabled...
+
 	echo
-	echo "Comparing Saved ChkConfig PVSD ADARA Config to System:"
+	echo "Comparing Saved SystemCtl ADARA PVSD Enabled to System:"
 	echo
 
 	local _check_update=0
-	chkconfig --list pvsd > /tmp/chkconfig.pvsd.$$ 2>&1
+	${SYSTEMCTL} is-enabled pvsd \
+		> /tmp/systemctl.enabled.pvsd.$$ 2>&1
 	if [ $? != 0 ]; then
-		echo "Failure Retrieving System ChkConfig for PVSD...!"
+		echo "Failure Retrieving SystemCtl Enabled for PVSD...!"
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo "${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
-		${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
+		echo -n "${DIFF} ./pvsd/systemctl.enabled.pvsd"
+		echo " /tmp/systemctl.enabled.pvsd.$$"
+		${DIFF} ./pvsd/systemctl.enabled.pvsd \
+			/tmp/systemctl.enabled.pvsd.$$
 		if [ $? != 0 ]; then
-			echo "System ChkConfig for PVSD Differed...!"
+			echo "SystemCtl Enabled for PVSD Differed...!"
 			_check_update=1
 			(( _nerrors++ ))
 		else
-			echo "System ChkConfig for PVSD is the Same."
+			echo "SystemCtl Enabled for PVSD is the Same."
 		fi
 	fi
-	${RM} -f /tmp/chkconfig.pvsd.$$
+	${RM} -f /tmp/systemctl.enabled.pvsd.$$
 	if [ $? != 0 ]; then
-		echo "Failure Deleting Temporary System ChkConfig File for PVSD...!"
+		echo \
+		"Failure Deleting Temporary SystemCtl Enabled File for PVSD!"
 		(( _nerrors++ ))
 	fi
-	# Create PVSD Local Run Level...
+	# Enable PVSD Local Run Level...
 	if [[ ${_check_update} == 1 ]]; then
 		if [[ $UPDATE == 1 ]]; then
-			echo -n "Create PVSD Local Run Level? [yes|No] "
+			echo -n "Enable PVSD Local Run Level? [yes|No] "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-				${SUDO} chkconfig --add pvsd
-				chkconfig --list pvsd
-				${SUDO} chkconfig pvsd on
-				chkconfig --list pvsd
-				${RM} -i ./pvsd/chkconfig.pvsd
-				chkconfig --list pvsd > ./pvsd/chkconfig.pvsd 2>&1
+				${SUDO} ${SYSTEMCTL} enable pvsd
+				${SYSTEMCTL} is-enabled pvsd
+				${RM} -i ./pvsd/systemctl.enabled.pvsd
+				${SYSTEMCTL} is-enabled pvsd \
+					> ./pvsd/systemctl.enabled.pvsd 2>&1
 			fi
 		else
 			echo -n "*** PVSD Must Be Added to the"
-			echo " System ChkConfig Run Level!"
+			echo " SystemCtl Enabled Run Level!"
 		fi
 	fi
 
