@@ -964,13 +964,14 @@ CONFIG_DIFF_DIR()
 			echo -e "Ignoring dasmon.deployment.history.txt.\n"
 		elif [ "${_file}" == "stat_list" ]; then
 			echo -e "Ignoring Stat List File: stat_list.\n"
+		elif [ "${_file}" == "$USER.crontab" ]; then
+			echo -e "Ignoring ADARA Admin Crontab File: $USER.crontab\n"
 		else
 
 			# File Diff
 
 			echo "${DIFF} ${_file} /${_file}"
 			${DIFF} "${_file}" "/${_file}"
-
 
 			if [ $? != 0 ] ; then
 				diff_cnt=$(( $diff_cnt + 1 ))
