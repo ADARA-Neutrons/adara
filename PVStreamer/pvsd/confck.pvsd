@@ -31,7 +31,7 @@ elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
 fi
 
 # ADARA Git Repo
-if [ -z "$ADARA_DIR" ]; then
+if [[ -z "$ADARA_DIR" ]]; then
 	ADARA_DIR="/usr/local/src/ADARA"
 	#ADARA_DIR="/SNS/users/$USER/gitsrc/ADARA"
 elif [[ $QUIET == 0 ]]; then
