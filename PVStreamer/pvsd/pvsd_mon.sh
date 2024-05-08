@@ -48,7 +48,7 @@ LOG_DIR="${PROG}"
 LOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short.log"
 LOGLOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short-log.log"
 
-PVSD_USER="root"
+PVSD_USER="snsdata"
 PVSD="pvsd"
 
 PVSD_LOG="/var/log/pvsd.log"
