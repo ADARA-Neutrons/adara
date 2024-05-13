@@ -191,6 +191,12 @@ ls -l /home/controls/prod/ADARA/Epics* ; \
 	lrwxrwxrwx 1 y8y slowcontrols_developers 52 Apr  5 17:51 /home/controls/prod/ADARA/EpicsExtensionsLink -> /home/controls/prod/epics/extensions/rel1.4_20230825/
 	lrwxrwxrwx 1 y8y slowcontrols_developers 50 Apr  5 13:19 /home/controls/prod/ADARA/EpicsPcasLink -> /home/controls/prod/common/pcas/rel4.13.3_20240201/
 
+As needed, to remove old soft links:
+
+/bin/rm /home/controls/prod/ADARA/Epics*
+
+Then:
+
 ln -s /home/controls/prod/common/base/rel7.0.7_20230322 \
 	/home/controls/prod/ADARA/EpicsBase7Link
 
