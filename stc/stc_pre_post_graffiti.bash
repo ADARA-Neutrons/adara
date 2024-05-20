@@ -341,22 +341,6 @@ done
 
 nPVNames="${i}"
 
-# Test GET_NEXUS_ARRAY...
-
-i=0
-
-GET_NEXUS_ARRAY "DASlogs/${PVNames[${i}]}" \
-	Array1 ArraySize1 "Test Array Get"
-
-echo -e "\nArray1 = [${Array1[@]}]"
-
-echo
-for (( i=0 ; i < ArraySize1 ; i++ )) ; do
-	echo "Array1[${i}] = [${Array1[${i}]}]"
-done
-
-echo -e "\nArraySize1 = [${ArraySize1}]"
-
 # Extract Value and Time Arrays for Each PV...
 
 echo -e "\nPVNames[${nPVNames}] Array =\n\n[${PVNames[@]}]\n"
@@ -378,8 +362,6 @@ for (( i=0 ; i < nPVNames ; i++ )) ; do
 	GET_NEXUS_ARRAY "DASlogs/${PVNames[${i}]}/value" \
 		${valueArr} ${valueArrSz} "${PVNames[${i}]} Value Array"
 
-	eval "echo -e \"\\n${valueArr} = [\${${valueArr}[@]}]\""
-
 	eval "size=\${${valueArrSz}}"
 
 	echo -e "\n${valueArrSz} = [${size}]"
@@ -400,8 +382,6 @@ for (( i=0 ; i < nPVNames ; i++ )) ; do
 	GET_NEXUS_ARRAY "DASlogs/${PVNames[${i}]}/time" \
 		${timeArr} ${timeArrSz} "${PVNames[${i}]} Value Array"
 
-	eval "echo -e \"\\n${timeArr} = [\${${timeArr}[@]}]\""
-
 	eval "size=\${${timeArrSz}}"
 
 	echo -e "\n${timeArrSz} = [${size}]"
@@ -411,6 +391,50 @@ for (( i=0 ; i < nPVNames ; i++ )) ; do
 		eval "echo \"${timeArr}[${j}] = [\${${timeArr}[${j}]}]\""
 	done
 
+done
+
+# Capture Scan Index (SpICE "Point") Value and Time Arrays...
+
+echo -e "\nCapturing Scan Index Value and Time Arrays..."
+
+# Scan Index Value Array...
+
+valueArr="ScanIndexValueArr"
+eval "declare -A ${valueArr}"
+
+valueArrSz="ScanIndexValueArrSize"
+eval "declare -A ${valueArrSz}"
+
+GET_NEXUS_ARRAY "DASlogs/scan_index/value" \
+	${valueArr} ${valueArrSz} "Scan Index Value Array"
+
+eval "size=\${${valueArrSz}}"
+
+echo -e "\n${valueArrSz} = [${size}]"
+
+echo
+for (( j=0 ; j < size ; j++ )) ; do
+	eval "echo \"${valueArr}[${j}] = [\${${valueArr}[${j}]}]\""
+done
+
+# Scan Index Time Array...
+
+timeArr="ScanIndexTimeArr"
+eval "declare -A ${timeArr}"
+
+timeArrSz="ScanIndexTimeArrSize"
+eval "declare -A ${timeArrSz}"
+
+GET_NEXUS_ARRAY "DASlogs/scan_index/time" \
+	${timeArr} ${timeArrSz} "Scan Index Value Array"
+
+eval "size=\${${timeArrSz}}"
+
+echo -e "\n${timeArrSz} = [${size}]"
+
+echo
+for (( j=0 ; j < size ; j++ )) ; do
+	eval "echo \"${timeArr}[${j}] = [\${${timeArr}[${j}]}]\""
 done
 
 #
@@ -610,7 +634,7 @@ for (( pt=0 ; pt < num ; pt++ )) ; do
 
 			eval "time=\${${timeArr}[${pt}]}"
 
-			printf " %12d" "${time}" >> "${scratch}"
+			printf " %12g" "${time}" >> "${scratch}"
 
 		else
 			printf " %12s" "" >> "${scratch}"
