@@ -11,6 +11,7 @@ GREP="/usr/bin/grep"
 AWK="/usr/bin/awk"
 CAT="/usr/bin/cat"
 SED="/usr/bin/sed"
+BC="/usr/bin/bc"
 LS="/usr/bin/ls"
 MV="/usr/bin/mv"
 RM="/usr/bin/rm"
@@ -242,6 +243,46 @@ GET_TIME()
 	echo "${_time}"
 }
 
+FLOAT_COMPARE()
+{
+	local _fv1="$1"
+	shift
+
+	local _fv2="$1"
+	shift
+
+	local _debug="$1"
+	shift
+
+	diff=`echo "${_fv1} - ${_fv2}" | ${BC}`
+
+	if [[ ${_debug} == "debug" ]]; then
+		echo "FLOAT_COMPARE(): FV1=[${_fv1}] FV2=[${_fv2}] diff=[${diff}]."
+	fi
+
+	# FV1 Less Than FV2...
+	if [[ "${diff:0:1}" == "-" ]]; then
+		if [[ ${_debug} == "debug" ]]; then
+			echo -e "   ${_fv1} LESS THAN ${_fv2}"
+		fi
+		echo "-1"
+		
+	# FV1 Equals FV2...
+	elif [[ "${diff:0:1}" == "0" ]]; then
+		if [[ ${_debug} == "debug" ]]; then
+			echo -e "   ${_fv1} EQUALS ${_fv2}"
+		fi
+		echo "0"
+
+	# FV1 Greater Than FV2 (".dddd" or "d.dddd")
+	else
+		if [[ ${_debug} == "debug" ]]; then
+			echo -e "   ${_fv1} GREATER THAN ${_fv2}"
+		fi
+		echo "1"
+	fi
+}
+
 #
 # Extract Required Header Fields from NeXus...
 #
@@ -255,6 +296,9 @@ run_start_time=`GET_TIME "${start_time}" "Run Start Time"`
 end_time=`GET_NEXUS_STR "end_time" "Run Stop Date and Time"`
 run_stop_date=`GET_DATE "${end_time}" "Run Stop Date"`
 run_stop_time=`GET_TIME "${end_time}" "Run Stop Time"`
+
+# Duration (for No Scan Index Runs, Multi-Column Data Timestamp...)
+duration=`GET_NEXUS_VAL "duration" "Run Duration (Seconds)"`
 
 # Experiment Title
 experiment_title=`GET_NEXUS_STR "experiment_title" "Experiment Title"`
@@ -326,6 +370,8 @@ declare -A PVNames
 
 PVList_clean=`echo "${PVList}" | ${SED} "s/,//g"`
 
+echo
+
 i=0
 
 for pv in ${PVList_clean} ; do
@@ -343,52 +389,52 @@ nPVNames="${i}"
 
 # Extract Value and Time Arrays for Each PV...
 
-echo -e "\nPVNames[${nPVNames}] Array =\n\n[${PVNames[@]}]\n"
+echo -e "\nPVNames[${nPVNames}] Array =\n\n[${PVNames[@]}]"
 
 # Capture Value and Time Array for Each PVName Instance...
 
-for (( i=0 ; i < nPVNames ; i++ )) ; do
+for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
 
-	echo -e "\nPVNames[${i}] = [${PVNames[${i}]}]"
+	echo -e "\nPVNames[${pv}] = [${PVNames[${pv}]}]"
 
 	# Value Array...
 
-	valueArr="PVValueArr${i}"
+	valueArr="PVValueArr${pv}"
 	eval "declare -A ${valueArr}"
 
-	valueArrSz="PVValueArrSize${i}"
+	valueArrSz="PVValueArrSize${pv}"
 	eval "declare -A ${valueArrSz}"
 
-	GET_NEXUS_ARRAY "DASlogs/${PVNames[${i}]}/value" \
-		${valueArr} ${valueArrSz} "${PVNames[${i}]} Value Array"
+	GET_NEXUS_ARRAY "DASlogs/${PVNames[${pv}]}/value" \
+		${valueArr} ${valueArrSz} "${PVNames[${pv}]} Value Array"
 
 	eval "size=\${${valueArrSz}}"
 
 	echo -e "\n${valueArrSz} = [${size}]"
 
 	echo
-	for (( j=0 ; j < size ; j++ )) ; do
-		eval "echo \"${valueArr}[${j}] = [\${${valueArr}[${j}]}]\""
+	for (( v=0 ; v < size ; v++ )) ; do
+		eval "echo \"${valueArr}[${v}] = [\${${valueArr}[${v}]}]\""
 	done
 
 	# Time Array...
 
-	timeArr="PVTimeArr${i}"
+	timeArr="PVTimeArr${pv}"
 	eval "declare -A ${timeArr}"
 
-	timeArrSz="PVTimeArrSize${i}"
+	timeArrSz="PVTimeArrSize${pv}"
 	eval "declare -A ${timeArrSz}"
 
-	GET_NEXUS_ARRAY "DASlogs/${PVNames[${i}]}/time" \
-		${timeArr} ${timeArrSz} "${PVNames[${i}]} Value Array"
+	GET_NEXUS_ARRAY "DASlogs/${PVNames[${pv}]}/time" \
+		${timeArr} ${timeArrSz} "${PVNames[${pv}]} Value Array"
 
 	eval "size=\${${timeArrSz}}"
 
 	echo -e "\n${timeArrSz} = [${size}]"
 
 	echo
-	for (( j=0 ; j < size ; j++ )) ; do
-		eval "echo \"${timeArr}[${j}] = [\${${timeArr}[${j}]}]\""
+	for (( t=0 ; t < size ; t++ )) ; do
+		eval "echo \"${timeArr}[${t}] = [\${${timeArr}[${t}]}]\""
 	done
 
 done
@@ -413,8 +459,8 @@ eval "size=\${${valueArrSz}}"
 echo -e "\n${valueArrSz} = [${size}]"
 
 echo
-for (( j=0 ; j < size ; j++ )) ; do
-	eval "echo \"${valueArr}[${j}] = [\${${valueArr}[${j}]}]\""
+for (( v=0 ; v < size ; v++ )) ; do
+	eval "echo \"${valueArr}[${v}] = [\${${valueArr}[${v}]}]\""
 done
 
 # Scan Index Time Array...
@@ -433,8 +479,8 @@ eval "size=\${${timeArrSz}}"
 echo -e "\n${timeArrSz} = [${size}]"
 
 echo
-for (( j=0 ; j < size ; j++ )) ; do
-	eval "echo \"${timeArr}[${j}] = [\${${timeArr}[${j}]}]\""
+for (( t=0 ; t < size ; t++ )) ; do
+	eval "echo \"${timeArr}[${t}] = [\${${timeArr}[${t}]}]\""
 done
 
 #
@@ -545,106 +591,244 @@ echo "# def_y = ${def_y}" >> "${scratch}"
 
 echo -n "#   Pt." >> "${scratch}"
 
-### Later... printf " %12s" "time" >> "${scratch}"
+printf " %12s" "time" >> "${scratch}"
 
-for (( i=0 ; i < nPVNames ; i++ )) ; do
+for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
 
 	# "Clean" the PVName Path to Eliminate the Cruft...
-	pvname=`echo "${PVNames[${i}]}" \
+	# XXX Yikes This Needs to be the BLXXX Beamline PV Prefix,
+	# _Not_ the Beamline Long Name...! ;-D (Works for "HB3" Only!)
+	pvname=`echo "${PVNames[${pv}]}" \
 		| ${SED} -e "s/${beamline}://" \
 			-e "s/Mot://" \
 			-e "s/.RBV//"`
 
 	printf " %12s" "${pvname}" >> "${scratch}"
 
-	# For Now... ;-D
-	printf " %12s" "(time)" >> "${scratch}"
-
 done
 
 echo >> "${scratch}"
 
-# Determine Max Number of Elements...
+# Step Through Scan Index Time-Series Log and Dump a Line for Each Scan
 
-num=0
+eval "nScan=\${ScanIndexValueArrSize}"
 
-for (( i=0 ; i < nPVNames ; i++ )) ; do
+echo -e "\nFound ${nScan} Scan Index Time-Series Log Value(s)."
 
-	# Value Array...
+scan_index=-1
 
-	valueArrSz="PVValueArrSize${i}"
+last_scan_ts=-1
 
-	eval "size=\${${valueArrSz}}"
+pt=1
 
-	if [[ ${size} -gt ${num} ]]; then
-		num=${size}
-	fi
+for (( scan=0 ; scan < nScan ; scan++ )) ; do
 
-	# Time Array...
+	# Next Scan Index...
 
-	timeArrSz="PVTimeArrSize${i}"
+	eval "index=\${ScanIndexValueArr[${scan}]}"
 
-	eval "size=\${${timeArrSz}}"
+	echo -e "\nScan Index #${scan} = ${index}"
 
-	if [[ ${size} -gt ${num} ]]; then
-		num=${size}
+	# New Scan Start - (Non-Zero) Scan Index...
+
+	if [[ ${index} -gt 0 ]]; then
+
+		# Save Scan Index
+		scan_index=${index}
+
+	# End of Scan (Zero Scan Index Value)
+
+	else
+
+		# Did We Find a Valid Non-Zero Scan Index...?
+		if [[ ${scan_index} -gt 0 ]]; then
+
+			eval "scan_ts=\${ScanIndexTimeArr[${scan}]}"
+
+			echo -e "\nScan Index ${scan_index} Complete at ${scan_ts}."
+
+			#FLOAT_COMPARE ${scan_ts} ${last_scan_ts} "debug"
+
+			scan_ts_cmp=`FLOAT_COMPARE ${scan_ts} ${last_scan_ts}`
+			#echo "scan_ts_cmp=[${scan_ts_cmp}]"
+
+			# New Scan Timestamp is Less Than or Equal to Last...?
+			if [[ ${scan_ts_cmp} -lt 1 ]]; then
+				echo -e -n "\nERROR: Scan Timestamp SAWTOOTH:"
+				echo -e " ${scan_ts} <= ${last_scan_ts}"
+			fi
+
+			# Dump Scan "Point" and Timestamp to Scratch File...
+
+			printf " %6d" "${pt}" >> "${scratch}"
+
+			printf " %12g" "${scan_ts}" >> "${scratch}"
+
+			# Now Go Through All Requested PV Logs and
+			# Snag Latest Value for Time <= Scan Timestamp
+
+			for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
+
+				echo -e "\nDumping Value for ${PVNames[${pv}]} PV:"
+
+				# Get PV's Time Array Size...
+
+				timeArrSz="PVTimeArrSize${pv}"
+
+				eval "size=\${${timeArrSz}}"
+
+				# Walk PV's Time Array...
+
+				valueArr="PVValueArr${pv}"
+
+				timeArr="PVTimeArr${pv}"
+
+				last_ts=-1
+				last_t=-1
+
+				for (( t=0 ; t < size ; t++ )) ; do
+
+					eval "ts=\${${timeArr}[${t}]}"
+
+					#FLOAT_COMPARE ${ts} ${scan_ts} "debug"
+
+					ts_cmp=`FLOAT_COMPARE ${ts} ${scan_ts}`
+					#echo "t=${t} ts_cmp=[${ts_cmp}]"
+
+					# PV Value Timestamp is Less Than Scan End...
+					if [[ ${ts_cmp} -lt 0 ]]; then
+					
+						eval "val=\${${valueArr}[${t}]}"
+
+						echo -e -n "Index ${t}: PV Value [${val}]"
+						echo -e " at Time ${ts} < Scan End ${scan_ts}"
+
+						last_ts="${ts}"
+						last_t="${t}"
+
+					# This PV Value Timestamp is _After_ Scan End,
+					# Use Last PV Value...
+					else
+
+						eval "val=\${${valueArr}[${t}]}"
+
+						echo -e -n "Index ${t}: PV Value [${val}]"
+						echo -e " at Time ${ts} >= Scan End ${scan_ts}"
+						echo -e "Done."
+
+						break
+
+					fi
+
+				done
+
+				# Found a PV Value Before or During Scan
+				if [[ ${last_t} != -1 ]]; then
+
+					# Get PV Value from Array...
+
+					eval "val=\${${valueArr}[${last_t}]}"
+
+					echo -e -n "\nGot PV Value Before/During Scan"
+					echo -e " at Index ${last_t} = [${val}] @ ${last_ts}"
+
+					printf " %12g" "${val}" >> "${scratch}"
+
+				else
+
+					echo -e "\nError: No PV Values Found!"
+
+					printf " %12s" "" >> "${scratch}"
+
+				fi
+
+			done
+
+			# End of Scan "Point" Line...
+			echo >> "${scratch}"
+
+			# Save Last Scan Timestamp
+			last_scan_ts=${scan_ts}
+
+			# Increment Scan "Point" Index...
+			pt=$(( pt + 1 ))
+
+		# No Valid Scan Index (Yet), Ignore...
+		else
+			# First Scan Index...?
+			if [[ ${scan_index} == -1 ]]; then
+				echo -e "\nIgnore First Scan Index of ${index}."
+			# No Intervening Non-Zero Scan Index...?
+			else
+				echo -e "\nWarning: No Intervening Non-Zero Scan Index?"
+				echo -e "\nOr Redundant Scan Index of Zero (${index})."
+			fi
+		fi
+
 	fi
 
 done
 
-echo -e "\nMax Number of Multi-Column Elements = ${num}."
+# Did We Ever Get a Non-Zero Scan Index...?
+# If Not, Then Just Dump a Single Final Scan "Point"
+# With the Last Value for Each PV...
+if [[ ${scan_index} == -1 ]]; then
 
-# For Now Just Dump Time and Value Array for Each PVName Instance...
+	echo -e "\nNo Non-Zero Scan Index Found."
+	echo -e "\nJust Dump Final Scan \"Point\"."
 
-for (( pt=0 ; pt < num ; pt++ )) ; do
+	# Dump Any Final Scan "Point" and Timestamp to Scratch File...
 
-	ptp1=$(( pt + 1 ))
+	printf " %6d" "${pt}" >> "${scratch}"
 
-	printf " %6d" "${ptp1}" >> "${scratch}"
+	# Use Run Duration as Maximum Run Timestamp... ;-D
 
-	for (( i=0 ; i < nPVNames ; i++ )) ; do
+	echo -e "\nUse Run Duration as Maximum Run Timestamp = [${duration}]."
 
-		# Value Array...
+	run_stop_ts="${duration}"
 
-		valueArr="PVValueArr${i}"
+	printf " %12g" "${run_stop_ts}" >> "${scratch}"
 
-		valueArrSz="PVValueArrSize${i}"
+	# Now Go Through All Requested PV Logs and
+	# Snag Last PV Value...
+
+	for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
+
+		echo -e "\nDumping Value for ${PVNames[${pv}]} PV:"
+
+		# Get PV's Value Array Size...
+
+		valueArrSz="PVValueArrSize${pv}"
 
 		eval "size=\${${valueArrSz}}"
 
-		if [[ ${pt} -lt ${size} ]]; then
+		# Get PV Value from Array...
 
-			eval "value=\${${valueArr}[${pt}]}"
+		if [[ ${size} -gt 0 ]]; then
 
-			printf " %12g" "${value}" >> "${scratch}"
+			valueArr="PVValueArr${pv}"
 
-		else
-			printf " %12s" "" >> "${scratch}"
-		fi
+			v=$(( size - 1 ))
 
-		# Time Array...
+			eval "val=\${${valueArr}[${v}]}"
 
-		timeArr="PVTimeArr${i}"
+			echo -e "\nGot Last PV Value [${val}] at Index ${v}."
 
-		timeArrSz="PVTimeArrSize${i}"
-
-		eval "size=\${${timeArrSz}}"
-
-		if [[ ${pt} -lt ${size} ]]; then
-
-			eval "time=\${${timeArr}[${pt}]}"
-
-			printf " %12g" "${time}" >> "${scratch}"
+			printf " %12g" "${val}" >> "${scratch}"
 
 		else
+
+			echo -e "\nError: No PV Values Found!"
+
 			printf " %12s" "" >> "${scratch}"
+
 		fi
 
 	done
 
 	echo >> "${scratch}"
 
-done
+fi
 
 #
 # Dump Graffiti Footer...
