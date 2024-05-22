@@ -42,6 +42,8 @@ local_contact=""
 
 PVList=""
 
+verbose=0
+
 for arg in "$@" ; do
 
 	#echo -e "arg=$arg"
@@ -82,6 +84,9 @@ for arg in "$@" ; do
 	elif [[ "${key}" == "PVList" ]]; then
 		echo "Setting PVList to [${value}]."
 		PVList="${value}"
+	elif [[ "${key}" == "verbose" ]]; then
+		echo "Setting Verbose Mode to [${value}]."
+		verbose="${value}"
 	fi
 
 done
@@ -417,10 +422,12 @@ for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
 
 	echo -e "\n${valueArrSz} = [${size}]"
 
-	echo
-	for (( v=0 ; v < size ; v++ )) ; do
-		eval "echo \"${valueArr}[${v}] = [\${${valueArr}[${v}]}]\""
-	done
+	if [[ ${verbose} -gt 1 ]]; then
+		echo
+		for (( v=0 ; v < size ; v++ )) ; do
+			eval "echo \"${valueArr}[${v}] = [\${${valueArr}[${v}]}]\""
+		done
+	fi
 
 	# Time Array...
 
@@ -437,10 +444,12 @@ for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
 
 	echo -e "\n${timeArrSz} = [${size}]"
 
-	echo
-	for (( t=0 ; t < size ; t++ )) ; do
-		eval "echo \"${timeArr}[${t}] = [\${${timeArr}[${t}]}]\""
-	done
+	if [[ ${verbose} -gt 1 ]]; then
+		echo
+		for (( t=0 ; t < size ; t++ )) ; do
+			eval "echo \"${timeArr}[${t}] = [\${${timeArr}[${t}]}]\""
+		done
+	fi
 
 done
 
@@ -463,10 +472,12 @@ eval "size=\${${valueArrSz}}"
 
 echo -e "\n${valueArrSz} = [${size}]"
 
-echo
-for (( v=0 ; v < size ; v++ )) ; do
-	eval "echo \"${valueArr}[${v}] = [\${${valueArr}[${v}]}]\""
-done
+if [[ ${verbose} -gt 1 ]]; then
+	echo
+	for (( v=0 ; v < size ; v++ )) ; do
+		eval "echo \"${valueArr}[${v}] = [\${${valueArr}[${v}]}]\""
+	done
+fi
 
 # Scan Index Time Array...
 
@@ -483,10 +494,12 @@ eval "size=\${${timeArrSz}}"
 
 echo -e "\n${timeArrSz} = [${size}]"
 
-echo
-for (( t=0 ; t < size ; t++ )) ; do
-	eval "echo \"${timeArr}[${t}] = [\${${timeArr}[${t}]}]\""
-done
+if [[ ${verbose} -gt 1 ]]; then
+	echo
+	for (( t=0 ; t < size ; t++ )) ; do
+		eval "echo \"${timeArr}[${t}] = [\${${timeArr}[${t}]}]\""
+	done
+fi
 
 #
 # Construct Graffiti Data File Path/Name
@@ -710,11 +723,12 @@ for (( scan=0 ; scan < nScan ; scan++ )) ; do
 
 					# PV Value Timestamp is Less Than Scan End...
 					if [[ ${ts_cmp} -lt 0 ]]; then
-					
-						eval "val=\${${valueArr}[${t}]}"
 
-						echo -e -n "Index ${t}: PV Value [${val}]"
-						echo -e " at Time ${ts} < Scan End ${scan_ts}"
+						if [[ ${verbose} -gt 0 ]]; then
+							eval "val=\${${valueArr}[${t}]}"
+							echo -e -n "Index ${t}: PV Value [${val}]"
+							echo -e " at Time ${ts} < Scan End ${scan_ts}"
+						fi
 
 						last_ts="${ts}"
 						last_t="${t}"
@@ -723,11 +737,12 @@ for (( scan=0 ; scan < nScan ; scan++ )) ; do
 					# Use Last PV Value...
 					else
 
-						eval "val=\${${valueArr}[${t}]}"
-
-						echo -e -n "Index ${t}: PV Value [${val}]"
-						echo -e " at Time ${ts} >= Scan End ${scan_ts}"
-						echo -e "Done."
+						if [[ ${verbose} -gt 0 ]]; then
+							eval "val=\${${valueArr}[${t}]}"
+							echo -e -n "Index ${t}: PV Value [${val}]"
+							echo -e " at Time ${ts} >= Scan End ${scan_ts}"
+							echo -e "Done."
+						fi
 
 						break
 
