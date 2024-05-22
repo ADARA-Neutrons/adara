@@ -30,6 +30,7 @@ script=`${BASENAME} "$0"`
 
 facility=""
 beamline=""
+beamline_prefix=""
 ipts=""
 run_number=""
 
@@ -56,6 +57,9 @@ for arg in "$@" ; do
 	elif [[ "${key}" == "beamline" ]]; then
 		echo "Setting Beamline to [${value}]."
 		beamline="${value}"
+	elif [[ "${key}" == "beamline_prefix" ]]; then
+		echo "Setting Beamline Prefix to [${value}]."
+		beamline_prefix="${value}"
 	elif [[ "${key}" == "proposal" ]]; then
 		echo "Setting IPTS Proposal to [${value}]."
 		ipts="${value}"
@@ -101,6 +105,7 @@ echo -e "\nParsed Command Line Parameters:\n"
 
 echo "facility = [${facility}]"
 echo "beamline = [${beamline}]"
+echo "beamline_prefix = [${beamline_prefix}]"
 echo "ipts = [${ipts}]"
 echo "proposal = [${proposal}]"
 echo "run_number = [${run_number}]"
@@ -596,12 +601,20 @@ printf " %12s" "time" >> "${scratch}"
 for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
 
 	# "Clean" the PVName Path to Eliminate the Cruft...
-	# XXX Yikes This Needs to be the BLXXX Beamline PV Prefix,
-	# _Not_ the Beamline Long Name...! ;-D (Works for "HB3" Only!)
-	pvname=`echo "${PVNames[${pv}]}" \
-		| ${SED} -e "s/${beamline}://" \
-			-e "s/Mot://" \
-			-e "s/.RBV//"`
+	# - This Needs to be the BLXXX Beamline PV Prefix,
+	# Probably _Not_ the Beamline Long Name.
+	# (As it happens, this Works for "HB3"! ;-D)
+	if [[ -n ${beamline_prefix} ]]; then
+		pvname=`echo "${PVNames[${pv}]}" \
+			| ${SED} -e "s/${beamline_prefix}://" \
+				-e "s/Mot://" \
+				-e "s/.RBV//"`
+	else
+		pvname=`echo "${PVNames[${pv}]}" \
+			| ${SED} -e "s/${beamline}://" \
+				-e "s/Mot://" \
+				-e "s/.RBV//"`
+	fi
 
 	printf " %12s" "${pvname}" >> "${scratch}"
 
