@@ -317,57 +317,102 @@ experiment_title=`GET_NEXUS_STR "experiment_title" "Experiment Title"`
 experiment_number="No Such Thing in EPICS/ADARA..."
 
 # SpICE Command
-spice_command="TODO What is this?"
+spice_command="Not_Used"
 
 # BuiltIn Command
-builtin_command="TODO What is this?"
+builtin_command="Not_Used"
 
 # Scan (Run) Title
 scan_title=`GET_NEXUS_STR "title" "Scan (Run) Title"`
 
 # Monochromator
-monochromator="TODO What is this?"
+# Type of Monochromator, e.g. pg002, lookup chart... (d-spacing)
+monochromator=`GET_NEXUS_STR "monochromator" "Monochromator"`
 
 # Analyzer
-analyzer="TODO What is this?"
+# TODO Type of Analyzer, choose from drop-down list...
+# Extract from NeXus... (hb3-Galil1)
+analyzer="TODO Type of Analyzer, choose from drop-down list..."
 
 # Sense (Ain't Got None)
-sense="TODO What is this?"
+# Beamline Config, 3 +/- characters concatenated "(+/-,+/-,+/-)"
+sense=""
+monochromator_PlusMinus=`GET_NEXUS_VAL "monochromator_PlusMinus" "Monochromator PlusMinus"`
+if [[ ${monochromator_PlusMinus} == "-1" ]]; then
+	sense="${sense}-"
+else
+	sense="${sense}+"
+fi
+sample_PlusMinus=`GET_NEXUS_VAL "sample_PlusMinus" "Sample PlusMinus"`
+if [[ ${sample_PlusMinus} == "-1" ]]; then
+	sense="${sense}-"
+else
+	sense="${sense}+"
+fi
+analyzer_PlusMinus=`GET_NEXUS_VAL "analyzer_PlusMinus" "Analyzer PlusMinus"`
+if [[ ${analyzer_PlusMinus} == "-1" ]]; then
+	sense="${sense}-"
+else
+	sense="${sense}+"
+fi
 
 # Collimation
+# TODO Beamline Config...
+# Extract from NeXus...
 collimation="TODO What is this?"
 
 # Sample Mosaic
+# TODO Relevant _Only_ for Single Crystal, depends on how good the sample is
+# "spread"... (in degrees/minutes of arc)... ["30.0 minutes")
+# Extract from NeXus...
 samplemosaic="TODO What is this?"
 
 # Lattice Constants
+# TODO Extract Sample Meta-Data from NeXus...
 latticeconstants="TODO Extract Sample Meta-Data from NeXus..."
 
 # UB Matrix
+# TODO Extract UB Matrix from NeXus...
 ubmatrix="TODO Extract UB Matrix from NeXus..."
 
 # Mode
+# TODO Related to "preset", maybe "normal" or -> "0"...?
 mode="TODO What is this?"
 
 # Plane Normal
+# TODO 3-Vector of Real Numbers, Plane Perpendicular to Beamline Plane,
+# Related to UB Matrix... (Maybe Not Used...?)
 plane_normal="TODO What is this?"
 
 # UB Conf
+# TODO Config File Associated with UB Matrix
+# Need to Capture in NeXus and Extract...
 ubconf="TODO What is this?"
 
 # Def X
+# TODO Default Plot X Axis
+# Extract from NeXus...
 def_x="TODO What is this?"
 
 # Def Y
+# TODO Default Plot Y Axis
+# Extract from NeXus...
 def_y="TODO What is this?"
 
 # Total Counts
 total_counts=`GET_NEXUS_VAL "total_counts" "Sum of (Total) Counts"`
 
 # Center of Mass
+# TODO Estimate After Run, Assuming there is a SINGLE Peak
+# - Determined during experiment... _Only_ for Alignment Scan?
+# Single Weighted X Value vs Y Axis... [Including Error Bar]
+# Extract from NeXus...? (Or Omit...?)
 center_of_mass="TODO What is this?"
 
 # Full Width Half Max (With a Twist of Lemon)
+# TODO How wide peak is, Max Value / 2, Difference vs 2 Nearest Peaks...
+# Data Points Updated After Each Point... Keep Last Value...
+# Extract from NeXus...
 full_width_half_max="TODO What is this?"
 
 #
