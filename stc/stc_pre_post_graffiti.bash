@@ -462,9 +462,24 @@ ubmatrix="${ubmatrix},${ubmatrixR3C3fmt}"
 mode="TODO Related to Preset, normal or 0..."
 
 # Plane Normal
-# TODO 3-Vector of Real Numbers, Plane Perpendicular to Beamline Plane,
-# Related to UB Matrix... (Maybe Not Used...?)
-plane_normal="TODO Plane Perpendicular to Beamline Plane..."
+# 3-Vector of Real Numbers, Plane Perpendicular to Beamline Plane,
+# Related to UB Matrix...
+plane_normal=""
+plane_normal_H=`GET_NEXUS_VAL \
+	"DASlogs/PlaneNormalH/value" \
+	"Plane Normal H Value"`
+plane_normal_Hfmt=`printf "%.6f" "${plane_normal_H}"`
+plane_normal="${plane_normal_Hfmt}"
+plane_normal_K=`GET_NEXUS_VAL \
+	"DASlogs/PlaneNormalK/value" \
+	"Plane Normal K Value"`
+plane_normal_Kfmt=`printf "%.6f" "${plane_normal_K}"`
+plane_normal="${plane_normal},${plane_normal_Kfmt}"
+plane_normal_L=`GET_NEXUS_VAL \
+	"DASlogs/PlaneNormalL/value" \
+	"Plane Normal L Value"`
+plane_normal_Lfmt=`printf "%.6f" "${plane_normal_L}"`
+plane_normal="${plane_normal},${plane_normal_Lfmt}"
 
 # UB Conf
 # TODO Config File Associated with UB Matrix
