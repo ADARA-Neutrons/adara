@@ -376,36 +376,86 @@ collimation="TODO Beamline Config..."
 samplemosaic="TODO Single Crystal Only, Spread in degrees/minutes of arc..."
 
 # Lattice Constants
-# TODO Extract Sample Meta-Data from NeXus...
 latticeconstants=""
 latticeA=`GET_NEXUS_VAL \
 	"DASlogs/LatticeA/value" \
 	"Lattice A Constant"`
-latticeconstants="${latticeA}"
+latticeAfmt=`printf "%.6f" "${latticeA}"`
+latticeconstants="${latticeAfmt}"
 latticeB=`GET_NEXUS_VAL \
 	"DASlogs/LatticeB/value" \
 	"Lattice B Constant"`
-latticeconstants="${latticeconstants},${latticeB}"
+latticeBfmt=`printf "%.6f" "${latticeB}"`
+latticeconstants="${latticeconstants},${latticeBfmt}"
 latticeC=`GET_NEXUS_VAL \
 	"DASlogs/LatticeC/value" \
 	"Lattice C Constant"`
-latticeconstants="${latticeconstants},${latticeC}"
+latticeCfmt=`printf "%.6f" "${latticeC}"`
+latticeconstants="${latticeconstants},${latticeCfmt}"
 latticeAlpha=`GET_NEXUS_VAL \
 	"DASlogs/LatticeAlpha/value" \
 	"Lattice Alpha Constant"`
-latticeconstants="${latticeconstants},${latticeAlpha}"
+latticeAlphafmt=`printf "%.6f" "${latticeAlpha}"`
+latticeconstants="${latticeconstants},${latticeAlphafmt}"
 latticeBeta=`GET_NEXUS_VAL \
 	"DASlogs/LatticeBeta/value" \
 	"Lattice Beta Constant"`
-latticeconstants="${latticeconstants},${latticeBeta}"
+latticeBetafmt=`printf "%.6f" "${latticeBeta}"`
+latticeconstants="${latticeconstants},${latticeBetafmt}"
 latticeGamma=`GET_NEXUS_VAL \
 	"DASlogs/LatticeGamma/value" \
 	"Lattice Gamma Constant"`
-latticeconstants="${latticeconstants},${latticeGamma}"
+latticeGammafmt=`printf "%.6f" "${latticeGamma}"`
+latticeconstants="${latticeconstants},${latticeGammafmt}"
 
 # UB Matrix
-# TODO Extract UB Matrix from NeXus...
-ubmatrix="TODO Extract UB Matrix from NeXus..."
+# (Assuming "Row Major" Ordering For Now... ;-D)
+ubmatrix=""
+ubmatrixR1C1=`GET_NEXUS_VAL \
+	"DASlogs/UBMatrixR1C1/value" \
+	"UBMatrix R1C1 Value"`
+ubmatrixR1C1fmt=`printf "%.6f" "${ubmatrixR1C1}"`
+ubmatrix="${ubmatrixR1C1fmt}"
+ubmatrixR1C2=`GET_NEXUS_VAL \
+	"DASlogs/UBMatrixR1C2/value" \
+	"UBMatrix R1C2 Value"`
+ubmatrixR1C2fmt=`printf "%.6f" "${ubmatrixR1C2}"`
+ubmatrix="${ubmatrix},${ubmatrixR1C2fmt}"
+ubmatrixR1C3=`GET_NEXUS_VAL \
+	"DASlogs/UBMatrixR1C3/value" \
+	"UBMatrix R1C3 Value"`
+ubmatrixR1C3fmt=`printf "%.6f" "${ubmatrixR1C3}"`
+ubmatrix="${ubmatrix},${ubmatrixR1C3fmt}"
+ubmatrixR2C1=`GET_NEXUS_VAL \
+	"DASlogs/UBMatrixR2C1/value" \
+	"UBMatrix R2C1 Value"`
+ubmatrixR2C1fmt=`printf "%.6f" "${ubmatrixR2C1}"`
+ubmatrix="${ubmatrix},${ubmatrixR2C1fmt}"
+ubmatrixR2C2=`GET_NEXUS_VAL \
+	"DASlogs/UBMatrixR2C2/value" \
+	"UBMatrix R2C2 Value"`
+ubmatrixR2C2fmt=`printf "%.6f" "${ubmatrixR2C2}"`
+ubmatrix="${ubmatrix},${ubmatrixR2C2fmt}"
+ubmatrixR2C3=`GET_NEXUS_VAL \
+	"DASlogs/UBMatrixR2C3/value" \
+	"UBMatrix R2C3 Value"`
+ubmatrixR2C3fmt=`printf "%.6f" "${ubmatrixR2C3}"`
+ubmatrix="${ubmatrix},${ubmatrixR2C3fmt}"
+ubmatrixR3C1=`GET_NEXUS_VAL \
+	"DASlogs/UBMatrixR3C1/value" \
+	"UBMatrix R3C1 Value"`
+ubmatrixR3C1fmt=`printf "%.6f" "${ubmatrixR3C1}"`
+ubmatrix="${ubmatrix},${ubmatrixR3C1fmt}"
+ubmatrixR3C2=`GET_NEXUS_VAL \
+	"DASlogs/UBMatrixR3C2/value" \
+	"UBMatrix R3C2 Value"`
+ubmatrixR3C2fmt=`printf "%.6f" "${ubmatrixR3C2}"`
+ubmatrix="${ubmatrix},${ubmatrixR3C2fmt}"
+ubmatrixR3C3=`GET_NEXUS_VAL \
+	"DASlogs/UBMatrixR3C3/value" \
+	"UBMatrix R3C3 Value"`
+ubmatrixR3C3fmt=`printf "%.6f" "${ubmatrixR3C3}"`
+ubmatrix="${ubmatrix},${ubmatrixR3C3fmt}"
 
 # Mode
 # TODO Related to "preset", maybe "normal" or -> "0"...?
@@ -686,7 +736,7 @@ echo "# def_y = ${def_y}" >> "${scratch}"
 
 echo -n "#   Pt." >> "${scratch}"
 
-printf " %12s" "time" >> "${scratch}"
+printf " %14s" "time" >> "${scratch}"
 
 for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
 
@@ -706,7 +756,7 @@ for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
 				-e "s/.RBV//"`
 	fi
 
-	printf " %12s" "${pvname}" >> "${scratch}"
+	printf " %14s" "${pvname}" >> "${scratch}"
 
 done
 
@@ -765,7 +815,7 @@ for (( scan=0 ; scan < nScan ; scan++ )) ; do
 
 			printf " %6d" "${pt}" >> "${scratch}"
 
-			printf " %12g" "${scan_ts}" >> "${scratch}"
+			printf " %14.4f" "${scan_ts}" >> "${scratch}"
 
 			# Now Go Through All Requested PV Logs and
 			# Snag Latest Value for Time <= Scan Timestamp
@@ -837,13 +887,13 @@ for (( scan=0 ; scan < nScan ; scan++ )) ; do
 					echo -e -n "\nGot PV Value Before/During Scan"
 					echo -e " at Index ${last_t} = [${val}] @ ${last_ts}"
 
-					printf " %12g" "${val}" >> "${scratch}"
+					printf " %14.4f" "${val}" >> "${scratch}"
 
 				else
 
 					echo -e "\nError: No PV Values Found!"
 
-					printf " %12s" "" >> "${scratch}"
+					printf " %14s" "" >> "${scratch}"
 
 				fi
 
@@ -892,7 +942,7 @@ if [[ ${scan_index} == -1 ]]; then
 
 	run_stop_ts="${duration}"
 
-	printf " %12g" "${run_stop_ts}" >> "${scratch}"
+	printf " %14.4f" "${run_stop_ts}" >> "${scratch}"
 
 	# Now Go Through All Requested PV Logs and
 	# Snag Last PV Value...
@@ -919,13 +969,13 @@ if [[ ${scan_index} == -1 ]]; then
 
 			echo -e "\nGot Last PV Value [${val}] at Index ${v}."
 
-			printf " %12g" "${val}" >> "${scratch}"
+			printf " %14.4f" "${val}" >> "${scratch}"
 
 		else
 
 			echo -e "\nError: No PV Values Found!"
 
-			printf " %12s" "" >> "${scratch}"
+			printf " %14s" "" >> "${scratch}"
 
 		fi
 
