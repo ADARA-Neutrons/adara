@@ -377,7 +377,31 @@ samplemosaic="TODO Single Crystal Only, Spread in degrees/minutes of arc..."
 
 # Lattice Constants
 # TODO Extract Sample Meta-Data from NeXus...
-latticeconstants="TODO Extract Sample Meta-Data from NeXus..."
+latticeconstants=""
+latticeA=`GET_NEXUS_VAL \
+	"DASlogs/LatticeA/value" \
+	"Lattice A Constant"`
+latticeconstants="${latticeA}"
+latticeB=`GET_NEXUS_VAL \
+	"DASlogs/LatticeB/value" \
+	"Lattice B Constant"`
+latticeconstants="${latticeconstants},${latticeB}"
+latticeC=`GET_NEXUS_VAL \
+	"DASlogs/LatticeC/value" \
+	"Lattice C Constant"`
+latticeconstants="${latticeconstants},${latticeC}"
+latticeAlpha=`GET_NEXUS_VAL \
+	"DASlogs/LatticeAlpha/value" \
+	"Lattice Alpha Constant"`
+latticeconstants="${latticeconstants},${latticeAlpha}"
+latticeBeta=`GET_NEXUS_VAL \
+	"DASlogs/LatticeBeta/value" \
+	"Lattice Beta Constant"`
+latticeconstants="${latticeconstants},${latticeBeta}"
+latticeGamma=`GET_NEXUS_VAL \
+	"DASlogs/LatticeGamma/value" \
+	"Lattice Gamma Constant"`
+latticeconstants="${latticeconstants},${latticeGamma}"
 
 # UB Matrix
 # TODO Extract UB Matrix from NeXus...
@@ -415,13 +439,13 @@ total_counts=`GET_NEXUS_VAL "total_counts" "Sum of (Total) Counts"`
 # - Determined during experiment... _Only_ for Alignment Scan?
 # Single Weighted X Value vs Y Axis... [Including Error Bar]
 # Extract from NeXus...? (Or Omit...?)
-center_of_mass="TODO What is this?"
+center_of_mass="TODO Single Weighted X Value vs Y Axis... SINGLE Peak..."
 
 # Full Width Half Max (With a Twist of Lemon)
 # TODO How wide peak is, Max Value / 2, Difference vs 2 Nearest Peaks...
 # Data Points Updated After Each Point... Keep Last Value...
 # Extract from NeXus...
-full_width_half_max="TODO What is this?"
+full_width_half_max="TODO Peak Width, Max Value / 2, Diff vs 2 Nearest..."
 
 #
 # Extract Multi-Column Data Section Arrays...
@@ -597,10 +621,10 @@ echo "# experiment = ${experiment_title}" >> "${scratch}"
 # Experiment Number (There Isn't Any... ;-b)
 echo "# experiment_number = ${experiment_number}" >> "${scratch}"
 
-# (SpICE) Command (What is this? Where is it Stored?)
+# (SpICE) Command (Not Used)
 echo "# command = ${spice_command}" >> "${scratch}"
 
-# Builtin Command (What is this? Where is it Stored?)
+# Builtin Command (Not Used)
 echo "# builtin_command = ${builtin_command}" >> "${scratch}"
 
 # Users
