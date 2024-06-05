@@ -749,6 +749,8 @@ echo "# def_y = ${def_y}" >> "${scratch}"
 
 # Dump Column Labels...
 
+echo "# col_headers = " >> "${scratch}"
+
 echo -n "#   Pt." >> "${scratch}"
 
 printf " %14s" "time" >> "${scratch}"
