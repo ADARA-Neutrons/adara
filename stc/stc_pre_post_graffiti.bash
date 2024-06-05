@@ -327,7 +327,9 @@ scan_title=`GET_NEXUS_STR "title" "Scan (Run) Title"`
 
 # Monochromator
 # Type of Monochromator, e.g. pg002, lookup chart... (d-spacing)
-monochromator=`GET_NEXUS_STR "monochromator" "Monochromator"`
+monochromator=`GET_NEXUS_STR \
+	"DASlogs/monochromator/value_strings" \
+	"Monochromator"`
 
 # Analyzer
 # TODO Type of Analyzer, choose from drop-down list...
@@ -337,19 +339,25 @@ analyzer="TODO Type of Analyzer, choose from drop-down list..."
 # Sense (Ain't Got None)
 # Beamline Config, 3 +/- characters concatenated "(+/-,+/-,+/-)"
 sense=""
-monochromator_PlusMinus=`GET_NEXUS_VAL "monochromator_PlusMinus" "Monochromator PlusMinus"`
+monochromator_PlusMinus=`GET_NEXUS_VAL \
+	"DASlogs/monochromator_PlusMinus/value" \
+	"Monochromator PlusMinus"`
 if [[ ${monochromator_PlusMinus} == "-1" ]]; then
 	sense="${sense}-"
 else
 	sense="${sense}+"
 fi
-sample_PlusMinus=`GET_NEXUS_VAL "sample_PlusMinus" "Sample PlusMinus"`
+sample_PlusMinus=`GET_NEXUS_VAL \
+	"DASlogs/sample_PlusMinus/value" \
+	"Sample PlusMinus"`
 if [[ ${sample_PlusMinus} == "-1" ]]; then
 	sense="${sense}-"
 else
 	sense="${sense}+"
 fi
-analyzer_PlusMinus=`GET_NEXUS_VAL "analyzer_PlusMinus" "Analyzer PlusMinus"`
+analyzer_PlusMinus=`GET_NEXUS_VAL \
+	"DASlogs/analyzer_PlusMinus/value" \
+	"Analyzer PlusMinus"`
 if [[ ${analyzer_PlusMinus} == "-1" ]]; then
 	sense="${sense}-"
 else
@@ -359,13 +367,13 @@ fi
 # Collimation
 # TODO Beamline Config...
 # Extract from NeXus...
-collimation="TODO What is this?"
+collimation="TODO Beamline Config..."
 
 # Sample Mosaic
 # TODO Relevant _Only_ for Single Crystal, depends on how good the sample is
 # "spread"... (in degrees/minutes of arc)... ["30.0 minutes")
 # Extract from NeXus...
-samplemosaic="TODO What is this?"
+samplemosaic="TODO Single Crystal Only, Spread in degrees/minutes of arc..."
 
 # Lattice Constants
 # TODO Extract Sample Meta-Data from NeXus...
@@ -377,27 +385,27 @@ ubmatrix="TODO Extract UB Matrix from NeXus..."
 
 # Mode
 # TODO Related to "preset", maybe "normal" or -> "0"...?
-mode="TODO What is this?"
+mode="TODO Related to Preset, normal or 0..."
 
 # Plane Normal
 # TODO 3-Vector of Real Numbers, Plane Perpendicular to Beamline Plane,
 # Related to UB Matrix... (Maybe Not Used...?)
-plane_normal="TODO What is this?"
+plane_normal="TODO Plane Perpendicular to Beamline Plane..."
 
 # UB Conf
 # TODO Config File Associated with UB Matrix
 # Need to Capture in NeXus and Extract...
-ubconf="TODO What is this?"
+ubconf="TODO Config File Associated with UB Matrix..."
 
 # Def X
 # TODO Default Plot X Axis
 # Extract from NeXus...
-def_x="TODO What is this?"
+def_x="TODO Default Plot X Axis..."
 
 # Def Y
 # TODO Default Plot Y Axis
 # Extract from NeXus...
-def_y="TODO What is this?"
+def_y="TODO Default Plot Y Axis..."
 
 # Total Counts
 total_counts=`GET_NEXUS_VAL "total_counts" "Sum of (Total) Counts"`
