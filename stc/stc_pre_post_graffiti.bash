@@ -753,7 +753,7 @@ echo "# col_headers = " >> "${scratch}"
 
 echo -n "#   Pt." >> "${scratch}"
 
-printf " %14s" "time" >> "${scratch}"
+printf " %14s" "timestamp" >> "${scratch}"
 
 for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
 
@@ -761,6 +761,8 @@ for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
 	# - This Needs to be the BLXXX Beamline PV Prefix,
 	# Probably _Not_ the Beamline Long Name.
 	# (As it happens, this Works for "HB3"! ;-D)
+	# Note: This may not really be necessary,
+	# given proper PV Aliases in the beamline.xml file... ;-D
 	if [[ -n ${beamline_prefix} ]]; then
 		pvname=`echo "${PVNames[${pv}]}" \
 			| ${SED} -e "s/${beamline_prefix}://" \
