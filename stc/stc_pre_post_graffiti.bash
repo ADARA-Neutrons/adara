@@ -487,14 +487,12 @@ plane_normal="${plane_normal},${plane_normal_Lfmt}"
 ubconf="TODO Config File Associated with UB Matrix..."
 
 # Def X
-# TODO Default Plot X Axis
-# Extract from NeXus...
-def_x="TODO Default Plot X Axis..."
+# Default Plot X Axis
+def_x=`GET_NEXUS_STR "def_x" "Default Plot X Axis"`
 
 # Def Y
-# TODO Default Plot Y Axis
-# Extract from NeXus...
-def_y="TODO Default Plot Y Axis..."
+# Default Plot Y Axis
+def_y=`GET_NEXUS_STR "def_y" "Default Plot Y Axis"`
 
 # Total Counts
 total_counts=`GET_NEXUS_VAL "total_counts" "Sum of (Total) Counts"`
