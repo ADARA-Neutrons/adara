@@ -488,11 +488,11 @@ ubconf="TODO Config File Associated with UB Matrix..."
 
 # Def X
 # Default Plot X Axis
-def_x=`GET_NEXUS_STR "def_x" "Default Plot X Axis"`
+def_x=`GET_NEXUS_STR "DASlogs/def_x/value" "Default Plot X Axis"`
 
 # Def Y
 # Default Plot Y Axis
-def_y=`GET_NEXUS_STR "def_y" "Default Plot Y Axis"`
+def_y=`GET_NEXUS_STR "DASlogs/def_y/value" "Default Plot Y Axis"`
 
 # Total Counts
 total_counts=`GET_NEXUS_VAL "total_counts" "Sum of (Total) Counts"`
