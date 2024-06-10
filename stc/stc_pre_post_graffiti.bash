@@ -658,7 +658,7 @@ echo -e "\ngraffiti_path = [${graffiti_path}]"
 graffiti_name="${beamline}_exp${experiment_number0}_scan${run_number}.dat"
 echo -e "\ngraffiti_name = [${graffiti_name}]"
 
-spice_path="${ipts_path}/exp${experiment_number}/Datafiles"
+spice_path="/${facility}/${beamline}/exp${experiment_number}/Datafiles"
 echo -e "\nspice_path = [${spice_path}]"
 
 scratch_dir="/tmp"
