@@ -41,7 +41,11 @@ sampletype=""
 users=""
 local_contact=""
 
+# PV List From hb3-Graffiti Placeholder App...
 PVList=""
+
+# PV List From proper hb3-GraffitiPVs App...
+LIST=""
 
 verbose=0
 
@@ -85,6 +89,9 @@ for arg in "$@" ; do
 	elif [[ "${key}" == "PVList" ]]; then
 		echo "Setting PVList to [${value}]."
 		PVList="${value}"
+	elif [[ "${key}" == "LIST" ]]; then
+		echo "Setting LIST to [${value}]."
+		LIST="${value}"
 	elif [[ "${key}" == "verbose" ]]; then
 		echo "Setting Verbose Mode to [${value}]."
 		verbose="${value}"
@@ -121,6 +128,8 @@ echo "users = [${users}]"
 echo "local_contact = [${local_contact}]"
 
 echo -e "\nPVList =\n\n[${PVList}]"
+
+echo -e "\nLIST =\n\n[${LIST}]"
 
 # Construct NeXus Data File Path/Name
 
@@ -525,7 +534,24 @@ full_width_half_max="TODO Peak Width, Max Value / 2, Diff vs 2 Nearest..."
 
 declare -A PVNames
 
-PVList_clean=`echo "${PVList}" | ${SED} "s/,//g"`
+# Prefer Proper hb3-GraffitiPVs PV List to the hb3-Graffiti Placeholder
+
+PVList_clean=""
+if [[ -n "${LIST}" ]]; then
+	PVList_clean=`echo "${LIST}" \
+		| ${SED} -e "s/^-//" -e "s/-$//" \
+			-e "s/ -/ /g" -e "s/-,//g"`
+elif [[ -n "${PVList}" ]]; then
+	PVList_clean=`echo "${PVList}" | ${SED} "s/,//g"`
+else
+	echo -e "\nWarning: NO PV LIST Specified...!"
+	PVList_clean="time"
+	# Ain't Nobody Got Time for That
+fi
+
+if [[ ${verbose} -gt 0 ]]; then
+	echo -e "\nPVList_clean=[${PVList_clean}]"
+fi
 
 echo
 
