@@ -875,6 +875,10 @@
 			<name>PVList</name>
 		</element>
 		<element>
+			<pattern>:CS:GraffitiPVs:LIST$</pattern>
+			<name>LIST</name>
+		</element>
+		<element>
 			<pattern>^SampleName$</pattern>
 			<name>SampleName</name>
 		</element>
