@@ -227,7 +227,7 @@ int main( int argc, char** argv )
     string                      work_base;
     string                      work_dir;
     string                      work_path; // Obsolete... (work_root/base)
-    string                      base_path;
+    string                      base_path = "";
     string                      config_file;
     unsigned long               chunk_size; // in Dataset Elements! :-O
     unsigned short              evt_buf_size;
@@ -517,7 +517,8 @@ int main( int argc, char** argv )
             }
 
             nxgen = new NxGen( infd,
-                work_root, work_base, adara_outfile, nexus_outfile,
+                work_root, work_base, base_path,
+                adara_outfile, nexus_outfile,
                 config_file, strict, gather_stats, chunk_size,
                 evt_buf_size, anc_buf_size, cache_size, compression_level,
                 verbose_level );

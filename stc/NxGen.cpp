@@ -32,6 +32,7 @@ NxGen::NxGen
     int             a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
     string         &a_work_root,                ///< [in] Work Directory Root
     string         &a_work_base,                ///< [in] Work Directory Base
+    string         &a_base_path,                ///< [in] Data Directory Base (if not "/")
     string         &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
     string         &a_nexus_out_file,           ///< [in] Filename of output Nexus file (disabled if empty)
     string         &a_config_file,              ///< [in] Filename of STC Config file (disabled if empty)
@@ -46,7 +47,8 @@ NxGen::NxGen
 )
 :
     StreamParser( a_fd_in,
-        a_work_root, a_work_base, a_adara_out_file, a_config_file,
+        a_work_root, a_work_base, a_base_path,
+        a_adara_out_file, a_config_file,
         a_strict, a_gather_stats,
         a_chunk_size * a_event_buf_chunk_count, // number of elements
         a_chunk_size * a_anc_buf_chunk_count, // number of elements
@@ -1186,6 +1188,7 @@ NxGen::executePrePostCommands(void)
             // Append Basic Run Meta-Data Args for Command...
             std::stringstream ssargs;
             ssargs << CMD->args;
+            ssargs << " base_path=" << "\"" << getDataBasePath() << "\"";
             ssargs << " facility=" << "\"" << getFacilityName() << "\"";
             ssargs << " beamline=" << "\"" << getBeamShortName() << "\"";
             ssargs << " proposal=" << "\"" << getProposalID() << "\"";
