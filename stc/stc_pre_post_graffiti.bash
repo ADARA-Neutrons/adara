@@ -29,6 +29,7 @@ script=`${BASENAME} "$0"`
 
 # Parse Command Line Parameters...
 
+base_path=""
 facility=""
 beamline=""
 beamline_prefix=""
@@ -58,7 +59,11 @@ for arg in "$@" ; do
 
 	#echo "arg=$arg, key=$key, value=$value"
 
-	if [[ "${key}" == "facility" ]]; then
+	if [[ "${key}" == "base_path" ]]; then
+		# Note: Base Path should be of the form "/foo", No Trailing Slash
+		echo "Setting Data Base Path to [${value}]."
+		base_path="${value}"
+	elif [[ "${key}" == "facility" ]]; then
 		echo "Setting Facility to [${value}]."
 		facility="${value}"
 	elif [[ "${key}" == "beamline" ]]; then
@@ -116,6 +121,7 @@ fi
 
 echo -e "\nParsed Command Line Parameters:\n"
 
+echo "base_path = [${base_path}]"
 echo "facility = [${facility}]"
 echo "beamline = [${beamline}]"
 echo "beamline_prefix = [${beamline_prefix}]"
@@ -133,7 +139,10 @@ echo -e "\nLIST =\n\n[${LIST}]"
 
 # Construct NeXus Data File Path/Name
 
-ipts_path="/${facility}/${beamline}/${ipts}"
+data_path="${base_path}/${facility}/${beamline}"
+echo -e "\ndata_path = [${data_path}]"
+
+ipts_path="${data_path}/${ipts}"
 echo -e "\nipts_path = [${ipts_path}]"
 
 nexus_path="${ipts_path}/nexus"
@@ -684,7 +693,7 @@ echo -e "\ngraffiti_path = [${graffiti_path}]"
 graffiti_name="${beamline}_exp${experiment_number0}_scan${run_number}.dat"
 echo -e "\ngraffiti_name = [${graffiti_name}]"
 
-spice_path="/${facility}/${beamline}/exp${experiment_number}/Datafiles"
+spice_path="${data_path}/exp${experiment_number}/Datafiles"
 echo -e "\nspice_path = [${spice_path}]"
 
 scratch_dir="/tmp"
