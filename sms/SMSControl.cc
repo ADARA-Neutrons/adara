@@ -551,6 +551,7 @@ void SMSControl::late_config(const boost::property_tree::ptree &conf)
 	ctrl->m_detBankSets.reset(new DetectorBankSet(conf));
 
 	ctrl->addSources(conf);
+
 	ctrl->m_fastmeta->addDevices(conf);
 }
 
@@ -4438,10 +4439,11 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 
 	ADARA::Event translated;
 	const ADARA::Event *events = pkt.events();
+	struct FastMeta::Variable *var = NULL;
 	uint32_t i, count = pkt.num_events();
 	uint32_t phys, base_phys, logical;
 	uint32_t state;
-	uint32_t key;
+	uint32_t key, val;
 	uint16_t bank = 0;
 
 	bool got_neutrons = false;
@@ -4548,13 +4550,20 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				 * mapping for it. If not, let it fall through to the
 				 * common error pixel handling.
 				 */
-				if (m_fastmeta->validVariable(phys, key)) {
+				if ((var = m_fastmeta->validVariable(phys, key))) {
 					if (pulse->m_fastMetaEvents[key].empty()) {
 						pulse->m_fastMetaEvents[key].reserve(
 							m_fastMetaReserve);
 					}
 					pulse->m_fastMetaEvents[key].push_back(events[i]);
 					meta_count++;
+					// Handle Fast-Metadata Counter Triggers
+					if ( var->m_is_counter ) {
+						val = phys & 0xffff;
+						DEBUG("pulseEvents(): Counter Trigger "
+							<< var->m_name << " Set to " << val);
+						// DO STUFF HERE... ;-D
+					}
 					continue;
 				}
 				else {
