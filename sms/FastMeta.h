@@ -12,6 +12,7 @@
 #include "SMSControl.h"
 
 class MetaDataMgr;
+class QuickCounter;
 
 class FastMeta {
 public:
@@ -22,6 +23,7 @@ public:
 		bool		m_persist;
 		bool		m_is_counter;
 		std::string	m_name;
+		QuickCounter *m_counter;
 	};
 
 	FastMeta(boost::shared_ptr<MetaDataMgr> mgr)

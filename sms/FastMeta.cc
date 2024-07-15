@@ -20,6 +20,7 @@ LOGGER("FastMeta");
 #include "ADARA.h"
 #include "FastMeta.h"
 #include "MetaDataMgr.h"
+#include "QuickCounter.h"
 #include "StorageManager.h"
 
 using namespace boost::property_tree;
@@ -240,7 +241,8 @@ void FastMeta::addDevice(const std::string &name,
 
 		// Create Counter/Statistic PVs, As Needed... ;-D
 		if ( is_counter ) {
-			DEBUG("addDevice(): CREATE COUNTER/STATISTICS PVs HERE...");
+			DEBUG("addDevice(): Create Quick Counter Here...");
+			m_vars[key].m_counter = new QuickCounter( &(m_vars[key]), key );
 		}
 	}
 
