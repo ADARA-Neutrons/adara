@@ -30,6 +30,7 @@ LOGGER("SMS.Control");
 #include "BeamMonitorConfig.h"
 #include "DetectorBankSet.h"
 #include "MetaDataMgr.h"
+#include "QuickCounter.h"
 #include "FastMeta.h"
 #include "Markers.h"
 #include "utils.h"
@@ -4561,8 +4562,13 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					if ( var->m_is_counter ) {
 						val = phys & 0xffff;
 						DEBUG("pulseEvents(): Counter Trigger "
-							<< var->m_name << " Set to " << val);
-						// DO STUFF HERE... ;-D
+							<< std::hex << "0x" << phys << std::dec
+							<< " Device [" << var->m_name << "]"
+							<< " Set to " << val);
+						if ( val )
+							var->m_counter->startCounting();
+						else
+							var->m_counter->stopCounting();
 					}
 					continue;
 				}
