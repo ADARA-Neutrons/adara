@@ -277,14 +277,22 @@ public:
 
 		// *** ParADARA ***
 		// For *Secondary* SMS Instances,
-		// Create Channel Access Subscriptions
-		// To SMS Primary "Recording", "RunNumber" and "Paused" PVs... ;-D
+		// or When an Alt Primary PV Prefix,
+		// Create Channel Access Subscriptions To SMS Primary
+		// or Proxy/Gateway
+		// for "Recording", "RunNumber" and "Paused" PVs... ;-D
 
-		if ( ctrl->getInstanceId() != 0 )
+		if ( ctrl->getInstanceId() != 0
+				|| ( new_pv_prefix.size()
+					&& new_pv_prefix.compare( "(unset)" ) ) )
 		{
-			DEBUG("PVPrefixPV:"
-				<< " Secondary SMS Instance, Id " << ctrl->getInstanceId()
-				<< " - Construct Primary SMS PV Prefix String...");
+			if ( ctrl->getInstanceId() != 0 )
+			{
+				DEBUG("PVPrefixPV:"
+					<< " Secondary SMS Instance, Id "
+					<< ctrl->getInstanceId()
+					<< " - Construct Primary SMS PV Prefix String...");
+			}
 
 			std::string PrimaryPVPrefix = ctrl->getBeamlineId() + ":SMS";
 
@@ -983,12 +991,17 @@ void SMSControl::EPICSInit(void)
 	IPTS_ITEMS_Resend();
 
 	// *** ParADARA ***
-	// For *Secondary* SMS Instances, Create Channel Access Subscriptions
-	// To SMS Primary "Recording", "RunNumber" and "Paused" PVs... ;-D
-	if ( m_instanceId != 0 ) {
+	// For *Secondary* SMS Instances, or When an Alt Primary PV Prefix,
+	// Create Channel Access Subscriptions To SMS Primary or Proxy/Gateway
+	// for "Recording", "RunNumber" and "Paused" PVs... ;-D
+	if ( m_instanceId != 0
+			|| ( m_altPrimaryPVPrefix.size()
+				&& m_altPrimaryPVPrefix.compare( "(unset)" ) ) ) {
 
-		DEBUG("Secondary SMS Instance Id " << m_instanceId
-			<< " - Construct Primary SMS PV Prefix String...");
+		if ( m_instanceId != 0 ) {
+			DEBUG("Secondary SMS Instance Id " << m_instanceId
+				<< " - Construct Primary SMS PV Prefix String...");
+		}
 
 		std::string PrimaryPVPrefix = m_beamlineId + ":SMS";
 
