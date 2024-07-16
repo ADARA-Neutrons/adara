@@ -4566,9 +4566,11 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 							<< " Device [" << var->m_name << "]"
 							<< " Set to " << val);
 						if ( val )
-							var->m_counter->startCounting();
+							var->m_counter->startCounting(
+								pulse->m_id.first, events[i].tof);
 						else
-							var->m_counter->stopCounting();
+							var->m_counter->stopCounting(
+								pulse->m_id.first, events[i].tof);
 					}
 					continue;
 				}
