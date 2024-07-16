@@ -6,10 +6,12 @@ LOGGER("QuickCounter");
 #include <string>
 
 #include <stdint.h>
+#include <time.h>
 
 #include "ADARA.h"
 #include "FastMeta.h"
 #include "QuickCounter.h"
+#include "ADARAUtils.h"
 
 QuickCounter::QuickCounter(struct FastMeta::Variable *var,
 			uint32_t key):
@@ -28,22 +30,131 @@ QuickCounter::QuickCounter(struct FastMeta::Variable *var,
 		<< " [" << m_var->m_name << "]"
 		<< " PixelId Key " << std::hex << "0x" << m_key << std::dec);
 
+	m_counting = false;
+
+	// Create Counter PVs...
+
 	m_ctrl = SMSControl::getInstance();
+
+	// Initialize Statistics...
+
+	reset_stats();
 }
 
-void QuickCounter::startCounting(void)
+void QuickCounter::reset_stats(void)
 {
-	DEBUG("startCounting(): Start Accumulating Statistics"
-		<< " for Fast Meta-Data Counter Device"
-		<< " [" << m_var->m_name << "]"
-		<< " PixelId Key " << std::hex << "0x" << m_key << std::dec);
+	m_start_time.tv_sec = 0;
+	m_start_time.tv_nsec = 0;
+
+	m_stop_time.tv_sec = 0;
+	m_stop_time.tv_nsec = 0;
+
+	m_elapsed_time = 0.0;
 }
 
-void QuickCounter::stopCounting(void)
+void QuickCounter::startCounting(uint64_t pulse_id, uint32_t tof)
 {
-	DEBUG("stopCounting(): Stop Accumulating Statistics"
-		<< " for Fast Meta-Data Counter Device"
-		<< " [" << m_var->m_name << "]"
-		<< " PixelId Key " << std::hex << "0x" << m_key << std::dec);
+	// If Redundant Start When Already Counting,
+	// Just Reset Statistics and Proceed...
+	if ( m_counting )
+	{
+		ERROR("startCounting(): Redundant Counter Start!"
+			<< " Resetting Statistics"
+			<< " for Fast Meta-Data Counter Device"
+			<< " [" << m_var->m_name << "]"
+			<< " PixelId Key " << std::hex << "0x" << m_key << std::dec
+			<< " Pulse Time 0x" << std::hex << pulse_id << std::dec
+			<< " TOF " << tof
+			<< " m_counting=" << m_counting);
+	}
+	else
+	{
+		DEBUG("startCounting(): Start Accumulating Statistics"
+			<< " for Fast Meta-Data Counter Device"
+			<< " [" << m_var->m_name << "]"
+			<< " PixelId Key " << std::hex << "0x" << m_key << std::dec
+			<< " Pulse Time 0x" << std::hex << pulse_id << std::dec
+			<< " TOF " << tof
+			<< " m_counting=" << m_counting);
+
+		m_counting = true;
+
+		DEBUG("startCounting(): Setting m_counting to " << m_counting);
+	}
+
+	reset_stats();
+
+	/* Create a timestamp for each Counting Marker Trigger by
+	 * adding the TOF value to the pulse ID, handling overflow of the
+	 * nanoseconds field. TOF is originally in units of 100ns.
+	 *
+	 * Note that we strip any cycle field from the TOF.
+	 */
+	tof &= ((1U << 21) - 1);
+	tof *= 100;
+	m_start_time.tv_sec = pulse_id >> 32;  // EPICS Time...!
+	m_start_time.tv_nsec = tof + (pulse_id & 0xffffffff);
+
+	DEBUG("startCounting(): EPICS Time"
+		<< " sec=" << m_start_time.tv_sec
+		<< " ns=" << m_start_time.tv_nsec);
+}
+
+void QuickCounter::stopCounting(uint64_t pulse_id, uint32_t tof)
+{
+	// If Erroneous Stop When Not Counting,
+	// Log Error and Ignore Statistics...
+	if ( !m_counting )
+	{
+		DEBUG("stopCounting(): Counter Stop When Not Counting!"
+			<< " Ignoring Any Accumulated Statistics"
+			<< " for Fast Meta-Data Counter Device"
+			<< " [" << m_var->m_name << "]"
+			<< " PixelId Key " << std::hex << "0x" << m_key << std::dec
+			<< " Pulse Time 0x" << std::hex << pulse_id << std::dec
+			<< " TOF " << tof
+			<< " m_counting=" << m_counting);
+
+		reset_stats();
+
+		return;
+	}
+	else
+	{
+		DEBUG("stopCounting(): Stop Accumulating Statistics"
+			<< " for Fast Meta-Data Counter Device"
+			<< " [" << m_var->m_name << "]"
+			<< " PixelId Key " << std::hex << "0x" << m_key << std::dec
+			<< " Pulse Time 0x" << std::hex << pulse_id << std::dec
+			<< " TOF " << tof
+			<< " m_counting=" << m_counting);
+	}
+
+	/* Create a timestamp for each Counting Marker Trigger by
+	 * adding the TOF value to the pulse ID, handling overflow of the
+	 * nanoseconds field. TOF is originally in units of 100ns.
+	 *
+	 * Note that we strip any cycle field from the TOF.
+	 */
+	tof &= ((1U << 21) - 1);
+	tof *= 100;
+	m_stop_time.tv_sec = pulse_id >> 32;  // EPICS Time...!
+	m_stop_time.tv_nsec = tof + (pulse_id & 0xffffffff);
+
+	DEBUG("stopCounting(): EPICS Time"
+		<< " sec=" << m_stop_time.tv_sec
+		<< " ns=" << m_stop_time.tv_nsec);
+	
+	// Compute Elapsed Time in Seconds (Double)
+	m_elapsed_time = calcDiffSeconds( m_stop_time, m_start_time );
+
+	DEBUG("stopCounting():"
+		<< " Elapsed=" << m_elapsed_time);
+
+	// Stop Counting...
+
+	m_counting = false;
+
+	DEBUG("stopCounting(): Setting m_counting to " << m_counting);
 }
 

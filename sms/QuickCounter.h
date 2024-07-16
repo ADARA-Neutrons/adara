@@ -1,8 +1,10 @@
 #ifndef __QUICK_COUNTER_H
 #define __QUICK_COUNTER_H
 
-#include <stdint.h>
 #include <string>
+
+#include <stdint.h>
+#include <time.h>
 
 #include "SMSControl.h"
 #include "FastMeta.h"
@@ -12,14 +14,23 @@ public:
 
 	QuickCounter(struct FastMeta::Variable *var, uint32_t key);
 
-	void startCounting(void);
-	void stopCounting(void);
+	void reset_stats(void);
+
+	void startCounting(uint64_t pulse_id, uint32_t tof);
+	void stopCounting(uint64_t pulse_id, uint32_t tof);
 
 private:
 	SMSControl *m_ctrl;
 
 	struct FastMeta::Variable *m_var;
 	uint32_t m_key;
+
+	bool m_counting;
+
+	struct timespec m_start_time;
+	struct timespec m_stop_time;
+
+	double m_elapsed_time;
 };
 
 #endif /* __QUICK_COUNTER_H */
