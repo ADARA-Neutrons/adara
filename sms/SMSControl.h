@@ -415,6 +415,8 @@ public:
 			boost::shared_ptr<smsConnectedPV> & pvStatus);
 	void unregisterLiveClient(int32_t clientId);
 
+	int32_t registerQuickCounter(std::string counterName);
+
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
 
@@ -1046,6 +1048,11 @@ private:
 	std::vector< boost::shared_ptr<smsUint32PV> > m_pvLiveClientStartTimes;
 	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientFilePaths;
 	std::vector< boost::shared_ptr<smsConnectedPV> > m_pvLiveClientStatuses;
+
+	boost::shared_ptr<smsUint32PV> m_pvNumQuickCounters;
+	uint32_t m_numQuickCounters;
+
+	std::vector< boost::shared_ptr<smsStringPV> > m_pvQuickCounterNames;
 
 	struct ca_client_context *m_epics_context;
 

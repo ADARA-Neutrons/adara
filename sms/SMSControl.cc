@@ -1034,7 +1034,8 @@ SMSControl::SMSControl() :
 	m_lastPulseId(0), m_lastRingPeriod(0),
 	m_monitorReserve(1024), m_bankReserve(4096),
 	m_chopperReserve(128), m_fastMetaReserve(16),
-	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta))
+	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta)),
+	m_numQuickCounters(0)
 {
 	// Initialize the Primary SMS PV Prefix to "Not Ready"... ;-b
 	// (For the PVPrefixPV::changed() method,
@@ -1163,6 +1164,10 @@ SMSControl::SMSControl() :
 						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "NumLiveClients"));
 
+	m_pvNumQuickCounters = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(m_pvPrefix + ":Control:"
+							+ "NumQuickCounters"));
+
 	// The Kill Switch. ["NEVER USE THIS!" Lol... (Except for Valgrind) :-]
 	m_pvCleanShutdown = boost::shared_ptr<CleanShutdownPV>(new
 						CleanShutdownPV(m_pvPrefix + ":CleanShutdown"));
@@ -1192,6 +1197,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvVerbose);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
+	addPV(m_pvNumQuickCounters);
 	addPV(m_pvCleanShutdown);
 
 	// Initialize Config/Info PVs...
@@ -1313,6 +1319,9 @@ SMSControl::SMSControl() :
 
 	// Initialize the Live Client Index List PV...
 	m_pvNumLiveClients->update(0, &now);
+
+	// Initialize the Quick Counter Index List PV...
+	m_pvNumQuickCounters->update(0, &now);
 
 	// Restore Any PVs to AutoSaved Config Values...
 
@@ -4179,6 +4188,37 @@ void SMSControl::unregisterLiveClient(int32_t clientId)
 	// Note: Leave the Number of Live Client PVs, Monotonically Increasing
 	// (because we leave the old Live Client index/PVs around for
 	// hysterical reasons, that is to see how they died... ;-D)
+}
+
+int32_t SMSControl::registerQuickCounter(std::string counterName)
+{
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "registerQuickCounter Name=" << counterName);
+
+	// Return "Next Quick Counter" Index...
+	int32_t counterId = m_numQuickCounters++;
+
+	std::string prefix(m_pvPrefix);
+	prefix += ":QuickCounter:";
+
+	std::stringstream ss;
+	ss << counterId + 1; // eh, count from 1 like everything else
+	prefix += ss.str();
+
+	// Quick Counter Name...
+	m_pvQuickCounterNames.resize(counterId + 1);
+	m_pvQuickCounterNames[counterId] =
+		boost::shared_ptr<smsStringPV>(new
+			smsStringPV(prefix + ":Name"));
+	addPV(m_pvQuickCounterNames[counterId]);
+
+	// Update the Name & Number of Quick Counters PV (we just added one)
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	(m_pvQuickCounterNames[counterId])->update(counterName, &now);
+	m_pvNumQuickCounters->update(counterId + 1, &now);
+
+	return( counterId );
 }
 
 void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
