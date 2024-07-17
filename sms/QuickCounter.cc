@@ -32,13 +32,34 @@ QuickCounter::QuickCounter(struct FastMeta::Variable *var,
 
 	m_counting = false;
 
+	// Initialize Statistics...
+
+	reset_stats();
+
 	// Create Counter PVs...
 
 	m_ctrl = SMSControl::getInstance();
 
-	// Initialize Statistics...
+	std::string prefix(m_ctrl->getPVPrefix());
+	prefix += ":" + m_var->m_name;
 
-	reset_stats();
+	m_pvCounting = boost::shared_ptr<smsBooleanPV>(new
+		smsBooleanPV(prefix + ":IsCounting",
+		/* AutoSave */ true));
+
+	m_pvElapsedTime = boost::shared_ptr<smsFloat64PV>(new
+		smsFloat64PV(prefix + ":ElapsedTime",
+		0.0, FLOAT64_MAX, FLOAT64_EPSILON,
+		/* AutoSave */ true));
+
+	m_ctrl->addPV(m_pvCounting);
+	m_ctrl->addPV(m_pvElapsedTime);
+
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME_COARSE, &now);
+
+	m_pvCounting->update(m_counting, &now);
+	m_pvElapsedTime->update(m_elapsed_time, &now);
 }
 
 void QuickCounter::reset_stats(void)
@@ -50,6 +71,15 @@ void QuickCounter::reset_stats(void)
 	m_stop_time.tv_nsec = 0;
 
 	m_elapsed_time = 0.0;
+}
+
+void QuickCounter::update_pvs(void)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME_COARSE, &now);
+
+	m_pvCounting->update(m_counting, &now);
+	m_pvElapsedTime->update(m_elapsed_time, &now);
 }
 
 void QuickCounter::startCounting(uint64_t pulse_id, uint32_t tof)
@@ -84,6 +114,8 @@ void QuickCounter::startCounting(uint64_t pulse_id, uint32_t tof)
 
 	reset_stats();
 
+	update_pvs();
+
 	/* Create a timestamp for each Counting Marker Trigger by
 	 * adding the TOF value to the pulse ID, handling overflow of the
 	 * nanoseconds field. TOF is originally in units of 100ns.
@@ -116,6 +148,8 @@ void QuickCounter::stopCounting(uint64_t pulse_id, uint32_t tof)
 			<< " m_counting=" << m_counting);
 
 		reset_stats();
+
+		update_pvs();
 
 		return;
 	}
@@ -156,5 +190,9 @@ void QuickCounter::stopCounting(uint64_t pulse_id, uint32_t tof)
 	m_counting = false;
 
 	DEBUG("stopCounting(): Setting m_counting to " << m_counting);
+
+	// Update PVs...
+
+	update_pvs();
 }
 
