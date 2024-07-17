@@ -45,12 +45,12 @@ QuickCounter::QuickCounter(struct FastMeta::Variable *var,
 
 	m_pvCounting = boost::shared_ptr<smsBooleanPV>(new
 		smsBooleanPV(prefix + ":IsCounting",
-		/* AutoSave */ true));
+		/* AutoSave */ false));
 
 	m_pvElapsedTime = boost::shared_ptr<smsFloat64PV>(new
 		smsFloat64PV(prefix + ":ElapsedTime",
 		0.0, FLOAT64_MAX, FLOAT64_EPSILON,
-		/* AutoSave */ true));
+		/* AutoSave */ false));
 
 	m_ctrl->addPV(m_pvCounting);
 	m_ctrl->addPV(m_pvElapsedTime);
@@ -60,6 +60,9 @@ QuickCounter::QuickCounter(struct FastMeta::Variable *var,
 
 	m_pvCounting->update(m_counting, &now);
 	m_pvElapsedTime->update(m_elapsed_time, &now);
+
+	// Register This Quick Counter with SMSControl...
+	m_counter_id = m_ctrl->registerQuickCounter(m_var->m_name);
 }
 
 void QuickCounter::reset_stats(void)

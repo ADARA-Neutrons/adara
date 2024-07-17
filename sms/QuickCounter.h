@@ -29,6 +29,8 @@ public:
 private:
 	SMSControl *m_ctrl;
 
+	uint32_t m_counter_id;
+
 	struct FastMeta::Variable *m_var;
 	uint32_t m_key;
 
