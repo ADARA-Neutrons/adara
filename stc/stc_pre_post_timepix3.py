@@ -111,6 +111,8 @@ def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number):
 	"""
 	if beamline in ['CG1D']:
 		tpx3_base = '/mcp-cg1d'
+	elif beamline in ['VENUS']:
+		tpx3_base = '/mcp-tpx3'
 	else:
 		# tpx3_base = '/mcp-cg1d/tpx3files'
 		tpx3_base = '/mcp-tpx3/tpx3files'
