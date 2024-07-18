@@ -3217,7 +3217,14 @@ bool StorageManager::parseAutoSaveFile(void)
 
 		}
 		catch( boost::filesystem::filesystem_error &e ) {
-			ERROR("parseAutoSaveFile(): Error Rotating SMS AutoSave File "
+			ERROR("parseAutoSaveFile():"
+				<< " Error Rotating SMS AutoSave File "
+				<< ( m_baseDir + "/" + src_asf.str() ) << " to "
+				<< ( m_baseDir + "/" + dst_asf.str() ) << "!");
+		}
+		catch (...) {
+			ERROR("parseAutoSaveFile():"
+				<< " Unknown Exception Rotating SMS AutoSave File "
 				<< ( m_baseDir + "/" + src_asf.str() ) << " to "
 				<< ( m_baseDir + "/" + dst_asf.str() ) << "!");
 		}
@@ -3226,6 +3233,8 @@ bool StorageManager::parseAutoSaveFile(void)
 			<< ( m_baseDir + "/" + src_asf.str() ) << " to "
 			<< ( m_baseDir + "/" + dst_asf.str() ) );
 	}
+
+	DEBUG("parseAutoSaveFile(): All SMS AutoSave Files Rotated.");
 
 	return true;
 }
