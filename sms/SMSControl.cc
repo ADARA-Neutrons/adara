@@ -4505,7 +4505,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 
 	for (i=0; i < count; i++) {
 
-		phys = events[i].pixel;
+		phys = events->pixel;
 
 		state = 0;
 
@@ -4516,11 +4516,12 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				 * next raw event -- it doesn't go in the banked
 				 * events section.
 				 */
-				addMonitorEvent(pkt, pulse, phys, events[i].tof);
+				addMonitorEvent(pkt, pulse, phys, events->tof);
 				pulse->m_numMonEvents++;
 				// Don't Count This Pulse's Proton Charge - No Neutrons
 				got_metadata = true;
 				meta_count++;
+				events++;
 				continue;
 
 			case 7: // Chopper Event
@@ -4528,10 +4529,11 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				 * next raw event -- it doesn't go into the banked
 				 * event section.
 				 */
-				addChopperEvent(pkt, pulse, phys, events[i].tof);
+				addChopperEvent(pkt, pulse, phys, events->tof);
 				// Don't Count This Pulse's Proton Charge - No Neutrons
 				got_metadata = true;
 				meta_count++;
+				events++;
 				continue;
 
 			case 0: // Detector Event
@@ -4609,7 +4611,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 						pulse->m_fastMetaEvents[key].reserve(
 							m_fastMetaReserve);
 					}
-					pulse->m_fastMetaEvents[key].push_back(events[i]);
+					pulse->m_fastMetaEvents[key].push_back(*events);
 					meta_count++;
 					// Handle Fast-Metadata Counter Triggers
 					if ( var->m_is_counter ) {
@@ -4620,11 +4622,12 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 							<< " Set to " << val);
 						if ( val )
 							var->m_counter->startCounting(
-								pulse->m_id.first, events[i].tof);
+								pulse->m_id.first, events->tof);
 						else
 							var->m_counter->stopCounting(
-								pulse->m_id.first, events[i].tof);
+								pulse->m_id.first, events->tof);
 					}
+					events++;
 					continue;
 				}
 				else {
@@ -4654,8 +4657,9 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 						pulse->m_fastMetaEvents[key].reserve(
 							m_fastMetaReserve);
 					}
-					pulse->m_fastMetaEvents[key].push_back(events[i]);
+					pulse->m_fastMetaEvents[key].push_back(*events);
 					meta_count++;
+					events++;
 					continue;
 				}
 				// No mapping, Error Pixel...
@@ -4741,11 +4745,13 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		}
 
 		translated.pixel = logical;
-		translated.tof = events[i].tof;
+		translated.tof = events->tof;
 
 		ev->push_back(translated);
 
 		pulse->m_numEvents++;
+
+		events++;
 	}
 
 	// If We Got Neutrons, We Will Count This Pulse's Proton Charge! :-D
