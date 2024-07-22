@@ -54,6 +54,7 @@ class BeamMonitorConfig;
 class DetectorBankSet;
 class MetaDataMgr;
 class FastMeta;
+class QuickCounter;
 class Markers;
 
 class SMSControl : public caServer {
@@ -416,6 +417,16 @@ public:
 	void unregisterLiveClient(int32_t clientId);
 
 	int32_t registerQuickCounter(std::string counterName);
+
+	int32_t registerDetectorAllCounter(QuickCounter *counter,
+			std::string counterName, struct timespec *start_time);
+	int32_t registerMonitorAllCounter(QuickCounter *counter,
+			std::string counterName, struct timespec *start_time);
+
+	void unregisterDetectorAllCounter(std::string counterName,
+			int32_t detector_counts_all_id);
+	void unregisterMonitorAllCounter(std::string counterName,
+			int32_t monitor_counts_all_id);
 
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
@@ -1047,10 +1058,17 @@ private:
 	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientNames;
 	std::vector< boost::shared_ptr<smsUint32PV> > m_pvLiveClientStartTimes;
 	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientFilePaths;
-	std::vector< boost::shared_ptr<smsConnectedPV> > m_pvLiveClientStatuses;
+	std::vector< boost::shared_ptr<smsConnectedPV> >
+		m_pvLiveClientStatuses;
 
 	boost::shared_ptr<smsUint32PV> m_pvNumQuickCounters;
 	uint32_t m_numQuickCounters;
+
+	std::vector<QuickCounter*> m_detectorAllCounter;
+	uint32_t m_numDetectorAllCounters;
+
+	std::vector<QuickCounter*> m_monitorAllCounter;
+	uint32_t m_numMonitorAllCounters;
 
 	std::vector< boost::shared_ptr<smsStringPV> > m_pvQuickCounterNames;
 

@@ -1035,7 +1035,9 @@ SMSControl::SMSControl() :
 	m_monitorReserve(1024), m_bankReserve(4096),
 	m_chopperReserve(128), m_fastMetaReserve(16),
 	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta)),
-	m_numQuickCounters(0)
+	m_numQuickCounters(0),
+	m_numDetectorAllCounters(0),
+	m_numMonitorAllCounters(0)
 {
 	// Initialize the Primary SMS PV Prefix to "Not Ready"... ;-b
 	// (For the PVPrefixPV::changed() method,
@@ -4193,7 +4195,7 @@ void SMSControl::unregisterLiveClient(int32_t clientId)
 int32_t SMSControl::registerQuickCounter(std::string counterName)
 {
 	DEBUG( ( m_recording ? "[RECORDING] " : "" )
-		<< "registerQuickCounter Name=" << counterName);
+		<< "registerQuickCounter() Name=" << counterName);
 
 	// Return "Next Quick Counter" Index...
 	int32_t counterId = m_numQuickCounters++;
@@ -4219,6 +4221,74 @@ int32_t SMSControl::registerQuickCounter(std::string counterName)
 	m_pvNumQuickCounters->update(counterId + 1, &now);
 
 	return( counterId );
+}
+
+int32_t SMSControl::registerDetectorAllCounter(QuickCounter *counter,
+		std::string counterName,
+		struct timespec *start_time)  // EPICS Time...!
+{
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "registerDetectorAllCounter() Name=" << counterName
+		<< " Start=" << start_time->tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< start_time->tv_nsec);
+
+	// Return "Next Detector All Counter" Index...
+	int32_t detector_counts_all_id = m_numDetectorAllCounters++;
+
+	// Save Reference to the Quick Counter Instance...
+	m_detectorAllCounter.push_back(counter);
+
+	return( detector_counts_all_id );
+}
+
+int32_t SMSControl::registerMonitorAllCounter(QuickCounter *counter,
+		std::string counterName,
+		struct timespec *start_time)  // EPICS Time...!
+{
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "registerMonitorAllCounter() Name=" << counterName
+		<< " Start=" << start_time->tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< start_time->tv_nsec);
+
+	// Return "Next Monitor All Counter" Index...
+	int32_t monitor_counts_all_id = m_numMonitorAllCounters++;
+
+	// Save Reference to the Quick Counter Instance...
+	m_monitorAllCounter.push_back(counter);
+
+	return( monitor_counts_all_id );
+}
+
+void SMSControl::unregisterDetectorAllCounter(std::string counterName,
+		int32_t detector_counts_all_id)
+{
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "unregisterDetectorAllCounter() Name=" << counterName
+		<< " detector_counts_all_id=" << detector_counts_all_id);
+
+	// Remove Reference to the Quick Counter Instance...
+	m_detectorAllCounter.erase( m_detectorAllCounter.begin()
+		+ detector_counts_all_id );
+
+	// Decrement "Next Detector All Counter" Index...
+	m_numDetectorAllCounters--;
+}
+
+void SMSControl::unregisterMonitorAllCounter(std::string counterName,
+		int32_t monitor_counts_all_id)
+{
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "unregisterMonitorAllCounter() Name=" << counterName
+		<< " monitor_counts_all_id=" << monitor_counts_all_id);
+
+	// Remove Reference to the Quick Counter Instance...
+	m_monitorAllCounter.erase( m_monitorAllCounter.begin()
+		+ monitor_counts_all_id );
+
+	// Decrement "Next Monitor All Counter" Index...
+	m_numMonitorAllCounters--;
 }
 
 void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
@@ -4500,6 +4570,8 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 	uint32_t key, val;
 	uint16_t bank = 0;
 
+	uint32_t monitor_count = 0;
+
 	bool got_neutrons = false;
 	bool got_metadata = false;
 
@@ -4520,6 +4592,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				pulse->m_numMonEvents++;
 				// Don't Count This Pulse's Proton Charge - No Neutrons
 				got_metadata = true;
+				monitor_count++;
 				meta_count++;
 				events++;
 				continue;
@@ -4752,6 +4825,16 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		pulse->m_numEvents++;
 
 		events++;
+	}
+
+	// Add All Detector Events to Any Registered Counters...
+	for ( uint32_t i=0 ; i < m_detectorAllCounter.size() ; ++i ) {
+		m_detectorAllCounter[i]->addDetectorAllCounts(event_count);
+	}
+
+	// Add All Monitor Events to Any Registered Counters...
+	for ( uint32_t i=0 ; i < m_monitorAllCounter.size() ; ++i ) {
+		m_monitorAllCounter[i]->addMonitorAllCounts(monitor_count);
 	}
 
 	// If We Got Neutrons, We Will Count This Pulse's Proton Charge! :-D
