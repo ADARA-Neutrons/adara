@@ -811,6 +811,14 @@
 			<value>1</value><!-- Timepix3 Imaging Mode Activated -->
 		</condition>
 		<element>
+			<pattern>:ConfigTpxFilePath$</pattern>
+			<name>ConfigTpxFilePath</name>
+		</element>
+		<element>
+			<pattern>:ConfigTIFFFilePath$</pattern>
+			<name>ConfigTIFFFilePath</name>
+		</element>
+		<element>
 			<pattern>:MeasTpxFilePath$</pattern>
 			<name>TpxFilePath</name>
 		</element>
