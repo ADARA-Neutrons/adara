@@ -430,7 +430,7 @@ def do_pre_post_timepix3(arg_list):
 		parms_present = all (p is not None for p in [proposal, run_number, tiff_file_path, tiff_file_name])
 
 		if parms_present is not None:
-			if beamline in ['CG1D']:
+			if beamline in ['CG1D', 'VENUS']:
 				include_tiff_files = False
 			else:
 				include_tiff_files = True
