@@ -175,7 +175,7 @@ GET_NEXUS_STR()
 	_str=`echo "${_str}" | ${SED} "s/%20/ /g"`
 
 	if [[ -z ${_str} ]]; then
-		_date="Error Extracting ${_label} from NeXus"
+		_str="Error Extracting ${_label} from NeXus"
 	fi
 
 	echo "${_str}"
@@ -191,7 +191,7 @@ GET_NEXUS_VAL()
 	local _val=`${NXLS} ${nexus} -p /entry/${_path} -l -s --terse`
 
 	if [[ -z ${_val} ]]; then
-		_date="Error Extracting ${_label} from NeXus"
+		_val="Error Extracting ${_label} from NeXus"
 	fi
 
 	echo "${_val}"
@@ -363,26 +363,48 @@ analyzer="TODO Type of Analyzer, choose from drop-down list..."
 
 # Sense (Ain't Got None)
 # Beamline Config, 3 +/- characters concatenated "(+/-,+/-,+/-)"
+
 sense=""
+
 monochromator_PlusMinus=`GET_NEXUS_VAL \
-	"DASlogs/monochromator_PlusMinus/value" \
+	"DASlogs/plus_minus_monochromator/value" \
 	"Monochromator PlusMinus"`
+# Check Old PV Alias... ;-b
+if [[ "${monochromator_PlusMinus}" =~ Error ]]; then
+	monochromator_PlusMinus=`GET_NEXUS_VAL \
+		"DASlogs/monochromator_PlusMinus/value" \
+		"Monochromator PlusMinus"`
+fi
 if [[ ${monochromator_PlusMinus} == "-1" ]]; then
 	sense="${sense}-"
 else
 	sense="${sense}+"
 fi
+
 sample_PlusMinus=`GET_NEXUS_VAL \
-	"DASlogs/sample_PlusMinus/value" \
+	"DASlogs/plus_minus_sample/value" \
 	"Sample PlusMinus"`
+# Check Old PV Alias... ;-b
+if [[ "${sample_PlusMinus}" =~ Error ]]; then
+	sample_PlusMinus=`GET_NEXUS_VAL \
+		"DASlogs/sample_PlusMinus/value" \
+		"Sample PlusMinus"`
+fi
 if [[ ${sample_PlusMinus} == "-1" ]]; then
 	sense="${sense}-"
 else
 	sense="${sense}+"
 fi
+
 analyzer_PlusMinus=`GET_NEXUS_VAL \
-	"DASlogs/analyzer_PlusMinus/value" \
+	"DASlogs/plus_minus_analyzer/value" \
 	"Analyzer PlusMinus"`
+# Check Old PV Alias... ;-b
+if [[ "${analyzer_PlusMinus}" =~ Error ]]; then
+	analyzer_PlusMinus=`GET_NEXUS_VAL \
+		"DASlogs/analyzer_PlusMinus/value" \
+		"Analyzer PlusMinus"`
+fi
 if [[ ${analyzer_PlusMinus} == "-1" ]]; then
 	sense="${sense}-"
 else
@@ -401,35 +423,78 @@ collimation="TODO Beamline Config..."
 samplemosaic="TODO Single Crystal Only, Spread in degrees/minutes of arc..."
 
 # Lattice Constants
+
 latticeconstants=""
+
 latticeA=`GET_NEXUS_VAL \
-	"DASlogs/LatticeA/value" \
+	"DASlogs/lattice_a/value" \
 	"Lattice A Constant"`
+# Check Old PV Alias... ;-b
+if [[ "${latticeA}" =~ Error ]]; then
+	latticeA=`GET_NEXUS_VAL \
+		"DASlogs/LatticeA/value" \
+		"Lattice A Constant"`
+fi
 latticeAfmt=`printf "%.6f" "${latticeA}"`
 latticeconstants="${latticeAfmt}"
+
 latticeB=`GET_NEXUS_VAL \
-	"DASlogs/LatticeB/value" \
+	"DASlogs/lattice_b/value" \
 	"Lattice B Constant"`
+# Check Old PV Alias... ;-b
+if [[ "${latticeB}" =~ Error ]]; then
+	latticeB=`GET_NEXUS_VAL \
+		"DASlogs/LatticeB/value" \
+		"Lattice B Constant"`
+fi
 latticeBfmt=`printf "%.6f" "${latticeB}"`
 latticeconstants="${latticeconstants},${latticeBfmt}"
+
 latticeC=`GET_NEXUS_VAL \
-	"DASlogs/LatticeC/value" \
+	"DASlogs/lattice_c/value" \
 	"Lattice C Constant"`
+# Check Old PV Alias... ;-b
+if [[ "${latticeC}" =~ Error ]]; then
+	latticeC=`GET_NEXUS_VAL \
+		"DASlogs/LatticeC/value" \
+		"Lattice C Constant"`
+fi
 latticeCfmt=`printf "%.6f" "${latticeC}"`
 latticeconstants="${latticeconstants},${latticeCfmt}"
+
 latticeAlpha=`GET_NEXUS_VAL \
-	"DASlogs/LatticeAlpha/value" \
+	"DASlogs/lattice_alpha/value" \
 	"Lattice Alpha Constant"`
+# Check Old PV Alias... ;-b
+if [[ "${latticeAlpha}" =~ Error ]]; then
+	latticeAlpha=`GET_NEXUS_VAL \
+		"DASlogs/LatticeAlpha/value" \
+		"Lattice Alpha Constant"`
+fi
 latticeAlphafmt=`printf "%.6f" "${latticeAlpha}"`
 latticeconstants="${latticeconstants},${latticeAlphafmt}"
+
 latticeBeta=`GET_NEXUS_VAL \
-	"DASlogs/LatticeBeta/value" \
+	"DASlogs/lattice_beta/value" \
 	"Lattice Beta Constant"`
+# Check Old PV Alias... ;-b
+if [[ "${latticeBeta}" =~ Error ]]; then
+	latticeBeta=`GET_NEXUS_VAL \
+		"DASlogs/LatticeBeta/value" \
+		"Lattice Beta Constant"`
+fi
 latticeBetafmt=`printf "%.6f" "${latticeBeta}"`
 latticeconstants="${latticeconstants},${latticeBetafmt}"
+
 latticeGamma=`GET_NEXUS_VAL \
-	"DASlogs/LatticeGamma/value" \
+	"DASlogs/lattice_gamma/value" \
 	"Lattice Gamma Constant"`
+# Check Old PV Alias... ;-b
+if [[ "${latticeGamma}" =~ Error ]]; then
+	latticeGamma=`GET_NEXUS_VAL \
+		"DASlogs/LatticeGamma/value" \
+		"Lattice Gamma Constant"`
+fi
 latticeGammafmt=`printf "%.6f" "${latticeGamma}"`
 latticeconstants="${latticeconstants},${latticeGammafmt}"
 
@@ -489,20 +554,42 @@ mode="TODO Related to Preset, normal or 0..."
 # Plane Normal
 # 3-Vector of Real Numbers, Plane Perpendicular to Beamline Plane,
 # Related to UB Matrix...
+
 plane_normal=""
+
 plane_normal_H=`GET_NEXUS_VAL \
-	"DASlogs/PlaneNormalH/value" \
+	"DASlogs/plane_normal_h/value" \
 	"Plane Normal H Value"`
+# Check Old PV Alias... ;-b
+if [[ "${plane_normal_H}" =~ Error ]]; then
+	plane_normal_H=`GET_NEXUS_VAL \
+		"DASlogs/PlaneNormalH/value" \
+		"Plane Normal H Value"`
+fi
 plane_normal_Hfmt=`printf "%.6f" "${plane_normal_H}"`
 plane_normal="${plane_normal_Hfmt}"
+
 plane_normal_K=`GET_NEXUS_VAL \
-	"DASlogs/PlaneNormalK/value" \
+	"DASlogs/plane_normal_k/value" \
 	"Plane Normal K Value"`
+# Check Old PV Alias... ;-b
+if [[ "${plane_normal_K}" =~ Error ]]; then
+	plane_normal_K=`GET_NEXUS_VAL \
+		"DASlogs/PlaneNormalK/value" \
+		"Plane Normal K Value"`
+fi
 plane_normal_Kfmt=`printf "%.6f" "${plane_normal_K}"`
 plane_normal="${plane_normal},${plane_normal_Kfmt}"
+
 plane_normal_L=`GET_NEXUS_VAL \
-	"DASlogs/PlaneNormalL/value" \
+	"DASlogs/plane_normal_l/value" \
 	"Plane Normal L Value"`
+# Check Old PV Alias... ;-b
+if [[ "${plane_normal_L}" =~ Error ]]; then
+	plane_normal_L=`GET_NEXUS_VAL \
+		"DASlogs/PlaneNormalL/value" \
+		"Plane Normal L Value"`
+fi
 plane_normal_Lfmt=`printf "%.6f" "${plane_normal_L}"`
 plane_normal="${plane_normal},${plane_normal_Lfmt}"
 
