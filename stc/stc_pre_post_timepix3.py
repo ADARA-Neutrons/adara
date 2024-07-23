@@ -105,7 +105,7 @@ def determine_source_and_target_directories(beamline, source_dir, ipts_dir, targ
 	print('\n\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
 	return initial_image_dir, new_image_dir
 
-def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number):
+def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, config_tpx_file_path):
 	"""
 	Determines source and target directories for copying.
 	"""
@@ -116,7 +116,11 @@ def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number):
 	else:
 		# tpx3_base = '/mcp-cg1d/tpx3files'
 		tpx3_base = '/mcp-tpx3/tpx3files'
-	initial_tpx3_dir = "{}/{}/Run_{}".format(tpx3_base, proposal, run_number) 
+
+	if beamline in ['VENUS']:
+	    initial_tpx3_dir = "{}/{}/{}".format(tpx3_base, proposal, config_tpx_file_path) 
+    else:
+	    initial_tpx3_dir = "{}/{}/Run_{}".format(tpx3_base, proposal, run_number) 
 
 	if target_dir is not None:
 		# expand away tilde if present.
@@ -276,7 +280,7 @@ def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_p
 	return source_files, target_files
 
 
-def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, include_tiff_files=True):
+def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path, include_tiff_files=True):
 	"""
 	Copies image files for the specified run.
 	"""
@@ -306,7 +310,7 @@ def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_fil
 
 	# ---------------------
 	# Handle raw tpx3 files
-	initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number)
+	initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, config_tpx_file_path)
 	# Identify target tpx files. Wait for file count to be stable for at least 60.0 seconds.
 	source_files, target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=False)
 
@@ -384,6 +388,8 @@ def process_args(arg_list):
 	tiff_file_path = 'not_found_yet'
 	tiff_file_name = 'not_found_yet'
 	tpx_file_path = 'not_found_yet'
+	config_tpx_file_path = 'not_found_yet'
+	config_tiff_file_path = 'not_found_yet'
 
 	# Loop through Command Line Parameters...
 	for arg in arg_list:
@@ -412,9 +418,13 @@ def process_args(arg_list):
 			tiff_file_name = value
 		elif key == "TpxFilePath":
 			tpx_file_path = value
+		elif key == "ConfigTpxFilePath":
+			config_tpx_file_path = value
+		elif key == "ConfigTIFFFilePath":
+			config_tiff_file_path = value
 
 
-	return beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path
+	return beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path, config_tpx_file_path, config_tiff_file_path
 
 
 def do_pre_post_timepix3(arg_list):
@@ -425,16 +435,16 @@ def do_pre_post_timepix3(arg_list):
 	try:
 		print('\n\nPre-Post-Processing for Timepix3.\n\n')
 
-		beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path = process_args(arg_list)
+		beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path, config_tpx_file_path, config_tiff_file_path = process_args(arg_list)
 
-		parms_present = all (p is not None for p in [proposal, run_number, tiff_file_path, tiff_file_name])
+		parms_present = all (p is not None for p in [proposal, run_number, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path])
 
 		if parms_present is not None:
 			if beamline in ['CG1D', 'VENUS']:
 				include_tiff_files = False
 			else:
 				include_tiff_files = True
-			files_to_catalog = copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, include_tiff_files=include_tiff_files)
+			files_to_catalog = copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path, include_tiff_files=include_tiff_files)
 			catalog_images(files_to_catalog)
 		else:
 			print('\n\nERROR: Not all parameters present.\n\n')
