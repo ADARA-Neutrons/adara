@@ -446,13 +446,21 @@ def do_pre_post_timepix3(arg_list):
                 include_tiff_files = False
             else:
                 include_tiff_files = True
-            if detector_type in ['MCP TPX']:
+            # No Value Strings from ADARA/STC in Command Args Yet... ;-b
+            #if detector_type in ['MCP TPX']:
+            #    det_sub_dir = 'tpx'
+            #elif detector_type in ['Timepix 3']:
+            #    det_sub_dir = 'tpx3'
+            #else:
+            #    det_sub_dir = 'raw'
+            # Just Use Numerical Values from Enum for Now... ;-/
+            if detector_type == 3:  # 'MCP TPX'
                 det_sub_dir = 'tpx'
-            elif detector_type in ['Timepix 3']:
+            elif detector_type == 4:  # 'Timepix 3'
                 det_sub_dir = 'tpx3'
             else:
                 det_sub_dir = 'raw'
-            print('\nDetector Type {} -> Detector Sub-Directory = [{}].\n'.format(str(detector_type), str(det_sub_dir))
+            print('\nDetector Type {} -> Detector Sub-Directory = [{}].\n'.format(str(detector_type), str(det_sub_dir)))
             files_to_catalog = copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path, det_sub_dir, include_tiff_files=include_tiff_files)
             catalog_images(files_to_catalog)
         else:
