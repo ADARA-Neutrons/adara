@@ -830,6 +830,10 @@
 			<pattern>:Det:N1:TIFF:FileName$</pattern>
 			<name>TIFFFileName</name>
 		</element>
+		<element>
+			<pattern>:Exp:Det$</pattern>
+			<name>DetectorType</name>
+		</element>
 	</command>
 
 	<!-- Pre-Post-Auto-Reduction Command Interface (for Timepix3 Image Files from CG1D) -->
