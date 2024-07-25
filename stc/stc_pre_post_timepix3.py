@@ -105,7 +105,7 @@ def determine_source_and_target_directories(beamline, source_dir, ipts_dir, targ
     print('\n\ninitial_image_dir: {}\nnew_image_dir: {}\n\n'.format(initial_image_dir, new_image_dir))
     return initial_image_dir, new_image_dir
 
-def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, config_tpx_file_path):
+def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, config_tpx_file_path, det_sub_dir):
     """
     Determines source and target directories for copying.
     """
@@ -131,7 +131,7 @@ def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, c
         else:
             target_dir = f'/SNS/{beamline}'
     # new_tpx3_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
-    new_tpx3_dir = "{}/{}/images/mcp/Run_{}/tpx3".format(target_dir, proposal, run_number) 
+    new_tpx3_dir = "{}/{}/images/mcp/Run_{}/{}".format(target_dir, proposal, run_number, det_sub_dir) 
     
     print('\n\ninitial_tpx3_dir: {}\nnew_tpx3_dir: {}\n\n'.format(initial_tpx3_dir, new_tpx3_dir))
     return initial_tpx3_dir, new_tpx3_dir
@@ -280,7 +280,7 @@ def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_p
     return source_files, target_files
 
 
-def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path, include_tiff_files=True):
+def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path, det_sub_dir, include_tiff_files=True):
     """
     Copies image files for the specified run.
     """
@@ -310,7 +310,7 @@ def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_fil
 
     # ---------------------
     # Handle raw tpx3 files
-    initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, config_tpx_file_path)
+    initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, config_tpx_file_path, det_sub_dir)
     # Identify target tpx files. Wait for file count to be stable for at least 60.0 seconds.
     source_files, target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=False)
 
@@ -422,9 +422,11 @@ def process_args(arg_list):
             config_tpx_file_path = value
         elif key == "ConfigTIFFFilePath":
             config_tiff_file_path = value
+        elif key == "DetectorType":
+            detector_type = value
 
 
-    return beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path, config_tpx_file_path, config_tiff_file_path
+    return beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path, config_tpx_file_path, config_tiff_file_path, detector_type
 
 
 def do_pre_post_timepix3(arg_list):
@@ -435,16 +437,23 @@ def do_pre_post_timepix3(arg_list):
     try:
         print('\n\nPre-Post-Processing for Timepix3.\n\n')
 
-        beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path, config_tpx_file_path, config_tiff_file_path = process_args(arg_list)
+        beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path, config_tpx_file_path, config_tiff_file_path, detector_type = process_args(arg_list)
 
-        parms_present = all (p is not None for p in [proposal, run_number, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path])
+        parms_present = all (p is not None for p in [proposal, run_number, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path, detector_type])
 
         if parms_present is not None:
             if beamline in ['CG1D', 'VENUS']:
                 include_tiff_files = False
             else:
                 include_tiff_files = True
-            files_to_catalog = copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path, include_tiff_files=include_tiff_files)
+            if detector_type in ['MCP TPX']:
+                det_sub_dir = 'tpx'
+            elif detector_type in ['Timepix 3']:
+                det_sub_dir = 'tpx3'
+            else:
+                det_sub_dir = 'raw'
+            print('\nDetector Type {} -> Detector Sub-Directory = [{}].\n'.format(str(detector_type), str(det_sub_dir))
+            files_to_catalog = copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path, det_sub_dir, include_tiff_files=include_tiff_files)
             catalog_images(files_to_catalog)
         else:
             print('\n\nERROR: Not all parameters present.\n\n')
