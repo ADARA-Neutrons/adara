@@ -454,9 +454,9 @@ def do_pre_post_timepix3(arg_list):
             #else:
             #    det_sub_dir = 'raw'
             # Just Use Numerical Values from Enum for Now... ;-/
-            if detector_type == 3:  # 'MCP TPX'
+            if int(detector_type) == 3:  # 'MCP TPX'
                 det_sub_dir = 'tpx'
-            elif detector_type == 4:  # 'Timepix 3'
+            elif int(detector_type) == 4:  # 'Timepix 3'
                 det_sub_dir = 'tpx3'
             else:
                 det_sub_dir = 'raw'
