@@ -1,6 +1,8 @@
 #ifndef __QUICK_COUNTER_H
 #define __QUICK_COUNTER_H
 
+#include <boost/smart_ptr.hpp>
+
 #include <string>
 
 #include <stdint.h>
@@ -17,22 +19,35 @@ class smsFloat64PV;
 class QuickCounter {
 public:
 
-	QuickCounter(struct FastMeta::Variable *var, uint32_t key);
+	QuickCounter(boost::shared_ptr<MetaDataMgr> mgr,
+			struct FastMeta::Variable *var, uint32_t key,
+			uint32_t stat_devId);
 
 	void reset_stats(void);
 
-	void update_pvs(void);
+	void update_pvs(struct timespec *ts);
+
+	void sendUpdates(struct timespec *now);
+
+	void sendUpdateUint32(struct timespec *now,
+			uint32_t varId, uint32_t val);
+	void sendUpdateFloat64(struct timespec *now,
+			uint32_t varId, double dval);
 
 	void startCounting(uint64_t pulse_id, uint32_t tof);
 	void stopCounting(uint64_t pulse_id, uint32_t tof);
 
-	void addDetectorAllCounts(uint32_t counts);
-	void addMonitorAllCounts(uint32_t counts);
+	void addDetectorAllCounts(uint64_t pulse_id, uint32_t counts);
+	void addMonitorAllCounts(uint64_t pulse_id, uint32_t counts);
 
 private:
 	SMSControl *m_ctrl;
 
+	boost::shared_ptr<MetaDataMgr> m_meta;
+
 	int32_t m_counter_id;
+
+	uint32_t m_stat_devId;
 
 	struct FastMeta::Variable *m_var;
 	uint32_t m_key;
