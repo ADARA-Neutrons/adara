@@ -239,10 +239,18 @@ void FastMeta::addDevice(const std::string &name,
 		m_vars[key].m_is_counter = is_counter;
 		m_vars[key].m_name = name;
 
-		// Create Counter/Statistic PVs, As Needed... ;-D
+		// Create Counter, Statistic PVs, Device Descriptor,
+		// As Needed... ;-D
 		if ( is_counter ) {
+
+			// Create Counter Statistics Device Descriptor...
+			uint32_t stat_devId;
+			addCounterStatsDevice(name, stat_devId);
+
+			// Create New QuickCounter Instance...
 			DEBUG("addDevice(): Create Quick Counter Here...");
-			m_vars[key].m_counter = new QuickCounter( &(m_vars[key]), key );
+			m_vars[key].m_counter = new QuickCounter( m_meta,
+				&(m_vars[key]), key, stat_devId );
 		}
 	}
 
@@ -355,6 +363,88 @@ void FastMeta::addGenericDevice(uint32_t pixel, uint32_t &key)
 	 * add the DDP to the stream. We'll carry it around even if we don't
 	 * end up seeing the fast metadata, but we don't have to perform
 	 * a mostly useless check for each event.
+	 */
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_meta->addFastMetaDDP(now, devId, ddp.str());
+}
+
+void FastMeta::addCounterStatsDevice(const std::string &name,
+		uint32_t &devId)
+{
+	std::stringstream ddp;
+
+	// PV Index for Fast Meta-Data Quick Counter Device... ;-D
+	uint32_t varId;
+
+	ddp << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+	ddp << "<device"
+		<< " xmlns=\"http://public.sns.gov/schema/device.xsd\""
+		<< " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+		<< " xsi:schemaLocation=\"http://public.sns.gov/schema/device.xsd"
+		<< " http://public.sns.gov/schema/device.xsd\">\n";
+	ddp << "<device_name>" << name << "</device_name>\n";
+	ddp << "<process_variables>\n";
+
+	// Is Counting State PV
+	varId = 1;
+	ddp << "    <process_variable>\n";
+	ddp << "        <pv_name>" << name << ":IsCounting" << "</pv_name>\n";
+	ddp << "        <pv_id>" << varId << "</pv_id>\n";
+	ddp << "        <pv_description>" << "Is Counting State"
+		<< " for QuickCounter " << name
+		<< "</pv_description>\n";
+	ddp << "        <pv_type>unsigned</pv_type>\n";
+	ddp << "    </process_variable>\n";
+
+	// Elapsed Time PV
+	varId = 2;
+	ddp << "    <process_variable>\n";
+	ddp << "        <pv_name>" << name << ":ElapsedTime" << "</pv_name>\n";
+	ddp << "        <pv_id>" << varId << "</pv_id>\n";
+	ddp << "        <pv_description>" << "Elapsed Time"
+		<< " for QuickCounter " << name
+		<< "</pv_description>\n";
+	ddp << "        <pv_type>double</pv_type>\n";
+	ddp << "    </process_variable>\n";
+
+	// Detector Counts All PV
+	varId = 3;
+	ddp << "    <process_variable>\n";
+	ddp << "        <pv_name>" << name << ":DetectorAll" << "</pv_name>\n";
+	ddp << "        <pv_id>" << varId << "</pv_id>\n";
+	ddp << "        <pv_description>" << "Detector Counts All"
+		<< " for QuickCounter " << name
+		<< "</pv_description>\n";
+	ddp << "        <pv_type>unsigned</pv_type>\n";
+	ddp << "    </process_variable>\n";
+
+	// Monitor Counts All PV
+	varId = 4;
+	ddp << "    <process_variable>\n";
+	ddp << "        <pv_name>" << name << ":MonitorAll" << "</pv_name>\n";
+	ddp << "        <pv_id>" << varId << "</pv_id>\n";
+	ddp << "        <pv_description>" << "Monitor Counts All"
+		<< " for QuickCounter " << name
+		<< "</pv_description>\n";
+	ddp << "        <pv_type>unsigned</pv_type>\n";
+	ddp << "    </process_variable>\n";
+
+	ddp << "</process_variables>\n";
+	ddp << "</device>\n";
+
+	// Map Next SMS Internal Device ID...
+	bool reconnected = false; // ignored for FastMeta devices...
+	devId = m_meta->allocDev(++m_numDevs,
+		0 /* srcTag=0, for SMS Internal */, true /* do_log */, reconnected);
+
+	DEBUG("addCounterStatsDevice(): Creating New Descriptor for"
+		<< " QuickCounter Fast Meta-Data Device"
+		<< " [" << name << "]"
+		<< " ddp=[" << ddp.str() << "]"
+		<< " devId=" << devId);
+
+	/* Add the DDP to the stream.
 	 */
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);

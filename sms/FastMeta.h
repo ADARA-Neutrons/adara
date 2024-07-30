@@ -35,6 +35,8 @@ public:
 
 	void addGenericDevice(uint32_t pixel, uint32_t &key);
 
+	void addCounterStatsDevice(const std::string &name, uint32_t &devId);
+
 	void sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof);
 
 	void sendMultUpdate(uint64_t pulse_id, SMSControl::EventVector events);
