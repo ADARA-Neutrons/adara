@@ -247,7 +247,7 @@ void QuickCounter::startCounting(uint64_t pulse_id, uint32_t tof)
 		<< " sec=" << m_start_time.tv_sec
 		<< " ns=" << m_start_time.tv_nsec);
 
-	update_pvs( &m_start_time );
+	update_pvs( &ts );
 
 	// Register Detector All Counter with SMSControl...
 	m_detector_counts_all_id = m_ctrl->registerDetectorAllCounter(
