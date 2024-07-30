@@ -4829,12 +4829,14 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 
 	// Add All Detector Events to Any Registered Counters...
 	for ( uint32_t i=0 ; i < m_detectorAllCounter.size() ; ++i ) {
-		m_detectorAllCounter[i]->addDetectorAllCounts(event_count);
+		m_detectorAllCounter[i]->addDetectorAllCounts(pulse->m_id.first,
+			event_count);
 	}
 
 	// Add All Monitor Events to Any Registered Counters...
 	for ( uint32_t i=0 ; i < m_monitorAllCounter.size() ; ++i ) {
-		m_monitorAllCounter[i]->addMonitorAllCounts(monitor_count);
+		m_monitorAllCounter[i]->addMonitorAllCounts(pulse->m_id.first,
+			monitor_count);
 	}
 
 	// If We Got Neutrons, We Will Count This Pulse's Proton Charge! :-D
