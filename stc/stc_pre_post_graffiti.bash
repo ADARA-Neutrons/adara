@@ -335,12 +335,6 @@ duration=`GET_NEXUS_VAL "duration" "Run Duration (Seconds)"`
 # Experiment Title
 experiment_title=`GET_NEXUS_STR "experiment_title" "Experiment Title"`
 
-# Experiment Number
-experiment_number=`GET_NEXUS_VAL \
-	"DASlogs/ExpNum/value" \
-	"SpICE Experiment Number"`
-experiment_number0=`printf "%04s" "${experiment_number}"`
-
 # SpICE Command
 spice_command="Not_Used"
 
@@ -777,11 +771,8 @@ fi
 graffiti_path="${ipts_path}/graffiti"
 echo -e "\ngraffiti_path = [${graffiti_path}]"
 
-graffiti_name="${beamline}_exp${experiment_number0}_scan${run_number}.dat"
+graffiti_name="${beamline}_IPTS${proposal}_RUN${run_number}.dat"
 echo -e "\ngraffiti_name = [${graffiti_name}]"
-
-spice_path="${data_path}/exp${experiment_number}/Datafiles"
-echo -e "\nspice_path = [${spice_path}]"
 
 scratch_dir="/tmp"
 
@@ -812,9 +803,6 @@ echo "# proposal = ${proposal}" >> "${scratch}"
 
 # Experiment (IPTS Title? Or Run Title?)
 echo "# experiment = ${experiment_title}" >> "${scratch}"
-
-# Experiment Number (There Isn't Any... ;-b)
-echo "# experiment_number = ${experiment_number}" >> "${scratch}"
 
 # (SpICE) Command (Not Used)
 echo "# command = ${spice_command}" >> "${scratch}"
@@ -1186,36 +1174,6 @@ if [[ ${status} == 0 ]]; then
 	else
 		echo -e "\nGraffiti Data File ${graffiti_name} Moved to Archive:\n"
 		${LS} -l "${graffiti_path}/${graffiti_name}"
-	fi
-fi
-
-# Make a Copy of Graffiti File in the SpICE-Expected Directory Structure
-
-spice_status=0
-
-if [[ ! -d "${spice_path}" ]]; then
-	${MKDIR} -p "${spice_path}"
-	if [[ $? != 0 ]]; then
-		echo -e "\nError Creating SpICE Experiment Datafiles Directory...!"
-		spice_status=1
-	else
-		echo -e "\nSpICE Experiment Datafiles Path Successfully Created:\n"
-		ls -ld "${spice_path}"
-	fi
-else
-	echo -e "\nSpICE Experiment Datafiles Archive Path Exists:\n"
-	${LS} -ld "${spice_path}"
-fi
-
-if [[ ${status} == 0 || ${spice_status} == 0 ]]; then
-	${CP} "${graffiti_path}/${graffiti_name}" \
-		"${spice_path}/${graffiti_name}"
-	if [[ $? != 0 ]]; then
-		echo -e "\nError Copying Graffiti Data File to SpICE Datafiles...!"
-		status=2
-	else
-		echo -e "\nGraffiti Data File ${graffiti_name} Copied to SpICE:\n"
-		${LS} -l "${spice_path}/${graffiti_name}"
 	fi
 fi
 
