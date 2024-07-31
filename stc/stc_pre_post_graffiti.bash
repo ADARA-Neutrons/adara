@@ -8,6 +8,7 @@ BASENAME="/usr/bin/basename"
 MKDIR="/usr/bin/mkdir"
 TOUCH="/usr/bin/touch"
 GREP="/usr/bin/grep"
+TAIL="/usr/bin/tail"
 AWK="/usr/bin/awk"
 CAT="/usr/bin/cat"
 SED="/usr/bin/sed"
@@ -168,8 +169,9 @@ GET_NEXUS_STR()
 
 	local _label="$*"
 
+	# Always Take "Last Value" Found in PV Log... ;-D
 	local _str=`${NXLS} ${nexus} -p /entry/${_path} -l -s --terse \
-		| ${SED} "s/\"//g"`
+		| ${SED} "s/\"//g" | ${TAIL} -1`
 
 	# Replace "%20" White Space Encodings...
 	_str=`echo "${_str}" | ${SED} "s/%20/ /g"`
@@ -183,12 +185,26 @@ GET_NEXUS_STR()
 
 GET_NEXUS_VAL()
 {
+	# Check for "--all" Option, for GET_NEXUS_ARRAY() Usage...
+	local _do_all=0
+	if [[ "$1" == "--all" ]]; then
+		_do_all=1
+		shift
+	fi
+
 	local _path="$1"
 	shift
 
 	local _label="$*"
 
-	local _val=`${NXLS} ${nexus} -p /entry/${_path} -l -s --terse`
+	if [[ ${_do_all} == 1 ]]; then
+		# Take All the Values Found in PV Log... ;-D
+		local _val=`${NXLS} ${nexus} -p /entry/${_path} -l -s --terse`
+	else
+		# Otherwise Just Take "Last Value" Found in PV Log... ;-D
+		local _val=`${NXLS} ${nexus} -p /entry/${_path} -l -s --terse \
+			| ${TAIL} -1`
+	fi
 
 	if [[ -z ${_val} ]]; then
 		_val="Error Extracting ${_label} from NeXus"
@@ -212,7 +228,7 @@ GET_NEXUS_ARRAY()
 
 	# Extract Array Values from NeXus...
 
-	local _val_arr=`GET_NEXUS_VAL "${_path}" "${_label}"`
+	local _val_arr=`GET_NEXUS_VAL "--all" "${_path}" "${_label}"`
 
 	if [[ -z ${_val_arr} || ${val_arr} =~ ^Error ]]; then
 		echo "Error Extracting ${_label} Array from NeXus...!"
@@ -786,6 +802,13 @@ echo
 ${LS} -l "${scratch}"
 
 #
+# Populate SPEC Header...
+#
+
+# 1st Line in File Starts "#S <RunNumber> experiment command ... "
+echo "#S ${run_number} scan ${def_x} 0 100 1" >> "${scratch}"
+
+#
 # Populate Graffiti Header...
 #
 
@@ -865,11 +888,43 @@ echo "# def_y = ${def_y}" >> "${scratch}"
 # Dump Multi-Column Data Section
 #
 
-# Dump Column Labels...
+# Graffiti Column Labels...
 
 echo "# col_headers = " >> "${scratch}"
 
 echo -n "#   Pt." >> "${scratch}"
+
+printf " %14s" "timestamp" >> "${scratch}"
+
+for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
+
+	# "Clean" the PVName Path to Eliminate the Cruft...
+	# - This Needs to be the BLXXX Beamline PV Prefix,
+	# Probably _Not_ the Beamline Long Name.
+	# (As it happens, this Works for "HB3"! ;-D)
+	# Note: This may not really be necessary,
+	# given proper PV Aliases in the beamline.xml file... ;-D
+	if [[ -n ${beamline_prefix} ]]; then
+		pvname=`echo "${PVNames[${pv}]}" \
+			| ${SED} -e "s/${beamline_prefix}://" \
+				-e "s/Mot://" \
+				-e "s/.RBV//"`
+	else
+		pvname=`echo "${PVNames[${pv}]}" \
+			| ${SED} -e "s/${beamline}://" \
+				-e "s/Mot://" \
+				-e "s/.RBV//"`
+	fi
+
+	printf " %14s" "${pvname}" >> "${scratch}"
+
+done
+
+echo >> "${scratch}"
+
+# SPEC Column Labels...
+
+echo -n "#L   Pt." >> "${scratch}"
 
 printf " %14s" "timestamp" >> "${scratch}"
 
