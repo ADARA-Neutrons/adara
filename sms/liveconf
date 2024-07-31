@@ -1528,6 +1528,8 @@ if [[ "$command" == "status" \
 
 		caget $WAIT ${PRE}:${SMS}:RunNumber
 
+		caget $WAIT ${PRE}:${SMS}:Next:RunNumber
+
 		caget $WAIT ${PRE}:${SMS}:Summary
 		sr="${PRE}:${SMS}:SummaryReason"
 		caget $WAIT -S $sr | grep $sr | awk "$awkLineBreak"

@@ -74,6 +74,7 @@ if [[ "$inrun" == "true" ]]; then
 			echo -e "\"caput ${BL}:${SMS}:Recording false\" command:"
 			echo -e "\n${stopout}\n"
 			caget -S -a ${BL}:${SMS}:Recording ${BL}:${SMS}:RunNumber \
+				${BL}:${SMS}:Next:RunNumber \
 				${BL}:${SMS}:Summary ${BL}:${SMS}:SummaryReason
 			echo -e "\nRetrying, cnt=$cnt/3..."
 			cnt=$(( $cnt + 1 ))
@@ -113,6 +114,7 @@ while [[ $cnt -lt 3 ]]; do
 			"\nOutput from \"caput ${BL}:${SMS}:Recording true\" command:"
 		echo -e "\n${startout}\n"
 		caget -S -a ${BL}:${SMS}:Recording ${BL}:${SMS}:RunNumber \
+			${BL}:${SMS}:Next:RunNumber \
 			${BL}:${SMS}:Summary ${BL}:${SMS}:SummaryReason
 		echo -e "\nRetrying, cnt=$cnt/3..."
 		cnt=$(( $cnt + 1 ))

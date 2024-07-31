@@ -326,6 +326,7 @@ if [ $do_notify == 1 ]; then
 
 				caget ${WAIT} -a "${prefix}:Recording"
 				caget ${WAIT} "${prefix}:RunNumber"
+				caget ${WAIT} "${prefix}:Next:RunNumber"
 				caget ${WAIT} "${summaryPV}"
 				caget ${WAIT} -S "${prefix}:SummaryReason"
 
@@ -353,6 +354,7 @@ if [ $do_notify == 1 ]; then
 
 					caget ${WAIT} -a "${prefix}:Recording"
 					caget ${WAIT} "${prefix}:RunNumber"
+					caget ${WAIT} "${prefix}:Next:RunNumber"
 					caget ${WAIT} "${summaryPV}"
 					caget ${WAIT} -S "${prefix}:SummaryReason"
 
