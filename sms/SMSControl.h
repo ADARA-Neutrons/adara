@@ -899,8 +899,9 @@ private:
 
 	boost::shared_ptr<PVPrefixPV> m_pvAltPrimaryPVPrefix;
 
-	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
+	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
+	boost::shared_ptr<smsRunNumberPV> m_pvNextRunNumber;
 	boost::shared_ptr<smsErrorPV> m_pvSummary;
 	boost::shared_ptr<smsStringPV> m_pvSummaryReason;
 

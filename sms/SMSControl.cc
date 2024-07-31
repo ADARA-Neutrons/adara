@@ -1065,8 +1065,12 @@ SMSControl::SMSControl() :
 
 	m_pvRecording = boost::shared_ptr<smsRecordingPV>(new
 						smsRecordingPV(m_pvPrefix, this));
+
 	m_pvRunNumber = boost::shared_ptr<smsRunNumberPV>(new
 						smsRunNumberPV(m_pvPrefix));
+
+	m_pvNextRunNumber = boost::shared_ptr<smsRunNumberPV>(new
+						smsRunNumberPV(m_pvPrefix + ":Next"));
 
 	m_markers = boost::shared_ptr<Markers>(new
 						Markers(this, m_notesCommentAutoReset));
@@ -1178,6 +1182,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvLogLevel);
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
+	addPV(m_pvNextRunNumber);
 	addPV(m_pvSummary);
 	addPV(m_pvSummaryReason);
 	addPV(m_pvInstanceId);
@@ -1445,6 +1450,8 @@ SMSControl::SMSControl() :
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to Get Next Run Number");
+
+	m_pvNextRunNumber->update(m_nextRunNumber, &now);
 
 	m_beamlineInfo.reset(new BeamlineInfo(m_targetStationNumber,
 			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
@@ -2563,6 +2570,9 @@ SMSControl::epicsEventHandler( struct event_handler_args a_args )
 						ctrl->m_nextRunNumber = ctrl->uint32ValueOf(
 							ich->second.m_pv->m_type, state );
 
+						ctrl->m_pvNextRunNumber->update(
+							ctrl->m_nextRunNumber, &ts );
+
 						DEBUG("epicsEventHandler():"
 							<< "External PV Setting NEXT RunNumber to "
 							<< ctrl->m_nextRunNumber << " at "
@@ -2827,6 +2837,8 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 		// We've Updated the Run Number on disk,
 		// so if we Fail Now, we need to Fail Big...
 		m_currentRunNumber = m_nextRunNumber++;
+
+		m_pvNextRunNumber->update(m_nextRunNumber, ts);
 
 		INFO("Starting Run " << m_currentRunNumber
 			<< " at ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
