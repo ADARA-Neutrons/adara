@@ -888,41 +888,7 @@ echo "# def_y = ${def_y}" >> "${scratch}"
 # Dump Multi-Column Data Section
 #
 
-# Graffiti Column Labels...
-
-echo "# col_headers = " >> "${scratch}"
-
-echo -n "#   Pt." >> "${scratch}"
-
-printf " %14s" "timestamp" >> "${scratch}"
-
-for (( pv=0 ; pv < nPVNames ; pv++ )) ; do
-
-	# "Clean" the PVName Path to Eliminate the Cruft...
-	# - This Needs to be the BLXXX Beamline PV Prefix,
-	# Probably _Not_ the Beamline Long Name.
-	# (As it happens, this Works for "HB3"! ;-D)
-	# Note: This may not really be necessary,
-	# given proper PV Aliases in the beamline.xml file... ;-D
-	if [[ -n ${beamline_prefix} ]]; then
-		pvname=`echo "${PVNames[${pv}]}" \
-			| ${SED} -e "s/${beamline_prefix}://" \
-				-e "s/Mot://" \
-				-e "s/.RBV//"`
-	else
-		pvname=`echo "${PVNames[${pv}]}" \
-			| ${SED} -e "s/${beamline}://" \
-				-e "s/Mot://" \
-				-e "s/.RBV//"`
-	fi
-
-	printf " %14s" "${pvname}" >> "${scratch}"
-
-done
-
-echo >> "${scratch}"
-
-# SPEC Column Labels...
+# SPEC-Friendly Column Labels...
 
 echo -n "#L   Pt." >> "${scratch}"
 
