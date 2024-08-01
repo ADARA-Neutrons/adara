@@ -7,6 +7,7 @@ NXLS="/usr/local/bin/nxls"
 BASENAME="/usr/bin/basename"
 MKDIR="/usr/bin/mkdir"
 TOUCH="/usr/bin/touch"
+DATE="/usr/bin/date"
 GREP="/usr/bin/grep"
 TAIL="/usr/bin/tail"
 AWK="/usr/bin/awk"
@@ -291,6 +292,22 @@ GET_TIME()
 	echo "${_time}"
 }
 
+SPEC_DATE()
+{
+	local _date_time="$1"
+	shift
+
+	local _label="$*"
+
+	local _spec_date=`${DATE} --date="${_date_time}"`
+
+	if [[ -z ${_spec_date} ]]; then
+		_spec_date="Error Extracting ${_label} from NeXus"
+	fi
+
+	echo "${_spec_date}"
+}
+
 FLOAT_COMPARE()
 {
 	local _fv1="$1"
@@ -339,6 +356,9 @@ FLOAT_COMPARE()
 start_time=`GET_NEXUS_STR "start_time" "Run Start Date and Time"`
 run_start_date=`GET_DATE "${start_time}" "Run Start Date"`
 run_start_time=`GET_TIME "${start_time}" "Run Start Time"`
+
+# Additional Human-Readable SPEC Start Date
+spec_start_time=`SPEC_DATE "${start_time}" "SPEC Date String"`
 
 # Run Stop Date and Time
 end_time=`GET_NEXUS_STR "end_time" "Run Stop Date and Time"`
@@ -807,6 +827,9 @@ ${LS} -l "${scratch}"
 
 # 1st Line in File Starts "#S <RunNumber> experiment command ... "
 echo "#S ${run_number} scan ${def_x} 0 100 1" >> "${scratch}"
+
+# SPEC (Start) Date String...
+echo "#D ${spec_start_time}" >> "${scratch}"
 
 #
 # Populate Graffiti Header...
