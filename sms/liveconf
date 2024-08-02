@@ -1699,6 +1699,8 @@ if [[ "$command" == "status" \
 					| awk '{print $2}'`
 
 				caget $WAIT ${PRE}:${SMS}:${qcName}:IsCounting
+				caget $WAIT ${PRE}:${SMS}:${qcName}:DoneTimeout
+				caget $WAIT ${PRE}:${SMS}:${qcName}:AutoReset
 				caget $WAIT ${PRE}:${SMS}:${qcName}:ElapsedTime
 				caget $WAIT ${PRE}:${SMS}:${qcName}:DetectorAll
 				caget $WAIT ${PRE}:${SMS}:${qcName}:MonitorAll
