@@ -16,12 +16,18 @@ class smsBooleanPV;
 class smsUint32PV;
 class smsFloat64PV;
 
+// QuickCounter "IsCounting" State Flags
+#define QC_NOT_COUNTING		(0)
+#define QC_COUNTING			(1)
+#define QC_WAITING			(2)
+#define QC_DONE_COUNTING	(3)
+
 class QuickCounter {
 public:
 
 	QuickCounter(boost::shared_ptr<MetaDataMgr> mgr,
 			struct FastMeta::Variable *var, uint32_t key,
-			uint32_t stat_devId);
+			uint32_t stat_devId, double done_timeout, bool auto_reset);
 
 	void reset_stats(void);
 
@@ -37,8 +43,18 @@ public:
 	void startCounting(uint64_t pulse_id, uint32_t tof);
 	void stopCounting(uint64_t pulse_id, uint32_t tof);
 
+	void doneCounting(uint64_t pulse_id);
+
 	void addDetectorAllCounts(uint64_t pulse_id, uint32_t counts);
 	void addMonitorAllCounts(uint64_t pulse_id, uint32_t counts);
+
+	uint32_t m_counting;
+
+	double m_done_timeout;
+
+	struct timespec m_start_time;
+	struct timespec m_stop_time;
+	struct timespec m_done_time;
 
 private:
 	SMSControl *m_ctrl;
@@ -52,11 +68,12 @@ private:
 	struct FastMeta::Variable *m_var;
 	uint32_t m_key;
 
-	boost::shared_ptr<smsBooleanPV> m_pvCounting;
-	bool m_counting;
+	boost::shared_ptr<smsUint32PV> m_pvCounting;
 
-	struct timespec m_start_time;
-	struct timespec m_stop_time;
+	boost::shared_ptr<smsFloat64PV> m_pvDoneTimeout;
+
+	boost::shared_ptr<smsBooleanPV> m_pvAutoReset;
+	bool m_auto_reset;
 
 	boost::shared_ptr<smsFloat64PV> m_pvElapsedTime;
 	double m_elapsed_time;
