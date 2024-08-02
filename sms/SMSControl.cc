@@ -4276,9 +4276,24 @@ int32_t SMSControl::registerMonitorAllCounter(QuickCounter *counter,
 void SMSControl::unregisterDetectorAllCounter(std::string counterName,
 		int32_t detector_counts_all_id)
 {
+	if ( detector_counts_all_id < 0
+			|| detector_counts_all_id
+				>= (int32_t) m_detectorAllCounter.size() ) {
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterDetectorAllCounter()"
+			<< " *** INVALID Detector Counts All Registration ID...!"
+			<< " Name=" << counterName
+			<< " detector_counts_all_id=" << detector_counts_all_id
+			<< " m_detectorAllCounter.size()="
+			<< m_detectorAllCounter.size() );
+		return;
+	}
+
 	DEBUG( ( m_recording ? "[RECORDING] " : "" )
 		<< "unregisterDetectorAllCounter() Name=" << counterName
-		<< " detector_counts_all_id=" << detector_counts_all_id);
+		<< " detector_counts_all_id=" << detector_counts_all_id
+		<< " m_detectorAllCounter.size()="
+		<< m_detectorAllCounter.size() );
 
 	// Remove Reference to the Quick Counter Instance...
 	m_detectorAllCounter.erase( m_detectorAllCounter.begin()
@@ -4291,9 +4306,24 @@ void SMSControl::unregisterDetectorAllCounter(std::string counterName,
 void SMSControl::unregisterMonitorAllCounter(std::string counterName,
 		int32_t monitor_counts_all_id)
 {
+	if ( monitor_counts_all_id < 0
+			|| monitor_counts_all_id
+				>= (int32_t) m_monitorAllCounter.size() ) {
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterMonitorAllCounter()"
+			<< " *** INVALID Monitor Counts All Registration ID...!"
+			<< " Name=" << counterName
+			<< " monitor_counts_all_id=" << monitor_counts_all_id
+			<< " m_monitorAllCounter.size()="
+			<< m_monitorAllCounter.size() );
+		return;
+	}
+
 	DEBUG( ( m_recording ? "[RECORDING] " : "" )
 		<< "unregisterMonitorAllCounter() Name=" << counterName
-		<< " monitor_counts_all_id=" << monitor_counts_all_id);
+		<< " monitor_counts_all_id=" << monitor_counts_all_id
+		<< " m_monitorAllCounter.size()="
+		<< m_monitorAllCounter.size() );
 
 	// Remove Reference to the Quick Counter Instance...
 	m_monitorAllCounter.erase( m_monitorAllCounter.begin()
@@ -4839,16 +4869,67 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		events++;
 	}
 
-	// Add All Detector Events to Any Registered Counters...
-	for ( uint32_t i=0 ; i < m_detectorAllCounter.size() ; ++i ) {
-		m_detectorAllCounter[i]->addDetectorAllCounts(pulse->m_id.first,
-			event_count);
-	}
+	// Generate Comparable Pulse Time as needed... ;-D
+	if ( m_detectorAllCounter.size() || m_monitorAllCounter.size() )
+	{
+		struct timespec pulse_time;
 
-	// Add All Monitor Events to Any Registered Counters...
-	for ( uint32_t i=0 ; i < m_monitorAllCounter.size() ; ++i ) {
-		m_monitorAllCounter[i]->addMonitorAllCounts(pulse->m_id.first,
-			monitor_count);
+		pulse_time.tv_sec = pulse->m_id.first >> 32;  // EPICS Time...!
+		pulse_time.tv_nsec = pulse->m_id.first & 0xffffffff;
+
+		DEBUG("pulseEvents(): Detector/Monitor All Counters Registered"
+			<< " - Pulse Time 0x"
+			<< std::hex << pulse->m_id.first << std::dec
+			<< " = " << pulse_time.tv_sec << "."
+                << std::setfill('0') << std::setw(9)
+                << pulse_time.tv_nsec << std::setw(0));
+
+		// Add All Detector Events to Any Registered Counters...
+		for ( uint32_t i=0 ; i < m_detectorAllCounter.size() ; ++i ) {
+			QuickCounter *QC = m_detectorAllCounter[i];
+			DEBUG("pulseEvents():"
+				<< " m_start_time=" << QC->m_start_time.tv_sec << "."
+                << std::setfill('0') << std::setw(9)
+                << QC->m_start_time.tv_nsec << std::setw(0)
+				<< " compareTimeStamps( pulse_time, m_start_time ) = "
+				<< compareTimeStamps( pulse_time, QC->m_start_time )
+				<< " m_counting=" << QC->m_counting
+				<< " m_stop_time=" << QC->m_stop_time.tv_sec << "."
+                << std::setfill('0') << std::setw(9)
+                << QC->m_stop_time.tv_nsec << std::setw(0)
+				<< " compareTimeStamps( pulse_time, m_stop_time ) = "
+				<< compareTimeStamps( pulse_time, QC->m_stop_time ));
+			if ( compareTimeStamps( pulse_time, QC->m_start_time ) >= 0
+					&& ( QC->m_counting == QC_COUNTING
+						|| ( QC->m_counting == QC_WAITING
+							&& compareTimeStamps( pulse_time,
+								QC->m_stop_time ) <= 0 ) ) ) {
+				// DEBUG("YES");
+				QC->addDetectorAllCounts( pulse->m_id.first, event_count);
+			}
+			// else DEBUG("NO");
+		}
+
+		// Add All Monitor Events to Any Registered Counters...
+		for ( uint32_t i=0 ; i < m_monitorAllCounter.size() ; ++i ) {
+			QuickCounter *QC = m_monitorAllCounter[i];
+			if ( compareTimeStamps( pulse_time, QC->m_start_time ) >= 0
+					&& ( QC->m_counting == QC_COUNTING
+						|| ( QC->m_counting == QC_WAITING
+							&& compareTimeStamps( pulse_time,
+								QC->m_stop_time ) <= 0 ) ) ) {
+				QC->addMonitorAllCounts( pulse->m_id.first, monitor_count);
+			}
+
+			// Check for Done Waiting Timeout Completion...!
+			// (Only Do for Registered *Monitor* All Counters,
+			// As We Don't Want to Stop Counting After the
+			// Detector All Part, And We Always Count for Both...! ;-D)
+			if ( QC->m_counting == QC_WAITING
+					&& compareTimeStamps( pulse_time,
+						QC->m_done_time ) >= 0 )
+				QC->doneCounting( pulse->m_id.first );
+		}
 	}
 
 	// If We Got Neutrons, We Will Count This Pulse's Proton Charge! :-D
