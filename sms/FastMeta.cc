@@ -29,6 +29,8 @@ void FastMeta::addDevices(const ptree &conf)
 {
 	LOGGER_INIT();
 
+	DEBUG("addDevices() Entry");
+
 	std::string name, prefix("fastmeta ");
 	size_t b, e, plen = prefix.length();
 	ptree::const_iterator it;
@@ -192,6 +194,43 @@ void FastMeta::addDevice(const std::string &name,
 		<< " at [" << path->second.data() << "]");
 	readFile(name, path->second.data(), ddp);
 
+	// Check for QuickCounter "Done Timeout" Config...
+	double done_timeout = 0.0;
+	path = info.find("done_timeout");
+	if (path != info.not_found()) {
+		try {
+			done_timeout = boost::lexical_cast<double>(
+				path->second.data() );
+		}
+		catch (...) {
+			ERROR("addDevice():"
+				<< " Error Parsing Done Timeout Config"
+				<< " for Fast Meta-Data Device"
+				<< " [" << name << "]"
+				<< " - Config Data = [" << path->second.data() << "]");
+		}
+	}
+
+	// Check for QuickCounter "Auto Reset" Config...
+	bool auto_reset = false;
+	path = info.find("auto_reset");
+	if (path != info.not_found()) {
+		try {
+			const std::string &bval = path->second.data();
+			if ( !bval.compare("true") )
+				auto_reset = true;
+			else
+				auto_reset = false;
+		}
+		catch (...) {
+			ERROR("addDevice():"
+				<< " Error Parsing Auto Reset Config"
+				<< " for Fast Meta-Data Device"
+				<< " [" << name << "]"
+				<< " - Config Data = [" << path->second.data() << "]");
+		}
+	}
+
 	bool reconnected = false; // ignored for FastMeta devices...
 	uint32_t devId = m_meta->allocDev(++m_numDevs,
 		0 /* srcTag=0, for SMS Internal */, true /* do_log */, reconnected);
@@ -199,7 +238,9 @@ void FastMeta::addDevice(const std::string &name,
 	bool persist;
 	bool is_counter;
 	BOOST_FOREACH(const ptree::value_type &v, info) {
-		if (!v.first.compare("description"))
+		if (!v.first.compare("description")
+				|| !v.first.compare("done_timeout")
+				|| !v.first.compare("auto_reset"))
 			continue;
 
 		/* Remove any trailing commend or whitespace. It'd be nice
@@ -232,7 +273,10 @@ void FastMeta::addDevice(const std::string &name,
 			<< " varId=" << varId
 			<< " key=0x" << std::hex << key << std::dec
 			<< " persist=" << persist
-			<< " is_counter=" << is_counter);
+			<< " is_counter=" << is_counter
+			<< " done_timeout=" << done_timeout
+			<< " auto_reset=" << auto_reset);
+
 		m_vars[key].m_devId = devId;
 		m_vars[key].m_varId = varId;
 		m_vars[key].m_persist = persist;
@@ -248,9 +292,9 @@ void FastMeta::addDevice(const std::string &name,
 			addCounterStatsDevice(name, stat_devId);
 
 			// Create New QuickCounter Instance...
-			DEBUG("addDevice(): Create Quick Counter Here...");
 			m_vars[key].m_counter = new QuickCounter( m_meta,
-				&(m_vars[key]), key, stat_devId );
+				&(m_vars[key]), key, stat_devId,
+				done_timeout, auto_reset );
 		}
 	}
 
