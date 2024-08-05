@@ -258,6 +258,22 @@ void QuickCounter::sendUpdateFloat64(struct timespec *ts,
 
 void QuickCounter::startCounting(uint64_t pulse_id, uint32_t tof)
 {
+	// UPDATE THE Internal IsCounting State from the PV NOW...!!
+	// (Since we expect the external QuickScan Control to do a
+	// Reset of the IsCounting to 0 before each new COunt Period... ;-D)
+	// TODO This should probably be wired in _Directly_ maybe,
+	// from the PV changed() method...? Unless that allows
+	// undue havoc to the Internal State Machine...? ;-)
+	uint32_t new_counting = m_pvCounting->value();
+	if ( m_counting != new_counting ) {
+		ERROR("startCounting(): Updating IsCounting State from PV"
+			<< " for Fast Meta-Data Counter Device"
+			<< " [" << m_var->m_name << "]"
+			<< " from " << m_counting
+			<< " to " << new_counting);
+		m_counting = new_counting;
+	}
+
 	/* Create a timestamp for each Counting Marker Trigger by
 	 * adding the TOF value to the pulse ID, handling overflow of the
 	 * nanoseconds field. TOF is originally in units of 100ns.
