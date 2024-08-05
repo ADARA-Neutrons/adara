@@ -266,7 +266,7 @@ void QuickCounter::startCounting(uint64_t pulse_id, uint32_t tof)
 	// undue havoc to the Internal State Machine...? ;-)
 	uint32_t new_counting = m_pvCounting->value();
 	if ( m_counting != new_counting ) {
-		ERROR("startCounting(): Updating IsCounting State from PV"
+		DEBUG("startCounting(): Updating IsCounting State from PV"
 			<< " for Fast Meta-Data Counter Device"
 			<< " [" << m_var->m_name << "]"
 			<< " from " << m_counting
@@ -526,7 +526,7 @@ void QuickCounter::doneCounting(uint64_t pulse_id)
 		return;
 	}
 
-	ERROR("doneCounting():"
+	DEBUG("doneCounting():"
 		<< " Done Waiting for Counts"
 		<< " for Fast Meta-Data Counter Device"
 		<< " [" << m_var->m_name << "]"
