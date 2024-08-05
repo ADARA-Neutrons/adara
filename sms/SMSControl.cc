@@ -4919,10 +4919,10 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 			// Check for "Last Pulse" of Count...
 			else if ( pulse->m_id.first == QC->m_stop_pulse_id ) {
 				DEBUG("pulseEvents(): Detector LAST PULSE"
-					<< " m_start_time=" << QC->m_start_time.tv_sec << "."
+					<< " m_stop_time=" << QC->m_stop_time.tv_sec << "."
                 	<< std::setfill('0') << std::setw(9)
-                	<< QC->m_start_time.tv_nsec << std::setw(0)
-					<< " m_start_pulse_id=" << QC->m_start_pulse_id
+                	<< QC->m_stop_time.tv_nsec << std::setw(0)
+					<< " m_stop_pulse_id=" << QC->m_stop_pulse_id
 					<< " m_counting=" << QC->m_counting);
 				uint32_t det_count = 0;
 				events = pkt.events();
@@ -4931,7 +4931,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					if ( !(events->pixel & 0xf0000000) ) {
 						uint32_t tof = events->tof & ((1U << 21) - 1);
 						tof *= 100;
-						if ( tof <= QC->m_start_tof )
+						if ( tof <= QC->m_stop_tof )
 							det_count++;
 					}
 					events++;
@@ -5005,10 +5005,10 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 			// Check for "Last Pulse" of Count...
 			else if ( pulse->m_id.first == QC->m_stop_pulse_id ) {
 				DEBUG("pulseEvents(): Monitor LAST PULSE"
-					<< " m_start_time=" << QC->m_start_time.tv_sec << "."
+					<< " m_stop_time=" << QC->m_stop_time.tv_sec << "."
                 	<< std::setfill('0') << std::setw(9)
-                	<< QC->m_start_time.tv_nsec << std::setw(0)
-					<< " m_start_pulse_id=" << QC->m_start_pulse_id
+                	<< QC->m_stop_time.tv_nsec << std::setw(0)
+					<< " m_stop_pulse_id=" << QC->m_stop_pulse_id
 					<< " m_counting=" << QC->m_counting);
 				uint32_t mon_count = 0;
 				events = pkt.events();
@@ -5017,7 +5017,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					if ( ( events->pixel & 0xf0000000 ) == 0x40000000 ) {
 						uint32_t tof = events->tof & ((1U << 21) - 1);
 						tof *= 100;
-						if ( tof <= QC->m_start_tof )
+						if ( tof <= QC->m_stop_tof )
 							mon_count++;
 					}
 					events++;
