@@ -4887,48 +4887,172 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		// Add All Detector Events to Any Registered Counters...
 		for ( uint32_t i=0 ; i < m_detectorAllCounter.size() ; ++i ) {
 			QuickCounter *QC = m_detectorAllCounter[i];
-			DEBUG("pulseEvents():"
-				<< " m_start_time=" << QC->m_start_time.tv_sec << "."
-                << std::setfill('0') << std::setw(9)
-                << QC->m_start_time.tv_nsec << std::setw(0)
-				<< " compareTimeStamps( pulse_time, m_start_time ) = "
-				<< compareTimeStamps( pulse_time, QC->m_start_time )
-				<< " m_counting=" << QC->m_counting
-				<< " m_stop_time=" << QC->m_stop_time.tv_sec << "."
-                << std::setfill('0') << std::setw(9)
-                << QC->m_stop_time.tv_nsec << std::setw(0)
-				<< " compareTimeStamps( pulse_time, m_stop_time ) = "
-				<< compareTimeStamps( pulse_time, QC->m_stop_time ));
-			if ( compareTimeStamps( pulse_time, QC->m_start_time ) >= 0
-					&& ( QC->m_counting == QC_COUNTING
-						|| ( QC->m_counting == QC_WAITING
-							&& compareTimeStamps( pulse_time,
-								QC->m_stop_time ) <= 0 ) ) ) {
-				// DEBUG("YES");
-				QC->addDetectorAllCounts( pulse->m_id.first, event_count);
+			// Check for "1st Pulse" of Count...
+			if ( pulse->m_id.first == QC->m_start_pulse_id ) {
+				DEBUG("pulseEvents(): Detector FIRST PULSE"
+					<< " m_start_time=" << QC->m_start_time.tv_sec << "."
+                	<< std::setfill('0') << std::setw(9)
+                	<< QC->m_start_time.tv_nsec << std::setw(0)
+					<< " m_start_pulse_id=" << QC->m_start_pulse_id
+					<< " m_counting=" << QC->m_counting);
+				uint32_t det_count = 0;
+				events = pkt.events();
+				for (i=0; i < count; i++) {
+					// Detector Event
+					if ( !(events->pixel & 0xf0000000) ) {
+						uint32_t tof = events->tof & ((1U << 21) - 1);
+						tof *= 100;
+						if ( tof >= QC->m_start_tof )
+							det_count++;
+					}
+					events++;
+				}
+				// Did We Count Any Detector Events...?
+				if ( det_count ) {
+					DEBUG("pulseEvents(): Detector FIRST PULSE"
+						<< " det_count=" << det_count
+						<< " vs. event_count=" << event_count);
+					QC->addDetectorAllCounts( pulse->m_id.first,
+						det_count);
+				}
 			}
-			// else DEBUG("NO");
+			// Check for "Last Pulse" of Count...
+			else if ( pulse->m_id.first == QC->m_stop_pulse_id ) {
+				DEBUG("pulseEvents(): Detector LAST PULSE"
+					<< " m_start_time=" << QC->m_start_time.tv_sec << "."
+                	<< std::setfill('0') << std::setw(9)
+                	<< QC->m_start_time.tv_nsec << std::setw(0)
+					<< " m_start_pulse_id=" << QC->m_start_pulse_id
+					<< " m_counting=" << QC->m_counting);
+				uint32_t det_count = 0;
+				events = pkt.events();
+				for (i=0; i < count; i++) {
+					// Detector Event
+					if ( !(events->pixel & 0xf0000000) ) {
+						uint32_t tof = events->tof & ((1U << 21) - 1);
+						tof *= 100;
+						if ( tof <= QC->m_start_tof )
+							det_count++;
+					}
+					events++;
+				}
+				// Did We Count Any Detector Events...?
+				if ( det_count ) {
+					DEBUG("pulseEvents(): Detector LAST PULSE"
+						<< " det_count=" << det_count
+						<< " vs. event_count=" << event_count);
+					QC->addDetectorAllCounts( pulse->m_id.first,
+						det_count);
+				}
+			}
+			// Otherwise, Just Count "All or None"...
+			else {
+				DEBUG("pulseEvents(): Detector"
+					<< " m_start_time=" << QC->m_start_time.tv_sec << "."
+                	<< std::setfill('0') << std::setw(9)
+                	<< QC->m_start_time.tv_nsec << std::setw(0)
+					<< " compareTimeStamps( pulse_time, m_start_time ) = "
+					<< compareTimeStamps( pulse_time, QC->m_start_time )
+					<< " m_counting=" << QC->m_counting
+					<< " m_stop_time=" << QC->m_stop_time.tv_sec << "."
+                	<< std::setfill('0') << std::setw(9)
+                	<< QC->m_stop_time.tv_nsec << std::setw(0)
+					<< " compareTimeStamps( pulse_time, m_stop_time ) = "
+					<< compareTimeStamps( pulse_time, QC->m_stop_time ));
+				if ( compareTimeStamps( pulse_time, QC->m_start_time ) >= 0
+						&& ( QC->m_counting == QC_COUNTING
+							|| ( QC->m_counting == QC_WAITING
+								&& compareTimeStamps( pulse_time,
+									QC->m_stop_time ) <= 0 ) ) ) {
+					QC->addDetectorAllCounts( pulse->m_id.first,
+						event_count);
+				}
+			}
 		}
 
 		// Add All Monitor Events to Any Registered Counters...
 		for ( uint32_t i=0 ; i < m_monitorAllCounter.size() ; ++i ) {
 			QuickCounter *QC = m_monitorAllCounter[i];
-			if ( compareTimeStamps( pulse_time, QC->m_start_time ) >= 0
-					&& ( QC->m_counting == QC_COUNTING
-						|| ( QC->m_counting == QC_WAITING
-							&& compareTimeStamps( pulse_time,
-								QC->m_stop_time ) <= 0 ) ) ) {
-				QC->addMonitorAllCounts( pulse->m_id.first, monitor_count);
+			// Check for "1st Pulse" of Count...
+			if ( pulse->m_id.first == QC->m_start_pulse_id ) {
+				DEBUG("pulseEvents(): Monitor FIRST PULSE"
+					<< " m_start_time=" << QC->m_start_time.tv_sec << "."
+                	<< std::setfill('0') << std::setw(9)
+                	<< QC->m_start_time.tv_nsec << std::setw(0)
+					<< " m_start_pulse_id=" << QC->m_start_pulse_id
+					<< " m_counting=" << QC->m_counting);
+				uint32_t mon_count = 0;
+				events = pkt.events();
+				for (i=0; i < count; i++) {
+					// Monitor Event
+					if ( ( events->pixel & 0xf0000000 ) == 0x40000000 ) {
+						uint32_t tof = events->tof & ((1U << 21) - 1);
+						tof *= 100;
+						if ( tof >= QC->m_start_tof )
+							mon_count++;
+					}
+					events++;
+				}
+				// Did We Count Any Detector Events...?
+				if ( mon_count ) {
+					DEBUG("pulseEvents(): Monitor FIRST PULSE"
+						<< " mon_count=" << mon_count
+						<< " vs. monitor_count=" << monitor_count);
+					QC->addMonitorAllCounts( pulse->m_id.first,
+						mon_count);
+				}
+			}
+			// Check for "Last Pulse" of Count...
+			else if ( pulse->m_id.first == QC->m_stop_pulse_id ) {
+				DEBUG("pulseEvents(): Monitor LAST PULSE"
+					<< " m_start_time=" << QC->m_start_time.tv_sec << "."
+                	<< std::setfill('0') << std::setw(9)
+                	<< QC->m_start_time.tv_nsec << std::setw(0)
+					<< " m_start_pulse_id=" << QC->m_start_pulse_id
+					<< " m_counting=" << QC->m_counting);
+				uint32_t mon_count = 0;
+				events = pkt.events();
+				for (i=0; i < count; i++) {
+					// Monitor Event
+					if ( ( events->pixel & 0xf0000000 ) == 0x40000000 ) {
+						uint32_t tof = events->tof & ((1U << 21) - 1);
+						tof *= 100;
+						if ( tof <= QC->m_start_tof )
+							mon_count++;
+					}
+					events++;
+				}
+				// Did We Count Any Detector Events...?
+				if ( mon_count ) {
+					DEBUG("pulseEvents(): Monitor LAST PULSE"
+						<< " mon_count=" << mon_count
+						<< " vs. monitor_count=" << monitor_count);
+					QC->addMonitorAllCounts( pulse->m_id.first,
+						mon_count);
+				}
+			}
+			// Otherwise, Just Count "All or None"...
+			else {
+				if ( compareTimeStamps( pulse_time, QC->m_start_time ) >= 0
+						&& ( QC->m_counting == QC_COUNTING
+							|| ( QC->m_counting == QC_WAITING
+								&& compareTimeStamps( pulse_time,
+									QC->m_stop_time ) <= 0 ) ) ) {
+					QC->addMonitorAllCounts( pulse->m_id.first,
+						monitor_count);
+				}
 			}
 
 			// Check for Done Waiting Timeout Completion...!
 			// (Only Do for Registered *Monitor* All Counters,
 			// As We Don't Want to Stop Counting After the
-			// Detector All Part, And We Always Count for Both...! ;-D)
+			// Detector All Part and Miss the Monitor All Part,
+			// And For Now We Always Count for *Both*...! ;-D)
 			if ( QC->m_counting == QC_WAITING
 					&& compareTimeStamps( pulse_time,
-						QC->m_done_time ) >= 0 )
+						QC->m_done_time ) >= 0 ) {
 				QC->doneCounting( pulse->m_id.first );
+			}
 		}
 	}
 
