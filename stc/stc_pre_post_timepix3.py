@@ -84,7 +84,7 @@ def determine_source_and_target_directories(beamline, source_dir, ipts_dir, targ
 
     # Check lead directory for match with proposal.
     if not ipts_dir == proposal:
-        print(f'\n\nWARNING: Unexpected input: ipts directory ({ipts_dir}) does not match current proposal ({proposal}).\n\n')
+        print(f'\nWARNING: Unexpected input: ipts directory ({ipts_dir}) does not match current proposal ({proposal}).\n')
     
     initial_image_dir = source_dir.replace('/mcp/', '/mcp-tpx3/', 1)
     if target_dir is not None:
@@ -467,7 +467,7 @@ def do_pre_post_timepix3(arg_list):
             print('\nERROR: Not all parameters present.\n')
             return_code = -2
     except Exception as e:
-        print('\n\nERROR In do_pre_post_imaging(): {}\n\n'.format(str(e)))
+        print('\nERROR In do_pre_post_imaging(): {}\n'.format(str(e)))
         print(traceback.format_exc())
         return_code = -1
     finally:
