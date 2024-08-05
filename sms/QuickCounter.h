@@ -52,8 +52,16 @@ public:
 
 	double m_done_timeout;
 
+	uint64_t m_start_pulse_id;
+	uint32_t m_start_tof;
+
 	struct timespec m_start_time;
+
+	uint64_t m_stop_pulse_id;
+	uint32_t m_stop_tof;
+
 	struct timespec m_stop_time;
+
 	struct timespec m_done_time;
 
 private:

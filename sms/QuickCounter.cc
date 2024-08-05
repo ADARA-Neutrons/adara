@@ -117,8 +117,14 @@ QuickCounter::QuickCounter(boost::shared_ptr<MetaDataMgr> mgr,
 
 void QuickCounter::reset_stats(void)
 {
+	m_start_pulse_id = 0;
+	m_start_tof = 0;
+
 	m_start_time.tv_sec = 0;
 	m_start_time.tv_nsec = 0;
+
+	m_stop_pulse_id = 0;
+	m_stop_tof = 0;
 
 	m_stop_time.tv_sec = 0;
 	m_stop_time.tv_nsec = 0;
@@ -388,6 +394,9 @@ void QuickCounter::startCounting(uint64_t pulse_id, uint32_t tof)
 
 	reset_stats();
 
+	m_start_pulse_id = pulse_id;
+	m_start_tof = tof;
+
 	m_start_time.tv_sec = ts.tv_sec;
 	m_start_time.tv_nsec = ts.tv_nsec;
 
@@ -455,6 +464,9 @@ void QuickCounter::stopCounting(uint64_t pulse_id, uint32_t tof)
 				<< ts.tv_nsec << std::setw(0) << ")"
 			<< " m_counting=" << m_counting);
 	}
+
+	m_stop_pulse_id = pulse_id;
+	m_stop_tof = tof;
 
 	m_stop_time.tv_sec = ts.tv_sec;
 	m_stop_time.tv_nsec = ts.tv_nsec;
