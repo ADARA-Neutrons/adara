@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-LOGGER("QuickCounter");
+LOGGER("SMS.QuickCounter");
 
 #include <string>
 

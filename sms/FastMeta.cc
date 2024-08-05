@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-LOGGER("FastMeta");
+LOGGER("SMS.FastMeta");
 
 #include <fstream>
 #include <string>
