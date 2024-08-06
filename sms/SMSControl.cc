@@ -4897,7 +4897,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					<< " m_counting=" << QC->m_counting);
 				uint32_t det_count = 0;
 				events = pkt.events();
-				for (i=0; i < count; i++) {
+				for ( uint32_t j=0; j < count; j++ ) {
 					// Detector Event
 					if ( !(events->pixel & 0xf0000000) ) {
 						uint32_t tof = events->tof & ((1U << 21) - 1);
@@ -4926,7 +4926,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					<< " m_counting=" << QC->m_counting);
 				uint32_t det_count = 0;
 				events = pkt.events();
-				for (i=0; i < count; i++) {
+				for ( uint32_t j=0; j < count; j++ ) {
 					// Detector Event
 					if ( !(events->pixel & 0xf0000000) ) {
 						uint32_t tof = events->tof & ((1U << 21) - 1);
@@ -4983,7 +4983,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					<< " m_counting=" << QC->m_counting);
 				uint32_t mon_count = 0;
 				events = pkt.events();
-				for (i=0; i < count; i++) {
+				for ( uint32_t j=0; j < count; j++ ) {
 					// Monitor Event
 					if ( ( events->pixel & 0xf0000000 ) == 0x40000000 ) {
 						uint32_t tof = events->tof & ((1U << 21) - 1);
@@ -5012,7 +5012,7 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 					<< " m_counting=" << QC->m_counting);
 				uint32_t mon_count = 0;
 				events = pkt.events();
-				for (i=0; i < count; i++) {
+				for ( uint32_t j=0; j < count; j++ ) {
 					// Monitor Event
 					if ( ( events->pixel & 0xf0000000 ) == 0x40000000 ) {
 						uint32_t tof = events->tof & ((1U << 21) - 1);
