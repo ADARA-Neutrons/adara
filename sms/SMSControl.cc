@@ -4877,12 +4877,12 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		pulse_time.tv_sec = pulse->m_id.first >> 32;  // EPICS Time...!
 		pulse_time.tv_nsec = pulse->m_id.first & 0xffffffff;
 
-		DEBUG("pulseEvents(): Detector/Monitor All Counters Registered"
-			<< " - Pulse Time 0x"
-			<< std::hex << pulse->m_id.first << std::dec
-			<< " = " << pulse_time.tv_sec << "."
-                << std::setfill('0') << std::setw(9)
-                << pulse_time.tv_nsec << std::setw(0));
+		// DEBUG("pulseEvents(): Detector/Monitor All Counters Registered"
+			// << " - Pulse Time 0x"
+			// << std::hex << pulse->m_id.first << std::dec
+			// << " = " << pulse_time.tv_sec << "."
+                // << std::setfill('0') << std::setw(9)
+                // << pulse_time.tv_nsec << std::setw(0));
 
 		// Add All Detector Events to Any Registered Counters...
 		for ( uint32_t i=0 ; i < m_detectorAllCounter.size() ; ++i ) {
@@ -4947,18 +4947,20 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 			}
 			// Otherwise, Just Count "All or None"...
 			else {
-				DEBUG("pulseEvents(): Detector"
-					<< " m_start_time=" << QC->m_start_time.tv_sec << "."
-                	<< std::setfill('0') << std::setw(9)
-                	<< QC->m_start_time.tv_nsec << std::setw(0)
-					<< " compareTimeStamps( pulse_time, m_start_time ) = "
-					<< compareTimeStamps( pulse_time, QC->m_start_time )
-					<< " m_counting=" << QC->m_counting
-					<< " m_stop_time=" << QC->m_stop_time.tv_sec << "."
-                	<< std::setfill('0') << std::setw(9)
-                	<< QC->m_stop_time.tv_nsec << std::setw(0)
-					<< " compareTimeStamps( pulse_time, m_stop_time ) = "
-					<< compareTimeStamps( pulse_time, QC->m_stop_time ));
+				// DEBUG("pulseEvents(): Detector"
+					// << " m_start_time="
+						// << QC->m_start_time.tv_sec << "."
+                	// << std::setfill('0') << std::setw(9)
+                	// << QC->m_start_time.tv_nsec << std::setw(0)
+					// << " compareTimeStamps(pulse_time, m_start_time) = "
+					// << compareTimeStamps( pulse_time, QC->m_start_time )
+					// << " m_counting=" << QC->m_counting
+					// << " m_stop_time=" << QC->m_stop_time.tv_sec << "."
+                	// << std::setfill('0') << std::setw(9)
+                	// << QC->m_stop_time.tv_nsec << std::setw(0)
+					// << " compareTimeStamps(pulse_time, m_stop_time) = "
+					// << compareTimeStamps( pulse_time,
+						// QC->m_stop_time ));
 				if ( compareTimeStamps( pulse_time, QC->m_start_time ) >= 0
 						&& ( QC->m_counting == QC_COUNTING
 							|| ( QC->m_counting == QC_WAITING
