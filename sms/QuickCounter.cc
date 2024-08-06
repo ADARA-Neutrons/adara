@@ -616,7 +616,7 @@ void QuickCounter::addDetectorAllCounts(uint64_t pulse_id, uint32_t counts)
 
 	// Periodically Update Count PVs...
 	// (Post-Increment, So We Always Get "1st Counts"... ;-D)
-	if ( !(m_update_det_count_pvs_cnt++ % 100) )
+	if ( !(m_update_det_count_pvs_cnt++ % 1000) )
 	{
 		// Extract Timestamp from Pulse ID...
 		struct timespec ts;
@@ -686,7 +686,7 @@ void QuickCounter::addMonitorAllCounts(uint64_t pulse_id, uint32_t counts)
 
 	// Periodically Update Count PVs...
 	// (Post-Increment, So We Always Get "1st Counts"... ;-D)
-	if ( !(m_update_mon_count_pvs_cnt++ % 100) )
+	if ( !(m_update_mon_count_pvs_cnt++ % 1000) )
 	{
 		// Extract Timestamp from Pulse ID...
 		struct timespec ts;
