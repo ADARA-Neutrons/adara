@@ -845,6 +845,8 @@ bool STCClientMgr::lookupTimeout(void)
 void STCClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 		Disposition disp, std::string reason)
 {
+	SMSControl *ctrl = SMSControl::getInstance();
+
 	// clean up...
 	dequeueRun(c);
 
@@ -859,6 +861,8 @@ void STCClientMgr::clientComplete(StorageContainer::SharedPtr &c,
 			result += " - " + reason;
 		StorageManager::sendComBus(c->runNumber(), c->propId(), result);
 		c->markTranslated();
+		// Update Last Successful Run Number PV...
+		ctrl->setLastSuccessRunNumber(c->runNumber());
 		break;
 	case CONNECTION_LOSS:
 	case INVALID_PROTOCOL:
