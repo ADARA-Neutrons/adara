@@ -130,8 +130,15 @@ def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, c
             target_dir = f'/HFIR/{beamline}'
         else:
             target_dir = f'/SNS/{beamline}'
-    # new_tpx3_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
-    new_tpx3_dir = "{}/{}/images/mcp/Run_{}/{}".format(target_dir, proposal, run_number, det_sub_dir) 
+
+    if beamline in ['VENUS']:
+        # Extract 1st Subdirectory Path from ConfigTpxFilePath
+        # and Use in Archive Path...
+        sub_dir = config_tpx_file_path.split('/')
+        new_tpx3_dir = "{}/{}/images/mcp/{}/Run_{}/{}".format(target_dir, proposal, sub_dir[0], run_number, det_sub_dir) 
+    else:
+        # new_tpx3_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
+        new_tpx3_dir = "{}/{}/images/mcp/Run_{}/{}".format(target_dir, proposal, run_number, det_sub_dir) 
     
     print('\ninitial_tpx3_dir: {}\nnew_tpx3_dir: {}\n'.format(initial_tpx3_dir, new_tpx3_dir))
     return initial_tpx3_dir, new_tpx3_dir
