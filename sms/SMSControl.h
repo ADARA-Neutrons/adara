@@ -484,6 +484,8 @@ public:
 	bool getUseAncientRunStatusPkt(void)
 		{ return m_useAncientRunStatusPkt; }
 
+	void setLastSuccessRunNumber(uint32_t lastSuccessRunNumber);
+
 	void updateVerbose(void);
 
 	uint32_t verbose(void) { return m_verbose; }
@@ -888,6 +890,7 @@ private:
 	std::map<std::string, PVSharedPtr> m_pv_map;
 	uint32_t m_nextRunNumber;
 	uint32_t m_currentRunNumber;
+	uint32_t m_lastSuccessRunNumber;
 	bool m_recording;
 	uint32_t m_nextSrcId;
 
@@ -902,6 +905,7 @@ private:
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
 	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRunNumberPV> m_pvNextRunNumber;
+	boost::shared_ptr<smsRunNumberPV> m_pvLastSuccessRunNumber;
 	boost::shared_ptr<smsErrorPV> m_pvSummary;
 	boost::shared_ptr<smsStringPV> m_pvSummaryReason;
 

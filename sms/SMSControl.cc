@@ -1072,6 +1072,9 @@ SMSControl::SMSControl() :
 	m_pvNextRunNumber = boost::shared_ptr<smsRunNumberPV>(new
 						smsRunNumberPV(m_pvPrefix + ":Next"));
 
+	m_pvLastSuccessRunNumber = boost::shared_ptr<smsRunNumberPV>(new
+						smsRunNumberPV(m_pvPrefix + ":LastSuccess"));
+
 	m_markers = boost::shared_ptr<Markers>(new
 						Markers(this, m_notesCommentAutoReset));
 
@@ -1183,6 +1186,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
 	addPV(m_pvNextRunNumber);
+	addPV(m_pvLastSuccessRunNumber);
 	addPV(m_pvSummary);
 	addPV(m_pvSummaryReason);
 	addPV(m_pvInstanceId);
@@ -1450,8 +1454,11 @@ SMSControl::SMSControl() :
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to Get Next Run Number");
-
 	m_pvNextRunNumber->update(m_nextRunNumber, &now);
+
+	// Initialize Last Successful Run Number...
+	m_lastSuccessRunNumber = 0;
+	m_pvLastSuccessRunNumber->update(m_lastSuccessRunNumber, &now);
 
 	m_beamlineInfo.reset(new BeamlineInfo(m_targetStationNumber,
 			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
@@ -1474,6 +1481,17 @@ SMSControl::~SMSControl()
 		delete m_fdregChannelAccess;
 		m_fdregChannelAccess = NULL;
 	}
+}
+
+// Set Last (Latest) Successfully Translated Run Number...
+void SMSControl::setLastSuccessRunNumber(uint32_t lastSuccessRunNumber)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+
+	m_lastSuccessRunNumber = lastSuccessRunNumber;
+
+	m_pvLastSuccessRunNumber->update(m_lastSuccessRunNumber, &now);
 }
 
 // Update SMS Verbose Value from PV...
