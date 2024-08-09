@@ -267,6 +267,7 @@ int main( int argc, char** argv )
         string broker_user;
         string broker_pass;
         string domain;
+        bool no_msg_wait;
 
         namespace po = boost::program_options;
         po::options_description options( "stc program options" );
@@ -297,6 +298,7 @@ int main( int argc, char** argv )
                 ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
                 ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
                 ("domain", po::value<string>( &domain )->default_value( "" ), "Override ComBus domain prefix (TEST ONLY)")
+                ("no_msg_wait", po::bool_switch( &no_msg_wait )->default_value( false ), "do not wait forever for final translation success message to send")
                 ;
 
 
@@ -335,6 +337,15 @@ int main( int argc, char** argv )
         {
             syslog( LOG_INFO, "[%i] %s %u.",
                 g_pid, "STC Verbose Logging Level Set to", verbose_level );
+            give_syslog_a_chance;
+        }
+
+        // Log No Terminal Message Wait Option...
+        if ( opt_map.count( "no_msg_wait" ))
+        {
+            syslog( LOG_INFO, "[%i] %s %u.",
+                g_pid, "Setting \"No Terminal Message Wait\" Option to",
+                no_msg_wait );
             give_syslog_a_chance;
         }
 
@@ -526,7 +537,7 @@ int main( int argc, char** argv )
             // Start ComBus monitor thread (even in interactive mode!)
             monitor = new ComBusTransMon();
             monitor->start( *nxgen,
-                broker_uri, broker_user, broker_pass, domain );
+                broker_uri, broker_user, broker_pass, domain, no_msg_wait );
 
             // Begin ADARA stream processing
             //    - does not return until recording ends
