@@ -73,7 +73,8 @@ ComBusTransMon::start( STC::StreamParser &a_stream_parser,
         const std::string &a_broker_uri,
         const std::string &a_broker_user,
         const std::string &a_broker_pass,
-        const std::string &a_domain )
+        const std::string &a_domain,
+        bool a_no_msg_wait )
 {
     boost::lock_guard<boost::mutex> lock(m_api_mutex);
 
@@ -85,6 +86,7 @@ ComBusTransMon::start( STC::StreamParser &a_stream_parser,
         m_broker_pass = a_broker_pass;
         m_stop = false;
         m_domain = a_domain;
+        m_no_msg_wait = a_no_msg_wait;
 
         m_comm_thread = new boost::thread(
             boost::bind( &ComBusTransMon::commThread, this ) );
@@ -225,7 +227,25 @@ ComBusTransMon::commThread()
                             " - Will Retry..." );
                         give_syslog_a_chance;
 
-                        terminal_bcast_retry = true;
+                        // Don't Wait Forever for Terminal Message Broadcast
+                        if ( m_no_msg_wait )
+                        {
+                            syslog( LOG_ERR,
+                         "[%i] STC Error: %s %s %s %s %s %s %s %s %s %s %s",
+                                g_pid,
+                                "NO MSG RETRY",
+                                "on Broadcast Terminal Message",
+                                "for Domain", m_domain.c_str(),
+                                "to URI", m_broker_uri.c_str(),
+                                "as User", m_broker_user.c_str(),
+                                "for", ss.str().c_str(),
+                                " - Giving Up..." );
+                            give_syslog_a_chance;
+
+                            terminal_bcast_retry = false;
+                        }
+                        else
+                            terminal_bcast_retry = true;
                     }
                     else
                     {
@@ -259,7 +279,25 @@ ComBusTransMon::commThread()
                             " - Will Retry..." );
                         give_syslog_a_chance;
 
-                        terminal_workflow_retry = true;
+                        // Don't Wait Forever for Terminal Workflow Message
+                        if ( m_no_msg_wait )
+                        {
+                            syslog( LOG_ERR,
+                         "[%i] STC Error: %s %s %s %s %s %s %s %s %s %s %s",
+                                g_pid,
+                                "NO MSG RETRY",
+                                "on Terminal Workflow Message",
+                                "for Domain", m_domain.c_str(),
+                                "to URI", m_broker_uri.c_str(),
+                                "as User", m_broker_user.c_str(),
+                                "for", ss.str().c_str(),
+                                " - Giving Up..." );
+                            give_syslog_a_chance;
+
+                            terminal_workflow_retry = false;
+                        }
+                        else
+                            terminal_workflow_retry = true;
                     }
                     else
                     {
