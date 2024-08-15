@@ -1584,6 +1584,7 @@ NxGen::processRunInfo
             if ( ( !u->name.compare( "XXX_UNRESOLVED_NAME_XXX" )
                         || u->name.empty() )
                     && !u->id.empty()
+                    && u->id.compare( "(unset)" )
                     && u->id.compare( "XXX_UNRESOLVED_UID_XXX" ) )
             {
                 // Create LDAP Connection Only as Needed...
