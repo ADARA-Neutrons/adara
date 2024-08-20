@@ -7,6 +7,11 @@
 # (and maybe even notify via email or text message on a crash...! :-)
 #
 
+# Source Controls Environment (for ${BL} env setting):
+if [ -e /etc/profile.d/controls.sh ] ; then
+	source /etc/profile.d/controls.sh
+fi
+
 # For Cron Usage - Source Home Shell Environment:
 if [ -e $HOME/.bash_profile ] ; then
 	source $HOME/.bash_profile
@@ -377,6 +382,28 @@ if [ $do_notify == 1 ]; then
 			echo " SMS${ALTLABEL} ${SMSD}${ALT} Config File Not Found!"
 			echo -e "\n\t[${SMSD_CONFIG}]\n"
 			/bin/ls -l ${SMSD_CONFIG}
+			NL="\n"
+		fi
+
+	fi
+
+	# Check for Non-Zero "Pending Runs"...! ;-o
+
+	pending_log=`grep "pending runs" /var/log/smsd.log | tail -1`
+
+	pending=`echo "${pending_log}" | awk -F "," '{print $4}' \
+		| awk '{print $1}'`
+
+	if [[ ${pending} -gt 0 ]]; then
+
+		CHECK_ERROR_REPORTING
+		do_report="$?"
+
+		# Report Error...
+		if [[ $do_report == 1 ]]; then
+			echo -e -n "${NL}Error on ${host}:"
+			echo " SMS${ALTLABEL} has ${pending} Pending Runs!"
+			echo -e "\n\t[${pending_log}]\n"
 			NL="\n"
 		fi
 
