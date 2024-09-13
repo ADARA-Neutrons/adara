@@ -64,6 +64,7 @@ S="[[:space:]]"
 
 ALT="" # for Alternate/Secondary SMS Deployments... ;-D
 ALTLABEL=""
+IGNORE_ALT="-e ${SMSD}-"
 
 # The Minute When We Gasp Our Dying Breath and Beg for Help... ;-D
 SOS_MIN=0
@@ -95,6 +96,7 @@ for arg in "$@" ; do
 		SMSD="smsd${ALT}"
 		SMS="sms${ALT}"
 		SMSD_LOG="/var/log/${SMSD}.log"
+		IGNORE_ALT=""
 	elif [ "#$key#" == '#--help#' ]; then
 		echo -n "usage:  ${PROG} [--no_notify] [--smsd_user=$USER]"
 		echo " [--alt=\"-mon\"]"
@@ -221,7 +223,8 @@ CHECK_ERROR_REPORTING()
 # Get SMS Daemon process status...
 #
 
-status=`ps augxww | grep $SMSD | grep -v -e $PROG -e $TIME -e grep \
+status=`ps augxww | grep $SMSD \
+	| grep -v -e $PROG -e $TIME -e grep $IGNORE_ALT \
 	| grep $SMSD_USER`
 #echo "status=$status"
 
