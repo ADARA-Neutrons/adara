@@ -163,7 +163,7 @@ LiveClient::~LiveClient()
 {
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	ERROR("client " << m_clientName << " disconnected");
+	DEBUG("client " << m_clientName << " disconnected");
 
 	if ( m_clientId >= 0 ) {
 		m_pvStatus->disconnected();
