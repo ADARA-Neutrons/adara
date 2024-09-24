@@ -134,7 +134,7 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 		throw;
 	}
 
-	ERROR("client " << m_clientName << " ready to connect"
+	DEBUG("client " << m_clientName << " ready to connect"
 		<< " SendPausedData=" << m_send_paused_data);
 
 	try {
@@ -1104,7 +1104,7 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 		ss << "PAUSE_AGNOSTIC";
 	ss << "]";
 
-	ERROR("LiveClient Hello V" << pkt.version()
+	DEBUG("LiveClient Hello V" << pkt.version()
 		<< " Received from " << m_clientName
 		<< ", Requested Start Time = " << pkt.requestedStartTime()
 		<< ", Client Flags = 0x" << std::hex << m_client_flags << std::dec
