@@ -359,6 +359,7 @@ def catalog_images(files_to_catalog, creds=None):
             response = requests.post(
                 "https://oncat.ornl.gov/api/datafiles{}/ingest".format(file_path),
                 headers={"Authorization": "Bearer {}".format(creds)},
+                timeout=60.000,
             )
 
             # Be Willing to Retry a Few Times... (Say, 5... ;-D)
@@ -379,7 +380,12 @@ def catalog_images(files_to_catalog, creds=None):
                     except:
                         print("Cataloging ERROR for file {}, Attempt {} of 5: Invalid JSON Response - {} {}\n".format(file_path, cnt, e.response.status_code, e.response.text))
                     # Give Catalog Time to "Un-Whatever" Itself... ;-D
-                    time.sleep(5)
+                    time.sleep(60)
+                except requests.exceptions.Timeout as t:
+                    cnt += 1
+                    print("Cataloging ERROR for file {}, Attempt {} of 5: Request Timed Out (timeout=60.000)\n".format(file_path, cnt))
+                    # Give Catalog Time to "Un-Whatever" Itself... ;-D
+                    time.sleep(60)
 
             # Did it (eventually) work...?
             # Give it One Last Try (if not just to raise the exception!)
@@ -396,6 +402,10 @@ def catalog_images(files_to_catalog, creds=None):
                         print("Cataloging ERROR for file {}, FINAL Attempt {}: {}\n".format(file_path, cnt, e.response.json()))
                     except:
                         print("Cataloging ERROR for file {}, FINAL Attempt {}: Invalid JSON Response - {} {}\n".format(file_path, cnt, e.response.status_code, e.response.text))
+                    raise
+                except requests.exceptions.Timeout as t:
+                    cnt += 1
+                    print("Cataloging ERROR for file {}, FINAL Attempt {}: Request Timed Out (timeout=60.000)\n".format(file_path, cnt))
                     raise
 
         else:
