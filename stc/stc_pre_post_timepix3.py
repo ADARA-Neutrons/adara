@@ -374,11 +374,17 @@ def catalog_images(files_to_catalog, creds=None):
                     # ONCat could go down, the network mount available to ONCat could go
                     # down, etc., etc.
                     cnt += 1
-                    print("\nCataloging ERROR for file {}, Attempt {} of 5: {}\n".format(file_path, cnt, e.response.json()))
+                    try:
+                        print("\nCataloging ERROR for file {}, Attempt {} of 5: {}\n".format(file_path, cnt, e.response.json()))
+                    except:
+                        print("\nCataloging ERROR for file {}, Attempt {} of 5: Invalid JSON Response\n".format(file_path, cnt))
 
             # Did it (eventually) work...?
             if not done:
-                print("\nCataloging ERROR for file {}, {} Retries Failed - BAILING: {}\n".format(file_path, cnt, e.response.json()))
+                try:
+                    print("\nCataloging ERROR for file {}, {} Retries Failed - BAILING: {}\n".format(file_path, cnt, e.response.json()))
+                except:
+                    print("\nCataloging ERROR for file {}, {} Retries Failed - BAILING: Invalid JSON Response\n".format(file_path, cnt))
                 raise
         else:
             print('\nNonapplicable file: {}. Skipping catalog.\n'.format(file_path))
