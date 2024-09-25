@@ -377,15 +377,27 @@ def catalog_images(files_to_catalog, creds=None):
                     try:
                         print("\nCataloging ERROR for file {}, Attempt {} of 5: {}\n".format(file_path, cnt, e.response.json()))
                     except:
-                        print("\nCataloging ERROR for file {}, Attempt {} of 5: Invalid JSON Response\n".format(file_path, cnt))
+                        print("\nCataloging ERROR for file {}, Attempt {} of 5: Invalid JSON Response - {} {}\n".format(file_path, cnt, e.response.status_code, e.response.text))
+                    # Give Catalog Time to "Un-Whatever" Itself... ;-D
+                    time.sleep(5)
 
             # Did it (eventually) work...?
+            # Give it One Last Try (if not just to raise the exception!)
             if not done:
                 try:
-                    print("\nCataloging ERROR for file {}, {} Retries Failed - BAILING: {}\n".format(file_path, cnt, e.response.json()))
-                except:
-                    print("\nCataloging ERROR for file {}, {} Retries Failed - BAILING: Invalid JSON Response\n".format(file_path, cnt))
-                raise
+                    # Raise on any errors.
+                    response.raise_for_status()
+                except requests.exceptions.HTTPError as e:
+                    # Handle any errors.  Assume that the network could go down,
+                    # ONCat could go down, the network mount available to ONCat could go
+                    # down, etc., etc.
+                    cnt += 1
+                    try:
+                        print("\nCataloging ERROR for file {}, FINAL Attempt {}: {}\n".format(file_path, cnt, e.response.json()))
+                    except:
+                        print("\nCataloging ERROR for file {}, FINAL Attempt {}: Invalid JSON Response - {} {}\n".format(file_path, cnt, e.response.status_code, e.response.text))
+                    raise
+
         else:
             print('\nNonapplicable file: {}. Skipping catalog.\n'.format(file_path))
             pass
