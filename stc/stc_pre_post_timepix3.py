@@ -67,7 +67,7 @@ def determine_subdirectories(file_path):
     lead_dir_2, subdir_2 = split_leading_directory(subdir_1)
     lead_dir_3, subdir_3 = split_leading_directory(subdir_2)
     ipts_dir, new_subdir = split_leading_directory(subdir_3)
-    print('\nsource_dir: {}\nlead_dir_2: {}\nsubdir_2: {}\nipts_dir: {}\n new_subdir: {}\n'.format(
+    print('source_dir: {}\nlead_dir_2: {}\nsubdir_2: {}\nipts_dir: {}\n new_subdir: {}\n'.format(
         source_dir, lead_dir_3, subdir_3, ipts_dir, new_subdir))
     return source_dir, ipts_dir, new_subdir
 
@@ -84,7 +84,7 @@ def determine_source_and_target_directories(beamline, source_dir, ipts_dir, targ
 
     # Check lead directory for match with proposal.
     if not ipts_dir == proposal:
-        print(f'\nWARNING: Unexpected input: ipts directory ({ipts_dir}) does not match current proposal ({proposal}).\n')
+        print(f'WARNING: Unexpected input: ipts directory ({ipts_dir}) does not match current proposal ({proposal}).\n')
     
     initial_image_dir = source_dir.replace('/mcp/', '/mcp-tpx3/', 1)
     if target_dir is not None:
@@ -98,11 +98,11 @@ def determine_source_and_target_directories(beamline, source_dir, ipts_dir, targ
 
     # Proposal is already in path. Don't need it in subdir.
     image_subdir = new_subdir.replace(proposal + '/', '')
-    print('\nIn determine_source_and_target_directories():new_subdir {} proposal: {} image_subdir: {}\n'.format(new_subdir, proposal, image_subdir))
+    print('In determine_source_and_target_directories():new_subdir {} proposal: {} image_subdir: {}\n'.format(new_subdir, proposal, image_subdir))
 
     new_image_dir = "{}/{}/images/mcp/Run_{}/{}".format(target_dir, proposal, run_number, image_subdir) 
     
-    print('\ninitial_image_dir: {}\nnew_image_dir: {}\n'.format(initial_image_dir, new_image_dir))
+    print('initial_image_dir: {}\nnew_image_dir: {}\n'.format(initial_image_dir, new_image_dir))
     return initial_image_dir, new_image_dir
 
 def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, config_tpx_file_path, det_sub_dir):
@@ -140,7 +140,7 @@ def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, c
         # new_tpx3_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
         new_tpx3_dir = "{}/{}/images/mcp/Run_{}/{}".format(target_dir, proposal, run_number, det_sub_dir) 
     
-    print('\ninitial_tpx3_dir: {}\nnew_tpx3_dir: {}\n'.format(initial_tpx3_dir, new_tpx3_dir))
+    print('initial_tpx3_dir: {}\nnew_tpx3_dir: {}\n'.format(initial_tpx3_dir, new_tpx3_dir))
     return initial_tpx3_dir, new_tpx3_dir
 
 def get_files_to_copy(initial_image_dir, run_number):
@@ -148,17 +148,17 @@ def get_files_to_copy(initial_image_dir, run_number):
     Gets files for the specified run that need to be copied.
     """
     files_to_copy_ini = os.listdir(initial_image_dir)
-    # print('\nfiles_to_copy_ini:\n{}\n'.format('\n'.join(str(f) for f in files_to_copy_ini)))
+    # print('files_to_copy_ini:\n{}\n'.format('\n'.join(str(f) for f in files_to_copy_ini)))
     files_to_copy = []
     for file_in_dir in files_to_copy_ini:
         if re.search('Run_{}'.format(run_number), file_in_dir):
             files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
 
-    # print('\nNumber of files to copy:\n{}\n'.format(len(files_to_copy)))
+    # print('Number of files to copy:\n{}\n'.format(len(files_to_copy)))
     # Temporarily only print last 15 characters of file name to reduce log file load.    
-    # print('\nfiles_to_copy (last 15 chars):\n{}\n'.format('\n'.join(str(f[-15:]) for f in files_to_copy)))
-    # print('\nfiles_to_copy:\n{}\n'.format('\n'.join(str(f) for f in files_to_copy)))
-    # print('\nfiles_to_copy:\n{}\n'.format(files_to_copy))
+    # print('files_to_copy (last 15 chars):\n{}\n'.format('\n'.join(str(f[-15:]) for f in files_to_copy)))
+    # print('files_to_copy:\n{}\n'.format('\n'.join(str(f) for f in files_to_copy)))
+    # print('files_to_copy:\n{}\n'.format(files_to_copy))
     return files_to_copy
 
 def get_tpx3_files_to_copy(initial_image_dir):
@@ -166,7 +166,7 @@ def get_tpx3_files_to_copy(initial_image_dir):
     Gets raw TPX3 files for the specified run that need to be copied.
     """
     files_to_copy_ini = os.listdir(initial_image_dir)
-    # print('\nfiles_to_copy_ini:\n{}\n'.format('\n'.join(str(f) for f in files_to_copy_ini)))
+    # print('files_to_copy_ini:\n{}\n'.format('\n'.join(str(f) for f in files_to_copy_ini)))
     files_to_copy = []
     for file_in_dir in files_to_copy_ini:
             files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
@@ -190,7 +190,7 @@ def run_rsync(arg_list):
     Run rsync with default options using specified arguments..
     """
     try:
-        # print('\nCopying [{}] to [{}].\n'.format(source_file, target_file))
+        # print('Copying [{}] to [{}].\n'.format(source_file, target_file))
         # command = ['rsync', '--list-only' , '-avz']
         command = ['rsync' , '-avz']
         command += arg_list
@@ -199,7 +199,7 @@ def run_rsync(arg_list):
         if p.returncode != 0:
             raise Exception("Failed to run rsync command {} with return code of {}. {}".format(' '.join(command), p.returncode, stde))
         else:
-            print("\nDone running rsync command {} with return code of {}. {}\n".format(' '.join(command), p.returncode, stdo))
+            print("Done running rsync command {} with return code of {}. {}\n".format(' '.join(command), p.returncode, stdo))
     except Exception as ex:
         raise Exception("Failed to run rsync command {}. {}".format(' '.join(command), ex))
 
@@ -208,7 +208,7 @@ def copy_file(source_file, target_file):
     """
     Copy a file to a target location.
     """
-    # print('\nCopying [{}] to [{}].\n'.format(source_file, target_file))
+    # print('Copying [{}] to [{}].\n'.format(source_file, target_file))
     run_rsync([source_file, target_file])
 
 
@@ -262,7 +262,7 @@ def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_p
     source_files = get_files_to_copy(initial_image_dir, run_number)
     file_count = len(source_files)
     time_val = time.time()
-    print('\nWaiting for stable file count. Current number of files to copy:{} stable file count time: {} (sec)\n'.format(file_count, stable_files_count_time))
+    print('Waiting for stable file count. Current number of files to copy:{} stable file count time: {} (sec)\n'.format(file_count, stable_files_count_time))
     while stable_files_count_time < wait_period_sec:
         time.sleep(interval_period_sec)
         if for_main_image_files:
@@ -278,7 +278,7 @@ def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_p
         time_val = time_val_now
         source_files = source_files_now
         file_count = file_count_now
-        print('\nWaiting for stable file count. Current number of files to copy:{} stable file count time: {} (sec)\n'.format(file_count, stable_files_count_time))
+        print('Waiting for stable file count. Current number of files to copy:{} stable file count time: {} (sec)\n'.format(file_count, stable_files_count_time))
 
     target_files = []
     for source_file in source_files:
@@ -291,7 +291,7 @@ def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_fil
     """
     Copies image files for the specified run.
     """
-    print('\nIn copy_images().\nbeamline: {}\nproposal: {}\nrun_number: {}\n'.format(beamline, proposal, run_number, tiff_file_path, tiff_file_name))
+    print('In copy_images().\nbeamline: {}\nproposal: {}\nrun_number: {}\n'.format(beamline, proposal, run_number, tiff_file_path, tiff_file_name))
 
     # Determine proper subdirectories.
     source_dir, ipts_dir, new_subdir = determine_subdirectories(tiff_file_path)
@@ -305,14 +305,14 @@ def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_fil
             # target_files = get_target_files(initial_image_dir, run_number, new_image_dir)
             source_files, target_files = get_target_files_patiently(initial_image_dir, run_number, new_image_dir, wait_period_sec=60.0)
 
-            print('\nIn copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n'.format(initial_image_dir, new_image_dir))
+            print('In copy_images().\ninitial_image_dir: {}\nnew_image_dir: {}\n'.format(initial_image_dir, new_image_dir))
 
             # Assure target directory exists.
             assure_directory_exists(new_image_dir)
             copy_files_batch(initial_image_dir, new_image_dir, run_number)
         except:
             e = sys.exc_info()
-            print('\nERROR In copy_images(). Trying to write TIFF files: {}\n'.format(str(e)))
+            print('ERROR In copy_images(). Trying to write TIFF files: {}\n'.format(str(e)))
             traceback.print_exc(limit=50, file=sys.stdout)
 
     # ---------------------
@@ -321,12 +321,12 @@ def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_fil
     # Identify target tpx files. Wait for file count to be stable for at least 60.0 seconds.
     source_files, target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=False)
 
-    print('\nIn copy_images(); raw tpx3 portion.\ninitial_tpx3_dir: {}\nnew_tpx3_dir: {}\n'.format(initial_tpx3_dir, new_tpx3_dir))
+    print('In copy_images(); raw tpx3 portion.\ninitial_tpx3_dir: {}\nnew_tpx3_dir: {}\n'.format(initial_tpx3_dir, new_tpx3_dir))
 
     # Assure target directory exists.
-    print('\nIn copy_images(); Making sure directory exists: {}\n'.format(new_tpx3_dir))
+    print('In copy_images(); Making sure directory exists: {}\n'.format(new_tpx3_dir))
     assure_directory_exists(new_tpx3_dir)
-    print('\nIn copy_images(); About to copy files: {} to target_dir: {}\n'.format(source_files, new_tpx3_dir))
+    print('In copy_images(); About to copy files: {} to target_dir: {}\n'.format(source_files, new_tpx3_dir))
     copy_files_individually(source_files, new_tpx3_dir)
     # copy_tpx3_files_batch(initial_tpx3_dir, new_tpx3_dir)
 
@@ -354,7 +354,7 @@ def catalog_images(files_to_catalog, creds=None):
     creds = get_creds()
     for file_path in files_to_catalog:
         should_catalog = should_catalog_file(file_path)
-        print('\nIn catalog_images(). file_path: {} should_catalog: {}\n'.format(file_path, should_catalog))
+        print('In catalog_images(). file_path: {} should_catalog: {}\n'.format(file_path, should_catalog))
         if should_catalog:
             response = requests.post(
                 "https://oncat.ornl.gov/api/datafiles{}/ingest".format(file_path),
@@ -375,9 +375,9 @@ def catalog_images(files_to_catalog, creds=None):
                     # down, etc., etc.
                     cnt += 1
                     try:
-                        print("\nCataloging ERROR for file {}, Attempt {} of 5: {}\n".format(file_path, cnt, e.response.json()))
+                        print("Cataloging ERROR for file {}, Attempt {} of 5: {}\n".format(file_path, cnt, e.response.json()))
                     except:
-                        print("\nCataloging ERROR for file {}, Attempt {} of 5: Invalid JSON Response - {} {}\n".format(file_path, cnt, e.response.status_code, e.response.text))
+                        print("Cataloging ERROR for file {}, Attempt {} of 5: Invalid JSON Response - {} {}\n".format(file_path, cnt, e.response.status_code, e.response.text))
                     # Give Catalog Time to "Un-Whatever" Itself... ;-D
                     time.sleep(5)
 
@@ -393,20 +393,20 @@ def catalog_images(files_to_catalog, creds=None):
                     # down, etc., etc.
                     cnt += 1
                     try:
-                        print("\nCataloging ERROR for file {}, FINAL Attempt {}: {}\n".format(file_path, cnt, e.response.json()))
+                        print("Cataloging ERROR for file {}, FINAL Attempt {}: {}\n".format(file_path, cnt, e.response.json()))
                     except:
-                        print("\nCataloging ERROR for file {}, FINAL Attempt {}: Invalid JSON Response - {} {}\n".format(file_path, cnt, e.response.status_code, e.response.text))
+                        print("Cataloging ERROR for file {}, FINAL Attempt {}: Invalid JSON Response - {} {}\n".format(file_path, cnt, e.response.status_code, e.response.text))
                     raise
 
         else:
-            print('\nNonapplicable file: {}. Skipping catalog.\n'.format(file_path))
+            print('Nonapplicable file: {}. Skipping catalog.\n'.format(file_path))
             pass
 
 def finish_up(rtn_code):
     """
     Exit with specified return code.
     """
-    print("\nFinishing up with return code {}\n".format(rtn_code))
+    print("Finishing up with return code {}\n".format(rtn_code))
     sys.exit(rtn_code)
 
 
@@ -428,7 +428,7 @@ def process_args(arg_list):
 
     # Loop through Command Line Parameters...
     for arg in arg_list:
-        print("\narg=%s" % arg)
+        print("arg=%s" % arg)
         pargs = arg.split('=')
         key = pargs[0]
         if len(pargs) > 1:
@@ -436,7 +436,7 @@ def process_args(arg_list):
         else:
             value = ""
         print("key=%s" % key)
-        print("value=%s" % value)
+        print("value=%s\n" % value)
         if key == "beamline":
             beamline = value
         if key == "proposal":
@@ -470,7 +470,7 @@ def do_pre_post_timepix3(arg_list):
     """
     return_code = 0
     try:
-        print('\nPre-Post-Processing for Timepix3.\n')
+        print('Pre-Post-Processing for Timepix3.\n')
 
         beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, tpx_file_path, config_tpx_file_path, config_tiff_file_path, detector_type = process_args(arg_list)
 
@@ -495,14 +495,14 @@ def do_pre_post_timepix3(arg_list):
                 det_sub_dir = 'tpx3'
             else:
                 det_sub_dir = 'raw'
-            print('\nDetector Type {} -> Detector Sub-Directory = [{}].\n'.format(str(detector_type), str(det_sub_dir)))
+            print('Detector Type {} -> Detector Sub-Directory = [{}].\n'.format(str(detector_type), str(det_sub_dir)))
             files_to_catalog = copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, config_tpx_file_path, config_tiff_file_path, det_sub_dir, include_tiff_files=include_tiff_files)
             catalog_images(files_to_catalog)
         else:
-            print('\nERROR: Not all parameters present.\n')
+            print('ERROR: Not all parameters present.\n')
             return_code = -2
     except Exception as e:
-        print('\nERROR In do_pre_post_imaging(): {}\n'.format(str(e)))
+        print('ERROR In do_pre_post_imaging(): {}\n'.format(str(e)))
         print(traceback.format_exc())
         return_code = -1
     finally:
@@ -511,7 +511,7 @@ def do_pre_post_timepix3(arg_list):
 
 if __name__ == "__main__":
     # Test parameters: [['/TESTING/SNS/stcdata_devel/stc_pre_post_timepix3.py', 'FileName=C:/data/IPTS-26687/DAS_TEST_8_1_21/20210803_Run_51901_sample_file_0001_0605', 'SubDir=DAS_TEST_8_1_21', 'facility=SNS', 'beamline=HFIR', 'proposal=IPTS-26687', 'run_number=51901']]
-    print("\nSTC Pre-Post AutoReduction Timepix3 Command Script Entry.\n")
+    print("STC Pre-Post AutoReduction Timepix3 Command Script Entry.\n")
     print("   [%s]\n" % sys.argv[0])
     print("   [%s]" % sys.argv)
 
