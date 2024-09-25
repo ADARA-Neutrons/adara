@@ -350,6 +350,9 @@ def should_catalog_file(file_path):
     return extension in extension_list
 
 
+#ONCAT = "https://oncat.ornl.gov"
+ONCAT = "https://oncat-prod-1.ornl.gov"
+
 def catalog_images(files_to_catalog, creds=None):
     creds = get_creds()
     for file_path in files_to_catalog:
@@ -357,7 +360,7 @@ def catalog_images(files_to_catalog, creds=None):
         print('In catalog_images(). file_path: {} should_catalog: {}\n'.format(file_path, should_catalog))
         if should_catalog:
             response = requests.post(
-                "https://oncat.ornl.gov/api/datafiles{}/ingest".format(file_path),
+                "{}/api/datafiles{}/ingest".format(ONCAT, file_path),
                 headers={"Authorization": "Bearer {}".format(creds)},
                 timeout=60.000,
             )
