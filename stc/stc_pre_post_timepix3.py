@@ -361,14 +361,24 @@ def catalog_images(files_to_catalog, creds=None):
                 headers={"Authorization": "Bearer {}".format(creds)},
             )
 
-            try:
-                # Raise on any errors.
-                response.raise_for_status()
-            except requests.exceptions.HTTPError as e:
-                # Handle any errors.  Assume that the network could go down,
-                # ONCat could go down, the network mount available to ONCat could go
-                # down, etc., etc.
-                print("\nCataloging ERROR for file {}: {}\n".format(file_path, e.response.json()))
+            # Be Willing to Retry a Few Times... (Say, 5... ;-D)
+            done = False
+            cnt = 0
+            while ( not done ) and ( cnt < 5 ):
+                try:
+                    # Raise on any errors.
+                    response.raise_for_status()
+                    done = True
+                except requests.exceptions.HTTPError as e:
+                    # Handle any errors.  Assume that the network could go down,
+                    # ONCat could go down, the network mount available to ONCat could go
+                    # down, etc., etc.
+                    cnt += 1
+                    print("\nCataloging ERROR for file {}, Attempt {} of 5: {}\n".format(file_path, cnt, e.response.json()))
+
+            # Did it (eventually) work...?
+            if not done:
+                print("\nCataloging ERROR for file {}, {} Retries Failed - BAILING: {}\n".format(file_path, cnt, e.response.json()))
                 raise
         else:
             print('\nNonapplicable file: {}. Skipping catalog.\n'.format(file_path))
