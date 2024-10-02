@@ -870,6 +870,10 @@ CK_EPICS_IOCS_ENABLED()
 	shopt -s nullglob
 
 	for iocpath in ${SYSTEMD_DIR}/smsd.service \
+			${SYSTEMD_DIR}/epics-controls-env*.service \
+			${SYSTEMD_DIR}/archive-engine*.service \
+			${SYSTEMD_DIR}/gateway*.service \
+			${SYSTEMD_DIR}/scan-server*.service \
 			${SYSTEMD_DIR}/ioc_*.service \
 			${SYSTEMD_DIR}/ics_*.service ; do
 

@@ -712,6 +712,10 @@ CK_EPICS_IOCS_ENABLED()
 	shopt -s nullglob
 
 	for iocpath in ${SYSTEMD_DIR}/smsd.service \
+			${SYSTEMD_DIR}/epics-controls-env*.service \
+			${SYSTEMD_DIR}/archive-engine*.service \
+			${SYSTEMD_DIR}/gateway*.service \
+			${SYSTEMD_DIR}/scan-server*.service \
 			${SYSTEMD_DIR}/ioc_*.service \
 			${SYSTEMD_DIR}/ics_*.service ; do
 
@@ -1002,9 +1006,21 @@ if [[ $UPDATE == 1 ]]; then
 
 fi
 
-if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+if [[ ${_ckconfck} != 0 \
+		|| ${_ckiocck} != 0 \
+		|| $QUIET == 0 ]]; then
 	echo -e "Status = ${_ckconfck}\n"
+	echo -e "IOC Enabled Status = ${_ckiocck}\n"
 fi
 
-exit ${_ckconfck}
+if [[ ${_ckconfck} != 0 ]]; then
+	exit ${_ckconfck}
+elif [[ ${_ckiocck} != 0 ]]; then
+	exit ${_ckiocck}
+else
+	if [[ $QUIET == 0 ]]; then
+		echo -e "ALL ConfCk Cases Passed.\n"
+	fi
+	exit 0
+fi
 
