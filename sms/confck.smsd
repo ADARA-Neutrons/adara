@@ -422,7 +422,8 @@ CK_SNS_LOCAL_DIRS()
 			${LS} -ld "${_sms_next_run}"
 			echo -e -n "\nCreate ADARA/SMS \"Next Run\" File? [yes|No] "
 			read ckSMSNextRun
-			ckSMSNextRun=`echo "$ckSMSNextRun" | tr '[:upper:]' '[:lower:]'`
+			ckSMSNextRun=`echo "$ckSMSNextRun" \
+				| tr '[:upper:]' '[:lower:]'`
 			if [[ "$ckSMSNextRun" == "y"
 					|| "$ckSMSNextRun" == "yes" ]]; then
 				${SUDO} ${Editor} "${_sms_next_run}"
@@ -566,7 +567,7 @@ CONFCK()
 	#${RM} -f /tmp/chkconfig.smsd${ALT}.$$
 	#if [ $? != 0 ]; then
 	#	echo \
-	#   "Failure Deleting Temporary System ChkConfig File for SMSD${ALT}...!"
+	#   "Failure Deleting Temporary System ChkConfig File for SMSD${ALT}!"
 	#	(( _nerrors++ ))
 	#fi
 	## Create SMSD Local Run Level...
@@ -669,8 +670,8 @@ CONFCK()
 	fi
 	${RM} -f /tmp/$USER.crontab.$$
 	if [ $? != 0 ]; then
-		echo \
-		  "Failure Deleting Temporary Admin Crontab File for SMSD${ALT}...!"
+		echo -n "Failure Deleting Temporary Admin Crontab File "
+		echo "for SMSD${ALT}...!"
 		(( _nerrors++ ))
 	fi
 
@@ -707,11 +708,13 @@ CK_EPICS_IOCS_ENABLED()
 	echo
 	echo "Verifying that EPICS IOC Services are Enabled:"
 
-	for ioc in ${SYSTEMD_DIR}/smsd.service \
+	for iocpath in ${SYSTEMD_DIR}/smsd.service \
 			${SYSTEMD_DIR}/ioc_*.service \
 			${SYSTEMD_DIR}/ics_*.service ; do
 
 		# Check SystemD SystemCtl Enabled...
+
+		ioc=`basename ${iocpath}`
 
 		echo
 		echo "Checking IOC Service Enabled for:\n   ${ioc}"
@@ -863,7 +866,7 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			cron_file=`mktemp ./.confck.smsd${ALT}.crontab.edit.file.XXXXXX`
+			cron_file=`mktemp ./.confck.smsd${ALT}.crontab.edit.XXXXXX`
 
 			echo "MAILTO=idac_adara_notify@email.ornl.gov" >> $cron_file
 			echo "0-59/10 * * * * /SNS/users/$USER/stuff/exec/smsd_mon" \
@@ -980,7 +983,8 @@ if [[ $UPDATE == 1 ]]; then
 	# Check/Create Clone of SNS Accelerator Timing Git Repo...
 	${LS} -ld "${ACCEL_TIMING}"
 	if [[ ! -d "${ACCEL_TIMING}" ]]; then
-		echo -n "Create Clone of SNS Accelerator Timing Git Repo? [yes|No] "
+		echo -n "Create Clone of "
+		echo -n "SNS Accelerator Timing Git Repo? [yes|No] "
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
