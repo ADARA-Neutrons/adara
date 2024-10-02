@@ -60,7 +60,7 @@ SNSLOCAL="/SNSlocal"
 RSYSLOG_CACHE="${SNSLOCAL}/rsyslog.cache"
 # Note: Always Use Non-ALT ADARA Deploy Directory,
 # We Don't Separately Deploy for SMSD-MON... ;-)
-ADARA_BINARIES="/home/controls/config-daq1/deploy"
+ADARA_BINARIES="/home/controls/config-now1/deploy"
 ADARA_LINKS="/usr/local/bin"
 PVSD_BINARY="/home/controls/config-now1${ALT}/deploy/pvsd"
 PVSD_LINK="/usr/sbin/pvsd"
