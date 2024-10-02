@@ -708,6 +708,9 @@ CK_EPICS_IOCS_ENABLED()
 	echo
 	echo "Verifying that EPICS IOC Services are Enabled:"
 
+	# Remove Globbed File List If None Found...
+	shopt -s nullglob
+
 	for iocpath in ${SYSTEMD_DIR}/smsd.service \
 			${SYSTEMD_DIR}/ioc_*.service \
 			${SYSTEMD_DIR}/ics_*.service ; do
@@ -763,6 +766,9 @@ CK_EPICS_IOCS_ENABLED()
 		fi
 
 	done
+
+	# Restore Normal Shell Globbing...
+	shopt -u nullglob
 
 	echo
 	if [ ${_nerrors} -gt 0 ]; then
