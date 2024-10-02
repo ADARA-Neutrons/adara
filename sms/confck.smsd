@@ -705,8 +705,7 @@ CK_EPICS_IOCS_ENABLED()
 {
 	local _nerrors=0
 
-	echo
-	echo "Verifying that EPICS IOC Services are Enabled:"
+	echo "*** Verifying that EPICS IOC Services are Enabled:"
 
 	# Remove Globbed File List If None Found...
 	shopt -s nullglob
