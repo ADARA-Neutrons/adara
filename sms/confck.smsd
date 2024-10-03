@@ -681,6 +681,7 @@ CONFCK()
 	else
 		echo "All Files/Configs are the Same."
 	fi
+	echo
 
 	return ${_nerrors}
 }
@@ -995,6 +996,7 @@ if [[ $UPDATE == 1 ]]; then
 		echo
 	
 	fi
+	echo
 
 	# Check/Create Clone of SNS Accelerator Timing Git Repo...
 	${LS} -ld "${ACCEL_TIMING}"
