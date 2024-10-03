@@ -1317,10 +1317,15 @@ CK_EPICS_IOCS_ENABLED()
 	return ${_nerrors}
 }
 
-doIocCk=`CK_EPICS_IOCS_ENABLED 2>&1`
-_ckiocck=$?
-if [[ ${_ckiocck} != 0 || $QUIET == 0 ]]; then
-	echo -e "$doIocCk\n"
+if [[ $UPDATE == 1 ]]; then
+	CK_EPICS_IOCS_ENABLED
+	_ckiocck=$?
+else
+	doIocCk=`CK_EPICS_IOCS_ENABLED 2>&1`
+	_ckiocck=$?
+	if [[ ${_ckiocck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doIocCk\n"
+	fi
 fi
 if [[ ${_ckiocck} != 0 ]]; then
 	echo -e "*** IOC Enabled Check FAILED...!\n"
