@@ -412,10 +412,15 @@ CONFCK()
 	return ${_nerrors}
 }
 
-doConfCk=`CONFCK 2>&1`
-_ckconfck=$?
-if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
-	echo -e "$doConfCk\n"
+if [[ $QUIET == 1 ]]; then
+	doConfCk=`CONFCK 2>&1`
+	_ckconfck=$?
+	if [[ ${_ckconfck} != 0 ]]; then
+		echo -e "$doConfCk\n"
+	fi
+else
+	CONFCK
+	_ckconfck=$?
 fi
 if [[ ${_ckconfck} != 0 ]]; then
 	echo -e "*** ConfCk FAILED...!\n"
