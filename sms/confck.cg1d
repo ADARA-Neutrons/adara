@@ -885,7 +885,9 @@ CK_EPICS_IOCS_ENABLED()
 		echo "Checking IOC Service Enabled for:\n   ${ioc}"
 
 		local _set_enabled=0
-		local _is_enabled=`${SYSTEMCTL} is-enabled ${ioc} 2>&1`
+		# Grep Out Old RedHat7 /etc/init.d/pvsd.service Warnings...
+		local _is_enabled=`${SYSTEMCTL} is-enabled ${ioc} 2>&1 \
+			| ${GREP} -v chkconfig`
 		local _check_enabled=$?
 		if [[ ${_check_enabled} != 0 ]]; then
 			if [[ ${_is_enabled} != "disabled" ]]; then
