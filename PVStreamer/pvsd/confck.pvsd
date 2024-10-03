@@ -435,7 +435,8 @@ CK_EPICS_IOCS_ENABLED()
 	# Remove Globbed File List If None Found...
 	shopt -s nullglob
 
-	for iocpath in ${SYSTEMD_DIR}/pvsd*.service \
+	for iocpath in /etc/init.d/*pvsd \
+			${SYSTEMD_DIR}/pvsd*.service \
 			${SYSTEMD_DIR}/epics-controls-env*.service \
 			${SYSTEMD_DIR}/archive-engine*.service \
 			${SYSTEMD_DIR}/gateway*.service \
