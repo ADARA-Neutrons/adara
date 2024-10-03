@@ -786,19 +786,21 @@ CK_EPICS_IOCS_ENABLED()
 	return ${_nerrors}
 }
 
-if [[ $UPDATE == 1 ]]; then
-	CK_EPICS_IOCS_ENABLED
-	_ckiocck=$?
-else
-	doIocCk=`CK_EPICS_IOCS_ENABLED 2>&1`
-	_ckiocck=$?
-	if [[ ${_ckiocck} != 0 || $QUIET == 0 ]]; then
-		echo -e "$doIocCk\n"
-	fi
-fi
-if [[ ${_ckiocck} != 0 ]]; then
-	echo -e "*** IOC Enabled Check FAILED...!\n"
-fi
+### NO Need to Check EPICS IOCs Enabled for SMS-MON Instances
+### - Just Let the Regular/Primary SMS Instance Handle It! ;-D
+#if [[ $UPDATE == 1 ]]; then
+#	CK_EPICS_IOCS_ENABLED
+#	_ckiocck=$?
+#else
+#	doIocCk=`CK_EPICS_IOCS_ENABLED 2>&1`
+#	_ckiocck=$?
+#	if [[ ${_ckiocck} != 0 || $QUIET == 0 ]]; then
+#		echo -e "$doIocCk\n"
+#	fi
+#fi
+#if [[ ${_ckiocck} != 0 ]]; then
+#	echo -e "*** IOC Enabled Check FAILED...!\n"
+#fi
 
 # In Update Mode, Perform Other Assorted Install Operations, As Needed...
 if [[ $UPDATE == 1 ]]; then
@@ -1014,16 +1016,16 @@ if [[ $UPDATE == 1 ]]; then
 fi
 
 if [[ ${_ckconfck} != 0 \
-		|| ${_ckiocck} != 0 \
 		|| $QUIET == 0 ]]; then
+		# || ${_ckiocck} != 0 \
 	echo -e "Status = ${_ckconfck}\n"
-	echo -e "IOC Enabled Status = ${_ckiocck}\n"
+	#echo -e "IOC Enabled Status = ${_ckiocck}\n"
 fi
 
 if [[ ${_ckconfck} != 0 ]]; then
 	exit ${_ckconfck}
-elif [[ ${_ckiocck} != 0 ]]; then
-	exit ${_ckiocck}
+#elif [[ ${_ckiocck} != 0 ]]; then
+#	exit ${_ckiocck}
 else
 	if [[ $QUIET == 0 ]]; then
 		echo -e "ALL ConfCk Cases Passed.\n"
