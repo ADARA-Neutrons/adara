@@ -35,6 +35,7 @@ SYSTEMD_DIR="/etc/systemd/system"
 SYSTEMCTL="/usr/bin/systemctl"
 SUDO="/usr/bin/sudo"
 DIFF="/usr/bin/diff"
+AWK="/usr/bin/awk"
 GREP="/bin/grep"
 RM="/bin/rm"
 
@@ -213,11 +214,11 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			cron_file=`mktemp ./.confck.smsd${ALT}.crontab.edit.XXXXXX`
+			cron_file=`mktemp ./.confck.crontab.edit.XXXXXX`
 
 			echo "MAILTO=idac_notify@email.ornl.gov" >> $cron_file
 			echo -n "0 8,17 * * *" >> $cron_file
-			echo " /home/controls/config-daq2${ALT}/confck --quiet" \
+			echo " /home/controls/config-daq2/confck --quiet" \
 				>> $cron_file
 
 			# Install Administrator Crontab
