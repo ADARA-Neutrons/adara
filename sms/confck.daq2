@@ -34,10 +34,74 @@ fi
 SYSTEMD_DIR="/etc/systemd/system"
 SYSTEMCTL="/usr/bin/systemctl"
 SUDO="/usr/bin/sudo"
+DIFF="/usr/bin/diff"
 GREP="/bin/grep"
+RM="/bin/rm"
 
 # Go to proper Git Config Repo Checkout, for easy checking systemwide.
 cd /home/controls/config-daq2/
+
+CONFCK()
+{
+	local _nerrors=0
+
+	echo
+	echo "Comparing Saved ADARA Admin Crontab to System:"
+	echo
+
+	_check_update=0
+	crontab -l > /tmp/$USER.crontab.$$ 2>&1
+	if [[ $? != 0 || ! -s /tmp/$USER.crontab.$$ ]]; then
+		echo "Failure Retrieving Admin Crontab...!"
+		_check_update=1
+		(( _nerrors++ ))
+	else
+		echo "${DIFF} ./$USER.crontab /tmp/$USER.crontab.$$"
+		${DIFF} ./$USER.crontab /tmp/$USER.crontab.$$
+		if [ $? != 0 ]; then
+			echo "Admin Crontab Differed...!"
+			_check_update=1
+			(( _nerrors++ ))
+		else
+			echo "Admin Crontab is the Same."
+		fi
+	fi
+	# Defer SMSD Admin Crontab to Below...
+	if [[ ${_check_update} == 1 ]]; then
+		echo "Defer Fixing of Admin Crontab..."
+		echo "(See Admin Crontab Create Below, or Fix Manually.)"
+	fi
+	${RM} -f /tmp/$USER.crontab.$$
+	if [ $? != 0 ]; then
+		echo "Failure Deleting Temporary Admin Crontab File...!"
+		(( _nerrors++ ))
+	fi
+
+	echo
+	if [ ${_nerrors} -gt 0 ]; then
+		echo "${_nerrors} Errors/Files Differed!"
+	else
+		echo "All Files/Configs are the Same."
+	fi
+	echo
+
+	return ${_nerrors}
+}
+
+if [[ $UPDATE == 1 ]]; then
+	CONFCK
+	_ckconfck=$?
+else
+	doConfCk=`CONFCK 2>&1`
+	_ckconfck=$?
+	if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doConfCk\n"
+	fi
+fi
+
+if [[ ${_ckconfck} != 0 ]]; then
+	echo -e "*** ConfCk FAILED...!\n"
+fi
 
 CK_EPICS_IOCS_ENABLED()
 {
@@ -182,12 +246,16 @@ if [[ $UPDATE == 1 ]]; then
 
 fi
 
-if [[ ${_ckiocck} != 0 \
+if [[ ${_ckconfck} != 0 \
+		|| ${_ckiocck} != 0 \
 		|| $QUIET == 0 ]]; then
+	echo -e "Status = ${_ckconfck}\n"
 	echo -e "IOC Enabled Status = ${_ckiocck}\n"
 fi
 
-if [[ ${_ckiocck} != 0 ]]; then
+if [[ ${_ckconfck} != 0 ]]; then
+	exit ${_ckconfck}
+elif [[ ${_ckiocck} != 0 ]]; then
 	exit ${_ckiocck}
 else
 	if [[ $QUIET == 0 ]]; then
