@@ -197,3 +197,5 @@ CHECK_PPP stc_pre_post_mobile_timepix3.py ${STC_DEVEL}
 
 CHECK_PPP stc_pre_post_graffiti.bash ${STC_HFIR}
 
+CHECK_PPP stc_pre_post_nxs2echo.bash ${STC_DEVEL}
+
