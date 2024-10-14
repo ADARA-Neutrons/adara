@@ -911,7 +911,6 @@
 	<!-- Pre-Post-Auto-Reduction Command Interface for NSE/BL15 Echo -->
 	<command>
 		<name>EchoCommand</name>
-		<path>/usr/local/bin/stc_pre_post_graffiti.bash</path>
 		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_nxs2echo.bash</path>
 		<!-- Echo Data File Generation Conditional PV Check -->
 		<condition>
