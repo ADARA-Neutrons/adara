@@ -6,6 +6,8 @@ NXS2ECHO="/usr/local/bin/nxs2echo"
 
 BASENAME="/usr/bin/basename"
 MKDIR="/usr/bin/mkdir"
+CHGRP="/usr/bin/chgrp"
+CHMOD="/usr/bin/chmod"
 AWK="/usr/bin/awk"
 CAT="/usr/bin/cat"
 LS="/usr/bin/ls"
@@ -134,14 +136,36 @@ echo -e "\nExpected Echo Destination Data File = [${echo_file}]"
 status=0
 
 if [[ ! -d "${echo_path}" ]]; then
+
 	${MKDIR} -p "${echo_path}"
+
 	if [[ $? != 0 ]]; then
 		echo -e "\nError Creating Echo Data Path Directory...!"
 		status=1
 	else
+
 		echo -e "\nEcho Data Path Successfully Created in Archive:\n"
 		ls -ld "${echo_path}"
+
+		# Set Proper Group Ownership...
+		${CHGRP} "${ipts}" "${echo_path}"
+		chgrp_status=$?
+		if [[ ${chgrp_status} != 0 ]]; then
+			echo -e "\nWarning: Unable to Set IPTS Group Ownership...!"
+			echo -e "\n\t[IPTS = ${ipts}]"
+			echo -e "\n\t[Status = ${chgrp_status}]"
+		fi
+
+		# Set Proper Group Permissions...
+		${CHMOD} g+ws "${echo_path}"
+		chmod_status=$?
+		if [[ ${chmod_status} != 0 ]]; then
+			echo -e "\nWarning: Unable to Set IPTS Group Permissions...!"
+			echo -e "\n\t[Status = ${chmod_status}]"
+		fi
+
 	fi
+
 else
 	echo -e "\nEcho Data File Path Already Exists in Archive:\n"
 	${LS} -ld "${echo_path}"
