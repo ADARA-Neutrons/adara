@@ -199,3 +199,5 @@ CHECK_PPP stc_pre_post_graffiti.bash ${STC_HFIR}
 
 CHECK_PPP stc_pre_post_nxs2echo.bash ${STC_DEVEL}
 
+CHECK_PPP nxs2echo.dummy ${STC_DEVEL}
+
