@@ -2,7 +2,8 @@
 
 # Globals
 
-NXS2ECHO="/usr/local/bin/nxs2echo"
+#NXS2ECHO="/usr/local/bin/nxs2echo"
+NXS2ECHO="/TESTING/SNS/stcdata_devel/nxs2echo.dummy"
 
 BASENAME="/usr/bin/basename"
 MKDIR="/usr/bin/mkdir"
