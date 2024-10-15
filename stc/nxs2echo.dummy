@@ -1,0 +1,35 @@
+#!/bin/bash
+
+echo -e "\nEntry Dummy Nxs2Echo Placeholder Script...!"
+
+echo -e "\nCommand line:"
+echo -e "\t$*"
+
+nexus="$1"
+shift
+
+if [[ "$1" == "--outdir" ]]; then
+	shift
+	outdir="$1"
+else
+	echo -e "\nNo --outdir command line option... Bail!"
+	exit -1
+fi
+
+# Extract Run Number from NeXus file...
+fname=`basename "${nexus}"`
+fname_base=`echo "${fname}" | awk -F "." '{print $1}'`
+run=`echo "${fname_base}" | awk -F "_" '{print $2}'`
+
+# Construct Dummy Echo File Name...
+echo_name="s${run}.echo"
+echo_path="${outdir}/${echo_name}"
+
+# Scribble some gibberish into the Dummy Echo file...
+touch "${echo_path}"
+echo -e "\n*** This is a Dummy Echo File Created by ADARA Testing...!\n" \
+	>> "${echo_path}"
+
+# Good Enough...!
+exit 0
+
