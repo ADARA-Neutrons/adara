@@ -146,6 +146,10 @@ CONFIG_DIFF_DIR()
 			echo -e "Ignoring Stat List File: stat_list.\n"
 		elif [ "${_file}" == "$USER.crontab" ]; then
 			echo -e "Ignoring ADARA Admin Crontab File: $USER.crontab\n"
+		elif [ "${_file}" == "pysen-nxs2echo.yml" ]; then
+			echo -e "Ignoring PySen-Nxs2Echo Config pysen-nxs2echo.yml\n"
+		elif [ "${_file}" == "README.conda" ]; then
+			echo -e "Ignoring PySen-Nxs2Echo README.conda\n"
 		else
 
 			# File Diff
