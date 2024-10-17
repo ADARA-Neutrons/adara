@@ -2,8 +2,12 @@
 
 # Globals
 
-#NXS2ECHO="/usr/local/bin/nxs2echo"
-NXS2ECHO="/TESTING/SNS/stcdata_devel/nxs2echo.dummy"
+NXS2ECHO="/usr/local/bin/nxs2echo"
+#NXS2ECHO="/TESTING/SNS/stcdata_devel/nxs2echo.dummy"
+
+CONDA_PROFILE="/home/controls/etc/profile.d/02_conda.sh"
+CONDA_ENV="pysen-nxs2echo"
+CONDA="conda"
 
 BASENAME="/usr/bin/basename"
 MKDIR="/usr/bin/mkdir"
@@ -181,6 +185,14 @@ if [[ ${status} == 0 ]]; then
 	command="${NXS2ECHO} ${nexus_file} --outdir ${echo_path}"
 	echo -e "\nNxs2Echo Command Line = [${command}]"
 
+	# Source CONDA Profile Settings
+
+	source ${CONDA_PROFILE}
+
+	# Start CONDA PySen-Nxs2Echo Environment
+
+	${CONDA} activate ${CONDA_ENV}
+
 	# Execute Nxs2Echo Python Program
 
 	eval "${command}"
@@ -213,6 +225,10 @@ if [[ ${status} == 0 ]]; then
 		${CAT} "${echo_file}"
 
 	fi
+
+	# Deactivate CONDA Environment
+
+	${CONDA} deactivate
 
 fi
 
