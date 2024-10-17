@@ -14,6 +14,8 @@ BASENAME="/usr/bin/basename"
 MKDIR="/usr/bin/mkdir"
 CHGRP="/usr/bin/chgrp"
 CHMOD="/usr/bin/chmod"
+HEAD="/usr/bin/head"
+TAIL="/usr/bin/tail"
 AWK="/usr/bin/awk"
 CAT="/usr/bin/cat"
 LS="/usr/bin/ls"
@@ -223,7 +225,9 @@ if [[ ${status} == 0 ]]; then
 		${LS} -l "${echo_file}"
 
 		echo
-		${CAT} "${echo_file}"
+		${HEAD} "${echo_file}"
+		echo ". . ."
+		${TAIL} "${echo_file}"
 
 	fi
 
