@@ -210,14 +210,17 @@ if [[ ${status} == 0 ]]; then
 
 	elif [[ ! -f ${echo_file} ]]; then
 
-		echo -e "\nError: Echo Data File Does Not Exist/Unreadable...!"
+		echo -e -n "\nWarning: Zero Status Returned from Nxs2Echo, "
+		echo -e "But Echo Data File Does Not Exist/Unreadable..."
 		echo
 		${LS} -l "${echo_file}"
 
-		status=-1
+		# Do Not Set PPP Error Status if Nxs2Echo Status was Zero!
+		# status=-1
 
 	else
 
+		echo -e "\nZero Status Returned from Nxs2Echo."
 		echo -e "\nFound Expected Echo Data File:"
 		echo -e "\n   [${echo_file}]"
 
