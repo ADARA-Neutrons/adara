@@ -160,8 +160,8 @@ if [[ ! -d "${echo_path}" ]]; then
 		chgrp_status=$?
 		if [[ ${chgrp_status} != 0 ]]; then
 			echo -e "\nWarning: Unable to Set IPTS Group Ownership...!"
-			echo -e "\n\t[IPTS = ${ipts}]"
-			echo -e "\n\t[Status = ${chgrp_status}]"
+			echo -e "\n   [IPTS = ${ipts}]"
+			echo -e "\n   [Status = ${chgrp_status}]"
 		fi
 
 		# Set Proper Group Permissions...
@@ -169,7 +169,7 @@ if [[ ! -d "${echo_path}" ]]; then
 		chmod_status=$?
 		if [[ ${chmod_status} != 0 ]]; then
 			echo -e "\nWarning: Unable to Set IPTS Group Permissions...!"
-			echo -e "\n\t[Status = ${chmod_status}]"
+			echo -e "\n   [Status = ${chmod_status}]"
 		fi
 
 	fi
@@ -204,7 +204,7 @@ if [[ ${status} == 0 ]]; then
 	if [[ ${echo_status} != 0 ]]; then
 
 		echo -e "\nError: Non-Zero Status Code Returned from Nxs2Echo...!"
-		echo -e "\n\t[${echo_status}]"
+		echo -e "\n   [${echo_status}]"
 
 		status=${echo_status}
 
@@ -219,7 +219,7 @@ if [[ ${status} == 0 ]]; then
 	else
 
 		echo -e "\nFound Expected Echo Data File:"
-		echo -e "\n\t[${echo_file}]"
+		echo -e "\n   [${echo_file}]"
 
 		echo
 		${LS} -l "${echo_file}"
