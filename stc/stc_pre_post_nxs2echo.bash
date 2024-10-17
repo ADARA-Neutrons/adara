@@ -185,7 +185,7 @@ if [[ ${status} == 0 ]]; then
 
 	# Construct Nxs2Echo Command Line
 
-	command="${NXS2ECHO} ${nexus_file} --outdir ${echo_path}"
+	command="${NXS2ECHO} ${nexus_file} --outdir ${echo_path} 2>&1"
 	echo -e "\nNxs2Echo Command Line = [${command}]"
 
 	# Source CONDA Profile Settings
