@@ -118,7 +118,14 @@ def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, c
         tpx3_base = '/mcp-tpx3/tpx3files'
 
     if beamline in ['VENUS']:
-        initial_tpx3_dir = "{}/{}/{}".format(tpx3_base, proposal, config_tpx_file_path) 
+        # Make sure we have a ConfigTpxFilePath Subdirectory...!
+        # Otherwise, We Copy Over the ENTIRE MCP/IPTS Proposal Folder!! ;-o
+        if config_tpx_file_path == "":
+            print("ERROR Constructing Raw TPX3 Directory - ConfigTpxFilePath is Empty [{}]\n".format(config_tpx_file_path))
+            raise
+        # Ok to Use ConfigTpxFilePath, hopefully... ;-D
+        else:
+            initial_tpx3_dir = "{}/{}/{}".format(tpx3_base, proposal, config_tpx_file_path) 
     else:
         initial_tpx3_dir = "{}/{}/Run_{}".format(tpx3_base, proposal, run_number) 
 
@@ -319,7 +326,12 @@ def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_fil
     # Handle raw tpx3 files
     initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, config_tpx_file_path, det_sub_dir)
     # Identify target tpx files. Wait for file count to be stable for at least 60.0 seconds.
-    source_files, target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=False)
+    # Use the Same "Run_{}".format(run_number) Criteria for TPX3 as TIFF...
+    # -> for_main_image_files=True (default)
+    # Otherwise We're Screwwwwed if Images from Multiple Runs Land in
+    # the Same Subdirectory... ;-Q
+    # source_files, target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=False)
+    source_files, target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=True)
 
     print('In copy_images(); raw tpx3 portion.\ninitial_tpx3_dir: {}\nnew_tpx3_dir: {}\n'.format(initial_tpx3_dir, new_tpx3_dir))
 
