@@ -802,14 +802,19 @@
 	<command>
 		<name>Timepix3Command</name>
 		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_timepix3.py</path>
-		<!-- Imaging Mode Conditional PV Check -->
+		<!-- Image Archiving Mode Conditional PV Check -->
 		<condition>
-			<name>Timepixe3 Imaging Mode</name>
+			<name>Timepix3 Imaging Mode</name>
 			<pattern>CG1D:CS:UE:Timepix3Mode$</pattern>
 			<pattern>BL3:Exp:IM:Timepix3Mode$</pattern>
 			<pattern>BL10:Exp:IM:Timepix3Mode$</pattern>
+			<pattern>BL10:Exp:IM:ImageFileArchive$</pattern>
 			<value>1</value><!-- Timepix3 Imaging Mode Activated -->
 		</condition>
+		<element>
+			<pattern>:ImageFilePath$</pattern>
+			<name>ImageFilePath</name>
+		</element>
 		<element>
 			<pattern>:ConfigTpxFilePath$</pattern>
 			<name>ConfigTpxFilePath</name>
