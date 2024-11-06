@@ -1,0 +1,33 @@
+
+Instructions for Manually Copying Over Images
+In Lieu of ADARA/STC Pre-Post-Processing "Timepix3" Command Script
+   - e.g. from VENUS MCP Timepix
+
+run=4724
+folder=November6_MCP_Baseline
+subdir=Run_4724_DSet0
+
+sudo mkdir -p /SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx ; \
+sudo chown snsdata \
+	/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx ; \
+sudo chgrp adara \
+	/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx ; \
+sudo chmod g+rwxs \
+	/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx ; \
+ll -d /SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx ; \
+echo -e -n "\nProceed? " ; read foo ; echo ; \
+llth /mcp-tpx3/IPTS-33699/${folder}/${subdir}/Run_${run}_* ; \
+echo -e -n "\nProceed? " ; read foo ; \
+for i in /mcp-tpx3/IPTS-33699/${folder}/${subdir}/Run_${run}_* ; do \
+	echo $i; \
+	f=`basename ${i}`; \
+	echo ${f}; \
+	rsync -avz ${i} \
+		/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx/${f}; \
+done ; \
+echo ; \
+sudo chown snsdata \
+	/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx/* ; \
+llth /SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx/ ; \
+echo
+
