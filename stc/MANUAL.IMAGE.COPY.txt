@@ -3,6 +3,20 @@ Instructions for Manually Copying Over Images
 In Lieu of ADARA/STC Pre-Post-Processing "Timepix3" Command Script
    - e.g. from VENUS MCP Timepix
 
+* Duh. Super easy, just Reconstruct the appropriate Pre-Post-Processing
+command line, and then "sudo" execute it as user "snsdata", e.g.:
+
+sudo -u snsdata \
+	/TESTING/SNS/stcdata_devel/stc_pre_post_timepix3.py \
+	ImageFilePath=November6_MCP_Baseline/Run_4727_DSet0 \
+	DetectorType=3 \
+	facility=SNS beamline=VENUS \
+	proposal=IPTS-33699 run_number=4727
+
+This Works! ;-D
+
+* Or if All Else Fails, and/or the Pre-Post-Processing script is toast:
+
 run=4724
 folder=November6_MCP_Baseline
 subdir=Run_4724_DSet0
@@ -30,4 +44,14 @@ sudo chown snsdata \
 	/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx/* ; \
 llth /SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx/ ; \
 echo
+
+Note: This recipe _Does Not_ include submitting the Image Files to ONCat!!
+
+* NOTE: None of these actions above will trigger Autoreduction for Runs!!
+
+   - you will need to do that Manually, using the Web Monitor:
+
+      -> https://monitor.sns.gov/report/venus/4727/
+
+      -> "Submit for post-processing: <all post-processing>"
 
