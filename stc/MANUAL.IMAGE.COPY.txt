@@ -18,31 +18,43 @@ This Works! ;-D
 * Or if All Else Fails, and/or the Pre-Post-Processing script is toast:
 
 run=4724
+data=/mcp-tpx3
+#data=/img-bl10/data
+det=mcp
+#det=qhy600
+detsub=/tpx
+#detsub=""
+data_sub=""
+#data_sub=images/${det}/
 folder=November6_MCP_Baseline
 subdir=Run_4724_DSet0
 
-sudo mkdir -p /SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx ; \
+sudo mkdir -p \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub} ; \
 sudo chown snsdata \
-	/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx ; \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub} ; \
 sudo chgrp adara \
-	/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx ; \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub} ; \
 sudo chmod g+rwxs \
-	/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx ; \
-ll -d /SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx ; \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub} ; \
+ll -d /SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub} ; \
 echo -e -n "\nProceed? " ; read foo ; echo ; \
-llth /mcp-tpx3/IPTS-33699/${folder}/${subdir}/Run_${run}_* ; \
+llth ${data}/IPTS-33699/${data_sub}${folder}/${subdir}/*Run_${run}_* ; \
 echo -e -n "\nProceed? " ; read foo ; \
-for i in /mcp-tpx3/IPTS-33699/${folder}/${subdir}/Run_${run}_* ; do \
+for i in ${data}/IPTS-33699/${data_sub}${folder}/${subdir}/*Run_${run}_* ; do \
 	echo $i; \
 	f=`basename ${i}`; \
 	echo ${f}; \
 	rsync -avz ${i} \
-		/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx/${f}; \
+		/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub}/${f}; \
 done ; \
 echo ; \
+ll -d /SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub}/ ; \
 sudo chown snsdata \
-	/SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx/* ; \
-llth /SNS/VENUS/IPTS-33699/images/mcp/${folder}/Run_${run}/tpx/ ; \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub}/* ; \
+sudo chgrp users \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub}/* ; \
+llth /SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub}/ ; \
 echo
 
 Note: This recipe _Does Not_ include submitting the Image Files to ONCat!!
