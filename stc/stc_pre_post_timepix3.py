@@ -105,7 +105,7 @@ def determine_source_and_target_directories(beamline, source_dir, ipts_dir, targ
     print('initial_image_dir: {}\nnew_image_dir: {}\n'.format(initial_image_dir, new_image_dir))
     return initial_image_dir, new_image_dir
 
-def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, image_file_path, detector_type, det_sub_dir):
+def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, image_file_path, alt_image_file_path, detector_type, det_sub_dir):
     """
     Determines source and target directories for copying.
     """
@@ -118,7 +118,7 @@ def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, i
         elif int(detector_type) == 4:  # 'Timepix 3'
             tpx3_base = '/mcp-tpx3'
         elif int(detector_type) == 7:  # 'QHY600 sCMOS'
-            tpx3_base = '/img-bl10'
+            tpx3_base = '/img-bl10/data'
         else:
             tpx3_base = '/mcp-tpx3'
         print('VENUS Detector Type {} -> Base Directory = [{}].\n'.format(str(detector_type), str(tpx3_base)))
@@ -135,6 +135,14 @@ def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, i
         # Ok to Use ImageFilePath, hopefully... ;-D
         else:
             initial_tpx3_dir = "{}/{}/{}".format(tpx3_base, proposal, image_file_path) 
+            # Check Whether This Directory Exists...
+            if not os.path.isdir(initial_tpx3_dir):
+                # If Not, Then Try Alternate ImageFilePath...
+                print("Warning: Raw TPX3 Directory Does Not Exist [{}]!\n".format(initial_tpx3_dir))
+                print("Trying Alternate ImageFilePath = [{}]!\n".format(alt_image_file_path))
+                initial_tpx3_dir = "{}/{}/{}".format(tpx3_base, proposal, alt_image_file_path) 
+                # Also Munge ImageFilePath for Subdirectory Below... ;-D
+                image_file_path = alt_image_file_path
     else:
         initial_tpx3_dir = "{}/{}/Run_{}".format(tpx3_base, proposal, run_number) 
 
@@ -303,7 +311,7 @@ def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_p
     return source_files, target_files
 
 
-def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, image_file_path, detector_type, det_sub_dir, include_tiff_files=True):
+def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, image_file_path, alt_image_file_path, detector_type, det_sub_dir, include_tiff_files=True):
     """
     Copies image files for the specified run.
     """
@@ -333,7 +341,7 @@ def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_fil
 
     # ---------------------
     # Handle raw tpx3 files
-    initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, image_file_path, detector_type, det_sub_dir)
+    initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, image_file_path, alt_image_file_path, detector_type, det_sub_dir)
     # Identify target tpx files. Wait for file count to be stable for at least 60.0 seconds.
     # Use the Same "Run_{}".format(run_number) Criteria for TPX3 as TIFF...
     # -> for_main_image_files=True (default)
@@ -460,6 +468,7 @@ def process_args(arg_list):
     tpx_file_path = 'not_found_yet'
     config_tpx_file_path = 'not_found_yet'
     config_tiff_file_path = 'not_found_yet'
+    alt_image_file_path = 'not_found_yet'
 
     # Loop through Command Line Parameters...
     for arg in arg_list:
@@ -510,8 +519,13 @@ def process_args(arg_list):
         if config_tpx_file_path != 'not_found_yet':
             print('process_args(): Steal Missing ImageFilePath from ConfigTpxFilePath = [{}].\n'.format(str(config_tpx_file_path)))
             image_file_path = config_tpx_file_path
+    # We Have *Two* Valid Image File Paths, Better Keep 2nd as "Alternate"
+    elif config_tpx_file_path != 'not_found_yet':
+        print('process_args(): *BOTH* ImageFilePath from ConfigTpxFilePath are Set!\n')
+        print('process_args(): Save ConfigTpxFilePath as Alternate = [{}].\n'.format(str(config_tpx_file_path)))
+        alt_image_file_path = config_tpx_file_path
 
-    return beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, image_file_path, detector_type
+    return beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, image_file_path, alt_image_file_path, detector_type
 
 
 def do_pre_post_timepix3(arg_list):
@@ -522,7 +536,7 @@ def do_pre_post_timepix3(arg_list):
     try:
         print('Pre-Post-Processing for Timepix3.\n')
 
-        beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, image_file_path, detector_type = process_args(arg_list)
+        beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, image_file_path, alt_image_file_path, detector_type = process_args(arg_list)
 
         parms_present = all (p is not None for p in [proposal, run_number, tiff_file_path, tiff_file_name, image_file_path, detector_type])
 
@@ -548,7 +562,7 @@ def do_pre_post_timepix3(arg_list):
             else:
                 det_sub_dir = 'raw'
             print('Detector Type {} -> Detector Sub-Directory = [{}].\n'.format(str(detector_type), str(det_sub_dir)))
-            files_to_catalog = copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, image_file_path, detector_type, det_sub_dir, include_tiff_files=include_tiff_files)
+            files_to_catalog = copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_file_path, tiff_file_name, image_file_path, alt_image_file_path, detector_type, det_sub_dir, include_tiff_files=include_tiff_files)
             catalog_images(files_to_catalog)
         else:
             print('ERROR: Not all parameters present.\n')
