@@ -83,6 +83,7 @@ USAGE()
 	echo "    [--sms_config=<${SMS_CONFIG}>] \\"
 	echo "    [--sms_data=<${SMS_DATA}>] \\"
 	echo "    [--send-paused-data] [--no-send-paused-data] \\"
+	echo "    [--just-say-yes] \\"
 	echo "    [--run=<RunNumber>] \\"
 	echo "    [--help|-h]"
 	echo
@@ -101,6 +102,10 @@ CHECK_PROCEED()
 	local _proceed_ck=""
 
 	echo -e -n "\n${_proceed_query} (yes/No)? "
+	if [[ ${JUST_SAY_YES} == 1 ]]; then
+		echo "<Just-Say-Yes/>"
+		return 0
+	fi
 	read _proceed_ck
 
 	_proceed_ck=`echo "${_proceed_ck}" | tr '[:upper:]' '[:lower:]'`
@@ -134,6 +139,8 @@ STC_PORT=""
 RUN_NUMBER=""
 
 SEND_PAUSED_DATA=""
+
+JUST_SAY_YES=0
 
 FACILITY=""
 
@@ -199,6 +206,10 @@ for arg in "$@" ; do
 		SEND_PAUSED_DATA="${key}"
 		echo -e "\nSetting ADARA Cat \"Send Paused Data\" to:"
 		echo -e "\t[${SEND_PAUSED_DATA}]"
+	elif [[ "#$key#" == '#--just-say-yes#' ]]; then
+		JUST_SAY_YES=1
+		echo -e "\nSetting \"Just Say Yes\" to:"
+		echo -e "\t[${JUST_SAY_YES}]"
 	elif [[ "#$key#" == '#--run#' ]]; then
 		RUN_NUMBER="${value}"
 		echo -e "\nProcessing Run Number: ${RUN_NUMBER}"
@@ -340,8 +351,17 @@ INSTALL_AND_CHECK_DATAFILE()
 
 	CHECK_PROCEED
 
-	${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
-		| ${Less} "+${lesscmd}"
+	if [[ ${JUST_SAY_YES} == 1 ]]; then
+
+		${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
+			| ${TAIL}"
+
+	else
+
+		${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
+			| ${Less} "+${lesscmd}"
+
+	fi
 
 	#
 	# Copy Original Data File to Backup Copy Before Proceeding...
@@ -580,7 +600,8 @@ RESUBMIT_RUN()
 		"Do You Want To Use FindNeXus to Verify the Run Completed"
 	_cknotify=$?
 
-	if [[ ${_cknotify} == 0 ]]; then
+	# Don't Do By Default When "Just Say Yes" is Set...! ;-D
+	if [[ ${_cknotify} == 0 && ${JUST_SAY_YES} == 0 ]]; then
 
 		echo -e "\n${FINDNEXUS} -i ${INST} ${RUN_NUMBER}"
 		echo
@@ -688,7 +709,7 @@ MANUAL_EDIT()
 	CHECK_PROCEED "Do You Want To Manually Edit the Data File"
 	local _ckmanedit=$?
 
-	if [[ ${_ckmanedit} != 0 ]]; then
+	if [[ ${_ckmanedit} != 0 || ${JUST_SAY_YES} == 1 ]]; then
 		return 22
 	fi
 
