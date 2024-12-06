@@ -103,7 +103,7 @@ CHECK_PROCEED()
 
 	echo -e -n "\n${_proceed_query} (yes/No)? "
 	if [[ ${JUST_SAY_YES} == 1 ]]; then
-		echo "<Just-Say-Yes/>"
+		echo "[Just-Say-Yes]"
 		return 0
 	fi
 	read _proceed_ck
@@ -354,7 +354,7 @@ INSTALL_AND_CHECK_DATAFILE()
 	if [[ ${JUST_SAY_YES} == 1 ]]; then
 
 		${ADARA_PARSER} --showrun ${_rundir}/${_datafile}.NEW-$$ \
-			| ${TAIL}"
+			| ${TAIL}
 
 	else
 
