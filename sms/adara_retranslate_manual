@@ -562,15 +562,21 @@ for dir in ${DIRS} ; do
 
 			LAST_RUN_ADD_END=1
 
+			if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+				justsayyes=""
+			else
+				justsayyes="--just-say-yes"
+			fi
+
 			echo "${ADARA_ADD_RUN_END} --inst=$INST --facility=${FACILITY} \
 				${STC_HOST} ${STC_SERVICE} \
 				--stc_port=${STC_PORT} \
-				${SMS_DATA_OPT} --run=${run}"
+				${SMS_DATA_OPT} ${justsayyes} --run=${run}"
 
 			${ADARA_ADD_RUN_END} --inst=$INST --facility=${FACILITY} \
 				${STC_HOST} ${STC_SERVICE} \
 				--stc_port=${STC_PORT} \
-				${SMS_DATA_OPT} --run=${run}
+				${SMS_DATA_OPT} ${justsayyes} --run=${run}
 
 			${LS} -lt ${dir} | ${HEAD}
 
