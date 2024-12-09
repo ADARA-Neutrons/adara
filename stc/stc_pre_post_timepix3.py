@@ -114,13 +114,13 @@ def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, i
     elif beamline in ['VENUS']:
         # Just Use Numerical Values from Enum for Now... ;-/
         if int(detector_type) == 3:  # 'MCP TPX'
-            tpx3_base = '/mcp-tpx3'
+            tpx3_base = '/mcp-bl10-tpx'
         elif int(detector_type) == 4:  # 'Timepix 3'
-            tpx3_base = '/mcp-tpx3'
+            tpx3_base = '/img-bl10'
         elif int(detector_type) == 7:  # 'QHY600 sCMOS'
-            tpx3_base = '/img-bl10/data'
+            tpx3_base = '/img-bl10'
         else:
-            tpx3_base = '/mcp-tpx3'
+            tpx3_base = '/img-bl10'
         print('VENUS Detector Type {} -> Base Directory = [{}].\n'.format(str(detector_type), str(tpx3_base)))
     else:
         # tpx3_base = '/mcp-cg1d/tpx3files'
