@@ -105,46 +105,46 @@ def determine_source_and_target_directories(beamline, source_dir, ipts_dir, targ
     print('initial_image_dir: {}\nnew_image_dir: {}\n'.format(initial_image_dir, new_image_dir))
     return initial_image_dir, new_image_dir
 
-def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, image_file_path, alt_image_file_path, detector_type, det_sub_dir):
+def determine_raw_img_directories(beamline, target_dir, proposal, run_number, image_file_path, alt_image_file_path, detector_type, det_sub_dir):
     """
     Determines source and target directories for copying.
     """
     if beamline in ['CG1D']:
-        tpx3_base = '/mcp-cg1d'
+        img_base = '/mcp-cg1d'
     elif beamline in ['VENUS']:
         # Just Use Numerical Values from Enum for Now... ;-/
         if int(detector_type) == 3:  # 'MCP TPX'
-            tpx3_base = '/mcp-bl10-tpx'
+            img_base = '/mcp-bl10-tpx'
         elif int(detector_type) == 4:  # 'Timepix 3'
-            tpx3_base = '/img-bl10'
+            img_base = '/img-bl10'
         elif int(detector_type) == 7:  # 'QHY600 sCMOS'
-            tpx3_base = '/img-bl10'
+            img_base = '/img-bl10'
         else:
-            tpx3_base = '/img-bl10'
-        print('VENUS Detector Type {} -> Base Directory = [{}].\n'.format(str(detector_type), str(tpx3_base)))
+            img_base = '/img-bl10'
+        print('VENUS Detector Type {} -> Base Directory = [{}].\n'.format(str(detector_type), str(img_base)))
     else:
-        # tpx3_base = '/mcp-cg1d/tpx3files'
-        tpx3_base = '/mcp-tpx3/tpx3files'
+        # img_base = '/mcp-cg1d/tpx3files'
+        img_base = '/mcp-tpx3/tpx3files'
 
     if beamline in ['VENUS']:
         # Make sure we have an ImageFilePath Subdirectory...!
         # Otherwise, We Copy Over the ENTIRE MCP/IPTS Proposal Folder!! ;-o
         if image_file_path == "":
-            print("ERROR Constructing Raw TPX3 Directory - ImageFilePath is Empty [{}]\n".format(image_file_path))
+            print("ERROR Constructing Raw Image Directory - ImageFilePath is Empty [{}]\n".format(image_file_path))
             raise
         # Ok to Use ImageFilePath, hopefully... ;-D
         else:
-            initial_tpx3_dir = "{}/{}/{}".format(tpx3_base, proposal, image_file_path) 
+            initial_img_dir = "{}/{}/{}".format(img_base, proposal, image_file_path) 
             # Check Whether This Directory Exists...
-            if not os.path.isdir(initial_tpx3_dir):
+            if not os.path.isdir(initial_img_dir):
                 # If Not, Then Try Alternate ImageFilePath...
-                print("Warning: Raw TPX3 Directory Does Not Exist [{}]!\n".format(initial_tpx3_dir))
+                print("Warning: Raw Image Directory Does Not Exist [{}]!\n".format(initial_img_dir))
                 print("Trying Alternate ImageFilePath = [{}]!\n".format(alt_image_file_path))
-                initial_tpx3_dir = "{}/{}/{}".format(tpx3_base, proposal, alt_image_file_path) 
+                initial_img_dir = "{}/{}/{}".format(img_base, proposal, alt_image_file_path) 
                 # Also Munge ImageFilePath for Subdirectory Below... ;-D
                 image_file_path = alt_image_file_path
     else:
-        initial_tpx3_dir = "{}/{}/Run_{}".format(tpx3_base, proposal, run_number) 
+        initial_img_dir = "{}/{}/Run_{}".format(img_base, proposal, run_number) 
 
     if target_dir is not None:
         # expand away tilde if present.
@@ -159,13 +159,13 @@ def determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, i
         # Extract 1st Subdirectory Path from ImageFilePath
         # and Use in Archive Path...
         sub_dir = image_file_path.split('/')
-        new_tpx3_dir = "{}/{}/images/mcp/{}/Run_{}/{}".format(target_dir, proposal, sub_dir[0], run_number, det_sub_dir) 
+        new_img_dir = "{}/{}/images/mcp/{}/Run_{}/{}".format(target_dir, proposal, sub_dir[0], run_number, det_sub_dir) 
     else:
-        # new_tpx3_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
-        new_tpx3_dir = "{}/{}/images/mcp/Run_{}/{}".format(target_dir, proposal, run_number, det_sub_dir) 
+        # new_img_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
+        new_img_dir = "{}/{}/images/mcp/Run_{}/{}".format(target_dir, proposal, run_number, det_sub_dir) 
     
-    print('initial_tpx3_dir: {}\nnew_tpx3_dir: {}\n'.format(initial_tpx3_dir, new_tpx3_dir))
-    return initial_tpx3_dir, new_tpx3_dir
+    print('initial_img_dir: {}\nnew_img_dir: {}\n'.format(initial_img_dir, new_img_dir))
+    return initial_img_dir, new_img_dir
 
 def get_files_to_copy(initial_image_dir, run_number):
     """
@@ -185,9 +185,9 @@ def get_files_to_copy(initial_image_dir, run_number):
     # print('files_to_copy:\n{}\n'.format(files_to_copy))
     return files_to_copy
 
-def get_tpx3_files_to_copy(initial_image_dir):
+def get_img_files_to_copy(initial_image_dir):
     """
-    Gets raw TPX3 files for the specified run that need to be copied.
+    Gets raw img files for the specified run that need to be copied.
     """
     files_to_copy_ini = os.listdir(initial_image_dir)
     # print('files_to_copy_ini:\n{}\n'.format('\n'.join(str(f) for f in files_to_copy_ini)))
@@ -244,9 +244,9 @@ def copy_files_batch(initial_image_dir, target_dir, run_number):
     arg_list = ["--include=*Run_{}*".format(run_number), "--exclude=*", initial_image_dir, target_dir]
     run_rsync(arg_list)
 
-def copy_tpx3_files_batch(initial_image_dir, target_dir):
+def copy_img_files_batch(initial_image_dir, target_dir):
     """
-    Copy specified raw tpx3 files to specified target directory using a single rsync command.
+    Copy specified raw img files to specified target directory using a single rsync command.
     """
     initial_image_dir = initial_image_dir.rstrip('/') + '/'
     arg_list = ["--include=*", "--exclude=*", initial_image_dir, target_dir]
@@ -292,7 +292,7 @@ def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_p
         if for_main_image_files:
             source_files_now = get_files_to_copy(initial_image_dir, run_number)
         else:
-            source_files_now = get_tpx3_files_to_copy(initial_image_dir)
+            source_files_now = get_img_files_to_copy(initial_image_dir)
         file_count_now = len(source_files_now)
         time_val_now = time.time()
         if file_count_now == file_count:
@@ -340,24 +340,24 @@ def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_fil
             traceback.print_exc(limit=50, file=sys.stdout)
 
     # ---------------------
-    # Handle raw tpx3 files
-    initial_tpx3_dir, new_tpx3_dir = determine_raw_tpx3_directories(beamline, target_dir, proposal, run_number, image_file_path, alt_image_file_path, detector_type, det_sub_dir)
-    # Identify target tpx files. Wait for file count to be stable for at least 60.0 seconds.
-    # Use the Same "Run_{}".format(run_number) Criteria for TPX3 as TIFF...
+    # Handle raw img files
+    initial_img_dir, new_img_dir = determine_raw_img_directories(beamline, target_dir, proposal, run_number, image_file_path, alt_image_file_path, detector_type, det_sub_dir)
+    # Identify target img files. Wait for file count to be stable for at least 60.0 seconds.
+    # Use the Same "Run_{}".format(run_number) Criteria for Image as TIFF...
     # -> for_main_image_files=True (default)
     # Otherwise We're Screwwwwed if Images from Multiple Runs Land in
     # the Same Subdirectory... ;-Q
-    # source_files, target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=False)
-    source_files, target_files = get_target_files_patiently(initial_tpx3_dir, run_number, new_tpx3_dir, wait_period_sec=60.0, for_main_image_files=True)
+    # source_files, target_files = get_target_files_patiently(initial_img_dir, run_number, new_img_dir, wait_period_sec=60.0, for_main_image_files=False)
+    source_files, target_files = get_target_files_patiently(initial_img_dir, run_number, new_img_dir, wait_period_sec=60.0, for_main_image_files=True)
 
-    print('In copy_images(); raw tpx3 portion.\ninitial_tpx3_dir: {}\nnew_tpx3_dir: {}\n'.format(initial_tpx3_dir, new_tpx3_dir))
+    print('In copy_images(); raw img portion.\ninitial_img_dir: {}\nnew_img_dir: {}\n'.format(initial_img_dir, new_img_dir))
 
     # Assure target directory exists.
-    print('In copy_images(); Making sure directory exists: {}\n'.format(new_tpx3_dir))
-    assure_directory_exists(new_tpx3_dir)
-    print('In copy_images(); About to copy files: {} to target_dir: {}\n'.format(source_files, new_tpx3_dir))
-    copy_files_individually(source_files, new_tpx3_dir)
-    # copy_tpx3_files_batch(initial_tpx3_dir, new_tpx3_dir)
+    print('In copy_images(); Making sure directory exists: {}\n'.format(new_img_dir))
+    assure_directory_exists(new_img_dir)
+    print('In copy_images(); About to copy files: {} to target_dir: {}\n'.format(source_files, new_img_dir))
+    copy_files_individually(source_files, new_img_dir)
+    # copy_img_files_batch(initial_img_dir, new_img_dir)
 
     return target_files
 
