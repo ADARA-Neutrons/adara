@@ -1258,6 +1258,7 @@ CK_EPICS_IOCS_ENABLED()
 	for iocpath in ${SYSTEMD_DIR}/smsd.service \
 			${SYSTEMD_DIR}/pvsd.service \
 			${SYSTEMD_DIR}/dasmond*.service \
+			${SYSTEMD_DIR}/stc*.socket \
 			${SYSTEMD_DIR}/epics-controls-env*.service \
 			${SYSTEMD_DIR}/archive-engine*.service \
 			${SYSTEMD_DIR}/gateway*.service \
@@ -1270,7 +1271,7 @@ CK_EPICS_IOCS_ENABLED()
 		ioc=`basename ${iocpath}`
 
 		echo
-		echo "Checking IOC Service Enabled for:\n   ${ioc}"
+		echo -e "Checking IOC Service Enabled for:\n   ${ioc}"
 
 		local _set_enabled=0
 		# Grep Out Old RedHat7 /etc/init.d/pvsd.service Warnings...
@@ -1293,6 +1294,36 @@ CK_EPICS_IOCS_ENABLED()
 		elif [[ ${_is_enabled} == "enabled" ]]; then
 			echo "SystemCtl Service is Enabled for IOC ${ioc}."
 			echo -e "   ${_check_enabled}: [${_is_enabled}]"
+			# If an STC Socket Service, Also Check Service _Active_!
+			if [[ "${ioc}" =~ stc.*socket$ ]]; then
+				local _is_active=`${SYSTEMCTL} is-active ${ioc} 2>&1 \
+					| ${GREP} -v chkconfig`
+				local _check_active=$?
+				if [[ ${_check_active} != 0 ]]; then
+					if [[ ${_is_active} != "inactive" ]]; then
+						echo -n "Failure Retrieving SystemCtl Active "
+						echo "for IOC ${ioc}...!"
+						echo -e "   ${_check_active}: [${_is_active}]"
+						_set_enabled=1
+						(( _nerrors++ ))
+					elif [[ ${_is_active} == "inactive" ]]; then
+						echo -n "SystemCtl Service is NOT Active"
+						echo " for IOC ${ioc}...!"
+						echo -e "   ${_check_active}: [${_is_active}]"
+						_set_enabled=1
+						(( _nerrors++ ))
+					fi
+				elif [[ ${_is_active} == "active" ]]; then
+					echo "SystemCtl Service is Active for IOC ${ioc}."
+					echo -e "   ${_check_active}: [${_is_active}]"
+				else
+					echo -n "Error: Confusing SystemCtl Active Output "
+					echo "for IOC ${ioc}."
+					echo -e "   ${_check_active}: [${_is_active}]"
+					_set_enabled=1
+					(( _nerrors++ ))
+				fi
+			fi
 		else
 			echo -n "Error: Confusing SystemCtl Enabled Output "
 			echo "for IOC ${ioc}."
@@ -1310,6 +1341,13 @@ CK_EPICS_IOCS_ENABLED()
 				if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
 					${SUDO} ${SYSTEMCTL} enable ${ioc}
 					${SYSTEMCTL} is-enabled ${ioc}
+					# If an STC Socket Service, Also _Start_ the Service!
+					if [[ "${ioc}" =~ stc.*socket$ ]]; then
+						echo -e "\nStarting STC Socket Service ${ioc}:"
+						${SUDO} ${SYSTEMCTL} start ${ioc}
+						${SUDO} ${SYSTEMCTL} is-active ${ioc}
+						${SUDO} ${SYSTEMCTL} status ${ioc}
+					fi
 				fi
 			else
 				echo -n "*** EPICS IOC ${ioc} Must Be Added to the"
