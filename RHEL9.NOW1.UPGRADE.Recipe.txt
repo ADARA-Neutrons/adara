@@ -191,6 +191,12 @@ cp /SNS/users/y8y/pvsd.service ./pvsd/pvsd.service ; \
 	git push ; \
 	git status
 
+# Add "--pvsd_user snsdata" to /usr/local/bin/pvsd_mon.sh in crontab
+vi +/pvsd_mon pvsd/y8y.crontab ; \
+	git commit -m "PVSD Runs as snsdata on RHel9" pvsd/y8y.crontab ; \
+	git push ; \
+	git status
+
 ./confck
 
 ./confck --update
