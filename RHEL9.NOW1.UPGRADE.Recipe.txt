@@ -180,6 +180,7 @@ git rm -r etc/xinetd.d/stc* ; \
 	git push ; \
 	git status
 
+# Add "_systemd" to "--daemon"... ;-D
 cp /SNS/users/y8y/pvsd.service ./pvsd/pvsd.service ; \
 	git add ./pvsd/pvsd.service ; \
 	git commit -m "Add PVSD SystemD Service Description" \
