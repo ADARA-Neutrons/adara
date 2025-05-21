@@ -161,9 +161,9 @@ CONFIG_DIFF_DIR()
 				diff_cnt=$(( $diff_cnt + 1 ))
 				# Update the Deployed System File or Git Repo File Version
 				if [[ $UPDATE == 1 ]]; then
-					echo -e "\nPush/Deploy the System File (\"sys\"),"
+					echo -e "\nPush/Deploy the File to the System (\"sys\"),"
 					echo -e \
-						"   or Pull/Update the Git Repo File (\"repo\"),"
+						"   or Pull/Update the File to the Git Repo (\"repo\"),"
 					echo -n "   or Do Nothing (\"nothing\")?"
 					echo -n " [sys|repo|Nothing]: "
 					read ckUpdate

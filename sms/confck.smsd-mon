@@ -151,8 +151,8 @@ DIFF_FILE()
 		_status=${_ckdiff}
 		# Update the Deployed System File or Git Repo File Version...
 		if [[ $UPDATE == 1 ]]; then
-			echo -e "\nPush/Deploy the System File (\"sys\"),"
-			echo -e "   or Pull/Update the Git Repo File (\"repo\"),"
+			echo -e "\nPush/Deploy the File to the System (\"sys\"),"
+			echo -e "   or Pull/Update the File to the Git Repo (\"repo\"),"
 			echo -n "   or Do Nothing (\"nothing\")? [sys|repo|Nothing]: "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
