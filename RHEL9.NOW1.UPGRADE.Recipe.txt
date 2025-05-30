@@ -269,7 +269,7 @@ BLNAME=`echo ${BL/BL0/NOW}` ; \
 	sudo mkdir "${LOCAL_DATA}/HFIR" ; \
 	sudo mkdir "${LOCAL_DATA}/HFIR/stcdata_hfir" ; \
 	sudo mkdir "${LOCAL_DATA}/HFIR/stcdata_hfir_test" ; \
-	sudo chown -R hfirdata "${LOCAL_DATA}/SNS" ; \
+	sudo chown -R hfirdata "${LOCAL_DATA}/HFIR" ; \
 	sudo mkdir "${LOCAL_DATA}/TESTING" ; \
 	sudo mkdir "${LOCAL_DATA}/TESTING/SNS" ; \
 	sudo mkdir "${LOCAL_DATA}/TESTING/SNS/stcdata_dummy" ; \
