@@ -254,6 +254,29 @@ cp /SNS/users/y8y/logging.conf sms/conf/logging.conf ; \
 	./confck --update ; \
 	./confck ; git status
 
+# Create Any Missing ${LOCAL_DATA} Folders
+
+ls -l "${LOCAL_DATA}"
+
+BLNAME=`echo ${BL/BL0/NOW}` ; \
+	sudo mkdir "${LOCAL_DATA}/SNS" ; \
+	sudo mkdir "${LOCAL_DATA}/SNS/stcdata" ; \
+	sudo mkdir "${LOCAL_DATA}/SNS/stcdata_test" ; \
+	sudo mkdir "${LOCAL_DATA}/SNS/${BLNAME}" ; \
+	sudo mkdir "${LOCAL_DATA}/SNS/${BLNAME}/stcdata" ; \
+	sudo mkdir "${LOCAL_DATA}/SNS/${BLNAME}/stcdata_test" ; \
+	sudo chown -R snsdata "${LOCAL_DATA}/SNS" ; \
+	sudo mkdir "${LOCAL_DATA}/HFIR" ; \
+	sudo mkdir "${LOCAL_DATA}/HFIR/stcdata_hfir" ; \
+	sudo mkdir "${LOCAL_DATA}/HFIR/stcdata_hfir_test" ; \
+	sudo chown -R hfirdata "${LOCAL_DATA}/SNS" ; \
+	sudo mkdir "${LOCAL_DATA}/TESTING" ; \
+	sudo mkdir "${LOCAL_DATA}/TESTING/SNS" ; \
+	sudo mkdir "${LOCAL_DATA}/TESTING/SNS/stcdata_dummy" ; \
+	sudo chown -R snsdata "${LOCAL_DATA}/TESTING" ; \
+	sudo chgrp -R adara \
+		"${LOCAL_DATA}/SNS" "${LOCAL_DATA}/HFIR" "${LOCAL_DATA}/TESTING"
+
 # Check Out All the STC Config Repos... ;-D
 
 if [[ -n "${LOCAL_DATA}" ]]; then \
