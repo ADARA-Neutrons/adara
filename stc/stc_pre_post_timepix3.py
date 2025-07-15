@@ -156,10 +156,13 @@ def determine_raw_img_directories(beamline, target_dir, proposal, run_number, im
             target_dir = f'/SNS/{beamline}'
 
     if beamline in ['VENUS']:
-        # Extract 1st Subdirectory Path from ImageFilePath
-        # and Use in Archive Path...
-        sub_dir = image_file_path.split('/')
-        new_img_dir = "{}/{}/images/mcp/{}/Run_{}/{}".format(target_dir, proposal, sub_dir[0], run_number, det_sub_dir) 
+        ### OLD WAY - NO LONGER USED...
+        ### Extract 1st Subdirectory Path from ImageFilePath
+        ### and Use in Archive Path...
+        ##sub_dir = image_file_path.split('/')
+        ##new_img_dir = "{}/{}/images/mcp/{}/Run_{}/{}".format(target_dir, proposal, sub_dir[0], run_number, det_sub_dir) 
+        ### NEW WAY - Just Use Entire Subdirectory Path from ImageFilePath
+        new_img_dir = "{}/{}/{}".format(target_dir, proposal, image_file_path) 
     else:
         # new_img_dir = "{}/{}/raw/Run_{}/tpx3".format(target_dir, proposal, run_number) 
         new_img_dir = "{}/{}/images/mcp/Run_{}/{}".format(target_dir, proposal, run_number, det_sub_dir) 
