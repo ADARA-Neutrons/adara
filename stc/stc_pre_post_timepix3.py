@@ -179,7 +179,10 @@ def get_files_to_copy(initial_image_dir, run_number):
     files_to_copy = []
     for file_in_dir in files_to_copy_ini:
         if re.search('Run_{}'.format(run_number), file_in_dir):
-            files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
+            if not re.search('.*.done', file_in_dir):
+                files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
+            else:
+                print('Skipping Done marker file for copy:\n{}\n'.format(file_in_dir))
 
     # print('Number of files to copy:\n{}\n'.format(len(files_to_copy)))
     # Temporarily only print last 15 characters of file name to reduce log file load.    
@@ -196,7 +199,10 @@ def get_img_files_to_copy(initial_image_dir):
     # print('files_to_copy_ini:\n{}\n'.format('\n'.join(str(f) for f in files_to_copy_ini)))
     files_to_copy = []
     for file_in_dir in files_to_copy_ini:
+        if not re.search('.*.done', file_in_dir):
             files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
+        else:
+            print('Skipping Done marker file for copy:\n{}\n'.format(file_in_dir))
 
     return files_to_copy
 
@@ -247,6 +253,7 @@ def copy_files_batch(initial_image_dir, target_dir, run_number):
     arg_list = ["--include=*Run_{}*".format(run_number), "--exclude=*", initial_image_dir, target_dir]
     run_rsync(arg_list)
 
+# No Longer Used... (originally used in copy_images()...)
 def copy_img_files_batch(initial_image_dir, target_dir):
     """
     Copy specified raw img files to specified target directory using a single rsync command.
@@ -265,6 +272,7 @@ def copy_files_individually(source_files, target_dir):
         copy_file(source_file, os.path.join(target_dir, head_tail[1])) 
 
 
+# No Longer Used... (originally used in copy_images()...)
 def get_target_files(initial_image_dir, run_number, target_dir):
     """
     Construct list of taget files.
@@ -279,14 +287,17 @@ def get_target_files(initial_image_dir, run_number, target_dir):
 
 def get_target_files_patiently(initial_image_dir, run_number, target_dir, wait_period_sec=30.0, interval_period_sec=5.0, for_main_image_files=True):
     """
-    Construct list of taget files, but don't presume they all exist yet.
+    Construct list of target files, but don't presume they all exist yet.
 
     Wait until there has been no increase in the number of files for the specified wait period.
     Files will be checked every interval according to the specified interval period.
 
     """
     stable_files_count_time = 0.0
-    source_files = get_files_to_copy(initial_image_dir, run_number)
+    if for_main_image_files:
+        source_files = get_files_to_copy(initial_image_dir, run_number)
+    else:
+        source_files = get_img_files_to_copy(initial_image_dir)
     file_count = len(source_files)
     time_val = time.time()
     print('Waiting for stable file count. Current number of files to copy:{} stable file count time: {} (sec)\n'.format(file_count, stable_files_count_time))
