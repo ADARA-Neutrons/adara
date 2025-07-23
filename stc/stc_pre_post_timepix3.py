@@ -242,7 +242,7 @@ def run_rsync(arg_list):
     return ret
 
 
-def mark_file_done(source_file):
+def mark_file_done(source_file, target_file):
     """
     Mark a file as Done copying to the target location.
     """
@@ -257,14 +257,14 @@ def mark_file_done(source_file):
     print('Done Marker File Path:\n{}\n'.format(done_file))
     # REMOVEME
 
-    # Obtain Size of Original File in Bytes
+    # Obtain Size of the Target File in Bytes
     size_in_bytes = -1
     try:
-        size_in_bytes = os.path.getsize(source_file)
-        print('Size in Bytes of Original File:\n{}\n'.format(size_in_bytes))
+        size_in_bytes = os.path.getsize(target_file)
+        print('Size in Bytes of Target File:\n{}\n'.format(size_in_bytes))
         # REMOVEME
     except FileNotFoundError:
-        print('Error: Source File Not Found:\n{}\n'.format(source_file))
+        print('Error: Target File Not Found:\n{}\n'.format(target_file))
     except Exception as e:
         print('Exception Obtaining Source File Size:\n{}\n'.format(str(e)))
 
@@ -291,7 +291,7 @@ def copy_file(source_file, target_file):
     # print('Copying [{}] to [{}].\n'.format(source_file, target_file))
     ret = run_rsync([source_file, target_file])
     if ret == 0:
-        mark_file_done(source_file)
+        mark_file_done(source_file, target_file)
 
 
 def copy_files_batch(initial_image_dir, target_dir, run_number):
@@ -306,7 +306,7 @@ def copy_files_batch(initial_image_dir, target_dir, run_number):
     #    explicitly select the desired Image/Tiff files by name, and then
     #    just use copy_files_individually() instead... ;-D
     # if ret == 0:
-        # mark_file_done(source_file)
+        # mark_file_done(source_file, target_file)
 
 # No Longer Used... (originally used in copy_images()...)
 def copy_img_files_batch(initial_image_dir, target_dir):
