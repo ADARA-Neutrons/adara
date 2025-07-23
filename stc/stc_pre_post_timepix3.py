@@ -183,6 +183,7 @@ def get_files_to_copy(initial_image_dir, run_number):
                 files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
             else:
                 print('Skipping Done marker file for copy:\n{}\n'.format(file_in_dir))
+                # REMOVEME
 
     # print('Number of files to copy:\n{}\n'.format(len(files_to_copy)))
     # Temporarily only print last 15 characters of file name to reduce log file load.    
@@ -203,6 +204,7 @@ def get_img_files_to_copy(initial_image_dir):
             files_to_copy.append(os.path.join(initial_image_dir, file_in_dir))
         else:
             print('Skipping Done marker file for copy:\n{}\n'.format(file_in_dir))
+            # REMOVEME
 
     return files_to_copy
 
@@ -222,6 +224,7 @@ def run_rsync(arg_list):
     """
     Run rsync with default options using specified arguments..
     """
+    ret = -1
     try:
         # print('Copying [{}] to [{}].\n'.format(source_file, target_file))
         # command = ['rsync', '--list-only' , '-avz']
@@ -229,20 +232,66 @@ def run_rsync(arg_list):
         command += arg_list
         p = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         stdo, stde = p.communicate()
+        ret = p.returncode
         if p.returncode != 0:
             raise Exception("Failed to run rsync command {} with return code of {}. {}".format(' '.join(command), p.returncode, stde))
         else:
             print("Done running rsync command {} with return code of {}. {}\n".format(' '.join(command), p.returncode, stdo))
     except Exception as ex:
         raise Exception("Failed to run rsync command {}. {}".format(' '.join(command), ex))
+    return ret
 
+
+def mark_file_done(source_file):
+    """
+    Mark a file as Done copying to the target location.
+    """
+    print('Creating Done Marker File for:\n{}\n'.format(source_file))
+    # REMOVEME
+
+    # Create Done Marker File Path
+    source_dir = os.path.dirname(source_file)
+    orig_file = os.path.basename(source_file)
+    done = "." + orig_file + ".done"
+    done_file = os.path.join(source_dir, done)
+    print('Done Marker File Path:\n{}\n'.format(done_file))
+    # REMOVEME
+
+    # Obtain Size of Original File in Bytes
+    size_in_bytes = -1
+    try:
+        size_in_bytes = os.path.getsize(source_file)
+        print('Size in Bytes of Original File:\n{}\n'.format(size_in_bytes))
+        # REMOVEME
+    except FileNotFoundError:
+        print('Error: Source File Not Found:\n{}\n'.format(source_file))
+    except Exception as e:
+        print('Exception Obtaining Source File Size:\n{}\n'.format(str(e)))
+
+    # Scribble Size in Bytes Into Done Marker File
+    if size_in_bytes > 0:
+        try:
+            with open(done_file, 'w') as file:
+                file.write('{}\n'.format(str(size_in_bytes)))
+            print('Done Marker File Written Size={}:\n{}\n'.format(str(size_in_bytes), done_file))
+        except PermissionError:
+            print('Error: Permission Denied Writing Done File:\n{}\n'.format(done_file))
+            # Maybe this should be an Exception, when we're more confident...?
+        except IOError as e:
+            print('IOError Writing Done File:\n{}\n{}\n'.format(done_file,str(e)))
+            # Maybe this should be an Exception, when we're more confident...?
+    else:
+        print('Error Marking File Copy Done for:\n{}\n'.format(source_file))
+        # Maybe this should be an Exception, when we're more confident...?
 
 def copy_file(source_file, target_file):
     """
     Copy a file to a target location.
     """
     # print('Copying [{}] to [{}].\n'.format(source_file, target_file))
-    run_rsync([source_file, target_file])
+    ret = run_rsync([source_file, target_file])
+    if ret == 0:
+        mark_file_done(source_file)
 
 
 def copy_files_batch(initial_image_dir, target_dir, run_number):
@@ -251,7 +300,13 @@ def copy_files_batch(initial_image_dir, target_dir, run_number):
     """
     initial_image_dir = initial_image_dir.rstrip('/') + '/'
     arg_list = ["--include=*Run_{}*".format(run_number), "--exclude=*", initial_image_dir, target_dir]
-    run_rsync(arg_list)
+    ret = run_rsync(arg_list)
+    # Can't Easily Create ".*.done" Marker Files in Batch Copy Mode...!
+    #    - if this method is truly needed, then it should be re-worked to
+    #    explicitly select the desired Image/Tiff files by name, and then
+    #    just use copy_files_individually() instead... ;-D
+    # if ret == 0:
+        # mark_file_done(source_file)
 
 # No Longer Used... (originally used in copy_images()...)
 def copy_img_files_batch(initial_image_dir, target_dir):
@@ -334,6 +389,17 @@ def copy_images(beamline, proposal, run_number, source_dir, target_dir, tiff_fil
     # Determine proper subdirectories.
     source_dir, ipts_dir, new_subdir = determine_subdirectories(tiff_file_path)
 
+    # I _Think_ This Case is Redundant Now...
+    #    - get_target_files_patiently() without "for_main_image_files=True"
+    #    will just grab Every File in the initial_image_dir
+    #    - however copy_files_batch() only copies the files with "Run_{}"
+    #    run_number in the file names, so this is basically the "same thing"!
+    # It is worth noting that if "include_tiff_files" is True (anywhere
+    # except CG1D and VENUS), you would actually copy Every File *Twice*!!
+    #    - this seems bad, like we should just eliminate the whole
+    #    "include_tiff_files" option all together...
+    # Nonetheless, please note that with copy_files_batch() here,
+    # there are _No_ ".*.done" marker files created for local cleanup...! ;-D
     if include_tiff_files:
         try:
             # Determine source and target directories.
