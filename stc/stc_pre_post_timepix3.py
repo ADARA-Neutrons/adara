@@ -257,23 +257,20 @@ def mark_file_done(source_file, target_file):
     """
     Mark a file as Done copying to the target location.
     """
-    print('Creating Done Marker File for:\n{}\n'.format(source_file))
-    # REMOVEME
+    #print('Creating Done Marker File for:\n{}\n'.format(source_file))
 
     # Create Done Marker File Path
     source_dir = os.path.dirname(source_file)
     orig_file = os.path.basename(source_file)
     done = "." + orig_file + ".done"
     done_file = os.path.join(source_dir, done)
-    print('Done Marker File Path:\n{}\n'.format(done_file))
-    # REMOVEME
+    #print('Done Marker File Path:\n{}\n'.format(done_file))
 
     # Obtain Size of the Target File in Bytes
     size_in_bytes = -1
     try:
         size_in_bytes = os.path.getsize(target_file)
-        print('Size in Bytes of Target File:\n{}\n'.format(size_in_bytes))
-        # REMOVEME
+        #print('Size in Bytes of Target File:\n{}\n'.format(size_in_bytes))
     except FileNotFoundError:
         print('Error: Target File Not Found:\n{}\n'.format(target_file))
     except Exception as e:
@@ -284,7 +281,7 @@ def mark_file_done(source_file, target_file):
         try:
             with open(done_file, 'w') as file:
                 file.write('{}\n'.format(str(size_in_bytes)))
-            print('Done Marker File Written Size={}:\n{}\n'.format(str(size_in_bytes), done_file))
+            print('Done Marker File Written, Size in Bytes of Target File = {}:\n{}\n'.format(str(size_in_bytes), done_file))
         except PermissionError:
             print('Error: Permission Denied Writing Done File:\n{}\n'.format(done_file))
             # Maybe this should be an Exception, when we're more confident...?
