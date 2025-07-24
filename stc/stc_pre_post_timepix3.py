@@ -113,11 +113,22 @@ def determine_raw_img_directories(beamline, target_dir, proposal, run_number, im
         img_base = '/mcp-cg1d'
     elif beamline in ['VENUS']:
         # Just Use Numerical Values from Enum for Now... ;-/
-        if int(detector_type) == 3:  # 'MCP TPX'
-            img_base = '/mcp-bl10-tpx'
-        elif int(detector_type) == 4:  # 'Timepix 3'
+        # BL10:Exp:Det enums:
+        #    0="MCP TPX1"
+        #    1="MCP TPX3"
+        #    2="Andor CCD iKon-XL"
+        #    3="ZWO ASI6200MM sCMOS"
+        #    4="QHY411 sCMOS"
+        #    5="QHY600 sCMOS"
+        #    6="Other"
+        #    7="Trigger By TTL"
+        #    8="None" 
+        if int(detector_type) == 0:  # 'MCP TPX1'
+            #img_base = '/mcp-bl10-tpx' Changed as of 7/24/2025
+            img_base = '/mnt/bl10-tpx1'
+        elif int(detector_type) == 1:  # 'MCP TPX3'
             img_base = '/img-bl10'
-        elif int(detector_type) == 7:  # 'QHY600 sCMOS'
+        elif int(detector_type) == 5:  # 'QHY600 sCMOS'
             img_base = '/img-bl10'
         else:
             img_base = '/img-bl10'
@@ -626,18 +637,29 @@ def do_pre_post_timepix3(arg_list):
             else:
                 include_tiff_files = True
             # No Value Strings from ADARA/STC in Command Args Yet... ;-b
-            #if detector_type in ['MCP TPX']:
-            #    det_sub_dir = 'tpx'
-            #elif detector_type in ['Timepix 3']:
+            #if detector_type in ['MCP TPX1']:
+            #    det_sub_dir = 'tpx1'
+            #elif detector_type in ['MCP TPX3']:
             #    det_sub_dir = 'tpx3'
             #else:
             #    det_sub_dir = 'raw'
             # Just Use Numerical Values from Enum for Now... ;-/
-            if int(detector_type) == 3:  # 'MCP TPX'
-                det_sub_dir = 'tpx'
-            elif int(detector_type) == 4:  # 'Timepix 3'
+            # BL10:Exp:Det enums:
+            #    0="MCP TPX1"
+            #    1="MCP TPX3"
+            #    2="Andor CCD iKon-XL"
+            #    3="ZWO ASI6200MM sCMOS"
+            #    4="QHY411 sCMOS"
+            #    5="QHY600 sCMOS"
+            #    6="Other"
+            #    7="Trigger By TTL"
+            #    8="None" 
+            # NOTE: det_sub_dir Not Used for VENUS anyway...!! ;-D
+            if int(detector_type) == 0:  # 'MCP TPX1'
+                det_sub_dir = 'tpx1'
+            elif int(detector_type) == 1:  # 'MCP TPX3'
                 det_sub_dir = 'tpx3'
-            elif int(detector_type) == 7:  # 'QHY600 sCMOS'
+            elif int(detector_type) == 5:  # 'QHY600 sCMOS'
                 det_sub_dir = 'qhy600'
             else:
                 det_sub_dir = 'raw'
