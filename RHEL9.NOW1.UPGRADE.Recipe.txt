@@ -276,6 +276,8 @@ BLNAME=`echo ${BL/BL0/NOW}` ; \
 	sudo chown -R snsdata "${LOCAL_DATA}/TESTING" ; \
 	sudo mkdir "${LOCAL_DATA}/gpfs" ; \
 	sudo mkdir "${LOCAL_DATA}/gpfs/neutronsfs" ; \
+	sudo mkdir "${LOCAL_DATA}/gpfs/neutronsfs/stcdata" ; \
+	sudo mkdir "${LOCAL_DATA}/gpfs/neutronsfs/stcdata_test" ; \
 	sudo chown -R snsdata "${LOCAL_DATA}/gpfs" ; \
 	sudo chgrp -R adara \
 		"${LOCAL_DATA}/SNS" "${LOCAL_DATA}/HFIR" \
