@@ -274,11 +274,16 @@ BLNAME=`echo ${BL/BL0/NOW}` ; \
 	sudo mkdir "${LOCAL_DATA}/TESTING/SNS" ; \
 	sudo mkdir "${LOCAL_DATA}/TESTING/SNS/stcdata_dummy" ; \
 	sudo chown -R snsdata "${LOCAL_DATA}/TESTING" ; \
+	sudo mkdir "${LOCAL_DATA}/gpfs" ; \
+	sudo mkdir "${LOCAL_DATA}/gpfs/neutronsfs" ; \
+	sudo chown -R snsdata "${LOCAL_DATA}/gpfs" ; \
 	sudo chgrp -R adara \
-		"${LOCAL_DATA}/SNS" "${LOCAL_DATA}/HFIR" "${LOCAL_DATA}/TESTING" ; \
+		"${LOCAL_DATA}/SNS" "${LOCAL_DATA}/HFIR" \
+		"${LOCAL_DATA}/TESTING" "${LOCAL_DATA}/gpfs" ; \
 	sudo chmod -R g+ws \
-		"${LOCAL_DATA}/SNS" "${LOCAL_DATA}/HFIR" "${LOCAL_DATA}/TESTING" ; \
-	sudo ln -s "${LOCAL_DATA}/SNS" "${LOCAL_DATA}/SNS/snfs1"
+		"${LOCAL_DATA}/SNS" "${LOCAL_DATA}/HFIR" \
+		"${LOCAL_DATA}/TESTING" "${LOCAL_DATA}/gpfs" ; \
+	sudo ln -s "${LOCAL_DATA}/SNS" "${LOCAL_DATA}/SNS/snfs1" 
 
 # Check Out All the STC Config Repos... ;-D
 
