@@ -2,7 +2,8 @@
 
 # Globals
 
-NXS2ECHO="/home/controls/pysen/pysen/inout/nxs2echo.py"
+NXS2ECHO="/home/controls/pysen/pysen/inout/nxs2taco.py"
+#NXS2ECHO="/home/controls/pysen/pysen/inout/nxs2echo.py"
 #NXS2ECHO="/TESTING/SNS/stcdata_devel/nxs2echo.dummy"
 #NXS2ECHO="/usr/local/bin/nxs2echo"
 
