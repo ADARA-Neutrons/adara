@@ -750,6 +750,32 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                     }
                                     else if ( pvs.size() )
                                     {
+                                        // Ensure No DUPLICATE Device Names
+                                        for (
+                                        vector<DeviceDescriptor*>::iterator
+                                            idev = a_devices.begin();
+                                            idev != a_devices.end();
+                                            ++idev )
+                                        {
+                                            // DUPLICATE Device Name!!
+                                            if ( !dev_name.compare(
+                                                    (*idev)->m_name ) )
+                                            {
+                                                syslog( LOG_ERR,
+                                        "%s: %s::%s(): %s [%s] -> %s = %d",
+                                                    "PVSD ERROR",
+                                                    "InputAdapter",
+                                                    "parseConfigBuffer",
+                                                "DUPLICATE Device Name",
+                                                    dev_name.c_str(),
+                                                    "Device ID", id );
+                                                throw -1;
+                                            }
+                                        }
+
+                                        // NOW Go Ahead and Define Device
+                                        // and Process PVs... ;-D
+
                                         DeviceDescriptor *dev =
                                             new DeviceDescriptor( dev_name,
                                                 m_source, EPICS_PROTOCOL,
