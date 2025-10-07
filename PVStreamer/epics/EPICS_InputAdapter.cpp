@@ -121,9 +121,12 @@ void
 InputAdapter::getDevicesStatus(
         uint32_t &a_partialDeviceCount, uint32_t &a_hungDeviceCount,
         uint32_t &a_inactiveDeviceCount, // via Active Status PV State
-        uint32_t &a_readyPVCount, uint32_t &a_totalPVCount )
+        uint32_t &a_readyPVCount, uint32_t &a_totalPVCount,
+        std::string &a_device_errs )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    stringstream ss_dev_errs;
 
     a_partialDeviceCount = 0;
     a_hungDeviceCount = 0;
@@ -144,14 +147,45 @@ InputAdapter::getDevicesStatus(
             a_inactiveDeviceCount++;
 
         else if ( hung )
+        {
             a_hungDeviceCount++;
 
+            ss_dev_errs << " [";
+            DeviceDescriptor *desc = idev->second->get_desc();
+            if ( desc != NULL && !(desc->m_name.empty()) )
+            {
+                ss_dev_errs << desc->m_name;
+            }
+            else
+            {
+                ss_dev_errs << "NO_DEVICE_NAME";
+            }
+            ss_dev_errs << ": HUNG]";
+        }
+
         else if ( ready_pvs < total_pvs )
+        {
             a_partialDeviceCount++;
+
+            ss_dev_errs << " [";
+            DeviceDescriptor *desc = idev->second->get_desc();
+            if ( desc != NULL && !(desc->m_name.empty()) )
+            {
+                ss_dev_errs << desc->m_name;
+            }
+            else
+            {
+                ss_dev_errs << "NO_DEVICE_NAME";
+            }
+            ss_dev_errs << ": PARTIAL]";
+        }
 
         a_readyPVCount += ready_pvs;
         a_totalPVCount += total_pvs;
     }
+
+    // Return Accumulated Device Errors String...
+    a_device_errs = ss_dev_errs.str();
 }
 
 
