@@ -390,10 +390,13 @@ int main(int argc, char *argv[])
                 uint32_t inactiveDeviceCount;
                 uint32_t readyPVCount, totalPVCount;
 
+                std::string device_errs;
+
                 input->getDevicesStatus(
                     partialDeviceCount, hungDeviceCount,
                     inactiveDeviceCount,
-                    readyPVCount, totalPVCount );
+                    readyPVCount, totalPVCount,
+                    device_errs );
 
                 std::string logPrefix = "";
                 int logType = LOG_INFO;
@@ -425,6 +428,7 @@ int main(int argc, char *argv[])
                 ss << " Output Devices Defined, ";
                 ss << output->numPVs();
                 ss << " Output PVs Defined";
+                ss << " -" << device_errs;
 
                 syslog( logType, "%sPVSD %s %s %s - %s.",
                     logPrefix.c_str(), PVSD_VERSION,
