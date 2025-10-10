@@ -6,10 +6,28 @@
 # in the specified ITEMS Sample Meta-Data, and Dump Any Inconsistencies
 #
 
+DEFAULT_STC_HOST_DOMAIN="ornl.gov"
+
 #NXLS="/SNS/users/$USER/stuff/exec/nxls"
 NXLS="$HOME/bin/nxls"
 
+Less="/usr/bin/less"
+
+AWK="/usr/bin/awk"
+SSH="/usr/bin/ssh"
+SED="/bin/sed"
+
 TTY=`tty`
+
+USAGE()
+{
+	echo -e "\nusage: stcitems [--run] <pid1/run1> [ <pid2/run2> ... ] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc<N>] \\"
+	echo "    [--num_files=<num_files>]"
+	echo "    [--verbose|-v]"
+	echo "    [--help|-h]"
+	echo
+}
 
 CHECK_PROCEED()
 {
@@ -47,87 +65,58 @@ CHECK_PROCEED()
 	return 0
 }
 
+#
+# Parse Command Line Arguments
+#
+
+EXE=""
+
 num_files=5
 
-if [[ $# < 1 ]]; then
-	echo "usage: stcitems [--verbose|-v] [--run] <pid/run>"
-	exit -1
-fi
+pid_list=""
+
+stc_host="This Server"
 
 verbose=0
-if [[ "$1" == "--verbose" || "$1" == "-v" ]]; then
-	verbose=1
-	shift
-fi
-
 do_run=0
-if [[ "$1" == "--run" ]]; then
-	do_run=1
-	shift
-fi
 
-if [[ $do_run == 1 ]]; then
-	run="$1"
-	if [[ $verbose == 1 ]]; then
-		echo -e "\nSearching for Run Number ${run}."
-	fi
-	pid=`stcrun --pid $run | tail -1`
-	if [[ -z "$pid" ]]; then
-		echo -e "\nRun Number ${run} Not Found on This Server.\n"
-		exit -2
+for arg in "$@" ; do
+
+	key=`echo "$arg" | ${AWK} -F = '{print $1}'`
+	value=`echo "$arg" | ${AWK} -F = '{print $2}'`
+
+	if [[ "$key" =~ ^--stc[1-9]+ ]]; then
+		name=`echo "${key}" | ${SED} 's/^--//'`
+		stc_host="${name}.${DEFAULT_STC_HOST_DOMAIN}"
+		echo -e "\nUsing STC Host: ${stc_host}"
+		EXE="${SSH} ${stc_host}"
+	elif [[ "#$key#" == '#--run#' ]]; then
+		do_run=1
+		echo -e "\nInterpreting Values as Run Numbers, Not PIDs."
+	elif [[ "#$key#" == '#--num_files#' ]]; then
+		num_files=${value}
+		echo -e "\nSearch STC Logs with num_files=${num_files}."
+	elif [[ "#$key#" == '#--verbose#' || "#$key#" == '#-v#' ]]; then
+		verbose=1
+		echo -e "\nSetting Verbose to True."
+	elif [[ "#$key#" == '#--help#' || "#$key#" == '#-h#' ]]; then
+		USAGE
+		exit 0
 	else
-		echo -e "\nResolved Run Number ${run} as Process Id ${pid}.\n"
-	fi
-else
-	pid="$1"
-	if [[ $verbose == 1 ]]; then
-		echo -e "\nSearching for Process ID ${pid}."
-	fi
-fi
-
-SEARCH_STC_LOGS()
-{
-	local _pid="$1"
-
-	files=`/bin/ls -t -r /var/log/stc.log* | tail -${num_files}`
-
-	for log in $files ; do
-
-		gzck=`echo $log | grep '.gz$' | wc | awk '{print $1}'`
-
-		if [[ $gzck == 1 ]]; then
-			zcat "$log" | grep "\[${_pid}\]"
+		if [[ $do_run == 1 ]]; then
+			echo -e "\nAdding Run Number ${key} to List."
 		else
-			grep "\[${_pid}\]" "$log"
+			echo -e "\nAdding PID ${key} to List."
 		fi
+		pid_list="${pid_list} ${key}"
+	fi
 
-	done
-}
+done
 
-# Search Log Files
-log_lines=`SEARCH_STC_LOGS ${pid}`
-
-if [[ $verbose == 1 ]]; then
-	nl=`echo "${log_lines}" | wc | awk '{print $1}'`
-	echo -e "\nFound ${nl} Log Lines for Process ID ${pid}."
-fi
-
-# Try to Determine Beamline Prefix for This Run from STC Logs...
-
-morethan1=`echo "${log_lines}" | grep "More Than 1" | tail -1`
-#echo "morethan1=[$morethan1]"
-
-if [[ $verbose == 1 ]]; then
-	echo -e "\nLast \"More Than 1 PV\" Line Found:\n\n   [${morethan1}]"
-fi
-
-# Strip Off Daslogs PV Name... ;-b
-blprefix=`echo "${morethan1}" | awk -F " - Check " '{print $2}' \
-	| sed "s@/entry/DASlogs/@@" | awk -F ":" '{print $1}'`
-#echo "blprefix=[$blprefix]"
-
-if [[ $verbose == 1 ]]; then
-	echo -e "\nBeamline Prefix Found: [${blprefix}]"
+if [[ "${pid_list}" == "" ]]; then
+	echo -e "\nNo PIDs/Run Numbers Specified...!"
+	USAGE
+	exit -1
 fi
 
 # Function to Dump Key Sample Meta-Data Datasets in a NeXus File
@@ -260,189 +249,257 @@ DUMP_SAMPLE_DASLOGS()
 	fi
 }
 
-# Determine Associated Facility, Beamline, IPTS and Run Number from Logs
+#
+# Process PID/Run Number List on Given STC Host
+# (or Locally, If None Specified)
+#
 
-tsline=`echo "${log_lines}" | grep "Target Station"`
-#echo "tsline=[${tsline}]"
-
-ntslines=`echo "${tsline}" | wc | awk '{print $1}'`
-#echo "ntslines=[${ntslines}]"
-
-if [[ $verbose == 1 ]]; then
-	echo -e "\n${ntslines} Target Station Line(s) Found:\n\n   [${tsline}]"
+if [[ $do_run == 1 ]]; then
+	echo -e -n "\nRun Number List: "
+else
+	echo -e -n "\nPID List: "
 fi
+echo "[${pid_list} ]"
 
-# No "Target Station" Line Found, Or *Multiple* "Target Station" Lines...
-# Search for NeXus File Paths, Or Just Dump Logs for Manual Inspection...
-if [[ -z "${tsline}" || ${ntslines} != 1 ]]; then
+for id in ${pid_list} ; do
 
-	if [[ -z "${tsline}" ]]; then
-		echo -e "\nError: No \"Target Station\" Line Found in STC Logs..."
-	elif [[ ${ntslines} != 1 ]]; then
-		echo -e \
-		"\nError: Multiple \"Target Station\" Lines Found in STC Logs..."
+	echo -e "\n${id}:"
+
+	if [[ $do_run == 1 ]]; then
+		run="$id"
+		if [[ $verbose == 1 ]]; then
+			echo -e "\nSearching for Run Number ${run}."
+		fi
+		pid=`eval "${EXE} stcrun --pid $run" | tail -1`
+		if [[ -z "$pid" ]]; then
+			echo -e "\nRun Number ${run} Not Found on ${stc_host}.\n"
+			exit -2
+		else
+			echo -e "\nResolved Run Number ${run} as Process Id ${pid}.\n"
+		fi
+	else
+		pid="$id"
+		if [[ $verbose == 1 ]]; then
+			echo -e "\nSearching for Process ID ${pid}."
+		fi
 	fi
 
-	if [[ -n "${log_lines}" ]]; then
+	# Search Log Files
+	log_lines=`eval \
+		"${EXE} stc_search_logs --num_files=${num_files} ${pid}"`
 
-		# Try to Find Some NeXus File Path(s) in the Log Lines...
+	if [[ $verbose == 1 ]]; then
+		nl=`echo "${log_lines}" | wc | awk '{print $1}'`
+		echo -e "\nFound ${nl} Log Lines for Process ID ${pid}."
+	fi
 
-		nexus_lines=`echo "${log_lines}" \
-			| grep "Successfully Renamed Ne[Xx]us"`
-		#echo "nexus_lines=[$nexus_lines]"
+	# Try to Determine Beamline Prefix for This Run from STC Logs...
 
-		if [[ -n "${nexus_lines}" ]]; then
+	morethan1=`echo "${log_lines}" | grep "More Than 1" | tail -1`
+	#echo "morethan1=[$morethan1]"
 
-			if [[ $verbose == 1 ]]; then
-				echo -e "\nFound Successful NeXus File Line(s):"
-				echo -e "\n   [${nexus_lines}]"
-			fi
+	if [[ $verbose == 1 ]]; then
+		echo -e "\nLast \"More Than 1 PV\" Line Found:\n\n   [${morethan1}]"
+	fi
 
-			nexus_file_paths=`echo "$nexus_lines" | awk '{print $NF}'`
-			#echo "nexus_file_paths=[$nexus_file_paths]"
+	# Strip Off Daslogs PV Name... ;-b
+	blprefix=`echo "${morethan1}" | awk -F " - Check " '{print $2}' \
+		| sed "s@/entry/DASlogs/@@" | awk -F ":" '{print $1}'`
+	#echo "blprefix=[$blprefix]"
 
-			num_nexus_files=`echo "$nexus_file_paths" \
-				| wc | awk '{print $1}'`
+	if [[ $verbose == 1 ]]; then
+		echo -e "\nBeamline Prefix Found: [${blprefix}]"
+	fi
 
-			echo -e "\nFound ${num_nexus_files} NeXus File Paths."
+	# Determine Associated Facility, Beamline, IPTS and Run Number from Logs
 
-			if [[ ${num_nexus_files} -gt 1 ]]; then
-				echo -e "\nChecking/Processing Each in Turn..."
-			fi
+	tsline=`echo "${log_lines}" | grep "Target Station"`
+	#echo "tsline=[${tsline}]"
 
-			for nexus_file_path in ${nexus_file_paths} ; do
+	ntslines=`echo "${tsline}" | wc | awk '{print $1}'`
+	#echo "ntslines=[${ntslines}]"
 
-				echo -e "\n*** ${blprefix} ***"
+	if [[ $verbose == 1 ]]; then
+		echo -e -n "\n${ntslines} Target Station Line(s) Found:"
+		echo -e "\n\n   [${tsline}]"
+	fi
 
-				CHECK_PROCEED "[$nexus_file_path]"
-				cknexus=$?
+	# No "Target Station" Line Found, Or *Multiple* "Target Station" Lines
+	# Search for NeXus File Paths, Or Just Dump Logs for Manual Inspection
+	if [[ -z "${tsline}" || ${ntslines} != 1 ]]; then
 
-				if [[ $cknexus == 0 ]]; then
-					DUMP_SAMPLE_DASLOGS
+		if [[ -z "${tsline}" ]]; then
+			echo -e -n "\nError: No \"Target Station\" Line Found "
+			echo -e "in STC Logs..."
+		elif [[ ${ntslines} != 1 ]]; then
+			echo -e -n "\nError: Multiple \"Target Station\" Lines Found "
+			echo -e "in STC Logs..."
+		fi
+
+		if [[ -n "${log_lines}" ]]; then
+
+			# Try to Find Some NeXus File Path(s) in the Log Lines...
+
+			nexus_lines=`echo "${log_lines}" \
+				| grep "Successfully Renamed Ne[Xx]us"`
+			#echo "nexus_lines=[$nexus_lines]"
+
+			if [[ -n "${nexus_lines}" ]]; then
+
+				if [[ $verbose == 1 ]]; then
+					echo -e "\nFound Successful NeXus File Line(s):"
+					echo -e "\n   [${nexus_lines}]"
 				fi
 
-			done
+				nexus_file_paths=`echo "$nexus_lines" | awk '{print $NF}'`
+				#echo "nexus_file_paths=[$nexus_file_paths]"
 
-		else
+				num_nexus_files=`echo "$nexus_file_paths" \
+					| wc | awk '{print $1}'`
 
-			echo -e "\nNo NeXus File Log Lines Found."
+				echo -e "\nFound ${num_nexus_files} NeXus File Paths."
 
-			echo -e "\nManual Log File Examination Required."
+				if [[ ${num_nexus_files} -gt 1 ]]; then
+					echo -e "\nChecking/Processing Each in Turn..."
+				fi
 
-			echo -e -n "\nDumping STC Log Lines - "
-			echo "Try to Determine NeXus File..."
+				for nexus_file_path in ${nexus_file_paths} ; do
 
-			echo -e \
-				"\n(Search for \"Successfully Renamed Ne[Xx]us\" line...)"
+					echo -e "\n*** ${blprefix} ***"
 
-			echo -e "\n*** ${blprefix} ***"
+					CHECK_PROCEED "[$nexus_file_path]"
+					cknexus=$?
 
-			CHECK_PROCEED
+					if [[ $cknexus == 0 ]]; then
+						DUMP_SAMPLE_DASLOGS | ${Less} -x4
+					fi
 
-			# Determine Whether Pager Required...
-
-			nlines=`echo "$log_lines" | wc | awk '{print $1}'`
-
-			if [[ $nlines -gt 48 ]]; then
-
-				echo "${log_lines}" | /usr/bin/less -x4
+				done
 
 			else
 
-				echo "${log_lines}"
+				echo -e "\nNo NeXus File Log Lines Found."
+
+				echo -e "\nManual Log File Examination Required."
+
+				echo -e -n "\nDumping STC Log Lines - "
+				echo "Try to Determine NeXus File..."
+
+				echo -e \
+				"\n(Search for \"Successfully Renamed Ne[Xx]us\" line...)"
+
+				echo -e "\n*** ${blprefix} ***"
+
+				CHECK_PROCEED
+
+				# Determine Whether Pager Required...
+
+				nlines=`echo "$log_lines" | wc | awk '{print $1}'`
+
+				if [[ $nlines -gt 48 ]]; then
+
+					echo "${log_lines}" | ${Less} -x4
+
+				else
+
+					echo "${log_lines}"
+
+				fi
+
+				DUMP_SAMPLE_DASLOGS | ${Less} -x4
 
 			fi
 
-			DUMP_SAMPLE_DASLOGS
+		else
+
+			echo -e -n "\n*** No STC Log Lines Found - "
+			echo -e "Incorrect Process ID...?"
+
+			echo -e "\nShowing Commands for NeXus Sample Meta-Data Paths..."
+
+			CHECK_PROCEED
+
+			# Dump Out Commands for NeXus DASlogs Paths... ;-D
+			DUMP_SAMPLE_DASLOGS | ${Less} -x4
 
 		fi
 
 	else
 
-		echo -e "\n*** No STC Log Lines Found - Incorrect Process ID...?"
+		# Parse "Target Station" Line into Parts...
 
-		echo -e "\nShowing Commands for NeXus Sample Meta-Data Paths..."
+		facility=`echo "${tsline}" | awk -F "[:, ]+" '{print $13}'`
+		#echo "facility=[$facility]"
 
-		CHECK_PROCEED
+		beamline=`echo "${tsline}" | awk -F "[:, ]+" '{print $14}'`
+		#echo "beamline=[$beamline]"
 
-		# Dump Out Commands for NeXus DASlogs Paths... ;-D
-		DUMP_SAMPLE_DASLOGS
+		proposal=`echo "${tsline}" | awk -F "[:, ]+" '{print $16}'`
+		#echo "proposal=[$proposal]"
+
+		run=`echo "${tsline}" | awk -F "[:, ]+" '{print $18}'`
+		#echo "run=[$run]"
+
+		bail=0
+		if [[ -z "${facility}" ]]; then
+			echo -e "\nError Parsing Facility from STC Logs...!"
+			bail=1
+		elif [[ -z "${beamline}" ]]; then
+			echo -e "\nError Parsing Beamline from STC Logs...!"
+			bail=1
+		elif [[ -z "${proposal}" ]]; then
+			echo -e "\nError Parsing Proposal from STC Logs...!"
+			bail=1
+		elif [[ -z "${run}" ]]; then
+			echo -e "\nError Parsing Run from STC Logs...!"
+			bail=1
+		fi
+		if [[ $bail == 1 ]]; then
+			echo
+			echo "facility=[$facility]"
+			echo "beamline=[$beamline]"
+			echo "proposal=[$proposal]"
+			echo "run=[$run]"
+			echo -e "\nBailing...\n"
+			exit -3
+		elif [[ $verbose == 1 ]]; then
+			echo -e "\nRun Meta-Data Found:\n"
+			echo "facility=[$facility]"
+			echo "beamline=[$beamline]"
+			echo "proposal=[$proposal]"
+			echo "run=[$run]"
+		fi
+
+		# Construct Run Directory & NeXus Data File Name
+		# from Constituent Parts... ;-D
+
+		run_dir="/${facility}/${beamline}/${proposal}/nexus"
+		#echo "run_dir=[$run_dir]"
+
+		nexus="${beamline}_${run}.nxs.h5"
+		#echo "nexus=[$nexus]"
+
+		nexus_file_path="${run_dir}/${nexus}"
+		#echo "nexus_file_path=[$nexus_file_path]"
+
+		if [[ $verbose == 1 ]]; then
+			echo -e "\nConstructed NeXus Directory Path:"
+			echo -e "\n   [${nexus_file_path}]"
+		fi
+
+		if [[ ! -f "${nexus_file_path}" ]]; then
+			echo -e -n "\nError: NeXus Run File "
+			echo -e "Does Not Exist/Not Readable...!\n"
+			/bin/ls -l "${nexus_file_path}"
+			echo -e "\nBailing...\n"
+			exit -4
+		fi
+
+		DUMP_SAMPLE_DASLOGS | ${Less} -x4
 
 	fi
 
-else
-
-	# Parse "Target Station" Line into Parts...
-
-	facility=`echo "${tsline}" | awk -F "[:, ]+" '{print $13}'`
-	#echo "facility=[$facility]"
-
-	beamline=`echo "${tsline}" | awk -F "[:, ]+" '{print $14}'`
-	#echo "beamline=[$beamline]"
-
-	proposal=`echo "${tsline}" | awk -F "[:, ]+" '{print $16}'`
-	#echo "proposal=[$proposal]"
-
-	run=`echo "${tsline}" | awk -F "[:, ]+" '{print $18}'`
-	#echo "run=[$run]"
-
-	bail=0
-	if [[ -z "${facility}" ]]; then
-		echo -e "\nError Parsing Facility from STC Logs...!"
-		bail=1
-	elif [[ -z "${beamline}" ]]; then
-		echo -e "\nError Parsing Beamline from STC Logs...!"
-		bail=1
-	elif [[ -z "${proposal}" ]]; then
-		echo -e "\nError Parsing Proposal from STC Logs...!"
-		bail=1
-	elif [[ -z "${run}" ]]; then
-		echo -e "\nError Parsing Run from STC Logs...!"
-		bail=1
-	fi
-	if [[ $bail == 1 ]]; then
-		echo
-		echo "facility=[$facility]"
-		echo "beamline=[$beamline]"
-		echo "proposal=[$proposal]"
-		echo "run=[$run]"
-		echo -e "\nBailing...\n"
-		exit -3
-	elif [[ $verbose == 1 ]]; then
-		echo -e "\nRun Meta-Data Found:\n"
-		echo "facility=[$facility]"
-		echo "beamline=[$beamline]"
-		echo "proposal=[$proposal]"
-		echo "run=[$run]"
-	fi
-
-	# Construct Run Directory & NeXus Data File Name
-	# from Constituent Parts... ;-D
-
-	run_dir="/${facility}/${beamline}/${proposal}/nexus"
-	#echo "run_dir=[$run_dir]"
-
-	nexus="${beamline}_${run}.nxs.h5"
-	#echo "nexus=[$nexus]"
-
-	nexus_file_path="${run_dir}/${nexus}"
-	#echo "nexus_file_path=[$nexus_file_path]"
-
-	if [[ $verbose == 1 ]]; then
-		echo -e "\nConstructed NeXus Directory Path:"
-		echo -e "\n   [${nexus_file_path}]"
-	fi
-
-	if [[ ! -f "${nexus_file_path}" ]]; then
-		echo -e "\nError: NeXus Run File Does Not Exist/Not Readable...!\n"
-		/bin/ls -l "${nexus_file_path}"
-		echo -e "\nBailing...\n"
-		exit -4
-	fi
-
-	DUMP_SAMPLE_DASLOGS
-
-fi
+done
 
 echo
 
