@@ -43,7 +43,7 @@ for log in $files ; do
 	if [[ $gzck == 1 ]]; then
 		zcat "$log" | grep "\[${pid}\]"
 	else
-		grep "\[${pid}\]" "$log"
+		grep --text "\[${pid}\]" "$log"
 	fi
 
 done
