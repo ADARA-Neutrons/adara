@@ -1,0 +1,69 @@
+
+Instructions for Manually Copying Over Images
+In Lieu of ADARA/STC Pre-Post-Processing "Timepix3" Command Script
+   - e.g. from VENUS MCP Timepix
+
+* Duh. Super easy, just Reconstruct the appropriate Pre-Post-Processing
+command line, and then "sudo" execute it as user "snsdata", e.g.:
+
+sudo -u snsdata \
+	/TESTING/SNS/stcdata_devel/stc_pre_post_timepix3.py \
+	ImageFilePath=November6_MCP_Baseline/Run_4727_DSet0 \
+	DetectorType=3 \
+	facility=SNS beamline=VENUS \
+	proposal=IPTS-33699 run_number=4727
+
+This Works! ;-D
+
+* Or if All Else Fails, and/or the Pre-Post-Processing script is toast:
+
+run=4724
+data=/mcp-tpx3
+#data=/img-bl10/data
+det=mcp
+#det=qhy600
+detsub=/tpx
+#detsub=""
+data_sub=""
+#data_sub=images/${det}/
+folder=November6_MCP_Baseline
+subdir=Run_4724_DSet0
+
+sudo mkdir -p \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub} ; \
+sudo chown snsdata \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub} ; \
+sudo chgrp adara \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub} ; \
+sudo chmod g+rwxs \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub} ; \
+ll -d /SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub} ; \
+echo -e -n "\nProceed? " ; read foo ; echo ; \
+llth ${data}/IPTS-33699/${data_sub}${folder}/${subdir}/*Run_${run}_* ; \
+echo -e -n "\nProceed? " ; read foo ; \
+for i in ${data}/IPTS-33699/${data_sub}${folder}/${subdir}/*Run_${run}_* ; do \
+	echo $i; \
+	f=`basename ${i}`; \
+	echo ${f}; \
+	rsync -avz ${i} \
+		/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub}/${f}; \
+done ; \
+echo ; \
+ll -d /SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub}/ ; \
+sudo chown snsdata \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub}/* ; \
+sudo chgrp users \
+	/SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub}/* ; \
+llth /SNS/VENUS/IPTS-33699/images/${det}/${folder}/Run_${run}${detsub}/ ; \
+echo
+
+Note: This recipe _Does Not_ include submitting the Image Files to ONCat!!
+
+* NOTE: None of these actions above will trigger Autoreduction for Runs!!
+
+   - you will need to do that Manually, using the Web Monitor:
+
+      -> https://monitor.sns.gov/report/venus/4727/
+
+      -> "Submit for post-processing: <all post-processing>"
+

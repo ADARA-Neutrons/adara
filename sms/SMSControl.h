@@ -54,6 +54,7 @@ class BeamMonitorConfig;
 class DetectorBankSet;
 class MetaDataMgr;
 class FastMeta;
+class QuickCounter;
 class Markers;
 
 class SMSControl : public caServer {
@@ -415,6 +416,18 @@ public:
 			boost::shared_ptr<smsConnectedPV> & pvStatus);
 	void unregisterLiveClient(int32_t clientId);
 
+	int32_t registerQuickCounter(std::string counterName);
+
+	int32_t registerDetectorAllCounter(QuickCounter *counter,
+			std::string counterName, struct timespec *start_time);
+	int32_t registerMonitorAllCounter(QuickCounter *counter,
+			std::string counterName, struct timespec *start_time);
+
+	void unregisterDetectorAllCounter(std::string counterName,
+			int32_t detector_counts_all_id);
+	void unregisterMonitorAllCounter(std::string counterName,
+			int32_t monitor_counts_all_id);
+
 	void updateDescriptor(const ADARA::DeviceDescriptorPkt &pkt,
 			uint32_t sourceId);
 
@@ -470,6 +483,8 @@ public:
 
 	bool getUseAncientRunStatusPkt(void)
 		{ return m_useAncientRunStatusPkt; }
+
+	void setLastSuccessRunNumber(uint32_t lastSuccessRunNumber);
 
 	void updateVerbose(void);
 
@@ -875,6 +890,7 @@ private:
 	std::map<std::string, PVSharedPtr> m_pv_map;
 	uint32_t m_nextRunNumber;
 	uint32_t m_currentRunNumber;
+	uint32_t m_lastSuccessRunNumber;
 	bool m_recording;
 	uint32_t m_nextSrcId;
 
@@ -886,8 +902,10 @@ private:
 
 	boost::shared_ptr<PVPrefixPV> m_pvAltPrimaryPVPrefix;
 
-	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
 	boost::shared_ptr<smsRecordingPV> m_pvRecording;
+	boost::shared_ptr<smsRunNumberPV> m_pvRunNumber;
+	boost::shared_ptr<smsRunNumberPV> m_pvNextRunNumber;
+	boost::shared_ptr<smsRunNumberPV> m_pvLastSuccessRunNumber;
 	boost::shared_ptr<smsErrorPV> m_pvSummary;
 	boost::shared_ptr<smsStringPV> m_pvSummaryReason;
 
@@ -1045,7 +1063,19 @@ private:
 	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientNames;
 	std::vector< boost::shared_ptr<smsUint32PV> > m_pvLiveClientStartTimes;
 	std::vector< boost::shared_ptr<smsStringPV> > m_pvLiveClientFilePaths;
-	std::vector< boost::shared_ptr<smsConnectedPV> > m_pvLiveClientStatuses;
+	std::vector< boost::shared_ptr<smsConnectedPV> >
+		m_pvLiveClientStatuses;
+
+	boost::shared_ptr<smsUint32PV> m_pvNumQuickCounters;
+	uint32_t m_numQuickCounters;
+
+	std::vector<QuickCounter*> m_detectorAllCounter;
+	uint32_t m_numDetectorAllCounters;
+
+	std::vector<QuickCounter*> m_monitorAllCounter;
+	uint32_t m_numMonitorAllCounters;
+
+	std::vector< boost::shared_ptr<smsStringPV> > m_pvQuickCounterNames;
 
 	struct ca_client_context *m_epics_context;
 

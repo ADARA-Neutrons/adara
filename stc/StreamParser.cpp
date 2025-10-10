@@ -48,6 +48,7 @@ StreamParser::StreamParser
     int             a_fd_in,                    ///< [in] File descriptor of input ADARA byte stream
     const string   &a_work_root,                ///< [in] Work Directory Root
     const string   &a_work_base,                ///< [in] Work Directory Base
+    const string   &a_base_path,                ///< [in] Data Directory Base (if not "/")
     const string   &a_adara_out_file,           ///< [in] Filename of output ADARA stream file (disabled if empty)
     const string   &a_config_file,              ///< [in] Path to STC Config file
     bool            a_strict,                   ///< [in] Controls strict processing of input stream
@@ -73,6 +74,7 @@ StreamParser::StreamParser
     m_info_rcvd(0),
     m_work_root(a_work_root),
     m_work_base(a_work_base),
+    m_base_path(a_base_path),
     m_work_dir(""),
     m_do_rename(true),
     m_adara_out_file(a_adara_out_file),

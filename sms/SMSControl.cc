@@ -30,6 +30,7 @@ LOGGER("SMS.Control");
 #include "BeamMonitorConfig.h"
 #include "DetectorBankSet.h"
 #include "MetaDataMgr.h"
+#include "QuickCounter.h"
 #include "FastMeta.h"
 #include "Markers.h"
 #include "utils.h"
@@ -559,6 +560,7 @@ void SMSControl::late_config(const boost::property_tree::ptree &conf)
 	ctrl->m_detBankSets.reset(new DetectorBankSet(conf));
 
 	ctrl->addSources(conf);
+
 	ctrl->m_fastmeta->addDevices(conf);
 }
 
@@ -1032,7 +1034,10 @@ SMSControl::SMSControl() :
 	m_lastPulseId(0), m_lastRingPeriod(0),
 	m_monitorReserve(1024), m_bankReserve(4096),
 	m_chopperReserve(128), m_fastMetaReserve(16),
-	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta))
+	m_meta(new MetaDataMgr), m_fastmeta(new FastMeta(m_meta)),
+	m_numQuickCounters(0),
+	m_numDetectorAllCounters(0),
+	m_numMonitorAllCounters(0)
 {
 	// Initialize the Primary SMS PV Prefix to "Not Ready"... ;-b
 	// (For the PVPrefixPV::changed() method,
@@ -1060,8 +1065,15 @@ SMSControl::SMSControl() :
 
 	m_pvRecording = boost::shared_ptr<smsRecordingPV>(new
 						smsRecordingPV(m_pvPrefix, this));
+
 	m_pvRunNumber = boost::shared_ptr<smsRunNumberPV>(new
 						smsRunNumberPV(m_pvPrefix));
+
+	m_pvNextRunNumber = boost::shared_ptr<smsRunNumberPV>(new
+						smsRunNumberPV(m_pvPrefix + ":Next"));
+
+	m_pvLastSuccessRunNumber = boost::shared_ptr<smsRunNumberPV>(new
+						smsRunNumberPV(m_pvPrefix + ":LastSuccess"));
 
 	m_markers = boost::shared_ptr<Markers>(new
 						Markers(this, m_notesCommentAutoReset));
@@ -1161,6 +1173,10 @@ SMSControl::SMSControl() :
 						smsUint32PV(m_pvPrefix + ":Control:"
 							+ "NumLiveClients"));
 
+	m_pvNumQuickCounters = boost::shared_ptr<smsUint32PV>(new
+						smsUint32PV(m_pvPrefix + ":Control:"
+							+ "NumQuickCounters"));
+
 	// The Kill Switch. ["NEVER USE THIS!" Lol... (Except for Valgrind) :-]
 	m_pvCleanShutdown = boost::shared_ptr<CleanShutdownPV>(new
 						CleanShutdownPV(m_pvPrefix + ":CleanShutdown"));
@@ -1169,6 +1185,8 @@ SMSControl::SMSControl() :
 	addPV(m_pvLogLevel);
 	addPV(m_pvRecording);
 	addPV(m_pvRunNumber);
+	addPV(m_pvNextRunNumber);
+	addPV(m_pvLastSuccessRunNumber);
 	addPV(m_pvSummary);
 	addPV(m_pvSummaryReason);
 	addPV(m_pvInstanceId);
@@ -1190,6 +1208,7 @@ SMSControl::SMSControl() :
 	addPV(m_pvVerbose);
 	addPV(m_pvNumDataSources);
 	addPV(m_pvNumLiveClients);
+	addPV(m_pvNumQuickCounters);
 	addPV(m_pvCleanShutdown);
 
 	// Initialize Config/Info PVs...
@@ -1312,6 +1331,9 @@ SMSControl::SMSControl() :
 	// Initialize the Live Client Index List PV...
 	m_pvNumLiveClients->update(0, &now);
 
+	// Initialize the Quick Counter Index List PV...
+	m_pvNumQuickCounters->update(0, &now);
+
 	// Restore Any PVs to AutoSaved Config Values...
 
 	struct timespec ts;
@@ -1432,6 +1454,11 @@ SMSControl::SMSControl() :
 	m_nextRunNumber = StorageManager::getNextRun();
 	if (!m_nextRunNumber)
 		throw std::runtime_error("Unable to Get Next Run Number");
+	m_pvNextRunNumber->update(m_nextRunNumber, &now);
+
+	// Initialize Last Successful Run Number...
+	m_lastSuccessRunNumber = 0;
+	m_pvLastSuccessRunNumber->update(m_lastSuccessRunNumber, &now);
 
 	m_beamlineInfo.reset(new BeamlineInfo(m_targetStationNumber,
 			m_beamlineId, m_beamlineShortName, m_beamlineLongName));
@@ -1454,6 +1481,17 @@ SMSControl::~SMSControl()
 		delete m_fdregChannelAccess;
 		m_fdregChannelAccess = NULL;
 	}
+}
+
+// Set Last (Latest) Successfully Translated Run Number...
+void SMSControl::setLastSuccessRunNumber(uint32_t lastSuccessRunNumber)
+{
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+
+	m_lastSuccessRunNumber = lastSuccessRunNumber;
+
+	m_pvLastSuccessRunNumber->update(m_lastSuccessRunNumber, &now);
 }
 
 // Update SMS Verbose Value from PV...
@@ -2550,6 +2588,9 @@ SMSControl::epicsEventHandler( struct event_handler_args a_args )
 						ctrl->m_nextRunNumber = ctrl->uint32ValueOf(
 							ich->second.m_pv->m_type, state );
 
+						ctrl->m_pvNextRunNumber->update(
+							ctrl->m_nextRunNumber, &ts );
+
 						DEBUG("epicsEventHandler():"
 							<< "External PV Setting NEXT RunNumber to "
 							<< ctrl->m_nextRunNumber << " at "
@@ -2814,6 +2855,8 @@ bool SMSControl::setRecording( bool v, struct timespec *ts )
 		// We've Updated the Run Number on disk,
 		// so if we Fail Now, we need to Fail Big...
 		m_currentRunNumber = m_nextRunNumber++;
+
+		m_pvNextRunNumber->update(m_nextRunNumber, ts);
 
 		INFO("Starting Run " << m_currentRunNumber
 			<< " at ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -4179,6 +4222,135 @@ void SMSControl::unregisterLiveClient(int32_t clientId)
 	// hysterical reasons, that is to see how they died... ;-D)
 }
 
+int32_t SMSControl::registerQuickCounter(std::string counterName)
+{
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "registerQuickCounter() Name=" << counterName);
+
+	// Return "Next Quick Counter" Index...
+	int32_t counterId = m_numQuickCounters++;
+
+	std::string prefix(m_pvPrefix);
+	prefix += ":QuickCounter:";
+
+	std::stringstream ss;
+	ss << counterId + 1; // eh, count from 1 like everything else
+	prefix += ss.str();
+
+	// Quick Counter Name...
+	m_pvQuickCounterNames.resize(counterId + 1);
+	m_pvQuickCounterNames[counterId] =
+		boost::shared_ptr<smsStringPV>(new
+			smsStringPV(prefix + ":Name"));
+	addPV(m_pvQuickCounterNames[counterId]);
+
+	// Update the Name & Number of Quick Counters PV (we just added one)
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	(m_pvQuickCounterNames[counterId])->update(counterName, &now);
+	m_pvNumQuickCounters->update(counterId + 1, &now);
+
+	return( counterId );
+}
+
+int32_t SMSControl::registerDetectorAllCounter(QuickCounter *counter,
+		std::string counterName,
+		struct timespec *start_time)  // EPICS Time...!
+{
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "registerDetectorAllCounter() Name=" << counterName
+		<< " Start=" << start_time->tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< start_time->tv_nsec);
+
+	// Return "Next Detector All Counter" Index...
+	int32_t detector_counts_all_id = m_numDetectorAllCounters++;
+
+	// Save Reference to the Quick Counter Instance...
+	m_detectorAllCounter.push_back(counter);
+
+	return( detector_counts_all_id );
+}
+
+int32_t SMSControl::registerMonitorAllCounter(QuickCounter *counter,
+		std::string counterName,
+		struct timespec *start_time)  // EPICS Time...!
+{
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "registerMonitorAllCounter() Name=" << counterName
+		<< " Start=" << start_time->tv_sec
+			<< "." << std::setfill('0') << std::setw(9)
+			<< start_time->tv_nsec);
+
+	// Return "Next Monitor All Counter" Index...
+	int32_t monitor_counts_all_id = m_numMonitorAllCounters++;
+
+	// Save Reference to the Quick Counter Instance...
+	m_monitorAllCounter.push_back(counter);
+
+	return( monitor_counts_all_id );
+}
+
+void SMSControl::unregisterDetectorAllCounter(std::string counterName,
+		int32_t detector_counts_all_id)
+{
+	if ( detector_counts_all_id < 0
+			|| detector_counts_all_id
+				>= (int32_t) m_detectorAllCounter.size() ) {
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterDetectorAllCounter()"
+			<< " *** INVALID Detector Counts All Registration ID...!"
+			<< " Name=" << counterName
+			<< " detector_counts_all_id=" << detector_counts_all_id
+			<< " m_detectorAllCounter.size()="
+			<< m_detectorAllCounter.size() );
+		return;
+	}
+
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "unregisterDetectorAllCounter() Name=" << counterName
+		<< " detector_counts_all_id=" << detector_counts_all_id
+		<< " m_detectorAllCounter.size()="
+		<< m_detectorAllCounter.size() );
+
+	// Remove Reference to the Quick Counter Instance...
+	m_detectorAllCounter.erase( m_detectorAllCounter.begin()
+		+ detector_counts_all_id );
+
+	// Decrement "Next Detector All Counter" Index...
+	m_numDetectorAllCounters--;
+}
+
+void SMSControl::unregisterMonitorAllCounter(std::string counterName,
+		int32_t monitor_counts_all_id)
+{
+	if ( monitor_counts_all_id < 0
+			|| monitor_counts_all_id
+				>= (int32_t) m_monitorAllCounter.size() ) {
+		ERROR( ( m_recording ? "[RECORDING] " : "" )
+			<< "unregisterMonitorAllCounter()"
+			<< " *** INVALID Monitor Counts All Registration ID...!"
+			<< " Name=" << counterName
+			<< " monitor_counts_all_id=" << monitor_counts_all_id
+			<< " m_monitorAllCounter.size()="
+			<< m_monitorAllCounter.size() );
+		return;
+	}
+
+	DEBUG( ( m_recording ? "[RECORDING] " : "" )
+		<< "unregisterMonitorAllCounter() Name=" << counterName
+		<< " monitor_counts_all_id=" << monitor_counts_all_id
+		<< " m_monitorAllCounter.size()="
+		<< m_monitorAllCounter.size() );
+
+	// Remove Reference to the Quick Counter Instance...
+	m_monitorAllCounter.erase( m_monitorAllCounter.begin()
+		+ monitor_counts_all_id );
+
+	// Decrement "Next Monitor All Counter" Index...
+	m_numMonitorAllCounters--;
+}
+
 void SMSControl::addMonitorEvent(const ADARA::RawDataPkt &pkt,
 		PulsePtr &pulse, uint32_t pixel, uint32_t tof)
 {
@@ -4451,18 +4623,21 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 
 	ADARA::Event translated;
 	const ADARA::Event *events = pkt.events();
+	struct FastMeta::Variable *var = NULL;
 	uint32_t i, count = pkt.num_events();
 	uint32_t phys, base_phys, logical;
 	uint32_t state;
-	uint32_t key;
+	uint32_t key, val;
 	uint16_t bank = 0;
+
+	uint32_t monitor_count = 0;
 
 	bool got_neutrons = false;
 	bool got_metadata = false;
 
 	for (i=0; i < count; i++) {
 
-		phys = events[i].pixel;
+		phys = events->pixel;
 
 		state = 0;
 
@@ -4473,11 +4648,13 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				 * next raw event -- it doesn't go in the banked
 				 * events section.
 				 */
-				addMonitorEvent(pkt, pulse, phys, events[i].tof);
+				addMonitorEvent(pkt, pulse, phys, events->tof);
 				pulse->m_numMonEvents++;
 				// Don't Count This Pulse's Proton Charge - No Neutrons
 				got_metadata = true;
+				monitor_count++;
 				meta_count++;
+				events++;
 				continue;
 
 			case 7: // Chopper Event
@@ -4485,10 +4662,11 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				 * next raw event -- it doesn't go into the banked
 				 * event section.
 				 */
-				addChopperEvent(pkt, pulse, phys, events[i].tof);
+				addChopperEvent(pkt, pulse, phys, events->tof);
 				// Don't Count This Pulse's Proton Charge - No Neutrons
 				got_metadata = true;
 				meta_count++;
+				events++;
 				continue;
 
 			case 0: // Detector Event
@@ -4561,13 +4739,28 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 				 * mapping for it. If not, let it fall through to the
 				 * common error pixel handling.
 				 */
-				if (m_fastmeta->validVariable(phys, key)) {
+				if ((var = m_fastmeta->validVariable(phys, key))) {
 					if (pulse->m_fastMetaEvents[key].empty()) {
 						pulse->m_fastMetaEvents[key].reserve(
 							m_fastMetaReserve);
 					}
-					pulse->m_fastMetaEvents[key].push_back(events[i]);
+					pulse->m_fastMetaEvents[key].push_back(*events);
 					meta_count++;
+					// Handle Fast-Metadata Counter Triggers
+					if ( var->m_is_counter ) {
+						val = phys & 0xffff;
+						DEBUG("pulseEvents(): Counter Trigger "
+							<< std::hex << "0x" << phys << std::dec
+							<< " Device [" << var->m_name << "]"
+							<< " Set to " << val);
+						if ( val )
+							var->m_counter->startCounting(
+								pulse->m_id.first, events->tof);
+						else
+							var->m_counter->stopCounting(
+								pulse->m_id.first, events->tof);
+					}
+					events++;
 					continue;
 				}
 				else {
@@ -4597,8 +4790,9 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 						pulse->m_fastMetaEvents[key].reserve(
 							m_fastMetaReserve);
 					}
-					pulse->m_fastMetaEvents[key].push_back(events[i]);
+					pulse->m_fastMetaEvents[key].push_back(*events);
 					meta_count++;
+					events++;
 					continue;
 				}
 				// No mapping, Error Pixel...
@@ -4684,11 +4878,202 @@ void SMSControl::pulseEvents( const ADARA::RawDataPkt &pkt,
 		}
 
 		translated.pixel = logical;
-		translated.tof = events[i].tof;
+		translated.tof = events->tof;
 
 		ev->push_back(translated);
 
 		pulse->m_numEvents++;
+
+		events++;
+	}
+
+	// Generate Comparable Pulse Time as needed... ;-D
+	if ( m_detectorAllCounter.size() || m_monitorAllCounter.size() )
+	{
+		struct timespec pulse_time;
+
+		pulse_time.tv_sec = pulse->m_id.first >> 32;  // EPICS Time...!
+		pulse_time.tv_nsec = pulse->m_id.first & 0xffffffff;
+
+		// DEBUG("pulseEvents(): Detector/Monitor All Counters Registered"
+			// << " - Pulse Time 0x"
+			// << std::hex << pulse->m_id.first << std::dec
+			// << " = " << pulse_time.tv_sec << "."
+                // << std::setfill('0') << std::setw(9)
+                // << pulse_time.tv_nsec << std::setw(0));
+
+		// Add All Detector Events to Any Registered Counters...
+		for ( uint32_t i=0 ; i < m_detectorAllCounter.size() ; ++i ) {
+			QuickCounter *QC = m_detectorAllCounter[i];
+			// Check for "1st Pulse" of Count...
+			if ( pulse->m_id.first == QC->m_start_pulse_id ) {
+				DEBUG("pulseEvents(): Detector FIRST PULSE"
+					<< " m_start_time=" << QC->m_start_time.tv_sec << "."
+                	<< std::setfill('0') << std::setw(9)
+                	<< QC->m_start_time.tv_nsec << std::setw(0)
+					<< " m_start_pulse_id=" << QC->m_start_pulse_id
+					<< " m_counting=" << QC->m_counting);
+				uint32_t det_count = 0;
+				events = pkt.events();
+				for ( uint32_t j=0; j < count; j++ ) {
+					// Detector Event
+					if ( !(events->pixel & 0xf0000000) ) {
+						uint32_t tof = events->tof & ((1U << 21) - 1);
+						tof *= 100;
+						if ( tof >= QC->m_start_tof )
+							det_count++;
+					}
+					events++;
+				}
+				// Did We Count Any Detector Events...?
+				if ( det_count ) {
+					DEBUG("pulseEvents(): Detector FIRST PULSE"
+						<< " det_count=" << det_count
+						<< " vs. event_count=" << event_count);
+					QC->addDetectorAllCounts( pulse->m_id.first,
+						det_count);
+				}
+			}
+			// Check for "Last Pulse" of Count...
+			else if ( pulse->m_id.first == QC->m_stop_pulse_id ) {
+				DEBUG("pulseEvents(): Detector LAST PULSE"
+					<< " m_stop_time=" << QC->m_stop_time.tv_sec << "."
+                	<< std::setfill('0') << std::setw(9)
+                	<< QC->m_stop_time.tv_nsec << std::setw(0)
+					<< " m_stop_pulse_id=" << QC->m_stop_pulse_id
+					<< " m_counting=" << QC->m_counting);
+				uint32_t det_count = 0;
+				events = pkt.events();
+				for ( uint32_t j=0; j < count; j++ ) {
+					// Detector Event
+					if ( !(events->pixel & 0xf0000000) ) {
+						uint32_t tof = events->tof & ((1U << 21) - 1);
+						tof *= 100;
+						if ( tof <= QC->m_stop_tof )
+							det_count++;
+					}
+					events++;
+				}
+				// Did We Count Any Detector Events...?
+				if ( det_count ) {
+					DEBUG("pulseEvents(): Detector LAST PULSE"
+						<< " det_count=" << det_count
+						<< " vs. event_count=" << event_count);
+					QC->addDetectorAllCounts( pulse->m_id.first,
+						det_count);
+				}
+			}
+			// Otherwise, Just Count "All or None"...
+			else {
+				// DEBUG("pulseEvents(): Detector"
+					// << " m_start_time="
+						// << QC->m_start_time.tv_sec << "."
+                	// << std::setfill('0') << std::setw(9)
+                	// << QC->m_start_time.tv_nsec << std::setw(0)
+					// << " compareTimeStamps(pulse_time, m_start_time) = "
+					// << compareTimeStamps( pulse_time, QC->m_start_time )
+					// << " m_counting=" << QC->m_counting
+					// << " m_stop_time=" << QC->m_stop_time.tv_sec << "."
+                	// << std::setfill('0') << std::setw(9)
+                	// << QC->m_stop_time.tv_nsec << std::setw(0)
+					// << " compareTimeStamps(pulse_time, m_stop_time) = "
+					// << compareTimeStamps( pulse_time,
+						// QC->m_stop_time ));
+				if ( compareTimeStamps( pulse_time, QC->m_start_time ) >= 0
+						&& ( QC->m_counting == QC_COUNTING
+							|| ( QC->m_counting == QC_WAITING
+								&& compareTimeStamps( pulse_time,
+									QC->m_stop_time ) <= 0 ) ) ) {
+					QC->addDetectorAllCounts( pulse->m_id.first,
+						event_count);
+				}
+			}
+		}
+
+		// Add All Monitor Events to Any Registered Counters...
+		for ( uint32_t i=0 ; i < m_monitorAllCounter.size() ; ++i ) {
+			QuickCounter *QC = m_monitorAllCounter[i];
+			// Check for "1st Pulse" of Count...
+			if ( pulse->m_id.first == QC->m_start_pulse_id ) {
+				DEBUG("pulseEvents(): Monitor FIRST PULSE"
+					<< " m_start_time=" << QC->m_start_time.tv_sec << "."
+                	<< std::setfill('0') << std::setw(9)
+                	<< QC->m_start_time.tv_nsec << std::setw(0)
+					<< " m_start_pulse_id=" << QC->m_start_pulse_id
+					<< " m_counting=" << QC->m_counting);
+				uint32_t mon_count = 0;
+				events = pkt.events();
+				for ( uint32_t j=0; j < count; j++ ) {
+					// Monitor Event
+					if ( ( events->pixel & 0xf0000000 ) == 0x40000000 ) {
+						uint32_t tof = events->tof & ((1U << 21) - 1);
+						tof *= 100;
+						if ( tof >= QC->m_start_tof )
+							mon_count++;
+					}
+					events++;
+				}
+				// Did We Count Any Detector Events...?
+				if ( mon_count ) {
+					DEBUG("pulseEvents(): Monitor FIRST PULSE"
+						<< " mon_count=" << mon_count
+						<< " vs. monitor_count=" << monitor_count);
+					QC->addMonitorAllCounts( pulse->m_id.first,
+						mon_count);
+				}
+			}
+			// Check for "Last Pulse" of Count...
+			else if ( pulse->m_id.first == QC->m_stop_pulse_id ) {
+				DEBUG("pulseEvents(): Monitor LAST PULSE"
+					<< " m_stop_time=" << QC->m_stop_time.tv_sec << "."
+                	<< std::setfill('0') << std::setw(9)
+                	<< QC->m_stop_time.tv_nsec << std::setw(0)
+					<< " m_stop_pulse_id=" << QC->m_stop_pulse_id
+					<< " m_counting=" << QC->m_counting);
+				uint32_t mon_count = 0;
+				events = pkt.events();
+				for ( uint32_t j=0; j < count; j++ ) {
+					// Monitor Event
+					if ( ( events->pixel & 0xf0000000 ) == 0x40000000 ) {
+						uint32_t tof = events->tof & ((1U << 21) - 1);
+						tof *= 100;
+						if ( tof <= QC->m_stop_tof )
+							mon_count++;
+					}
+					events++;
+				}
+				// Did We Count Any Detector Events...?
+				if ( mon_count ) {
+					DEBUG("pulseEvents(): Monitor LAST PULSE"
+						<< " mon_count=" << mon_count
+						<< " vs. monitor_count=" << monitor_count);
+					QC->addMonitorAllCounts( pulse->m_id.first,
+						mon_count);
+				}
+			}
+			// Otherwise, Just Count "All or None"...
+			else {
+				if ( compareTimeStamps( pulse_time, QC->m_start_time ) >= 0
+						&& ( QC->m_counting == QC_COUNTING
+							|| ( QC->m_counting == QC_WAITING
+								&& compareTimeStamps( pulse_time,
+									QC->m_stop_time ) <= 0 ) ) ) {
+					QC->addMonitorAllCounts( pulse->m_id.first,
+						monitor_count);
+				}
+			}
+
+			// Check for Done Waiting Timeout Completion...!
+			// (Only Do for Registered *Monitor* All Counters,
+			// As We Don't Want to Stop Counting After the
+			// Detector All Part and Miss the Monitor All Part,
+			// And For Now We Always Count for *Both*...! ;-D)
+			if ( QC->m_counting == QC_WAITING
+					&& compareTimeStamps( pulse_time,
+						QC->m_done_time ) >= 0 ) {
+				QC->doneCounting( pulse->m_id.first );
+			}
+		}
 	}
 
 	// If We Got Neutrons, We Will Count This Pulse's Proton Charge! :-D

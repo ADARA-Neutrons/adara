@@ -802,14 +802,27 @@
 	<command>
 		<name>Timepix3Command</name>
 		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_timepix3.py</path>
-		<!-- Imaging Mode Conditional PV Check -->
+		<!-- Image Archiving Mode Conditional PV Check -->
 		<condition>
-			<name>Timepixe3 Imaging Mode</name>
+			<name>Timepix3 Imaging Mode</name>
 			<pattern>CG1D:CS:UE:Timepix3Mode$</pattern>
 			<pattern>BL3:Exp:IM:Timepix3Mode$</pattern>
 			<pattern>BL10:Exp:IM:Timepix3Mode$</pattern>
+			<pattern>BL10:Exp:IM:ImageFileArchive$</pattern>
 			<value>1</value><!-- Timepix3 Imaging Mode Activated -->
 		</condition>
+		<element>
+			<pattern>:ImageFilePath$</pattern>
+			<name>ImageFilePath</name>
+		</element>
+		<element>
+			<pattern>:ConfigTpxFilePath$</pattern>
+			<name>ConfigTpxFilePath</name>
+		</element>
+		<element>
+			<pattern>:ConfigTIFFFilePath$</pattern>
+			<name>ConfigTIFFFilePath</name>
+		</element>
 		<element>
 			<pattern>:MeasTpxFilePath$</pattern>
 			<name>TpxFilePath</name>
@@ -821,6 +834,10 @@
 		<element>
 			<pattern>:Det:N1:TIFF:FileName$</pattern>
 			<name>TIFFFileName</name>
+		</element>
+		<element>
+			<pattern>:Exp:Det$</pattern>
+			<name>DetectorType</name>
 		</element>
 	</command>
 
@@ -875,6 +892,10 @@
 			<name>PVList</name>
 		</element>
 		<element>
+			<pattern>:CS:GraffitiPVs:LIST$</pattern>
+			<name>LIST</name>
+		</element>
+		<element>
 			<pattern>^SampleName$</pattern>
 			<name>SampleName</name>
 		</element>
@@ -890,6 +911,18 @@
 			<pattern>:CS:IPTS:Contact$</pattern>
 			<name>Contact</name>
 		</element>
+	</command>
+
+	<!-- Pre-Post-Auto-Reduction Command Interface for NSE/BL15 Echo -->
+	<command>
+		<name>EchoCommand</name>
+		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_nxs2echo.bash</path>
+		<!-- Echo Data File Generation Conditional PV Check -->
+		<condition>
+			<name>Echo Data File Generation Mode</name>
+			<pattern>:CS:Echo:Generate$</pattern>
+			<value>1</value><!-- Echo Data File Generation Activated -->
+		</condition>
 	</command>
 
 </stc_config>

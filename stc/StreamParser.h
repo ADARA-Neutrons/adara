@@ -52,6 +52,7 @@ public:
     StreamParser( int a_fd,
         const std::string & a_work_root,
         const std::string & a_work_base,
+        const std::string & a_base_path,
         const std::string & a_adara_out_file,
         const std::string & a_config_file,
         bool a_strict, bool a_gather_stats = false,
@@ -69,6 +70,8 @@ public:
         { return m_beamline_info.instr_shortname; }
     std::string getBeamLongName() const
         { return m_beamline_info.instr_longname; }
+    std::string getDataBasePath() const
+        { return m_base_path; }
     std::string getFacilityName() const
         { return m_run_info.facility_name; }
     std::string getProposalID() const
@@ -258,6 +261,7 @@ private:
     RunMetrics                              m_run_metrics;              ///< Run metrics
     std::string                             m_work_root;                ///< Working Directory Root
     std::string                             m_work_base;                ///< Working Directory Base
+    std::string                             m_base_path;                ///< Data Directory Base (if not "/")
     std::string                             m_work_dir;                 ///< Working Directory
     bool                                    m_do_rename;                ///< Can We Do a NeXus File Rename?
     std::string                             m_adara_out_file;           ///< Filename of output ADARA stream file

@@ -393,6 +393,7 @@ void smsRunNumberPV::update(uint32_t run, struct timespec *ts)
 	// No Change
 	if (v == run) {
 		DEBUG("smsRunNumberPV::update() m_pv_name=" << m_pv_name
+			<< " value=" << v
 			<< " Value Did Not Change - Ignore..."
 			<< " Still Update ts="
 			<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -533,6 +534,7 @@ void smsRecordingPV::update(bool recording, struct timespec *ts)
 	// No Change
 	if (v == recording) {
 		DEBUG("smsRecordingPV::update() m_pv_name=" << m_pv_name
+			<< " value=" << v
 			<< " Value Did Not Change - Ignore..."
 			<< " Still Update ts="
 			<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -790,6 +792,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 			&& m_value->getStat() == epicsAlarmNone ) {
 		if ( m_first_set ) {
 			DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
+				<< " value=[" << new_str << "]"
 				<< " String Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -805,6 +808,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
+					<< " value=[" << new_str << "]"
 					<< " String Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -816,6 +820,7 @@ void smsStringPV::update(const std::string str, struct timespec *ts)
 			}
 			else {
 				DEBUG("smsStringPV::update() m_pv_name=" << m_pv_name
+					<< " value=[" << new_str << "]"
 					<< " String Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1119,6 +1124,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 	if (v == val) {
 		if ( m_first_set ) {
 			DEBUG("smsBooleanPV::update() m_pv_name=" << m_pv_name
+				<< " value=" << v
 				<< " Value Did Not Change, But First Setting - "
 				<< ( ( !m_no_changed_on_update || force_changed )
 					? "" : "*Don't* " )
@@ -1139,6 +1145,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsBooleanPV::update() m_pv_name=" << m_pv_name
+					<< " value=" << v
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, "
 					<< ( ( !m_no_changed_on_update || force_changed )
@@ -1157,6 +1164,7 @@ void smsBooleanPV::update(bool val, struct timespec *ts,
 			}
 			else {
 				DEBUG("smsBooleanPV::update() m_pv_name=" << m_pv_name
+					<< " value=" << v
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1244,6 +1252,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 	if (v == val) {
 		if ( m_first_set ) {
 			DEBUG("smsEnabledPV::update() m_pv_name=" << m_pv_name
+				<< " value=" << v
 				<< " Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1259,6 +1268,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsEnabledPV::update() m_pv_name=" << m_pv_name
+					<< " value=" << v
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1270,6 +1280,7 @@ void smsEnabledPV::update(bool val, struct timespec *ts,
 			}
 			else {
 				DEBUG("smsEnabledPV::update() m_pv_name=" << m_pv_name
+					<< " value=" << v
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1461,6 +1472,7 @@ void smsErrorPV::update(bool val, bool major, struct timespec *ts)
 	m_value->get(v);
 	if (v == val) {
 		DEBUG("smsErrorPV::update() m_pv_name=" << m_pv_name
+			<< " value=" << v
 			<< " Value Did Not Change - Ignore..."
 			<< " Still Update ts="
 			<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1630,6 +1642,7 @@ void smsConnectedPV::update(uint16_t val, struct timespec *ts)
 	m_value->get(v);
 	if (v == val) {
 		DEBUG("smsConnectedPV::update() m_pv_name=" << m_pv_name
+			<< " value=" << v
 			<< " Value Did Not Change - Ignore..."
 			<< " Still Update ts="
 			<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1889,6 +1902,7 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 	if (v == val) {
 		if ( m_first_set ) {
 			DEBUG("smsPassThruPV::update() m_pv_name=" << m_pv_name
+				<< " value=" << v
 				<< " Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1904,6 +1918,7 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsPassThruPV::update() m_pv_name=" << m_pv_name
+					<< " value=" << v
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -1915,6 +1930,7 @@ void smsPassThruPV::update(uint16_t val, struct timespec *ts)
 			}
 			else {
 				DEBUG("smsPassThruPV::update() m_pv_name=" << m_pv_name
+					<< " value=" << v
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 						<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2211,6 +2227,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 		if ( m_first_set ) {
 			if ( !no_log ) {
 				DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
+					<< " value=" << v
 					<< " Value Did Not Change, But First Setting"
 					<< " - Call changed()..."
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2228,6 +2245,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				if ( !no_log ) {
 					DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
+						<< " value=" << v
 						<< " Value Did Not Change, But Time Earlier"
 						<< " - Likely AutoSave Recovery, Call changed()..."
 						<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2241,6 +2259,7 @@ void smsUint32PV::update(uint32_t val, struct timespec *ts, bool no_log)
 			else {
 				if ( !no_log ) {
 					DEBUG("smsUint32PV::update() m_pv_name=" << m_pv_name
+						<< " value=" << v
 						<< " Value Did Not Change - Ignore..."
 						<< " Still Update ts="
 						<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2403,6 +2422,7 @@ void smsInt32PV::update(int32_t val, struct timespec *ts)
 	m_value->get(v);
 	if (v == val) {
 		DEBUG("smsInt32PV::update() m_pv_name=" << m_pv_name
+			<< " value=" << v
 			<< " Value Did Not Change - Ignore..."
 			<< " Still Update ts="
 			<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2766,6 +2786,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 	if ( approximatelyEqual( v, val, m_epsilon ) ) {
 		if ( m_first_set ) {
 			DEBUG("smsFloat64PV::update() m_pv_name=" << m_pv_name
+				<< " value=" << v
 				<< " Value Did Not Change, But First Setting"
 				<< " - Call changed()..."
 				<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2781,6 +2802,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 			m_value->getTimeStamp(&old_ts); // Wallclock Time...!
 			if ( compareTimeStamps( *ts, old_ts ) < 0 ) {
 				DEBUG("smsFloat64PV::update() m_pv_name=" << m_pv_name
+					<< " value=" << v
 					<< " Value Did Not Change, But Time Earlier"
 					<< " - Likely AutoSave Recovery, Call changed()..."
 					<< " ts=" << ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET
@@ -2792,6 +2814,7 @@ void smsFloat64PV::update(double val, struct timespec *ts)
 			}
 			else {
 				DEBUG("smsFloat64PV::update() m_pv_name=" << m_pv_name
+					<< " value=" << v
 					<< " Value Did Not Change - Ignore..."
 					<< " Still Update ts="
 					<< ts->tv_sec - ADARA::EPICS_EPOCH_OFFSET

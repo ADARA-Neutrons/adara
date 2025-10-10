@@ -15,9 +15,9 @@ ADARA_ADD_RUN_END="/usr/local/bin/adara_add_run_end"
 ADARA_PARSER="/usr/local/bin/adara-parser"
 
 DEFAULT_STC_HOST_DOMAIN="ornl.gov"
-DEFAULT_STC_HOST="stc1.${DEFAULT_STC_HOST_DOMAIN}"
+DEFAULT_STC_HOST_NAME="stc1.${DEFAULT_STC_HOST_DOMAIN}"
 
-XINETD_DIR="/etc/xinetd.d"
+SYSTEMD_DIR="/etc/systemd/system"
 
 STC_PORT_HFIR="31420"
 STC_PORT_SNS="31417"
@@ -44,7 +44,7 @@ USAGE()
 	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
 	echo "    [--beamline=BL14B] [--instance_id=<0123>] \\"
 	echo "    [--config=./smsd.conf] \\"
-	echo "    [--stc1|--stc2|--stc3|--stc_host=<STC_HOST>] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc<N>|--stc_host=<STC_HOST>] \\"
 	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
 	echo "    [--stc_devel|--stc_main] (ADARA Test Harness Use Only) \\"
 	echo "    [--stc_port=<STCPort>] \\"
@@ -196,18 +196,18 @@ for arg in "$@" ; do
 		SMSD_CONFIG="$value"
 		echo -e "\nUsing SMS Daemon Config File in:"
 		echo -e "   [$SMSD_CONFIG]"
-	elif [[ "#$key#" == '#--stc1#' \
-			|| "#$key#" == '#--stc2#' \
-			|| "#$key#" == '#--stc3#' ]]; then
+	elif [[ "$key" =~ ^--stc[1-9]+ ]]; then
 		STC_HOST="${key}"
 		echo -e "\nSetting STC Host to: [${STC_HOST}]"
 		STC_HOST_NAME=`echo "${STC_HOST}" | ${SED} 's/^--//'`
-		DEFAULT_STC_HOST="${STC_HOST_NAME}.${DEFAULT_STC_HOST_DOMAIN}"
+		DEFAULT_STC_HOST_NAME="${STC_HOST_NAME}.${DEFAULT_STC_HOST_DOMAIN}"
+		echo -e "\nSetting STC Host Name to: [${DEFAULT_STC_HOST_NAME}]"
 	elif [[ "#$key#" == '#--stc_host#' ]]; then
 		STC_HOST="${key}=${value}"
+		echo -e "\nSetting STC Host to: [${STC_HOST}]"
 		STC_HOST_NAME="$value"
-		echo -e "\nSetting STC Host to: [${STC_HOST_NAME}]"
-		DEFAULT_STC_HOST="${STC_HOST_NAME}"
+		DEFAULT_STC_HOST_NAME="${STC_HOST_NAME}"
+		echo -e "\nSetting STC Host Name to: [${DEFAULT_STC_HOST_NAME}]"
 	elif [[ "#$key#" == '#--stc#' || "#$key#" == '#--stc_test#'
 			|| "#$key#" == '#--stc_dummy#'
 			|| "#$key#" == '#--stc_hfir#'
@@ -217,13 +217,15 @@ for arg in "$@" ; do
 		STC_SERVICE="${key}"
 		STC_SERVICE_NAME=`echo "${STC_SERVICE}" | ${SED} 's/^--//'`
 		echo -e "\nSetting STC Service to: [${STC_SERVICE_NAME}]"
-		echo -e "\nContacting STC Host \"${DEFAULT_STC_HOST}\" via SSH"
+		echo -e "\nContacting STC Host \"${DEFAULT_STC_HOST_NAME}\" via SSH"
 		echo "   to Get Port for STC \"${STC_SERVICE_NAME}\" Service..."
-		echo -e -n "\n${SSH} ${DEFAULT_STC_HOST}"
-		echo -e " ${GREP} port ${XINETD_DIR}/${STC_SERVICE_NAME}"
-		STC_PORT=`${SSH} ${DEFAULT_STC_HOST} \
-			${GREP} "port" ${XINETD_DIR}/${STC_SERVICE_NAME} \
-			| ${AWK} '{print $3}'`
+		echo -e "\n${SSH} ${DEFAULT_STC_HOST_NAME} \\"
+		echo -e -n "   ${GREP} ListenStream"
+		echo -e " ${SYSTEMD_DIR}/${STC_SERVICE_NAME}.socket"
+		STC_PORT=`${SSH} ${DEFAULT_STC_HOST_NAME} \
+			${GREP} "ListenStream" \
+			${SYSTEMD_DIR}/${STC_SERVICE_NAME}.socket \
+			| ${AWK} -F "=" '{print $2}'`
 		echo -e -n "\nGot STC Port [${STC_PORT}]"
 		echo -e " for STC \"${STC_SERVICE_NAME}\" Service."
 	elif [[ "#$key#" == '#--stc_port#' ]]; then
@@ -560,10 +562,21 @@ for dir in ${DIRS} ; do
 
 			LAST_RUN_ADD_END=1
 
+			if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
+				justsayyes=""
+			else
+				justsayyes="--just-say-yes"
+			fi
+
+			echo "${ADARA_ADD_RUN_END} --inst=$INST --facility=${FACILITY} \
+				${STC_HOST} ${STC_SERVICE} \
+				--stc_port=${STC_PORT} \
+				${SMS_DATA_OPT} ${justsayyes} --run=${run}"
+
 			${ADARA_ADD_RUN_END} --inst=$INST --facility=${FACILITY} \
 				${STC_HOST} ${STC_SERVICE} \
 				--stc_port=${STC_PORT} \
-				${SMS_DATA_OPT} --run=${run}
+				${SMS_DATA_OPT} ${justsayyes} --run=${run}
 
 			${LS} -lt ${dir} | ${HEAD}
 

@@ -31,7 +31,7 @@ elif [[ "$1" == "-h" || "$1" == "--help" ]]; then
 fi
 
 # ADARA Git Repo
-if [ -z "$ADARA_DIR" ]; then
+if [[ -z "$ADARA_DIR" ]]; then
 	ADARA_DIR="/usr/local/src/ADARA"
 	#ADARA_DIR="/SNS/users/$USER/gitsrc/ADARA"
 elif [[ $QUIET == 0 ]]; then
@@ -40,6 +40,7 @@ elif [[ $QUIET == 0 ]]; then
 fi
 
 # Default Update/Installation Target Definitions
+SYSTEMD_DIR="/etc/systemd/system"
 SYSTEMCTL="/usr/bin/systemctl"
 PVSD_LOG="/var/log/pvsd.log"
 MESSAGES_LOG="/var/log/messages"
@@ -141,8 +142,8 @@ DIFF_FILE()
 		_status=${_ckdiff}
 		# Update the Deployed System File or Git Repo File Version...
 		if [[ $UPDATE == 1 ]]; then
-			echo -e "\nPush/Deploy the System File (\"sys\"),"
-			echo -e "   or Pull/Update the Git Repo File (\"repo\"),"
+			echo -e "\nPush/Deploy the File to the System (\"sys\"),"
+			echo -e "   or Pull/Update the File to the Git Repo (\"repo\"),"
 			echo -n "   or Do Nothing (\"nothing\")? [sys|repo|Nothing]: "
 			read ckUpdate
 			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
@@ -202,7 +203,7 @@ CONFCK()
 
 	# New SystemD Service Configuration...
 	DIFF_FILE "PVSD SystemD Service Config" "Deployed" \
-		./pvsd/pvsd.service /etc/systemd/system/pvsd.service
+		./pvsd/pvsd.service ${SYSTEMD_DIR}/pvsd.service
 	if [ $? != 0 ]; then
 		echo "Files Differed...!"
 		(( _nerrors++ ))
@@ -274,44 +275,97 @@ CONFCK()
 		echo "Files are the Same."
 	fi
 
+	# Deprecated SystemV ChkConfig Usage, Now Using SystemD SystemCtl...
+
+	#echo
+	#echo "Comparing Saved ChkConfig PVSD ADARA Config to System:"
+	#echo
+
+	#local _check_update=0
+	#chkconfig --list pvsd > /tmp/chkconfig.pvsd.$$ 2>&1
+	#if [ $? != 0 ]; then
+	#	echo "Failure Retrieving System ChkConfig for PVSD...!"
+	#	_check_update=1
+	#	(( _nerrors++ ))
+	#else
+	#	echo "${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
+	#	${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
+	#	if [ $? != 0 ]; then
+	#		echo "System ChkConfig for PVSD Differed...!"
+	#		_check_update=1
+	#		(( _nerrors++ ))
+	#	else
+	#		echo "System ChkConfig for PVSD is the Same."
+	#	fi
+	#fi
+	#${RM} -f /tmp/chkconfig.pvsd.$$
+	#if [ $? != 0 ]; then
+	#	echo "Failure Deleting Temporary System ChkConfig File for PVSD...!"
+	#	(( _nerrors++ ))
+	#fi
+	## Create PVSD Local Run Level...
+	#if [[ $UPDATE == 1 && ${_check_update} == 1 ]]; then
+	#	echo -n "Create PVSD Local Run Level? [yes|No] "
+	#	read ckUpdate
+	#	ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+	#	if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+	#		${SUDO} chkconfig --add pvsd
+	#		chkconfig --list pvsd
+	#		${SUDO} chkconfig pvsd on
+	#		chkconfig --list pvsd
+	#		${RM} -i pvsd/chkconfig.pvsd
+	#		chkconfig --list pvsd > ./pvsd/chkconfig.pvsd 2>&1
+	#	fi
+	#fi
+
+	# Compare SystemD SystemCtl Enabled...
+
 	echo
-	echo "Comparing Saved ChkConfig PVSD ADARA Config to System:"
+	echo "Comparing Saved SystemCtl ADARA PVSD Enabled to System:"
 	echo
 
 	local _check_update=0
-	chkconfig --list pvsd > /tmp/chkconfig.pvsd.$$ 2>&1
+	${SYSTEMCTL} is-enabled pvsd \
+		> /tmp/systemctl.enabled.pvsd.$$ 2>&1
 	if [ $? != 0 ]; then
-		echo "Failure Retrieving System ChkConfig for PVSD...!"
+		echo "Failure Retrieving SystemCtl Enabled for PVSD...!"
 		_check_update=1
 		(( _nerrors++ ))
 	else
-		echo "${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$"
-		${DIFF} ./pvsd/chkconfig.pvsd /tmp/chkconfig.pvsd.$$
+		echo -n "${DIFF} ./pvsd/systemctl.enabled.pvsd"
+		echo " /tmp/systemctl.enabled.pvsd.$$"
+		${DIFF} ./pvsd/systemctl.enabled.pvsd \
+			/tmp/systemctl.enabled.pvsd.$$
 		if [ $? != 0 ]; then
-			echo "System ChkConfig for PVSD Differed...!"
+			echo "SystemCtl Enabled for PVSD Differed...!"
 			_check_update=1
 			(( _nerrors++ ))
 		else
-			echo "System ChkConfig for PVSD is the Same."
+			echo "SystemCtl Enabled for PVSD is the Same."
 		fi
 	fi
-	${RM} -f /tmp/chkconfig.pvsd.$$
+	${RM} -f /tmp/systemctl.enabled.pvsd.$$
 	if [ $? != 0 ]; then
-		echo "Failure Deleting Temporary System ChkConfig File for PVSD...!"
+		echo \
+		"Failure Deleting Temporary SystemCtl Enabled File for PVSD!"
 		(( _nerrors++ ))
 	fi
-	# Create PVSD Local Run Level...
-	if [[ $UPDATE == 1 && ${_check_update} == 1 ]]; then
-		echo -n "Create PVSD Local Run Level? [yes|No] "
-		read ckUpdate
-		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
-		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			${SUDO} chkconfig --add pvsd
-			chkconfig --list pvsd
-			${SUDO} chkconfig pvsd on
-			chkconfig --list pvsd
-			${RM} -i pvsd/chkconfig.pvsd
-			chkconfig --list pvsd > ./pvsd/chkconfig.pvsd 2>&1
+	# Enable PVSD Local Run Level...
+	if [[ ${_check_update} == 1 ]]; then
+		if [[ $UPDATE == 1 ]]; then
+			echo -n "Enable PVSD Local Run Level? [yes|No] "
+			read ckUpdate
+			ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+			if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+				${SUDO} ${SYSTEMCTL} enable pvsd
+				${SYSTEMCTL} is-enabled pvsd
+				${RM} -i ./pvsd/systemctl.enabled.pvsd
+				${SYSTEMCTL} is-enabled pvsd \
+					> ./pvsd/systemctl.enabled.pvsd 2>&1
+			fi
+		else
+			echo -n "*** PVSD Must Be Added to the"
+			echo " SystemCtl Enabled Run Level!"
 		fi
 	fi
 
@@ -367,13 +421,108 @@ if [[ $QUIET == 1 ]]; then
 else
 	CONFCK
 	_ckconfck=$?
-	if [[ ${_ckconfck} != 0 ]]; then
-		echo -e "$doConfCk\n"
-	fi
 fi
-
 if [[ ${_ckconfck} != 0 ]]; then
 	echo -e "*** ConfCk FAILED...!\n"
+fi
+
+CK_EPICS_IOCS_ENABLED()
+{
+	local _nerrors=0
+
+	echo "*** Verifying that EPICS IOC Services are Enabled:"
+
+	# Remove Globbed File List If None Found...
+	shopt -s nullglob
+
+	for iocpath in /etc/init.d/*pvsd \
+			${SYSTEMD_DIR}/pvsd*.service \
+			${SYSTEMD_DIR}/epics-controls-env*.service \
+			${SYSTEMD_DIR}/archive-engine*.service \
+			${SYSTEMD_DIR}/gateway*.service \
+			${SYSTEMD_DIR}/scan-server*.service \
+			${SYSTEMD_DIR}/ioc_*.service \
+			${SYSTEMD_DIR}/ics_*.service ; do
+
+		# Check SystemD SystemCtl Enabled...
+
+		ioc=`basename ${iocpath}`
+
+		echo
+		echo "Checking IOC Service Enabled for:\n   ${ioc}"
+
+		local _set_enabled=0
+		# Grep Out Old RedHat7 /etc/init.d/pvsd.service Warnings...
+		local _is_enabled=`${SYSTEMCTL} is-enabled ${ioc} 2>&1 \
+			| ${GREP} -v chkconfig`
+		local _check_enabled=$?
+		if [[ ${_check_enabled} != 0 ]]; then
+			if [[ ${_is_enabled} != "disabled" ]]; then
+				echo -n "Failure Retrieving SystemCtl Enabled "
+				echo "for IOC ${ioc}...!"
+				echo -e "   ${_check_enabled}: [${_is_enabled}]"
+				_set_enabled=1
+				(( _nerrors++ ))
+			elif [[ ${_is_enabled} == "disabled" ]]; then
+				echo "SystemCtl Service is NOT Enabled for IOC ${ioc}...!"
+				echo -e "   ${_check_enabled}: [${_is_enabled}]"
+				_set_enabled=1
+				(( _nerrors++ ))
+			fi
+		elif [[ ${_is_enabled} == "enabled" ]]; then
+			echo "SystemCtl Service is Enabled for IOC ${ioc}."
+			echo -e "   ${_check_enabled}: [${_is_enabled}]"
+		else
+			echo -n "Error: Confusing SystemCtl Enabled Output "
+			echo "for IOC ${ioc}."
+			echo -e "   ${_check_enabled}: [${_is_enabled}]"
+			_set_enabled=1
+			(( _nerrors++ ))
+		fi
+
+		# Enable SMSD Local Run Level...
+		if [[ ${_set_enabled} == 1 ]]; then
+			if [[ $UPDATE == 1 ]]; then
+				echo -n "Enable IOC ${ioc} Service Run Level? [yes|No] "
+				read ckUpdate
+				ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
+				if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
+					${SUDO} ${SYSTEMCTL} enable ${ioc}
+					${SYSTEMCTL} is-enabled ${ioc}
+				fi
+			else
+				echo -n "*** EPICS IOC ${ioc} Must Be Added to the"
+				echo " SystemCtl Enabled Run Level!"
+			fi
+		fi
+
+	done
+
+	# Restore Normal Shell Globbing...
+	shopt -u nullglob
+
+	echo
+	if [ ${_nerrors} -gt 0 ]; then
+		echo "${_nerrors} IOC Enabled Errors Encountered!"
+	else
+		echo "All EPICS IOC Services are Enabled."
+	fi
+
+	return ${_nerrors}
+}
+
+if [[ $UPDATE == 1 ]]; then
+	CK_EPICS_IOCS_ENABLED
+	_ckiocck=$?
+else
+	doIocCk=`CK_EPICS_IOCS_ENABLED 2>&1`
+	_ckiocck=$?
+	if [[ ${_ckiocck} != 0 || $QUIET == 0 ]]; then
+		echo -e "$doIocCk\n"
+	fi
+fi
+if [[ ${_ckiocck} != 0 ]]; then
+	echo -e "*** IOC Enabled Check FAILED...!\n"
 fi
 
 # In Update Mode, Perform Other Assorted Install Operations, As Needed...
@@ -457,7 +606,7 @@ if [[ $UPDATE == 1 ]]; then
 		read ckUpdate
 		ckUpdate=`echo "$ckUpdate" | tr '[:upper:]' '[:lower:]'`
 		if [[ "$ckUpdate" == "y" || "$ckUpdate" == "yes" ]]; then
-			cron_file=`mktemp ./.confck.pvsd.crontab.edit.file.XXXXXX`
+			cron_file=`mktemp ./.confck.pvsd.crontab.edit.XXXXXX`
 			manual_edit=0
 			echo "MAILTO=idac_adara_notify@email.ornl.gov" >> $cron_file
 			echo -n "PATH=" >> $cron_file
@@ -550,9 +699,21 @@ if [[ $UPDATE == 1 ]]; then
 
 fi
 
-if [[ ${_ckconfck} != 0 || $QUIET == 0 ]]; then
+if [[ ${_ckconfck} != 0 \
+		|| ${_ckiocck} != 0 \
+		|| $QUIET == 0 ]]; then
 	echo -e "Status = ${_ckconfck}\n"
+	echo -e "IOC Enabled Status = ${_ckiocck}\n"
 fi
 
-exit ${_ckconfck}
+if [[ ${_ckconfck} != 0 ]]; then
+	exit ${_ckconfck}
+elif [[ ${_ckiocck} != 0 ]]; then
+	exit ${_ckiocck}
+else
+	if [[ $QUIET == 0 ]]; then
+		echo -e "ALL ConfCk Cases Passed.\n"
+	fi
+	exit 0
+fi
 

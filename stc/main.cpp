@@ -227,7 +227,7 @@ int main( int argc, char** argv )
     string                      work_base;
     string                      work_dir;
     string                      work_path; // Obsolete... (work_root/base)
-    string                      base_path;
+    string                      base_path = "";
     string                      config_file;
     unsigned long               chunk_size; // in Dataset Elements! :-O
     unsigned short              evt_buf_size;
@@ -267,6 +267,7 @@ int main( int argc, char** argv )
         string broker_user;
         string broker_pass;
         string domain;
+        bool no_msg_wait;
 
         namespace po = boost::program_options;
         po::options_description options( "stc program options" );
@@ -297,6 +298,7 @@ int main( int argc, char** argv )
                 ("broker_user", po::value<string>( &broker_user )->default_value( "" ), "set AMQP broker user name")
                 ("broker_pass", po::value<string>( &broker_pass )->default_value( "" ), "set AMQP broker password")
                 ("domain", po::value<string>( &domain )->default_value( "" ), "Override ComBus domain prefix (TEST ONLY)")
+                ("no_msg_wait", po::bool_switch( &no_msg_wait )->default_value( false ), "do not wait forever for final translation success message to send")
                 ;
 
 
@@ -335,6 +337,15 @@ int main( int argc, char** argv )
         {
             syslog( LOG_INFO, "[%i] %s %u.",
                 g_pid, "STC Verbose Logging Level Set to", verbose_level );
+            give_syslog_a_chance;
+        }
+
+        // Log No Terminal Message Wait Option...
+        if ( opt_map.count( "no_msg_wait" ))
+        {
+            syslog( LOG_INFO, "[%i] %s %u.",
+                g_pid, "Setting \"No Terminal Message Wait\" Option to",
+                no_msg_wait );
             give_syslog_a_chance;
         }
 
@@ -517,7 +528,8 @@ int main( int argc, char** argv )
             }
 
             nxgen = new NxGen( infd,
-                work_root, work_base, adara_outfile, nexus_outfile,
+                work_root, work_base, base_path,
+                adara_outfile, nexus_outfile,
                 config_file, strict, gather_stats, chunk_size,
                 evt_buf_size, anc_buf_size, cache_size, compression_level,
                 verbose_level );
@@ -525,7 +537,7 @@ int main( int argc, char** argv )
             // Start ComBus monitor thread (even in interactive mode!)
             monitor = new ComBusTransMon();
             monitor->start( *nxgen,
-                broker_uri, broker_user, broker_pass, domain );
+                broker_uri, broker_user, broker_pass, domain, no_msg_wait );
 
             // Begin ADARA stream processing
             //    - does not return until recording ends

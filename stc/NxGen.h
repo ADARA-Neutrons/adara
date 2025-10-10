@@ -2915,6 +2915,7 @@ public:
         int a_fd_in,
         std::string &a_work_root,
         std::string &a_work_base,
+        std::string &a_base_path,
         std::string &a_adara_out_file,
         std::string &a_nexus_out_file,
         std::string &a_config_file,

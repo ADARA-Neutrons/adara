@@ -7,7 +7,7 @@
 STC_DEVEL="/TESTING/SNS/stcdata_devel"
 STC_HFIR="/HFIR/stcdata_hfir"
 
-STC_SSH="ssh -AY stc1.ornl.gov"
+STC_SSH="ssh -AY stc4.ornl.gov"
 #STC_SSH="ssh -AY stc2.ornl.gov"
 #STC_SSH="ssh -AY stc3.ornl.gov"
 
@@ -196,4 +196,8 @@ CHECK_PPP stc_pre_post_timepix3.py ${STC_DEVEL}
 CHECK_PPP stc_pre_post_mobile_timepix3.py ${STC_DEVEL}
 
 CHECK_PPP stc_pre_post_graffiti.bash ${STC_HFIR}
+
+CHECK_PPP stc_pre_post_nxs2echo.bash ${STC_DEVEL}
+
+CHECK_PPP nxs2echo.dummy ${STC_DEVEL}
 

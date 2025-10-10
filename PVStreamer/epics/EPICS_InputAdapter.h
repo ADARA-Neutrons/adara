@@ -51,7 +51,8 @@ public:
                         uint32_t &a_hungDeviceCount,
                         uint32_t &a_inactiveDeviceCount,
                         uint32_t &a_readyPVCount,
-                        uint32_t &a_totalPVCount );
+                        uint32_t &a_totalPVCount,
+                        std::string &a_device_errs );
 private:
     void            configFileMonitorThread();
     void            startDevice( DeviceDescriptor *a_device );

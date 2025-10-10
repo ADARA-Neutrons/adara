@@ -1,6 +1,5 @@
 #!/bin/bash
 # Do not edit, managed by Puppet.
-# Source: /etc/puppetlabs/code/environments/production/modules/neutron_sciences/rsyslog/templates/scripts/rsyslogMailer.erb
 #
 # rsyslogMailer
 #
@@ -21,15 +20,17 @@ namedPipeFile="/etc/rsyslog.pipes/criticalMessages"
 
 localCacheDir="/SNSlocal/rsyslog.cache"
 
-archiveDir="/SNS/users/$USER/RSyslogErrors"
+archiveDir="/SNS/users/${USER}/RSyslogErrors"
 
-altArchiveDir="/home/$USER/RSyslogErrors"
+altArchiveDir="/home/${USER}/RSyslogErrors"
 
 fileGroup="adara"
 
-alertRecipient="$USER@ornl.gov"      # the mail recipient for alerts
+# the mail recipient for alerts
+alertRecipient="idac_adara_notify@email.ornl.gov"
 
-hostName=`hostname`                # the host are we logging from
+# the host are we logging from
+hostName=`hostname`               
 
 # Archive Log Errors (or Not)...?
 deactivateFile="/usr/local/bin/deactivateRsyslogMailer"

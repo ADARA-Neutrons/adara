@@ -3,6 +3,11 @@
 # ADARA SMS LiveConf - Live Configuration and Status Script
 #
 
+# Source Controls Environment (for ${BL} env setting):
+if [ -e /etc/profile.d/controls.sh ] ; then
+	source /etc/profile.d/controls.sh
+fi
+
 # For Cron Usage - Source Home Shell Environment:
 if [ -e $HOME/.bash_profile ] ; then
 	source $HOME/.bash_profile
@@ -1523,6 +1528,10 @@ if [[ "$command" == "status" \
 
 		caget $WAIT ${PRE}:${SMS}:RunNumber
 
+		caget $WAIT ${PRE}:${SMS}:Next:RunNumber
+
+		caget $WAIT ${PRE}:${SMS}:LastSuccess:RunNumber
+
 		caget $WAIT ${PRE}:${SMS}:Summary
 		sr="${PRE}:${SMS}:SummaryReason"
 		caget $WAIT -S $sr | grep $sr | awk "$awkLineBreak"
@@ -1661,6 +1670,48 @@ if [[ "$command" == "status" \
 		caget $WAIT -S ${PRE}:${SMS}:LogLevel
 
 		echo
+
+	fi
+
+	if [[ "$command" == "status" \
+			|| "$command" == "run_status" ]]; then
+
+		nqcvar="${PRE}:${SMS}:Control:NumQuickCounters"
+
+		caget $WAIT $nqcvar
+
+		if [ $? == 0 ]; then
+
+			echo
+
+			numQuickCounters=`caget $WAIT $nqcvar | grep $nqcvar \
+				| awk '{print $2}'`
+
+			# Count from 1...!
+			for (( qc=1 ; qc <= numQuickCounters ; qc++ )); do
+
+				echo "Quick Counter id=${qc}:"
+
+				qcprefix="${PRE}:${SMS}:QuickCounter:${qc}"
+
+				caget $WAIT -S ${qcprefix}:Name
+
+				qcName=`caget $WAIT -S ${qcprefix}:Name \
+					| grep ${qcprefix}:Name \
+					| awk '{print $2}'`
+
+				caget $WAIT ${PRE}:${SMS}:${qcName}:IsCounting
+				caget $WAIT ${PRE}:${SMS}:${qcName}:DoneTimeout
+				caget $WAIT ${PRE}:${SMS}:${qcName}:AutoReset
+				caget $WAIT ${PRE}:${SMS}:${qcName}:ElapsedTime
+				caget $WAIT ${PRE}:${SMS}:${qcName}:DetectorAll
+				caget $WAIT ${PRE}:${SMS}:${qcName}:MonitorAll
+
+				echo
+
+			done
+
+		fi
 
 	fi
 

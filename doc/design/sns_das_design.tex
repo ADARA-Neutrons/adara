@@ -28,7 +28,7 @@
 % No indentation (see below)
 \usepackage[parfill]{parskip}
 % Include bibliography in index
-\usepackage[nottoc,numbib]{tocbibind}
+%\usepackage[nottoc,numbib]{tocbibind}
 % \topcaption
 %\usepackage{topcapt}
 % \newcolumntype
@@ -41,7 +41,7 @@
 % Easy bytefield creation (local package)
 \usepackage[endianness=big]{packages/bytefield}
 % Allow includes/inputs in subfolders
-\usepackage{chapterfolder}
+%\usepackage{chapterfolder}
 
 % Allow conditionals
 \usepackage{ifthen}
@@ -250,7 +250,7 @@ built on \today
 \newpage
 \input 3_Live_Analysis/component.tex
 \newpage
-\cfchapter {}{4_Parallel_Analysis}{component.tex}
+\input 4_Parallel_Analysis/component.tex
 \newpage
 \input 5_Neutron_Event_Timing/component.tex
 \newpage

@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-LOGGER("FastMeta");
+LOGGER("SMS.FastMeta");
 
 #include <fstream>
 #include <string>
@@ -20,6 +20,7 @@ LOGGER("FastMeta");
 #include "ADARA.h"
 #include "FastMeta.h"
 #include "MetaDataMgr.h"
+#include "QuickCounter.h"
 #include "StorageManager.h"
 
 using namespace boost::property_tree;
@@ -27,6 +28,8 @@ using namespace boost::property_tree;
 void FastMeta::addDevices(const ptree &conf)
 {
 	LOGGER_INIT();
+
+	DEBUG("addDevices() Entry");
 
 	std::string name, prefix("fastmeta ");
 	size_t b, e, plen = prefix.length();
@@ -88,7 +91,7 @@ static void readFile(const std::string &name, const std::string &path,
 
 static void parseEntry(const std::string &name, const std::string &var,
 		const std::string &val, uint32_t &varId, uint32_t &key,
-		bool &persist)
+		bool &persist, bool &is_counter)
 {
 	/* Build the common error string */
 	std::string msg("fastmeta '");
@@ -114,8 +117,12 @@ static void parseEntry(const std::string &name, const std::string &var,
 	}
 
 	/* What type of fast metadata are we? */
+	is_counter = false;
 	if (boost::algorithm::iequals(*arg, "trigger")) {
 		key = 0x50000000;
+	} else if (boost::algorithm::iequals(*arg, "counter")) {
+		key = 0x50000000;
+		is_counter = true;
 	} else if (boost::algorithm::iequals(*arg, "adc")) {
 		key = 0x60000000;
 	} else {
@@ -187,13 +194,53 @@ void FastMeta::addDevice(const std::string &name,
 		<< " at [" << path->second.data() << "]");
 	readFile(name, path->second.data(), ddp);
 
+	// Check for QuickCounter "Done Timeout" Config...
+	double done_timeout = 0.0;
+	path = info.find("done_timeout");
+	if (path != info.not_found()) {
+		try {
+			done_timeout = boost::lexical_cast<double>(
+				path->second.data() );
+		}
+		catch (...) {
+			ERROR("addDevice():"
+				<< " Error Parsing Done Timeout Config"
+				<< " for Fast Meta-Data Device"
+				<< " [" << name << "]"
+				<< " - Config Data = [" << path->second.data() << "]");
+		}
+	}
+
+	// Check for QuickCounter "Auto Reset" Config...
+	bool auto_reset = false;
+	path = info.find("auto_reset");
+	if (path != info.not_found()) {
+		try {
+			const std::string &bval = path->second.data();
+			if ( !bval.compare("true") )
+				auto_reset = true;
+			else
+				auto_reset = false;
+		}
+		catch (...) {
+			ERROR("addDevice():"
+				<< " Error Parsing Auto Reset Config"
+				<< " for Fast Meta-Data Device"
+				<< " [" << name << "]"
+				<< " - Config Data = [" << path->second.data() << "]");
+		}
+	}
+
 	bool reconnected = false; // ignored for FastMeta devices...
 	uint32_t devId = m_meta->allocDev(++m_numDevs,
 		0 /* srcTag=0, for SMS Internal */, true /* do_log */, reconnected);
 	uint32_t varId, key;
 	bool persist;
+	bool is_counter;
 	BOOST_FOREACH(const ptree::value_type &v, info) {
-		if (!v.first.compare("description"))
+		if (!v.first.compare("description")
+				|| !v.first.compare("done_timeout")
+				|| !v.first.compare("auto_reset"))
 			continue;
 
 		/* Remove any trailing commend or whitespace. It'd be nice
@@ -208,7 +255,7 @@ void FastMeta::addDevice(const std::string &name,
 			<< " [" << name << "]"
 			<< " id=" << v.first
 			<< " val=[" << val << "]");
-		parseEntry(name, v.first, val, varId, key, persist);
+		parseEntry(name, v.first, val, varId, key, persist, is_counter);
 
 		if (m_vars.count(key)) {
 			std::string msg("fastmeta '");
@@ -225,10 +272,30 @@ void FastMeta::addDevice(const std::string &name,
 			<< " devId=" << devId
 			<< " varId=" << varId
 			<< " key=0x" << std::hex << key << std::dec
-			<< " persist=" << persist);
+			<< " persist=" << persist
+			<< " is_counter=" << is_counter
+			<< " done_timeout=" << done_timeout
+			<< " auto_reset=" << auto_reset);
+
 		m_vars[key].m_devId = devId;
 		m_vars[key].m_varId = varId;
 		m_vars[key].m_persist = persist;
+		m_vars[key].m_is_counter = is_counter;
+		m_vars[key].m_name = name;
+
+		// Create Counter, Statistic PVs, Device Descriptor,
+		// As Needed... ;-D
+		if ( is_counter ) {
+
+			// Create Counter Statistics Device Descriptor...
+			uint32_t stat_devId;
+			addCounterStatsDevice(name, stat_devId);
+
+			// Create New QuickCounter Instance...
+			m_vars[key].m_counter = new QuickCounter( m_meta,
+				&(m_vars[key]), key, stat_devId,
+				done_timeout, auto_reset );
+		}
 	}
 
 	/* Now that we know we can parse the variable map from the config,
@@ -307,6 +374,9 @@ void FastMeta::addGenericDevice(uint32_t pixel, uint32_t &key)
 	// Default to Non-Persistent PVs for Generic Fast Meta-Data Devices...
 	bool persist = false;
 
+	// Default to Non-Counter PVs for Generic Fast Meta-Data Devices...
+	bool is_counter = false;
+
 	if (m_vars.count(key)) {
 		std::string msg("fastmeta '");
 		msg += devName.str();
@@ -324,11 +394,14 @@ void FastMeta::addGenericDevice(uint32_t pixel, uint32_t &key)
 		<< " devId=" << devId
 		<< " varId=" << varId
 		<< " key=0x" << std::hex << key << std::dec
-		<< " persist=" << persist);
+		<< " persist=" << persist
+		<< " is_counter=" << is_counter);
 
 	m_vars[key].m_devId = devId;
 	m_vars[key].m_varId = varId;
 	m_vars[key].m_persist = persist;
+	m_vars[key].m_is_counter = is_counter;
+	m_vars[key].m_name = pvName.str();
 
 	/* Now that we know we can parse the variable map from the config,
 	 * add the DDP to the stream. We'll carry it around even if we don't
@@ -338,6 +411,104 @@ void FastMeta::addGenericDevice(uint32_t pixel, uint32_t &key)
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
 	m_meta->addFastMetaDDP(now, devId, ddp.str());
+}
+
+void FastMeta::addCounterStatsDevice(const std::string &name,
+		uint32_t &devId)
+{
+	std::stringstream ddp;
+
+	// PV Index for Fast Meta-Data Quick Counter Device... ;-D
+	uint32_t varId;
+
+	ddp << "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
+	ddp << "<device"
+		<< " xmlns=\"http://public.sns.gov/schema/device.xsd\""
+		<< " xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\""
+		<< " xsi:schemaLocation=\"http://public.sns.gov/schema/device.xsd"
+		<< " http://public.sns.gov/schema/device.xsd\">\n";
+	ddp << "<device_name>" << name << "</device_name>\n";
+	ddp << "<process_variables>\n";
+
+	// Is Counting State PV
+	varId = 1;
+	ddp << "    <process_variable>\n";
+	ddp << "        <pv_name>" << name << ":IsCounting" << "</pv_name>\n";
+	ddp << "        <pv_id>" << varId << "</pv_id>\n";
+	ddp << "        <pv_description>" << "Is Counting State"
+		<< " for QuickCounter " << name
+		<< "</pv_description>\n";
+	ddp << "        <pv_type>unsigned</pv_type>\n";
+	ddp << "    </process_variable>\n";
+
+	// Elapsed Time PV
+	varId = 2;
+	ddp << "    <process_variable>\n";
+	ddp << "        <pv_name>" << name << ":ElapsedTime" << "</pv_name>\n";
+	ddp << "        <pv_id>" << varId << "</pv_id>\n";
+	ddp << "        <pv_description>" << "Elapsed Time"
+		<< " for QuickCounter " << name
+		<< "</pv_description>\n";
+	ddp << "        <pv_type>double</pv_type>\n";
+	ddp << "    </process_variable>\n";
+
+	// Detector Counts All PV
+	varId = 3;
+	ddp << "    <process_variable>\n";
+	ddp << "        <pv_name>" << name << ":DetectorAll" << "</pv_name>\n";
+	ddp << "        <pv_id>" << varId << "</pv_id>\n";
+	ddp << "        <pv_description>" << "Detector Counts All"
+		<< " for QuickCounter " << name
+		<< "</pv_description>\n";
+	ddp << "        <pv_type>unsigned</pv_type>\n";
+	ddp << "    </process_variable>\n";
+
+	// Monitor Counts All PV
+	varId = 4;
+	ddp << "    <process_variable>\n";
+	ddp << "        <pv_name>" << name << ":MonitorAll" << "</pv_name>\n";
+	ddp << "        <pv_id>" << varId << "</pv_id>\n";
+	ddp << "        <pv_description>" << "Monitor Counts All"
+		<< " for QuickCounter " << name
+		<< "</pv_description>\n";
+	ddp << "        <pv_type>unsigned</pv_type>\n";
+	ddp << "    </process_variable>\n";
+
+	ddp << "</process_variables>\n";
+	ddp << "</device>\n";
+
+	// Map Next SMS Internal Device ID...
+	bool reconnected = false; // ignored for FastMeta devices...
+	devId = m_meta->allocDev(++m_numDevs,
+		0 /* srcTag=0, for SMS Internal */, true /* do_log */, reconnected);
+
+	DEBUG("addCounterStatsDevice(): Creating New Descriptor for"
+		<< " QuickCounter Fast Meta-Data Device"
+		<< " [" << name << "]"
+		<< " ddp=[" << ddp.str() << "]"
+		<< " devId=" << devId);
+
+	/* Add the DDP to the stream.
+	 */
+	struct timespec now;
+	clock_gettime(CLOCK_REALTIME, &now);
+	m_meta->addFastMetaDDP(now, devId, ddp.str());
+}
+
+FastMeta::Variable *FastMeta::validVariable(uint32_t pixel, uint32_t &key)
+{
+	FastMeta::Variable *var;
+	/* Our variables are indexed by the type and device ID,
+	 * which are the upper 15 bits of the pixel.
+	 */
+	key = pixel & ~0xffff;
+	try {
+		var = &(m_vars.at(key));
+	}
+	catch (const std::out_of_range& e) {
+		var = (FastMeta::Variable *) NULL;
+	}
+	return var;
 }
 
 void FastMeta::sendUpdate(uint64_t pulse_id, uint32_t pixel, uint32_t tof)

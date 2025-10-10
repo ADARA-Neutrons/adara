@@ -16,6 +16,8 @@ NOW_SYSTEM_FILES="/SNSlocal/sms/conf/* \
 	/etc/logrotate.d/smsd_log \
 	/usr/local/bin/pvsd \
 	/etc/init.d/pvsd \
+	/etc/init.d/pvsd.XXX \
+	/etc/systemd/system/pvsd.service \
 	/etc/rsyslog.d/pvsd_syslog.conf \
 	/etc/rsyslog.d/*pvsd*.conf \
 	/etc/logrotate.d/pvsd_log \

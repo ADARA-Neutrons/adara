@@ -1,0 +1,403 @@
+#
+# April 2024, NOW RedHat9 Upgrade Recipe...! ;-D
+#
+# As collated from RedMine Ticket #3377:
+#    https://idac.ornl.gov/issues/3377
+#
+
+# Check for Required RHel9 RPM Packages:
+
+sudo yum install \
+	swig.x86_64 rpcgen.x86_64 libtirpc-devel.x86_64 \
+	readline-devel.x86_64 hdf5.x86_64 hdf5-devel.x86_64 \
+	boost.x86_64 boost-devel.x86_64 libuuid-devel.x86_64 \
+	log4cpp.x86_64 log4cpp-devel.x86_64 log4cpp-doc.x86_64 \
+	cppunit.x86_64 cppunit-devel.x86_64 apr-devel.x86_64 \
+	doxygen.x86_64 openldap-devel.x86_64
+
+# Check Permissions on RSyslog.Pipes:
+
+ls -l /etc/rsyslog.pipes /etc/rsyslog.pipes/criticalMessages
+
+sudo chmod g+w /etc/rsyslog.pipes/criticalMessages
+
+cp ~/gitsrc/ADARA/big_err_pipe.c /tmp
+
+cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+
+/tmp/big_err_pipe
+
+	Opened System Pipe Max Size File:
+	/proc/sys/fs/pipe-max-size
+
+	Read System Pipe Max Size as 1048576 from:
+	/proc/sys/fs/pipe-max-size
+
+	Opened Named RSyslog Pipe:
+	/etc/rsyslog.pipes/criticalMessages
+
+	Got Pipe Buffer Size of 65536 for:
+	/etc/rsyslog.pipes/criticalMessages
+
+	Set Pipe Buffer Size to 1048576 for:
+	/etc/rsyslog.pipes/criticalMessages
+
+	Verified Pipe Buffer Size of 1048576 for:
+	/etc/rsyslog.pipes/criticalMessages
+
+# EPICS Controls Environment SystemD Service
+
+ls -l /etc/systemd/system/epics-controls-env.service /var/run/controls.env
+
+sudo cp /SNS/users/y8y/epics-controls-env.service /etc/systemd/system
+
+sudo systemctl start epics-controls-env
+
+sudo systemctl enable epics-controls-env
+
+sudo systemctl status epics-controls-env
+
+/bin/cat /var/run/controls.env
+
+	EDMLIB_SUFFIX=so
+	EPICS_EXTENSIONS=/home/controls/epics/extensions/master
+	EPICS_BASEV4=/home/controls/epics/basev4/master
+	BEAMLINE_GATEWAYS=10.111.204.130:5066 10.111.201.130:5066 128.219.164.170:5066 10.111.2.130:5066 10.111.3.130:5066 10.111.4.130:5066 10.111.6.130:5066 10.111.8.130:5066 10.111.9.130:5066 10.111.10.130:5066 10.111.12.130:5066 10.111.14.130:5066 10.111.18.130:5066 10.111.22.130:5066 10.111.23.130:5066 10.111.24.130:5066 10.111.26.130:5066 10.111.29.130:5066 10.111.30.130:5066 10.111.33.130:5066 10.111.34.130:5066 10.111.36.130:5066 10.111.103.130:5066 10.111.123.130:5066 10.111.124.130:5066
+	PWD=/
+	BL=BL1B
+	SYSTEMD_EXEC_PID=469281
+	EPICS_CA_ADDR_LIST=10.111.3.255 160.91.228.17
+	EDMPVOBJECTS=/home/controls/epics/extensions/master/pref/edm
+	EPICS_CAS_INTF_ADDR_LIST=10.111.3.150 10.111.3.150
+	EPICS_HOST_ARCH=linux-x86_64
+	LANG=en_US.UTF-8
+	EDMOBJECTS=/home/controls/epics/extensions/master/pref/edm
+	EDMHELPFILES=/home/controls/epics/extensions/master/src/edm/helpFiles
+	EPICS4_DIR=/home/controls/epics/basev4/master
+	INVOCATION_ID=e4a39f1532fc4b6781ec824bf33d221f
+	PYTHONPATH=/home/controls/python:/home/controls/share/master/scan:/home/controls/share/master/python:/home/controls/bl1b/python:/home/controls/css/PyScanClient/build/lib
+	EPICS_CA_MAX_ARRAY_BYTES=100000000
+	SHLVL=1
+	EDMFILES=/home/controls/epics/extensions/master/pref/edm
+	EDMLIBS=/home/controls/epics/extensions/master/lib/linux-x86_64
+	JOURNAL_STREAM=8:1164796
+	BEAMLINE=bl1b
+	EPICS_CA_AUTO_ADDR_LIST=NO
+	PATH=/home/controls/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+	EDMACTIONS=/home/controls/epics/extensions/master/pref/edm
+	EPICS_BASE=/home/controls/epics/base/master
+	_=/usr/bin/env
+
+# ActiveMQ-3.9.3 Install:
+
+ls -l /usr/local/src/activemq-cpp-library-3.9.3/ \
+	/usr/lib64/pkgconfig/activemq-cpp.pc
+
+/bin/cat /etc/ld.so.conf.d/activemq-cpp-library-3.9.3.conf
+	(/usr/local/lib/)
+
+# Else:
+
+cd /usr/local/src/ ; \
+	zcat /SNS/users/y8y/activemq-cpp-library-3.9.3-src.patched.tar.gz \
+	| sudo tar xvf -
+
+cd activemq-cpp-library-3.9.3/
+
+configure
+
+make
+
+sudo make install
+
+sudo /bin/cp -i \
+	/usr/local/src/activemq-cpp-library-3.9.3/activemq-cpp.pc \
+	/usr/lib64/pkgconfig/
+
+sudo vi /etc/ld.so.conf.d/activemq-cpp-library-3.9.3.conf
+	-> /usr/local/lib/
+
+sudo ldconfig
+
+# Ensure SMSD Config-Now1 Checkout...
+
+ls -l /home/controls/config/
+
+/bin/rm -rf /home/controls/config/
+
+ls -l /home/controls/config-now1/
+
+git clone git+ssh://trac.sns.gov/var/repos/config \
+	/home/controls/config-now1/
+
+cd /home/controls/config-now1/ ; git status
+
+git checkout bl0XXX-now1
+
+# SMSD Config-Now1 Update...
+
+cd /home/controls/config-now1/ ; git pull ; git diff ; git status
+
+diff /SNS/users/y8y/confck.now ./confck | m
+
+cp /SNS/users/y8y/confck.now ./confck ; \
+	git diff ./confck ; \
+	git commit -m "Update with Latest NOW ConfCk Script." ./confck ; \
+	git push ; \
+	git status
+
+ls -l /etc/rsyslog.d/ ; echo ; \
+	ls -l ./etc/rsyslog.d/* ./sms/*.conf ./pvsd/*.conf
+
+git mv ./etc/rsyslog.d/adaraMailer.conf ./etc/rsyslog.d/50_adaraMailer.conf ; \
+	git mv ./etc/rsyslog.d/stclog.conf ./etc/rsyslog.d/51_stc.conf ; \
+	git mv ./pvsd/adaraMailer.conf ./pvsd/50_adaraMailer.conf ; \
+	git mv ./pvsd/pvsd_syslog.conf ./pvsd/51_pvsd.conf ; \
+	git mv ./sms/adaraMailer.conf ./sms/50_adaraMailer.conf ; \
+	git mv ./sms/smsd_syslog.conf ./sms/51_smsd.conf ; \
+	git mv ./dasmond/adaraMailer.conf ./dasmond/50_adaraMailer.conf ; \
+	git mv ./dasmond/dasmon_syslog.conf ./dasmond/51_dasmond.conf ; \
+	git commit -m "Rename for Latest ADARA RSyslog Config Files" \
+		./etc/rsyslog.d/adaraMailer.conf \
+		./etc/rsyslog.d/50_adaraMailer.conf \
+		./etc/rsyslog.d/stclog.conf ./etc/rsyslog.d/51_stc.conf \
+		./pvsd/adaraMailer.conf ./pvsd/50_adaraMailer.conf \
+		./pvsd/pvsd_syslog.conf ./pvsd/51_pvsd.conf \
+		./sms/adaraMailer.conf ./sms/50_adaraMailer.conf \
+		./sms/smsd_syslog.conf ./sms/51_smsd.conf \
+		./dasmond/adaraMailer.conf ./dasmond/50_adaraMailer.conf \
+		./dasmond/dasmon_syslog.conf ./dasmond/51_dasmond.conf ; \
+	git push ; \
+	git status
+
+git rm -r etc/xinetd.d/stc* ; \
+	mkdir -p ./etc/systemd/system ; \
+	cp -r ~/STC.SystemD.Services/stc* ./etc/systemd/system/ ;
+	git add ./etc/systemd/system/ ; \
+	git commit -m "Replace Old STC SysV Services with SystemD" \
+		etc/xinetd.d/ \
+		./etc/systemd/system/ ; \
+	git push ; \
+	git status
+
+# Add "_systemd" to "--daemon"... ;-D
+cp /SNS/users/y8y/pvsd.service ./pvsd/pvsd.service ; \
+	git add ./pvsd/pvsd.service ; \
+	git commit -m "Add PVSD SystemD Service Description" \
+		./pvsd/pvsd.service ; \
+	vi +"/--daemon" ./pvsd/usr.local.bin.pvsd ; \
+	git commit -m "Switch PVSD Wrapper to Run as SystemD Daemon" \
+		./pvsd/usr.local.bin.pvsd ; \
+	git push ; \
+	git status
+
+# Add "--pvsd_user=snsdata" to /usr/local/bin/pvsd_mon.sh in crontab
+vi +/pvsd_mon pvsd/y8y.crontab ; \
+	git commit -m "PVSD Runs as snsdata on RHel9" pvsd/y8y.crontab ; \
+	git push ; \
+	git status
+
+./confck
+
+./confck --update
+
+git add pvsd/systemctl.enabled.pvsd ; \
+	git commit -m "Track PVSD SystemCtl Enabled Service Status" \
+		pvsd/systemctl.enabled.pvsd ; \
+	git push ; \
+	git status
+
+vi ./etc/services
+-> append:
+stc             31417/udp               # stc service
+stc             31417/tcp               # stc service
+stc_test        31418/udp               # stc test service
+stc_test        31418/tcp               # stc test service
+stc_dummy       31419/udp               # stc dummy service
+stc_dummy       31419/tcp               # stc dummy service
+stc_hfir        31420/udp               # stc HFIR service
+stc_hfir        31420/tcp               # stc HFIR service
+stc_hfir_test   31421/udp               # stc HFIR test service
+stc_hfir_test   31421/tcp               # stc HFIR test service
+
+git commit -m "Add STC Service Ports to /etc/services" ./etc/services ; \
+	git push ; \
+	git status
+
+./confck --update
+
+./confck
+
+rm stat_list ;  ~/mkstatlist.now ; \
+	git commit -m "Updated System Deployed File Stat List" stat_list ; \
+	git push ; \
+	./confck ; git status
+
+# SMSD Log4Cpp Logging.conf
+
+diff /SNS/users/y8y/logging.conf sms/conf/logging.conf
+
+	-# SMS log4cxx properties
+	+# SMS log4cxx/log4cpp properties
+	+
+	+# Root appender (Required for log4cpp...!)
+	+#
+	+log4j.rootCategory=DEBUG, rootAppender
+	+log4j.appender.rootAppender=org.apache.log4j.ConsoleAppender
+	+log4j.appender.rootAppender.layout=org.apache.log4j.PatternLayout
+	+log4j.appender.rootAppender.layout.ConversionPattern=%d %p %c - %m%n
+
+cp /SNS/users/y8y/logging.conf sms/conf/logging.conf ; \
+	git commit -m "Update with Root Logger for Log4Cpp..." \
+		sms/conf/logging.conf ; \
+	git push ; \
+	./confck --update ; \
+	./confck ; git status
+
+# Create Any Missing ${LOCAL_DATA} Folders
+
+ls -l "${LOCAL_DATA}"
+
+BLNAME=`echo ${BL/BL0/NOW}` ; \
+	sudo mkdir "${LOCAL_DATA}/SNS" ; \
+	sudo mkdir "${LOCAL_DATA}/SNS/stcdata" ; \
+	sudo mkdir "${LOCAL_DATA}/SNS/stcdata_test" ; \
+	sudo mkdir "${LOCAL_DATA}/SNS/${BLNAME}" ; \
+	sudo mkdir "${LOCAL_DATA}/SNS/${BLNAME}/stcdata" ; \
+	sudo mkdir "${LOCAL_DATA}/SNS/${BLNAME}/stcdata_test" ; \
+	sudo chown -R snsdata "${LOCAL_DATA}/SNS" ; \
+	sudo mkdir "${LOCAL_DATA}/HFIR" ; \
+	sudo mkdir "${LOCAL_DATA}/HFIR/stcdata_hfir" ; \
+	sudo mkdir "${LOCAL_DATA}/HFIR/stcdata_hfir_test" ; \
+	sudo chown -R hfirdata "${LOCAL_DATA}/HFIR" ; \
+	sudo mkdir "${LOCAL_DATA}/TESTING" ; \
+	sudo mkdir "${LOCAL_DATA}/TESTING/SNS" ; \
+	sudo mkdir "${LOCAL_DATA}/TESTING/SNS/stcdata_dummy" ; \
+	sudo chown -R snsdata "${LOCAL_DATA}/TESTING" ; \
+	sudo mkdir "${LOCAL_DATA}/gpfs" ; \
+	sudo mkdir "${LOCAL_DATA}/gpfs/neutronsfs" ; \
+	sudo mkdir "${LOCAL_DATA}/gpfs/neutronsfs/stcdata" ; \
+	sudo mkdir "${LOCAL_DATA}/gpfs/neutronsfs/stcdata_test" ; \
+	sudo chown -R snsdata "${LOCAL_DATA}/gpfs" ; \
+	sudo chgrp -R adara \
+		"${LOCAL_DATA}/SNS" "${LOCAL_DATA}/HFIR" \
+		"${LOCAL_DATA}/TESTING" "${LOCAL_DATA}/gpfs" ; \
+	sudo chmod -R g+ws \
+		"${LOCAL_DATA}/SNS" "${LOCAL_DATA}/HFIR" \
+		"${LOCAL_DATA}/TESTING" "${LOCAL_DATA}/gpfs" ; \
+	sudo ln -s "${LOCAL_DATA}/SNS" "${LOCAL_DATA}/SNS/snfs1" 
+
+# Check Out All the STC Config Repos... ;-D
+
+if [[ -n "${LOCAL_DATA}" ]]; then \
+	pushd /home/controls ; \
+	for i in stc-config stc-config-test \
+			stc-config-hfir stc-config-hfir-test \
+			stc-config-dummy ; do \
+		git clone git+ssh://trac.sns.gov/var/repos/config \
+			config-${i} ; \
+		pushd config-${i} ; \
+		git checkout ${i} ; \
+		./confck ; \
+		./confck --update ; \
+		git pull ; git push ; \
+		./confck ; \
+		git status ; \
+		popd ; \
+	done ; \
+	ls -l config-stc* ; \
+	popd ; \
+fi
+
+# Production ADARA EPICS Soft Links
+
+ls -l /home/controls/prod/ADARA
+
+mkdir /home/controls/prod/ADARA
+
+ls -l /home/controls/prod/ADARA/Epics* ; \
+	echo ; \
+	ls -ld /home/controls/prod/common/base/rel7.0.7_20230322 \
+		/home/controls/prod/common/pcas/rel4.13.3_20240201
+
+	lrwxrwxrwx 1 y8y slowcontrols_developers 49 Apr  5 13:19 /home/controls/prod/ADARA/EpicsBase7Link -> /home/controls/prod/common/base/rel7.0.7_20230322/
+	lrwxrwxrwx 1 y8y slowcontrols_developers 52 Apr  4 17:18 /home/controls/prod/ADARA/EpicsBaseLink -> /home/controls/prod/epics/base/rel3.14.12.6_20230825/
+	lrwxrwxrwx 1 y8y slowcontrols_developers 48 Apr  5 17:50 /home/controls/prod/ADARA/EpicsBaseV4Link -> /home/controls/prod/epics/basev4/rel4.6_20230825/
+	lrwxrwxrwx 1 y8y slowcontrols_developers 52 Apr  5 17:51 /home/controls/prod/ADARA/EpicsExtensionsLink -> /home/controls/prod/epics/extensions/rel1.4_20230825/
+	lrwxrwxrwx 1 y8y slowcontrols_developers 50 Apr  5 13:19 /home/controls/prod/ADARA/EpicsPcasLink -> /home/controls/prod/common/pcas/rel4.13.3_20240201/
+
+ln -s /home/controls/prod/common/base/rel7.0.7_20230322 \
+	/home/controls/prod/ADARA/EpicsBase7Link
+
+ln -s /home/controls/prod/common/pcas/rel4.13.3_20240201 \
+	/home/controls/prod/ADARA/EpicsPcasLink
+
+ls -l /home/controls/prod/ADARA/Epics*
+
+# Deploy ADARA/SMS/etc on RHel9
+
+echo ${REDHAT}
+
+source $HOME/.bashrc
+
+pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
+
+./deploy_adara sms
+
+   20240213/V1.8.4
+
+Re-Build Latest ADARA/SMS on RHel9 nED-on-Wheels System
+- with EPICS7 and PCAS, Because It's Coooool... :-D
+
+# Verify SMSD Config-Now1 Git Status
+
+pushd ; git status
+
+git add deploy/adara_fix_ITEMS ; \
+	git commit -m "Add New Deployment Link for: deploy/adara_fix_ITEMS" \
+		deploy/adara_fix_ITEMS ; \
+	git push ; \
+	./confck ; git status
+
+# Start the PVSD Service on RHel9...! :-D
+
+sudo systemctl status pvsd
+
+sudo systemctl start pvsd
+
+sudo systemctl enable pvsd
+
+sudo systemctl status pvsd
+
+pvsdt
+
+# Start the DASMOND Service on RHel9...! :-D
+
+sudo systemctl status dasmond
+
+sudo systemctl start dasmond
+
+sudo systemctl enable dasmond
+
+sudo systemctl status dasmond
+
+dasmondt
+
+# Start the SMSD Service on RHel9...! :-D
+
+sudo systemctl status smsd
+
+sudo systemctl start smsd
+
+sudo systemctl enable smsd
+
+sudo systemctl status smsd
+
+liveconf run_status
+
+liveconf data_status
+
+liveconf live_status
+
+# DONE! :-D
+
