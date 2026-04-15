@@ -1,8 +1,14 @@
 
 EXTRA_PROGRAMS += common/test/parser-test
 
-COMMON_CPPFLAGS = -Icommon
+# Adding -fPIE Everywhere to Enable Building on Rhel9 & GCC 11.3.1
+# Which, Along with HDF5 and its Compilation Flag:
+#    -specs=/usr/lib/rpm/redhat/redhat-hardened-ld
+# Has Apparently Forced Us to Build Everything with PIE Format... ;-Q
+COMMON_CPPFLAGS = -fPIE -Icommon
+
 COMMON_PARSER = common/ADARAPackets.cc common/ADARAParser.cc
+
 POSIX_PARSER = common/POSIXParser.cc $(COMMON_PARSER)
 
 # The EPICS headers spew these warnings, but we'd like to keep the

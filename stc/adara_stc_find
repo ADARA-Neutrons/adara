@@ -11,19 +11,24 @@
 # Defaults:
 #
 
-STC1="stc1.ornl.gov"
-STC2="stc2.ornl.gov"
-STC3="stc3.ornl.gov"
+DEFAULT_STC_HOST_DOMAIN="ornl.gov"
 
-STC_NEW="${STC1} ${STC2} ${STC3}"
+# Old RHel7 STC VMs "stc[123]" Shut Down as of April 2024...
+#STC1="stc1.${DEFAULT_STC_HOST_DOMAIN}"
+#STC2="stc2.${DEFAULT_STC_HOST_DOMAIN}"
+#STC3="stc3.${DEFAULT_STC_HOST_DOMAIN}"
 
+STC4="stc4.${DEFAULT_STC_HOST_DOMAIN}"
+STC5="stc5.${DEFAULT_STC_HOST_DOMAIN}"
+STC6="stc6.${DEFAULT_STC_HOST_DOMAIN}"
+
+#STC_NEW="${STC1} ${STC2} ${STC3} ${STC4} ${STC5} ${STC6}"
+STC_NEW="${STC4} ${STC5} ${STC6}"
+
+# Removed ${STC_OLD}, They're Gone... 5/5/2022
 STC1_OLD="sns-stc1.sns.gov"
 STC2_OLD="sns-stc2.sns.gov"
-
 STC_OLD="${STC1_OLD} ${STC2_OLD}"
-
-STC_ALL="${STC_NEW}"
-# Removed ${STC_OLD}, They're Gone... 5/5/2022
 
 STCVIEW="/SNS/users/$USER/stuff/exec/stcview"
 
@@ -40,9 +45,8 @@ WC="/usr/bin/wc"
 USAGE()
 {
 	echo -e "\nusage: adara_stc_find <RunNumber> \\"
-	echo "    [--stc1|--stc2|--stc3|--stc] \\"
-	echo "    [--stc1-old|--stc2-old|--stc-old] \\"
-	echo "    [--stc-all (default)] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc<N>] \\"
+	echo "    [--stc (default)|--stc-old] \\"
 	echo "    [--all][--last (default)] \\"
 	echo "    [--start][--status (default)][--end][--any] \\"
 	echo "    [--terse] \\"
@@ -103,30 +107,17 @@ for arg in "$@" ; do
 	key=`echo "$arg" | ${AWK} -F = '{print $1}'`
 	value=`echo "$arg" | ${AWK} -F = '{print $2}'`
 
-	if [[ "#$key#" == '#--stc1#' ]]; then
-		STC_HOSTS="${STC_HOSTS} ${STC1}"
-		echo -e "\nAdding STC1 Host to Hosts List:\n\n[${STC_HOSTS} ]"
-	elif [[ "#$key#" == '#--stc2#' ]]; then
-		STC_HOSTS="${STC_HOSTS} ${STC2}"
-		echo -e "\nAdding STC2 Host to Hosts List:\n\n[${STC_HOSTS} ]"
-	elif [[ "#$key#" == '#--stc3#' ]]; then
-		STC_HOSTS="${STC_HOSTS} ${STC3}"
-		echo -e "\nAdding STC3 Host to Hosts List:\n\n[${STC_HOSTS} ]"
+	if [[ "$key" =~ ^--stc[1-9]+ ]]; then
+		name=`echo "${key}" | ${SED} 's/^--//'`
+		STC_HOSTS="${STC_HOSTS} ${name}.${DEFAULT_STC_HOST_DOMAIN}"
+		echo -e "\nAdding STC Host to Hosts List: ${name}"
+		echo -e "\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc#' ]]; then
 		STC_HOSTS="${STC_HOSTS} ${STC_NEW}"
 		echo -e "\nAdding STC VMs to Hosts List:\n\n[${STC_HOSTS} ]"
-	elif [[ "#$key#" == '#--stc1-old#' ]]; then
-		STC_HOSTS="${STC_HOSTS} ${STC1_OLD}"
-		echo -e "\nAdding Old STC1 Host to Hosts List:\n\n[${STC_HOSTS} ]"
-	elif [[ "#$key#" == '#--stc2-old#' ]]; then
-		STC_HOSTS="${STC_HOSTS} ${STC2_OLD}"
-		echo -e "\nAdding Old STC2 Host to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--stc-old#' ]]; then
 		STC_HOSTS="${STC_HOSTS} ${STC_OLD}"
 		echo -e "\nAdding All Old STCs to Hosts List:\n\n[${STC_HOSTS} ]"
-	elif [[ "#$key#" == '#--stc-all#' ]]; then
-		STC_HOSTS="${STC_HOSTS} ${STC_ALL}"
-		echo -e "\nAdding All STCs to Hosts List:\n\n[${STC_HOSTS} ]"
 	elif [[ "#$key#" == '#--all#' ]]; then
 		DO_ALL_LOGS=1
 		echo -e "\nCapturing All STC Instance Logs."
@@ -165,8 +156,8 @@ for arg in "$@" ; do
 done
 
 if [[ -z ${STC_HOSTS} ]]; then
-	STC_HOSTS="${STC_HOSTS} ${STC_ALL}"
-	echo -e "\nDefaulting to All STCs in Hosts List:\n\n[${STC_HOSTS} ]"
+	STC_HOSTS="${STC_HOSTS} ${STC_NEW}"
+	echo -e "\nDefaulting to New STCs in Hosts List:\n\n[${STC_HOSTS} ]"
 fi
 
 if [[ -z ${RUN_NUMBER} ]]; then
@@ -204,6 +195,8 @@ if [[ ${DO_END} == 1 ]]; then
 	fi
 	GREP_CMD="${GREP_CMD} -e \"Terminal\""
 fi
+
+echo "Grep Command = [${GREP_CMD}]"
 
 #
 # Capture STC Logs for Given Run Number on Selected STC Hosts
@@ -269,9 +262,16 @@ done
 #
 # Sort Logs in Time...
 #
+# First Column by Month "-k 1M"
+# Second Column by Numeric "-k 2n"
+#
+# Logs are of the form:
+#
+# Nov 16 12:34:56 . . .
+# Dec  2 11:22:33 . . .
+#
 
-SORT_LOGS=`echo -e "${LOGS}" | ${SORT}`
-
+SORT_LOGS=`echo -e "${LOGS}" | ${SORT} -k 1M -k 2n`
 #echo -e "\nSORT_LOGS=[${SORT_LOGS}]"
 
 #
@@ -315,7 +315,7 @@ echo -e "\n${FINAL_LOGS}"
 nout=`echo -e "${FINAL_LOGS}" | ${WC} | ${AWK} '{print $1}'`
 
 if [[ $nout -gt 20 ]]; then
-	echo -e "\n${FINAL_LOGS}" | ${Less} +/"Run: ${RUN_NUMBER}"
+	echo -e "\n${FINAL_LOGS}" | ${Less} +/"Run: ${RUN_NUMBER} "
 fi
 
 #
@@ -328,7 +328,7 @@ if [[ $DO_ALL_LOGS == 0 ]]; then
 
 	if [[ $? == 0 ]]; then
 		ssh -AY ${USER}@${HOST} ${STCVIEW} ${PID} \
-			| ${Less} +/"Run: ${RUN_NUMBER}"
+			| ${Less} +/"Run: ${RUN_NUMBER} "
 	fi
 
 fi

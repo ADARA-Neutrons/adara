@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.RunInfo"));
+LOGGER("SMS.RunInfo");
 
 #include <string>
 #include <sstream>
@@ -11,7 +11,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.RunInfo"));
 #include <gddApps.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
@@ -27,8 +27,8 @@ RateLimitedLogging::History RLLHistory_RunInfo;
 
 class RunInfoResetPV : public smsTriggerPV {
 public:
-	RunInfoResetPV(const std::string &prefix, RunInfo *master) :
-		smsTriggerPV(prefix + "Reset"), m_master(master),
+	RunInfoResetPV(const std::string &prefix, RunInfo *primary) :
+		smsTriggerPV(prefix + "Reset"), m_primary(primary),
 		m_unlocked(true) {}
 
 	void lock(void) { m_unlocked = false; }
@@ -36,10 +36,10 @@ public:
 
 	bool allowUpdate(const gdd &) { return m_unlocked; }
 
-	void triggered(struct timespec *ts) { m_master->reset(ts); }
+	void triggered(struct timespec *ts) { m_primary->reset(ts); }
 
 private:
-	RunInfo *m_master;
+	RunInfo *m_primary;
 	bool m_unlocked;
 };
 
@@ -407,6 +407,8 @@ RunInfo::RunInfo(const std::string &facility, const std::string &beamline,
 	m_runNumber(0), m_lastRunNumber(0),
 	m_packetValid(false), m_packet(NULL), m_packetSize(0)
 {
+	LOGGER_INIT();
+
 	std::string prefix(m_ctrl->getPVPrefix());
 	prefix += ":RunInfo:";
 

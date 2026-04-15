@@ -253,7 +253,8 @@ protected:
 
         for ( std::set<std::string>::iterator fact = m_facts.begin(); fact != m_facts.end(); ++fact )
         {
-            pt.push_back( std::make_pair( "", *fact ));
+            pt.push_back( std::make_pair( "",
+                boost::property_tree::ptree( *fact ) ) );
         }
 
         a_prop_tree.add_child( "facts", pt );

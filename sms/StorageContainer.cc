@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.StorageContainer"));
+LOGGER("SMS.StorageContainer");
 
 #include <string>
 #include <sstream>
@@ -1789,6 +1789,8 @@ StorageContainer::StorageContainer(
 	m_active(true), m_translated(false), m_manual(false),
 	m_requeueCount(0), m_saved_size(0)
 {
+	LOGGER_INIT();
+
 	m_maxTime.tv_sec = 0; // EPICS Time...!
 	m_maxTime.tv_nsec = 0;
 
@@ -2416,7 +2418,7 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 			purged += size;
 
 			fit = files.erase(fit);
-		} catch (fs::filesystem_error err) {
+		} catch (fs::filesystem_error &err) {
 			WARN("Error purging container: " << err.what());
 			++fit;
 			continue;
@@ -2454,7 +2456,7 @@ uint64_t StorageContainer::purge(const std::string &path, uint64_t goal,
 			if ( ctrl->verbose() > 2 ) {
 				DEBUG("Removed container " << base);
 			}
-		} catch(fs::filesystem_error err) {
+		} catch(fs::filesystem_error &err) {
 			WARN("Error removing container: " << err.what());
 			path_deleted = false;
 		}

@@ -53,7 +53,7 @@ HEADERS += \
     ../../../common/ADARAPackets.h \
     ../../../common/ADARAParser.h
 
-LIBS += -lboost_thread-mt -lboost_program_options -lxml2 -lactivemq-cpp -lboost_filesystem
+LIBS += -lboost_thread -lboost_program_options -lxml2 -lactivemq-cpp -lboost_filesystem
 
 !contains( DEFINES, NO_DB )
 {

@@ -1,0 +1,254 @@
+#
+# April 2024, DAQ RedHat9 Upgrade Recipe...! ;-D
+#
+# As collated from RedMine Ticket #3377:
+#    https://idac.ornl.gov/issues/3377
+#
+
+# Check for Required RHel9 RPM Packages:
+
+sudo yum install \
+	swig.x86_64 rpcgen.x86_64 libtirpc-devel.x86_64 \
+	readline-devel.x86_64 hdf5.x86_64 hdf5-devel.x86_64 \
+	boost.x86_64 boost-devel.x86_64 libuuid-devel.x86_64 \
+	log4cpp.x86_64 log4cpp-devel.x86_64 log4cpp-doc.x86_64 \
+	cppunit.x86_64 cppunit-devel.x86_64 apr-devel.x86_64 \
+	doxygen.x86_64 openldap-devel.x86_64
+
+# Check Permissions on RSyslog.Pipes:
+
+ls -l /etc/rsyslog.pipes /etc/rsyslog.pipes/criticalMessages
+
+sudo chmod g+w /etc/rsyslog.pipes/criticalMessages
+
+cp ~/gitsrc/ADARA/big_err_pipe.c /tmp
+
+cc -o /tmp/big_err_pipe /tmp/big_err_pipe.c
+
+/tmp/big_err_pipe
+
+	Opened System Pipe Max Size File:
+	/proc/sys/fs/pipe-max-size
+
+	Read System Pipe Max Size as 1048576 from:
+	/proc/sys/fs/pipe-max-size
+
+	Opened Named RSyslog Pipe:
+	/etc/rsyslog.pipes/criticalMessages
+
+	Got Pipe Buffer Size of 65536 for:
+	/etc/rsyslog.pipes/criticalMessages
+
+	Set Pipe Buffer Size to 1048576 for:
+	/etc/rsyslog.pipes/criticalMessages
+
+	Verified Pipe Buffer Size of 1048576 for:
+	/etc/rsyslog.pipes/criticalMessages
+
+# EPICS Controls Environment SystemD Service
+
+ls -l /etc/systemd/system/epics-controls-env.service /var/run/controls.env
+
+sudo cp /SNS/users/y8y/epics-controls-env.service /etc/systemd/system
+
+sudo systemctl start epics-controls-env
+
+sudo systemctl enable epics-controls-env
+
+sudo systemctl status epics-controls-env
+
+/bin/cat /var/run/controls.env
+
+	EDMLIB_SUFFIX=so
+	EPICS_EXTENSIONS=/home/controls/epics/extensions/master
+	EPICS_BASEV4=/home/controls/epics/basev4/master
+	BEAMLINE_GATEWAYS=10.111.204.130:5066 10.111.201.130:5066 128.219.164.170:5066 10.111.2.130:5066 10.111.3.130:5066 10.111.4.130:5066 10.111.6.130:5066 10.111.8.130:5066 10.111.9.130:5066 10.111.10.130:5066 10.111.12.130:5066 10.111.14.130:5066 10.111.18.130:5066 10.111.22.130:5066 10.111.23.130:5066 10.111.24.130:5066 10.111.26.130:5066 10.111.29.130:5066 10.111.30.130:5066 10.111.33.130:5066 10.111.34.130:5066 10.111.36.130:5066 10.111.103.130:5066 10.111.123.130:5066 10.111.124.130:5066
+	PWD=/
+	BL=BL1B
+	SYSTEMD_EXEC_PID=469281
+	EPICS_CA_ADDR_LIST=10.111.3.255 160.91.228.17
+	EDMPVOBJECTS=/home/controls/epics/extensions/master/pref/edm
+	EPICS_CAS_INTF_ADDR_LIST=10.111.3.150 10.111.3.150
+	EPICS_HOST_ARCH=linux-x86_64
+	LANG=en_US.UTF-8
+	EDMOBJECTS=/home/controls/epics/extensions/master/pref/edm
+	EDMHELPFILES=/home/controls/epics/extensions/master/src/edm/helpFiles
+	EPICS4_DIR=/home/controls/epics/basev4/master
+	INVOCATION_ID=e4a39f1532fc4b6781ec824bf33d221f
+	PYTHONPATH=/home/controls/python:/home/controls/share/master/scan:/home/controls/share/master/python:/home/controls/bl1b/python:/home/controls/css/PyScanClient/build/lib
+	EPICS_CA_MAX_ARRAY_BYTES=100000000
+	SHLVL=1
+	EDMFILES=/home/controls/epics/extensions/master/pref/edm
+	EDMLIBS=/home/controls/epics/extensions/master/lib/linux-x86_64
+	JOURNAL_STREAM=8:1164796
+	BEAMLINE=bl1b
+	EPICS_CA_AUTO_ADDR_LIST=NO
+	PATH=/home/controls/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin
+	EDMACTIONS=/home/controls/epics/extensions/master/pref/edm
+	EPICS_BASE=/home/controls/epics/base/master
+	_=/usr/bin/env
+
+# ActiveMQ-3.9.3 Install:
+
+ls -l /usr/local/src/activemq-cpp-library-3.9.3/ \
+	/usr/lib64/pkgconfig/activemq-cpp.pc
+
+/bin/cat /etc/ld.so.conf.d/activemq-cpp-library-3.9.3.conf
+	(/usr/local/lib/)
+
+# Else:
+
+cd /usr/local/src/ ; \
+	zcat /SNS/users/y8y/activemq-cpp-library-3.9.3-src.patched.tar.gz \
+	| sudo tar xvf -
+
+cd activemq-cpp-library-3.9.3/
+
+configure
+
+make
+
+sudo make install
+
+sudo /bin/cp -i \
+	/usr/local/src/activemq-cpp-library-3.9.3/activemq-cpp.pc \
+	/usr/lib64/pkgconfig/
+
+sudo vi /etc/ld.so.conf.d/activemq-cpp-library-3.9.3.conf
+	-> /usr/local/lib/
+
+sudo ldconfig
+
+# SMSD Config-Daq1 Update...
+
+cd /home/controls/config-daq1/ ; git pull ; git diff ; git status
+
+./confck
+
+./confck --update
+
+./confck
+
+rm stat_list ;  ~/mkstatlist.smsd ; \
+	git commit -m "Updated System Deployed File Stat List" stat_list ; \
+	git push ; \
+	./confck ; git status
+
+# (For SMSD-MON Systems (NOMAD, TOPAZ, VULCAN), Also Do:)
+
+crontab sms/y8y.crontab ; crontab sms/y8y.crontab
+
+# SMSD Log4Cpp Logging.conf
+
+diff /SNS/users/y8y/logging.conf sms/conf/logging.conf
+
+	-# SMS log4cxx properties
+	+# SMS log4cxx/log4cpp properties
+	+
+	+# Root appender (Required for log4cpp...!)
+	+#
+	+log4j.rootCategory=DEBUG, rootAppender
+	+log4j.appender.rootAppender=org.apache.log4j.ConsoleAppender
+	+log4j.appender.rootAppender.layout=org.apache.log4j.PatternLayout
+	+log4j.appender.rootAppender.layout.ConversionPattern=%d %p %c - %m%n
+
+cp /SNS/users/y8y/logging.conf sms/conf/logging.conf ; \
+	git commit -m "Update with Root Logger for Log4Cpp..." \
+		sms/conf/logging.conf ; \
+	git push ; \
+	./confck --update ; \
+	./confck ; git status
+
+# SMSD-MON Config-Daq1-Mon Setup (NOMAD, TOPAZ, VULCAN):
+
+pushd /home/controls/config-daq1-mon/ ; git pull ; git diff ; git status
+
+./confck
+
+./confck --update
+
+ll /usr/local/bin/smsd-mon
+
+./confck ; git status
+
+rm stat_list ;  ~/mkstatlist.smsd-mon ; \
+	git commit -m "Updated System Deployed File Stat List" stat_list ; \
+	git push ; \
+	./confck ; git status
+
+popd
+
+# Production ADARA EPICS Soft Links
+
+ls -l /home/controls/prod/ADARA/Epics* ; \
+	echo ; \
+	ls -ld /home/controls/prod/common/base/rel7.0.7_20230322 \
+		/home/controls/prod/common/pcas/rel4.13.3_20240201
+
+	lrwxrwxrwx 1 y8y slowcontrols_developers 49 Apr  5 13:19 /home/controls/prod/ADARA/EpicsBase7Link -> /home/controls/prod/common/base/rel7.0.7_20230322/
+	lrwxrwxrwx 1 y8y slowcontrols_developers 52 Apr  4 17:18 /home/controls/prod/ADARA/EpicsBaseLink -> /home/controls/prod/epics/base/rel3.14.12.6_20230825/
+	lrwxrwxrwx 1 y8y slowcontrols_developers 48 Apr  5 17:50 /home/controls/prod/ADARA/EpicsBaseV4Link -> /home/controls/prod/epics/basev4/rel4.6_20230825/
+	lrwxrwxrwx 1 y8y slowcontrols_developers 52 Apr  5 17:51 /home/controls/prod/ADARA/EpicsExtensionsLink -> /home/controls/prod/epics/extensions/rel1.4_20230825/
+	lrwxrwxrwx 1 y8y slowcontrols_developers 50 Apr  5 13:19 /home/controls/prod/ADARA/EpicsPcasLink -> /home/controls/prod/common/pcas/rel4.13.3_20240201/
+
+As needed, to remove old soft links:
+
+/bin/rm /home/controls/prod/ADARA/Epics*
+
+Then:
+
+ln -s /home/controls/prod/common/base/rel7.0.7_20230322 \
+	/home/controls/prod/ADARA/EpicsBase7Link
+
+ln -s /home/controls/prod/common/pcas/rel4.13.3_20240201 \
+	/home/controls/prod/ADARA/EpicsPcasLink
+
+ls -l /home/controls/prod/ADARA/Epics*
+
+# Deploy ADARA/SMS on RHel9
+
+echo ${REDHAT}
+
+source $HOME/.bashrc
+
+pushd ~/gitsrc/ADARA ; git pull ; git diff ; git status
+
+./deploy_adara sms
+
+   20240213/V1.8.4
+
+Re-Build Latest ADARA/SMS on HYSPEC RHel9 DAQ1
+- with EPICS7 and PCAS, to avoid conflicts with EPICS on DASSRV1... ;-b
+
+# Verify SMSD Config-Daq1 Git Status
+
+pushd ; git status
+
+git add deploy/adara_fix_ITEMS ; \
+	git commit -m "Add New Deployment Link for: deploy/adara_fix_ITEMS" \
+		deploy/adara_fix_ITEMS ; \
+	git push ; \
+	./confck ; git status
+
+# Start the SMSD Service on RHel9...! :-D
+
+sudo systemctl status smsd
+
+sudo systemctl start smsd
+
+sudo systemctl status smsd
+
+liveconf run_status
+
+# SMSD-MON Config-Daq1-Mon Setup (NOMAD, TOPAZ, VULCAN):
+
+sudo systemctl status smsd-mon
+
+sudo systemctl start smsd-mon
+
+sudo systemctl status smsd-mon
+
+liveconf --alt=-mon run_status
+
+# DONE! :-D
+

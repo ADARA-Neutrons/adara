@@ -38,7 +38,10 @@
 // 
 
 #include <iostream>
+
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/program_options.hpp>
+
 #include <syslog.h>
 #include <stdint.h>
 #include <signal.h>
@@ -57,7 +60,7 @@ using namespace PVS;
 
 using namespace std;
 
-#define PVSD_VERSION "1.7.8"
+#define PVSD_VERSION "1.7.10"
 
 bool g_active = true;
 bool g_child_signal = false;
@@ -72,7 +75,7 @@ signalHandlerExit( int UNUSED(a_signal) )
 }
 
 
-/// Handles child signal during daemonization
+/// Handles child signal during SysV daemonization
 void
 signalHandlerChild( int UNUSED(a_signal), siginfo_t *info,
         void *UNUSED(data) )
@@ -82,7 +85,7 @@ signalHandlerChild( int UNUSED(a_signal), siginfo_t *info,
 }
 
 
-/// Sends signal to parent process during daemonization
+/// Sends signal to parent process during SysV daemonization
 void
 signalParent( int ret_code )
 {
@@ -99,16 +102,16 @@ signalParent( int ret_code )
 }
 
 
-/// Function to daemonize the PVStreamer process
+/// Function to SysV daemonize the PVStreamer process
 void
-daemonize()
+daemonize_sysv()
 {
     pid_t pid = fork();
     if ( pid < 0 )
     {
         int e = errno;
         syslog( LOG_ERR, "PVSD ERROR: %s: Unable to fork: %s",
-            "daemonize()", strerror(e) );
+            "daemonize_sysv()", strerror(e) );
         exit(1);
     }
 
@@ -120,7 +123,7 @@ daemonize()
         exit( g_child_code );
     }
 
-    // We're the child process, become a daemon.
+    // We're the child process, become a SysV daemon.
     // Create a new session, then fork and have the parent exit,
     // ensuring we are not the leader of the session -- we don't
     // want a controlling terminal.
@@ -128,7 +131,7 @@ daemonize()
     {
         int e = errno;
         syslog( LOG_ERR, "PVSD ERROR: %s: Unable to setsid: %s",
-            "daemonize()", strerror(e) );
+            "daemonize_sysv()", strerror(e) );
         exit(1);
     }
 
@@ -137,7 +140,7 @@ daemonize()
     {
         int e = errno;
         syslog( LOG_ERR, "PVSD ERROR: %s: Second fork failed: %s",
-            "daemonize()", strerror(e) );
+            "daemonize_sysv()", strerror(e) );
         exit(1);
     }
     else if ( pid )
@@ -162,23 +165,38 @@ daemonize()
     // Reopen log
     openlog( "pvsd", 0, LOG_DAEMON );
     syslog( LOG_INFO,
-        "PVSD Daemon %s Starting. (ADARA Common %s, ComBus %s, Tag %s)",
-        PVSD_VERSION, ::ADARA::VERSION.c_str(),
-        ::ADARA::ComBus::VERSION.c_str(), ::ADARA::TAG_NAME.c_str() );
+        "PVSD SysV Daemonized %s Starting (%s %s, %s %s, %s %s)",
+        PVSD_VERSION,
+        "ADARA Common", ::ADARA::VERSION.c_str(),
+        "ComBus", ::ADARA::ComBus::VERSION.c_str(),
+        "Tag", ::ADARA::TAG_NAME.c_str() );
 
     // Chdir to "/"
     if ( chdir("/") < 0 )
     {
         int e = errno;
         syslog( LOG_ERR, "PVSD ERROR: %s: Chdir failed: %s",
-            "daemonize()", strerror(e) );
+            "daemonize_sysv()", strerror(e) );
         exit(1);
     }
 }
 
 
+/// Function to SystemD daemonize the PVStreamer process
+void
+daemonize_systemd()
+{
+    syslog( LOG_INFO,
+        "PVSD SystemD Daemonized %s Starting (%s %s, %s %s, %s %s)",
+        PVSD_VERSION,
+        "ADARA Common", ::ADARA::VERSION.c_str(),
+        "ComBus", ::ADARA::ComBus::VERSION.c_str(),
+        "Tag", ::ADARA::TAG_NAME.c_str() );
+}
+
+
 /**
- * @brief Entry point for PVStreamer deaomon
+ * @brief Entry point for PVStreamer Daemon
  * @param argc - CLI argument count
  * @param argv - CLI arguments
  * @return Always returns 0
@@ -238,7 +256,9 @@ int main(int argc, char *argv[])
     time_t          timeout;
     uint32_t        pid;
     bool            track_logged = false;
-    bool            daemon = false;
+    bool            daemon_sysv = false;
+    bool            daemon_systemd = false;
+
     ::ADARA::ComBus::Connection *combus = 0;
     PVS::ADARA::OutputAdapter *output = 0;
     PVS::EPICS::InputAdapter *input = 0;
@@ -262,7 +282,8 @@ int main(int argc, char *argv[])
             ("offset,o", po::value<uint32_t>( &offset )->default_value( 0 ), "set device ID offset")
             ("timeout,t", po::value<time_t>( &timeout )->default_value( 60 ), "set device Init timeout (seconds)")
             ("track_log", "track logged PVs only (default is all)")
-            ("daemon", "Run as background daemon")
+            ("daemon_sysv", "Run as background SysV Daemon")
+            ("daemon_systemd", "Run as background SystemD daemon")
             ;
 
     po::variables_map opt_map;
@@ -274,15 +295,19 @@ int main(int argc, char *argv[])
     if ( opt_map.count( "track_log" ) )
         track_logged = true;
 
-    if ( opt_map.count( "daemon" ) )
-        daemon = true;
+    if ( opt_map.count( "daemon_sysv" ) )
+        daemon_sysv = true;
 
-    if ( opt_map.count( "help" ) && !daemon )
+    if ( opt_map.count( "daemon_systemd" ) )
+        daemon_systemd = true;
+
+    if ( opt_map.count( "help" ) && !daemon_sysv && !daemon_systemd )
     {
         cout << options << endl;
         return 0;
     }
-    else if ( opt_map.count( "version" ) && !daemon )
+    else if ( opt_map.count( "version" )
+            && !daemon_sysv && !daemon_systemd )
     {
         cout << PVSD_VERSION
             << " (ADARA Common " << ::ADARA::VERSION
@@ -307,8 +332,25 @@ int main(int argc, char *argv[])
     }
 
     // Parent process will exit in this call
-    if ( daemon )
-        daemonize();
+    if ( daemon_sysv )
+        daemonize_sysv();
+
+    else if ( daemon_systemd )
+        daemonize_systemd();
+
+    else
+    {
+        syslog( LOG_ERR, "%s %s: %s", "PVSD ERROR:", "main()",
+            "Running PVSD Daemon in Foreground" );
+    }
+
+    // If we made it here as a daemon, signal parent that all is well
+    if ( daemon_sysv )
+        signalParent(0);
+
+    // Seems like a good idea to check the EPICS Environment... ;-D
+    syslog( LOG_INFO, "EPICS Environment Settings:" );
+    system("printenv | grep -i EPICS | /usr/bin/logger --tag \"pvsd:\"");
 
     try
     {
@@ -327,10 +369,6 @@ int main(int argc, char *argv[])
         // Create and attach EPICS input adapter
         input = new PVS::EPICS::InputAdapter( streamer, epics_cfg,
             track_logged, timeout );
-
-        // If we mad it here as a daemon, signal parent that all is well
-        if ( daemon )
-            signalParent(0);
 
         // The main thread acts as the ComBus health / status output loop
         uint32_t count = 0;
@@ -352,10 +390,13 @@ int main(int argc, char *argv[])
                 uint32_t inactiveDeviceCount;
                 uint32_t readyPVCount, totalPVCount;
 
+                std::string device_errs;
+
                 input->getDevicesStatus(
                     partialDeviceCount, hungDeviceCount,
                     inactiveDeviceCount,
-                    readyPVCount, totalPVCount );
+                    readyPVCount, totalPVCount,
+                    device_errs );
 
                 std::string logPrefix = "";
                 int logType = LOG_INFO;
@@ -387,6 +428,7 @@ int main(int argc, char *argv[])
                 ss << " Output Devices Defined, ";
                 ss << output->numPVs();
                 ss << " Output PVs Defined";
+                ss << " -" << device_errs;
 
                 syslog( logType, "%sPVSD %s %s %s - %s.",
                     logPrefix.c_str(), PVSD_VERSION,
@@ -415,8 +457,9 @@ int main(int argc, char *argv[])
         ret_code = 1;
     }
 
-    // If we failed due to an exception and we're a daemon, inform parent
-    if ( daemon && ret_code )
+    // If we failed due to an exception and we're a SysV daemon,
+    // inform parent
+    if ( daemon_sysv && ret_code )
         signalParent( ret_code );
 
     // Cleanup...

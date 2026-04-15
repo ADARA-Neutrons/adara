@@ -29,9 +29,17 @@ AC_ARG_ENABLE([adara_pvgen],
     AS_HELP_STRING([--disable-adara-pvgen], [Disable building adara-pvgen]))
 
 AS_IF([test "x$enable_sms" != "xno"], [
-	PKG_CHECK_EXISTS([liblog4cxx >= 0.10], [], [
-		enable_sms=no
-		AC_WARN(Disabling SMS due to missing dependencies)
+	PKG_CHECK_EXISTS([log4cpp >= 1.1], [
+			enable_log4cpp=yes
+			enable_liblog4cxx=no
+		], [
+		PKG_CHECK_EXISTS([liblog4cxx >= 0.10], [
+				enable_log4cpp=no
+				enable_liblog4cxx=yes
+			], [
+			enable_sms=no
+			AC_WARN(Disabling SMS due to missing Log4Cpp/Cxx dependencies)
+		])
 	])
 ])
 
@@ -56,19 +64,75 @@ AS_IF([test "x$enable_adara_gen" != "xno"], [epics_disabled=no])
 AS_IF([test "x$enable_adara_pvgen" != "xno"], [epics_disabled=no])
 
 tryepicsdir=""
+trypcasdir=""
+epicsversion=""
+
 AC_ARG_WITH(epics,
-       [  --with-epics=PATH Specify path to EPICS installation ],
+       [  --with-epics=PATH Specify path to EPICS 3 installation ],
        [
                 if test "x$withval" != "xno" ; then
+                        AC_MSG_NOTICE([Setting EPICS 3 Installation to:])
+                        AC_MSG_NOTICE([   $withval])
                         tryepicsdir=$withval
+                        # Use Same Channel Access Install for EPICS 3...
+                        trypcasdir=$withval
+                        epicsversion="3"
+                fi
+       ]
+)
+
+AC_ARG_WITH(epics7,
+       [  --with-epics7=PATH Specify path to EPICS 7 installation ],
+       [
+                if test "x$withval" != "xno" ; then
+                        if test "x$tryepicsdir" != "x" ; then
+                                AC_WARN([Overriding EPICS 3 Installation as Specified in:])
+                                AC_MSG_NOTICE([   $tryepicsdir])
+                                AC_MSG_NOTICE([Instead with EPICS 7 Installation in:])
+                                AC_MSG_NOTICE([   $withval])
+                        else
+                                AC_MSG_NOTICE([Setting EPICS 7 Installation to:])
+                                AC_MSG_NOTICE([   $withval])
+                        fi
+                        tryepicsdir=$withval
+                        epicsversion="7"
+                        # Clear Channel Access Install for EPICS 7...
+                        if test "x$trypcasdir" != "x" ; then
+                                AC_WARN([Clearing Previous Channel Access Installation Setting in:])
+                                AC_MSG_NOTICE([   $trypcasdir])
+                                AC_MSG_NOTICE([After Setting EPICS 7 Installation.])
+                                trypcasdir=""
+                        fi
+                fi
+       ]
+)
+
+AC_ARG_WITH(pcas,
+       [  --with-pcas=PATH Specify path to EPICS Channel Access installation ],
+       [
+                if test "x$withval" != "xno" ; then
+                        if test "x$trypcasdir" != "x" ; then
+                                AC_WARN([Overriding EPICS Channel Access Installation as Specified in:])
+                                AC_MSG_NOTICE([   $trypcasdir])
+                                AC_MSG_NOTICE([Instead with Specified Explicit Installation in:])
+                                AC_MSG_NOTICE([   $withval.])
+                        else
+                                AC_MSG_NOTICE([Setting EPICS Channel Access Installation to:])
+                                AC_MSG_NOTICE([   $withval])
+                        fi
+                        trypcasdir=$withval
                 fi
        ]
 )
 
 EPICS_URL="http://www.aps.anl.gov/epics/index.php"
 
+PCAS_URL="https://github.com/epics-modules/pcas"
+
 AS_IF([test "x$epics_disabled" = "xno"], [
+
 	dnl AC_LANG_PUSH(C++)
+
 	AC_CACHE_CHECK([for EPICS], ac_cv_epics_dir, [
 		saved_LIBS="$LIBS"
 		saved_LDFLAGS="$LDFLAGS"
@@ -76,9 +140,8 @@ AS_IF([test "x$epics_disabled" = "xno"], [
 		le_found=no
 		for ledir in $tryepicsdir "" $prefix /usr/local /opt/epics; do
 			LDFLAGS="$saved_LDFLAGS"
-			LIBS="-lcas -lca -lCom -lgdd $saved_LIBS"
-
-			if test ! -z "$ledir" -a ! -d "$ledir"; then
+			LIBS="-lca -lCom $saved_LIBS"
+			if test ! -z "$ledir" -a ! -d "$ledir" ; then
 				continue;
 			fi
 			if test ! -z "$ledir" ; then
@@ -88,16 +151,20 @@ AS_IF([test "x$epics_disabled" = "xno"], [
 					LDFLAGS="-L$ledir $LDFLAGS"
 				fi
 				if test -d "$ledir/include" ; then
-					CPPFLAGS="-I$ledir/include -I$ledir/include/os/Linux $CPPFLAGS"
+					if test -d "$ledir/include/compiler/gcc" ; then
+						CPPFLAGS="-I$ledir/include -I$ledir/include/os/Linux -I$ledir/include/compiler/gcc $CPPFLAGS"
+					else
+						CPPFLAGS="-I$ledir/include -I$ledir/include/os/Linux $CPPFLAGS"
+					fi
 				else
 					CPPFLAGS="-I$ledir $CPPFLAGS"
 				fi
 			fi
 			# Can I compile and link it?
-			AC_TRY_LINK([#include "casdef.h"],
-				[ pvAttachReturn *p = new pvAttachReturn(); ],
+			AC_TRY_LINK([#include "cadef.h"],
+				[ int status = ca_task_initialize(); status = ca_task_exit(); ],
 				[ libepics_linked=yes ], [ libepics_linked=no ])
-			if test $libepics_linked = yes; then
+			if test $libepics_linked = yes ; then
 				if test ! -z "$ledir" ; then
 					ac_cv_epics_dir=$ledir
 					saved_LDFLAGS="$saved_LDFLAGS -Wl,-rpath,$ledir/lib/linux-x86_64"
@@ -115,13 +182,11 @@ AS_IF([test "x$epics_disabled" = "xno"], [
 			epics_disabled=yes
 			AC_WARN([EPICS is required to build this configuration.
 	You can get it from $EPICS_URL
-	If it's already installed, specify its path using --with-epics=PATH])
+	If it is already installed, specify its path using --with-epics=PATH])
 		fi
 	])
 
-	dnl #' fix highlighting
-
-	if test "$ac_cv_epics_dir" != "(system)"; then
+	if test "$ac_cv_epics_dir" != "(system)" ; then
 		if test -d "$ac_cv_epics_dir/lib/linux-x86_64" ; then
 			EPICS_LDFLAGS="-L$ac_cv_epics_dir/lib/linux-x86_64"
 			le_libdir="$ac_cv_epics_dir/lib/linux-x86_64"
@@ -135,7 +200,82 @@ AS_IF([test "x$epics_disabled" = "xno"], [
 		else
 			EPICS_CPPFLAGS="-I$ac_cv_epics_dir"
 		fi
+		# Extract Compiler Class for compilerSpecific.h in EPICS 7... ;-b
+		# (If in doubt, just set EPICS_CMPLR_CLASS to "gcc", lol... ;-D)
+		if test $epicsversion = 7 ; then
+			# Yuk... ;-D
+			EPICS_CMPLR_CLASS=`make -C $ac_cv_epics_dir -n -p |& grep "^CMPLR_CLASS = " | head -1 | awk '{print $3}'`
+			if test "x$EPICS_CMPLR_CLASS" != "x" ; then
+				AC_MSG_NOTICE([Found EPICS 7 Compiler Class: $EPICS_CMPLR_CLASS])
+				EPICS_CPPFLAGS="-I$ac_cv_epics_dir/include/compiler/$EPICS_CMPLR_CLASS $EPICS_CPPFLAGS"
+			fi
+		fi
 	fi
+
+	AC_CACHE_CHECK([for PCAS], ac_cv_pcas_dir, [
+		saved_LIBS="$LIBS"
+		saved_LDFLAGS="$LDFLAGS"
+		saved_CPPFLAGS="$CPPFLAGS"
+		le_found=no
+		for ledir in $trypcasdir "" $prefix /usr/local /opt/pcas; do
+			CPPFLAGS="$EPICS_CPPFLAGS"
+			LDFLAGS="$saved_LDFLAGS $EPICS_LDFLAGS"
+			LIBS="-lcas -lgdd $saved_LIBS"
+
+			if test ! -z "$ledir" -a ! -d "$ledir" ; then
+				continue;
+			fi
+			if test ! -z "$ledir" ; then
+				if test -d "$ledir/lib/linux-x86_64" ; then
+					LDFLAGS="-L$ledir/lib/linux-x86_64 $LDFLAGS"
+				else
+					LDFLAGS="-L$ledir $LDFLAGS"
+				fi
+				if test -d "$ledir/include" ; then
+					CPPFLAGS="-I$ledir/include $CPPFLAGS"
+				else
+					CPPFLAGS="-I$ledir $CPPFLAGS"
+				fi
+			fi
+			# Can I compile and link it?
+			AC_TRY_LINK([#include "casdef.h"],
+				[ pvAttachReturn *p = new pvAttachReturn(); ],
+				[ libpcas_linked=yes ], [ libpcas_linked=no ])
+			if test $libpcas_linked = yes ; then
+				if test ! -z "$ledir" ; then
+					ac_cv_pcas_dir=$ledir
+					saved_LDFLAGS="$saved_LDFLAGS -Wl,-rpath,$ledir/lib/linux-x86_64"
+				else
+					ac_cv_pcas_dir="(system)"
+				fi
+				le_found=yes
+				break
+			fi
+		done
+		LIBS="$saved_LIBS"
+		LDFLAGS="$saved_LDFLAGS"
+		CPPFLAGS="$saved_CPPFLAGS"
+		if test $le_found = no ; then
+			epics_disabled=yes
+			AC_WARN([EPICS Channel Access is required to build this configuration.
+	You can get it from $PCAS_URL
+	If it is already installed, specify its path using --with-pcas=PATH])
+		fi
+	])
+
+	if test "$ac_cv_pcas_dir" != "(system)" ; then
+		if test -d "$ac_cv_pcas_dir/lib/linux-x86_64" ; then
+			EPICS_LDFLAGS="-L$ac_cv_pcas_dir/lib/linux-x86_64 $EPICS_LDFLAGS"
+		else
+			EPICS_LDFLAGS="-L$ac_cv_pcas_dir $EPICS_LDFLAGS"
+		fi
+		if test -d "$ac_cv_pcas_dir/include" ; then
+			EPICS_CPPFLAGS="-I$ac_cv_pcas_dir/include $EPICS_CPPFLAGS"
+		else
+			EPICS_CPPFLAGS="-I$ac_cv_pcas_dir $EPICS_CPPFLAGS"
+		fi
+	fi
+
 	dnl AC_LANG_POP(C++)
 ])
 
@@ -173,7 +313,14 @@ AS_IF([test "x$enable_stc" != "xno" -o "x$enable_dasmon_server" != "xno"], [
 ])
 
 AS_IF([test "x$enable_sms" != "xno"], [
-	PKG_CHECK_MODULES([liblog4cxx], [liblog4cxx >= 0.10])
+	AS_IF([test "x$enable_log4cpp" != "xno"], [
+		PKG_CHECK_MODULES([log4cpp], [log4cpp >= 1.1])
+		log4cpp_CFLAGS="$log4cpp_CFLAGS -DUSE_LOG4CPP_LOGGING"
+	])
+	AS_IF([test "x$enable_liblog4cxx" != "xno"], [
+		PKG_CHECK_MODULES([liblog4cxx], [liblog4cxx >= 0.10])
+		liblog4cxx_CFLAGS="$liblog4cxx_CFLAGS -DUSE_LOG4CXX_LOGGING"
+	])
 ])
 
 AM_CONDITIONAL([BUILD_SMS], [test "x$enable_sms" != "xno"])

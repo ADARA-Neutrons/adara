@@ -2,7 +2,15 @@
 #define __EVENT_FD_H
 
 #include <boost/function.hpp>
+
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#endif
 #include <fdManager.h>
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+#pragma GCC diagnostic pop
+#endif
+
 #include <stdint.h>
 
 #include "ReadyAdapter.h"

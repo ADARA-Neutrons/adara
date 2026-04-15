@@ -16,11 +16,34 @@
 #   - switch/create "deploy" soft link for the ADARA Daemon/Service Binary
 #   - (optionally restart the SMS Daemon Service...)
 #   - document the deployment using the "Config" Git repository
+#     (or in DAS 3.0 in the Beamline Inst "PVSD Config" Sub-Repo:
+#         /home/controls/inst/$BEAMLINE/pvsd/$BRANCH
+#     which when "Selected" is soft-linked into the Beamline Hostinfo Repo:
+#         /home/controls/common/hostinfo/$BEAMLINE/config/[smsd|pvsd]@
+#     As of Version 1.8.1, this deployment script handles this difference
+#     automagically. :-)
 #      -> determine which Beamline/STC Host we are on...
-#      -> clone a fresh copy of the Config Git repo (in /tmp)
-#      -> check out the correct Beamline/STC Branch
+#      -> clone a fresh copy of the Config Git repo (in /tmp) [DAS 2.*]
+#      -> check out the correct Beamline/STC Branch [DAS 2.*]
 #      -> update the "deployment.history.txt" file with a proper log
 #
+
+#
+# RedHat Deployment Notes - 4/5/2024
+#
+# We are transitioning all the DAQ1 Beamline Computers to RHel9 Now,
+# Building/Running with the Latest EPICS7 and PCAS Libraries,
+# but are leaving the DASSRV1 Systems on RHel7 for now,
+# so _Temporarily_ we will have *Both* EPICS3/RHel7 and EPICS7/RHel9
+# Coexisting on the Same /home/controls/ mounts for a while... ;-D
+#
+# Therefore, This Script Now Expects a ${REDHAT} Environment Variable:
+#
+#    - "RedHat7" or "RedHat9"
+#
+# When Set, This Will Skew the Selection of EPICS3 vs EPICS7/PCAS
+# for the build. ;-D
+# 
 
 #
 # What are we actually Deploying...? (Check Command Line Options... :-)
@@ -48,6 +71,16 @@ set -o pipefail
 
 # Initialize Log File...
 LOG=""
+
+# Set the Magic HOSTNAME Macro(s)...
+# - in a perfect world, they would just be "hostname -A" and "hostname",
+# as long as "hostname" produces a fully-qualified host name.
+# Either way, we should be good, as needed... ;-D
+
+HOSTNAME_A="hostname -A"
+#HOSTNAME_A="hostname"
+
+HOSTNAME="hostname"
 
 # Check Proceed Function
 CHECK_PROCEED()
@@ -156,15 +189,19 @@ echo -e "\nDeploying ADARA $PROG Target."
 # Install Defaults
 #
 
-DEPLOY_VERSION="1.7.1"
+DEPLOY_VERSION="1.8.3"
 
 TMP_DIR="/tmp"
 
 INSTALL_BASE="/home/controls"
 
-ADARA_ARCHIVE="$INSTALL_BASE/prod/ADARA"
+ADARA_ARCHIVE="${INSTALL_BASE}/prod/ADARA"
 
-EPICS_BASE="$ADARA_ARCHIVE/EpicsBaseLink"
+EPICS_BASE="${ADARA_ARCHIVE}/EpicsBaseLink"
+
+EPICS7_BASE="${ADARA_ARCHIVE}/EpicsBase7Link"
+
+EPICS_PCAS="${ADARA_ARCHIVE}/EpicsPcasLink"
 
 CONFIG_REPO="git+ssh://trac.sns.gov/var/repos/config"
 
@@ -172,6 +209,20 @@ CONFIG_LINE=\
 "------------------------------------------------------------------"
 
 WAIT="-w 9"
+
+#
+# DAS 3.0 Defaults
+#
+
+HOME_CONTROLS="/home/controls"
+
+HOSTINFO="${HOME_CONTROLS}/common/hostinfo"
+
+SMSD_CONFIG="${HOSTINFO}/${BEAMLINE}/config/smsd"
+
+PVSD_CONFIG="${HOSTINFO}/${BEAMLINE}/config/pvsd"
+
+# Awk and Log Stuff
 
 awkLineBreak=" \
 	{ \
@@ -202,20 +253,20 @@ echo -e "\nDeploying User: $gcos ($userid)." | tee -a $LOG
 # Determine if Installing on SNS or HFIR facility computer system...
 HOST_PREFIX=""
 
-hfir_hb_ck=`hostname -A | sed 's/ /\n/g' | grep '^hb' \
+hfir_hb_ck=`${HOSTNAME_A} | sed 's/ /\n/g' | grep '^hb' \
 	| wc | awk '{print $1}'`
 
-hfir_cg_ck=`hostname -A | sed 's/ /\n/g' | grep '^cg' \
+hfir_cg_ck=`${HOSTNAME_A} | sed 's/ /\n/g' | grep '^cg' \
 	| wc | awk '{print $1}'`
 
 # STC New VM Host Names: stc[123].ornl.gov
-stc_ck=`hostname -A | sed 's/ /\n/g' | grep -e '^stc' \
+stc_ck=`${HOSTNAME_A} | sed 's/ /\n/g' | grep -e '^stc' \
 	| wc | awk '{print $1}'`
 # STC Old Host Names: sns-stc[12].sns.gov [REMOVE ME LATER] 
-stc_old_ck=`hostname -A | sed 's/ /\n/g' | grep -e '^sns' \
+stc_old_ck=`${HOSTNAME_A} | sed 's/ /\n/g' | grep -e '^sns' \
 	| wc | awk '{print $1}'`
 
-now_ck=`hostname -A | sed 's/ /\n/g' | grep 'now[0-9]' \
+now_ck=`${HOSTNAME_A} | sed 's/ /\n/g' | grep 'now[0-9]' \
 	| wc | awk '{print $1}'`
 
 if [[ $hfir_hb_ck != 0 ]]; then
@@ -244,14 +295,21 @@ else
 	HOST_PREFIX="bl"
 fi
 
+if [[ -n "${REDHAT}" ]]; then
+	echo -e "\nDeploying on a ${REDHAT} System." | tee -a $LOG
+else
+	echo -e "\nNot Deploying on a RedHat System." | tee -a $LOG
+fi
+
 # Determine the Beamline/STC Branch associated with this computer system
 
+# Note: ${CONFIG} Branch is Unused in DAS 3.0
 CONFIG="config"
 
 PV_PREFIX=""
 
 if [ $IS_STC == 1 ]; then
-	install_host=`hostname`
+	install_host=`${HOSTNAME}`
 	install_branch=`echo "$install_host" \
 		| sed -e "s/${HOST_PREFIX}.*-//" -e 's/\..*//'`
 	# Old Physical STC Servers [REMOVE ME LATER]
@@ -269,14 +327,14 @@ if [ $IS_STC == 1 ]; then
 	fi
 	HOST_TYPE="STC"
 elif [ $IS_PVSD == 1 ]; then
-	install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
+	install_host=`${HOSTNAME_A} | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
 		| head -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
 	install_suffix=`echo "$install_host" | sed 's/\..*//' \
 		| sed "s/${HOST_PREFIX}.*-//"`
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
 	if [[ -z $install_host || -z $install_branch ]]; then
-		install_host=`hostname`
+		install_host=`${HOSTNAME}`
 		install_branch=`echo "$install_host" | sed 's/\..*//'`
 		install_suffix="dassrv1"
 	fi
@@ -288,7 +346,7 @@ elif [ $IS_PVSD == 1 ]; then
 	# Note: the $BEAMLINE and $BL environment variable are set in:
 	#    /home/controls/etc/profile.d/01_<beamline>.sh
 	# as sourced from:
-	#    /home/controls/share/master/scripts/managed/bash_profile.sh
+	#    /home/controls/share/scripts/managed/bash_profile.sh
 	# as sourced from:
 	#    /etc/profile.d/epics.sh
 	# :-D
@@ -323,20 +381,20 @@ elif [ $IS_PVSD == 1 ]; then
 elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
 	# Don't Munge nED-on-Wheels Install... ;-D
 	if [[ $now_ck != 0 ]]; then
-		install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
+		install_host=`${HOSTNAME_A} | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
 			| head -1`
 		install_branch=`echo "$install_host" | sed 's/-.*//'`
 		install_suffix=`echo "$install_host" | sed 's/\..*//' \
 			| sed "s/${HOST_PREFIX}.*-//"`
 	else
-		install_host=`hostname -A | sed 's/ /\n/g' | grep 'dasmon' | head -1`
+		install_host=`${HOSTNAME_A} | sed 's/ /\n/g' | grep 'dasmon' | head -1`
 		install_branch=`echo "$install_host" | sed 's/-.*//'`
 		install_suffix=`echo "$install_host" | sed 's/\..*//' \
 			| sed "s/${install_branch}-//"`
 	fi
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
 	if [[ -z $install_host || -z $install_branch ]]; then
-		install_host=`hostname`
+		install_host=`${HOSTNAME}`
 		install_branch=`echo "$install_host" | sed 's/\..*//'`
 		install_suffix="dasmon"
 	fi
@@ -346,14 +404,14 @@ elif [[ $IS_DASMON == 1 || $IS_DASMOND == 1 ]]; then
 	fi
 	HOST_TYPE="DASMON"
 else
-	install_host=`hostname -A | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
+	install_host=`${HOSTNAME_A} | sed 's/ /\n/g' | grep "^${HOST_PREFIX}" \
 		| head -1`
 	install_branch=`echo "$install_host" | sed 's/-.*//'`
 	install_suffix=`echo "$install_host" | sed 's/\..*//' \
 		| sed "s/${HOST_PREFIX}.*-//"`
 	# Fall Back for Non-Beamline Test/Development Hosts... (a la "jeeem" :)
 	if [[ -z $install_host || -z $install_branch ]]; then
-		install_host=`hostname`
+		install_host=`${HOSTNAME}`
 		install_branch=`echo "$install_host" | sed 's/\..*//'`
 	fi
 	if [[ "#$install_suffix#" != '##' \
@@ -364,12 +422,37 @@ else
 	HOST_TYPE="Beamline"
 fi
 
-echo -e -n "\nInstalling ADARA/$PROG " | tee -a $LOG
-echo "for $HOST_TYPE Host ($install_host)" | tee -a $LOG
-echo -e "in Config Repo Install Branch $install_branch." | tee -a $LOG
+#
+# Check for DAS 3.0 Deployment
+#
 
-echo -e "\nUsing Git Config Repository in: ${INSTALL_BASE}/${CONFIG}" \
-	| tee -a $LOG
+DAS="2"
+if [ $IS_PVSD == 1 ]; then
+	if [[ -L ${PVSD_CONFIG} ]]; then
+		echo -e "\nFound a DAS 3.0 PVSD Configuration Soft Link:\n"
+		/bin/ls -l "${PVSD_CONFIG}"
+		echo -e "\nProceeding with DAS 3.0 Deployment Handling."
+		ADARA_CONFIG=${PVSD_CONFIG}
+		DAS="3"
+	fi
+else
+	if [[ -L ${SMSD_CONFIG} ]]; then
+		echo -e "\nFound a DAS 3.0 SMSD Configuration Soft Link:\n"
+		/bin/ls -l "${SMSD_CONFIG}"
+		echo -e "\nProceeding with DAS 3.0 Deployment Handling."
+		ADARA_CONFIG=${SMSD_CONFIG}
+		DAS="3"
+	fi
+fi
+
+echo -e -n "\nInstalling ADARA/$PROG " | tee -a $LOG
+echo "for ${HOST_TYPE} Host ($install_host)" | tee -a $LOG
+
+if [[ ${DAS} == "2" ]]; then
+	echo -e "in Config Repo Install Branch $install_branch." | tee -a $LOG
+	echo -e "\nUsing Git Config Repository in: ${INSTALL_BASE}/${CONFIG}" \
+		| tee -a $LOG
+fi
 
 if [[ -n "$PV_PREFIX" ]]; then
 	echo -e "\nUsing Beamline EPICS PV Prefix = [${PV_PREFIX}]." \
@@ -491,15 +574,15 @@ echo -e "$log_desc" | tee -a $LOG
 
 # Make sure the parent ADARA Archive directory exists
 
-if [ ! -d "$ADARA_ARCHIVE" ]; then
+if [ ! -d "${ADARA_ARCHIVE}" ]; then
 
 	echo -e "\nADARA Archive Directory Not Found.\n" | tee -a $LOG
 
 	echo -e "Creating Parent ADARA Archive Directory:\n" \
 		| tee -a $LOG
-	echo -e "   $ADARA_ARCHIVE\n" | tee -a $LOG
+	echo -e "   ${ADARA_ARCHIVE}\n" | tee -a $LOG
 
-	mkdir -p "$ADARA_ARCHIVE" |& tee -a $LOG
+	mkdir -p "${ADARA_ARCHIVE}" |& tee -a $LOG
 
 	mkdir_ok=$?
 
@@ -510,60 +593,213 @@ if [ ! -d "$ADARA_ARCHIVE" ]; then
 		exit -5
 	fi
 
-	/bin/ls -ld "$ADARA_ARCHIVE" |& tee -a $LOG
+	/bin/ls -ld "${ADARA_ARCHIVE}" |& tee -a $LOG
 
-	# Now Display (Any) Production Deployed EPICS Builds
-	# and Prompt for One to Create the "EpicsBaseLink"...
+	# Are There Any EPICS3 Production Releases...?
 
-	prod_epics_base="$INSTALL_BASE/prod/epics/base"
+	prod_epics_base="${INSTALL_BASE}/prod/epics/base"
 
-	echo -e "\nNow You Must Choose a Production Deployed EPICS Build:\n" \
-		| tee -a $LOG
+	if [[ -d "${prod_epics_base}" ]]; then
 
-	/bin/ls -ld $prod_epics_base/* | sed s@$prod_epics_base/@@ \
-		|& tee -a $LOG
+		# Now Display (Any) Production Deployed EPICS3 Builds
+		# and Prompt for One to Create the "EpicsBaseLink"...
 
-	echo -e -n "\nPlease Enter the Desired " | tee -a $LOG
-	echo -e "Production EPICS Deployment Directory (or \"quit\"):\n" \
-		|& tee -a $LOG
+		echo -e "\nNow Choose a Production Deployed EPICS3 Build:\n" \
+			| tee -a $LOG
 
-	echo -n " > "
-	read epics_build
+		/bin/ls -ld ${prod_epics_base}/* | sed s@${prod_epics_base}/@@ \
+			|& tee -a $LOG
 
-	if [[ "#$epics_build#" == '##' || "#$epics_build#" == '#quit#' ]]; then
-		if [ "#$epics_build#" == '##' ]; then
-			echo -e "\nError: No EPICS Deployment Directory Specified.\n" \
-				| tee -a $LOG
+		echo -e -n "\nPlease Enter the Desired " | tee -a $LOG
+		echo -e "Production EPICS3 Deployment Directory (or \"quit\"):\n" \
+			| tee -a $LOG
+
+		echo -n " > "
+		read epics_build
+
+		if [[ "#${epics_build}#" == '##' \
+				|| "#${epics_build}#" == '#quit#' ]]; then
+			if [ "#${epics_build}#" == '##' ]; then
+				echo -e \
+				"\nError: No EPICS3 Deployment Directory Specified.\n" \
+					| tee -a $LOG
+			fi
+			echo -e \
+				"\nExiting Deploy Script at User's Request." | tee -a $LOG
+			exit 0
 		fi
-		echo -e "\nExiting Deploy Script at User's Request." | tee -a $LOG
-		exit 0
+
+		epics_path="${prod_epics_base}/${epics_build}"
+
+		if [ ! -d "${epics_path}" ]; then
+			echo -e \
+		"\nError: EPICS3 Production Deployment Directory Not Found!\n" \
+				| tee -a $LOG
+			echo -e "   ${epics_path}\n" | tee -a $LOG
+			/bin/ls -ld ${epics_path} |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -6
+		fi
+
+		echo -e \
+			"\nLinking Production EPICS3 Deployment Directory for ADARA:" \
+			| tee -a $LOG
+		echo -e "\n/bin/ln -s ${epics_path} ${EPICS_BASE}" | tee -a $LOG
+		/bin/ln -s "${epics_path}" "${EPICS_BASE}" |& tee -a $LOG
+
+		elink_ok=$?
+
+		if [ $elink_ok != 0 ]; then
+			echo -e \
+		"\nError Linking EPICS3 to Current Working Set! ($elink_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -7
+		fi
+
+		echo -e \
+		"\nSuccessfully Linked Production EPICS3 Deployment for ADARA:\n" \
+ 			| tee -a $LOG
+		/bin/ls -l "${EPICS_BASE}" |& tee -a $LOG
+
 	fi
 
-	epics_path="$prod_epics_base/$epics_build"
+	# Are There Any EPICS7 Production Releases...?
 
-	if [ ! -d "$epics_path" ]; then
-		echo -e \
-			"\nError: EPICS Production Deployment Directory Not Found!\n" \
+	prod_epics7_base="${INSTALL_BASE}/prod/common/base"
+
+	if [[ -d "${prod_epics7_base}" ]]; then
+
+		# Now Display (Any) Production Deployed EPICS7 Builds
+		# and Prompt for One to Create the "EpicsBase7Link"...
+
+		echo -e "\nNow Choose a Production Deployed EPICS7 Build:\n" \
 			| tee -a $LOG
-		echo -e "   $epics_path\n" | tee -a $LOG
-		/bin/ls -ld $epics_path | tee -a $LOG
-		echo -e "\nBailing Out..." | tee -a $LOG
-		exit -6
+
+		/bin/ls -ld ${prod_epics7_base}/* | sed s@${prod_epics7_base}/@@ \
+			|& tee -a $LOG
+
+		echo -e -n "\nPlease Enter the Desired " | tee -a $LOG
+		echo -e "Production EPICS7 Deployment Directory (or \"quit\"):\n" \
+			| tee -a $LOG
+
+		echo -n " > "
+		read epics7_build
+
+		if [[ "#${epics7_build}#" == '##' \
+				|| "#${epics7_build}#" == '#quit#' ]]; then
+			if [ "#${epics7_build}#" == '##' ]; then
+				echo -e \
+				"\nError: No EPICS7 Deployment Directory Specified.\n" \
+					| tee -a $LOG
+			fi
+			echo -e \
+				"\nExiting Deploy Script at User's Request." | tee -a $LOG
+			exit 0
+		fi
+
+		epics7_path="${prod_epics7_base}/${epics7_build}"
+
+		if [ ! -d "${epics7_path}" ]; then
+			echo -e \
+		"\nError: EPICS7 Production Deployment Directory Not Found!\n" \
+				| tee -a $LOG
+			echo -e "   ${epics7_path}\n" | tee -a $LOG
+			/bin/ls -ld ${epics7_path} |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -6
+		fi
+
+		echo -e \
+			"\nLinking Production EPICS7 Deployment Directory for ADARA:" \
+			| tee -a $LOG
+		echo -e "\n/bin/ln -s ${epics7_path} ${EPICS7_BASE}" | tee -a $LOG
+		/bin/ln -s "${epics7_path}" "${EPICS7_BASE}" |& tee -a $LOG
+
+		elink_ok=$?
+
+		if [ $elink_ok != 0 ]; then
+			echo -e \
+		"\nError Linking EPICS7 to Current Working Set! ($elink_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -7
+		fi
+
+		echo -e \
+		"\nSuccessfully Linked Production EPICS7 Deployment for ADARA:\n" \
+ 			| tee -a $LOG
+		/bin/ls -l "${EPICS7_BASE}" |& tee -a $LOG
+
 	fi
 
-	echo -e "\nLinking Production EPICS Deployment Directory for ADARA:" \
-		| tee -a $LOG
-	echo "/bin/ln -s $epics_path $EPICS_BASE" |& tee -a $LOG
-	/bin/ln -s "$epics_path" "$EPICS_BASE" |& tee -a $LOG
+	# Are There Any PCAS Production Releases...?
 
-	elink_ok=$?
+	prod_epics_pcas="${INSTALL_BASE}/prod/common/pcas"
 
-	if [ $elink_ok != 0 ]; then
-		echo -e \
-			"\nError Linking $exe to Current Working Set! ($elink_ok)\n" \
+	if [[ -d "${prod_epics_pcas}" ]]; then
+
+		# Now Display (Any) Production Deployed PCAS Builds
+		# and Prompt for One to Create the "EpicsPcasLink"...
+
+		echo -e "\nNow Choose a Production Deployed PCAS Build:\n" \
 			| tee -a $LOG
-		echo "Bailing Out..." | tee -a $LOG
-		exit -7
+
+		/bin/ls -ld ${prod_epics_pcas}/* | sed s@${prod_epics_pcas}/@@ \
+			|& tee -a $LOG
+
+		echo -e -n "\nPlease Enter the Desired " | tee -a $LOG
+		echo -e "Production PCAS Deployment Directory (or \"quit\"):\n" \
+			| tee -a $LOG
+
+		echo -n " > "
+		read pcas_build
+
+		if [[ "#${pcas_build}#" == '##' \
+				|| "#${pcas_build}#" == '#quit#' ]]; then
+			if [ "#${pcas_build}#" == '##' ]; then
+				echo -e \
+				"\nError: No PCAS Deployment Directory Specified.\n" \
+					| tee -a $LOG
+			fi
+			echo -e \
+				"\nExiting Deploy Script at User's Request." | tee -a $LOG
+			exit 0
+		fi
+
+		pcas_path="${prod_epics_pcas}/${pcas_build}"
+
+		if [ ! -d "${pcas_path}" ]; then
+			echo -e \
+		"\nError: PCAS Production Deployment Directory Not Found!\n" \
+				| tee -a $LOG
+			echo -e "   ${pcas_path}\n" | tee -a $LOG
+			/bin/ls -ld ${pcas_path} |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -6
+		fi
+
+		echo -e \
+			"\nLinking Production PCAS Deployment Directory for ADARA:" \
+			| tee -a $LOG
+		echo -e "\n/bin/ln -s ${pcas_path} ${EPICS_PCAS}" | tee -a $LOG
+		/bin/ln -s "${pcas_path}" "${EPICS_PCAS}" |& tee -a $LOG
+
+		elink_ok=$?
+
+		if [ $elink_ok != 0 ]; then
+			echo -e \
+			"\nError Linking PCAS to Current Working Set! ($elink_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -7
+		fi
+
+		echo -e \
+		"\nSuccessfully Linked Production PCAS Deployment for ADARA:\n" \
+ 			| tee -a $LOG
+		/bin/ls -l "${EPICS_PCAS}" |& tee -a $LOG
+
 	fi
 
 fi
@@ -675,9 +911,9 @@ if [ $need_build == 1 ]; then
 
 	cd "$TMP_DIR/ADARA"
 
-	pwd | tee -a $LOG
+	pwd |& tee -a $LOG
 
-	/bin/ls -l | tee -a $LOG
+	/bin/ls -l |& tee -a $LOG
 
 	# Check out the desired Release Tag
 
@@ -718,14 +954,20 @@ if [ $need_build == 1 ]; then
 	if [ $tagsubst_ok != 0 ]; then
 		echo -e "\nError Substituting Release Tag! ($tagsubst_ok)\n" \
 			| tee -a $LOG
-		/bin/ls "$TMP_DIR/ADARA/common/ADARA.h*" | tee -a $LOG
+		/bin/ls "$TMP_DIR/ADARA/common/ADARA.h*" |& tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -12
 	fi
 
-	# Build the ADARA software suite, using EPICS linked to in:
+	# Build the ADARA software suite, using EPICS3 linked to in:
 	#   EPICS_BASE="/home/controls/prod/ADARA/EpicsBaseLink"...
 	# -> e.g. "/home/controls/prod/epics/base/rel3.14.12.4_20140619"
+	# or:
+	#   EPICS7_BASE="/home/controls/prod/ADARA/EpicsBase7Link"...
+	# -> e.g. "/home/controls/prod/epics/base/rel7.0.7_20230322"
+	# and:
+	#   EPICS_PCAS="/home/controls/prod/ADARA/EpicsPcasLink"...
+	# -> e.g. "/home/controls/prod/common/pcas/rel4.13.3_20240201"
 
 	echo -e "\nBuilding the ADARA software suite." | tee -a $LOG
 
@@ -741,36 +983,146 @@ if [ $need_build == 1 ]; then
 		exit -13
 	fi
 
-	# Resolve Production EPICS Deployment Link... (Use Direct Path)
-	epics_base=`/usr/bin/readlink -f $EPICS_BASE`
-	readlink_ok=$?
-	if [ $readlink_ok != 0 ]; then
-		echo -e -n "\nError Resolving Production EPICS Deployment Link!" \
+	# Initialize WITH_EPICS command line configure options...
+	WITH_EPICS=""
+
+	# Is there an EPICS3 Deployment Link...?
+	if [[ -L "${EPICS_BASE}" && "${REDHAT}" != "RedHat9" ]]; then
+
+		# Resolve Production EPICS3 Deployment Link... (Use Direct Path)
+		epics_base=`/usr/bin/readlink -f ${EPICS_BASE}`
+		readlink_ok=$?
+		if [ $readlink_ok != 0 ]; then
+			echo -e -n \
+				"\nError Resolving Production EPICS3 Deployment Link!" \
+				| tee -a $LOG
+			echo -e " ($readlink_ok)\n" | tee -a $LOG
+			echo -e "   EPICS_BASE=[$EPICS_BASE]\n" | tee -a $LOG
+			echo -e "   -> [$epics_base]\n" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -133
+		fi
+
+		# Make Sure Production EPICS3 Deployment Directory Exists...
+		if [ ! -d "$epics_base" ]; then
+			echo -e \
+			"\nError: Invalid or Missing Production EPICS3 Deployment!\n" \
+				| tee -a $LOG
+			echo -e "   [$epics_base]\n" | tee -a $LOG
+			/bin/ls -ld "$epics_base" |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -136
+		fi
+	
+		# Add Any EPICS3 Base Path to WITH_EPICS configure options...
+		if [[ -n "${epics_base}" ]]; then
+			echo -e "\nFound EPICS3 Base Path, Add to Configure:\n" \
+				| tee -a $LOG
+			echo -e "   --with-epics=[${epics_base}]" \
+				| tee -a $LOG
+			WITH_EPICS="${WITH_EPICS} --with-epics=${epics_base}"
+		fi
+	else
+		echo -e "\nWarning: No Valid EPICS3 Deployment Link Found in:\n" \
 			| tee -a $LOG
-		echo -e " ($readlink_ok)\n" | tee -a $LOG
-		echo -e "   EPICS_BASE=[$EPICS_BASE]\n" | tee -a $LOG
-		echo -e "   -> [$epics_base]\n" | tee -a $LOG
-		echo "Bailing Out..." | tee -a $LOG
-		exit -133
+		echo -e "   [${EPICS_BASE}]\n" | tee -a $LOG
+		/bin/ls -l "${EPICS_BASE}" |& tee -a $LOG
 	fi
 
-	# Make Sure Production EPICS Deployment Directory Exists...
-	if [ ! -d "$epics_base" ]; then
-		echo -e \
-			"\nError: Invalid or Missing Production EPICS Deployment!\n" \
+	# Is there an EPICS7 Deployment Link...?
+	if [[ -L "${EPICS7_BASE}" && "${REDHAT}" != "RedHat7" ]]; then
+
+		# Resolve Production EPICS7 Deployment Link... (Use Direct Path)
+		epics7_base=`/usr/bin/readlink -f ${EPICS7_BASE}`
+		readlink_ok=$?
+		if [ $readlink_ok != 0 ]; then
+			echo -e -n \
+				"\nError Resolving Production EPICS7 Deployment Link!" \
+				| tee -a $LOG
+			echo -e " ($readlink_ok)\n" | tee -a $LOG
+			echo -e "   EPICS7_BASE=[$EPICS7_BASE]\n" | tee -a $LOG
+			echo -e "   -> [$epics7_base]\n" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -133
+		fi
+
+		# Make Sure Production EPICS7 Deployment Directory Exists...
+		if [ ! -d "$epics7_base" ]; then
+			echo -e \
+			"\nError: Invalid or Missing Production EPICS7 Deployment!\n" \
+				| tee -a $LOG
+			echo -e "   [$epics7_base]\n" | tee -a $LOG
+			/bin/ls -ld "$epics7_base" |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -136
+		fi
+	
+		# Add Any EPICS7 Base Path to WITH_EPICS configure options...
+		if [[ -n "${epics7_base}" ]]; then
+			echo -e "\nFound EPICS7 Base Path, Add to Configure:\n" \
+				| tee -a $LOG
+			echo -e "   --with-epics7=[${epics7_base}]" \
+				| tee -a $LOG
+			WITH_EPICS="${WITH_EPICS} --with-epics7=${epics7_base}"
+		fi
+	else
+		echo -e "\nWarning: No Valid EPICS7 Deployment Link Found in:\n" \
 			| tee -a $LOG
-		echo -e "   [$epics_base]\n" | tee -a $LOG
-		/bin/ls -ld "$epics_base" | tee -a $LOG
-		echo -e "\nBailing Out..." | tee -a $LOG
-		exit -136
+		echo -e "   [${EPICS7_BASE}]\n" | tee -a $LOG
+		/bin/ls -l "${EPICS7_BASE}" |& tee -a $LOG
 	fi
 
-	echo "./configure --with-epics=$epics_base" | tee -a $LOG
-	./configure --with-epics="$epics_base" |& tee -a $LOG
+	# Is there a PCAS Deployment Link...?
+	if [[ -L "${EPICS_PCAS}" && "${REDHAT}" != "RedHat7" ]]; then
+
+		# Resolve Production PCAS Deployment Link... (Use Direct Path)
+		epics_pcas=`/usr/bin/readlink -f ${EPICS_PCAS}`
+		readlink_ok=$?
+		if [ $readlink_ok != 0 ]; then
+			echo -e -n \
+				"\nError Resolving Production PCAS Deployment Link!" \
+				| tee -a $LOG
+			echo -e " ($readlink_ok)\n" | tee -a $LOG
+			echo -e "   EPICS_PCAS=[$EPICS_PCAS]\n" | tee -a $LOG
+			echo -e "   -> [$epicspcas]\n" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -133
+		fi
+
+		# Make Sure Production PCAS Deployment Directory Exists...
+		if [ ! -d "$epics_pcas" ]; then
+			echo -e \
+			"\nError: Invalid or Missing Production PCAS Deployment!\n" \
+				| tee -a $LOG
+			echo -e "   [$epics_pcas]\n" | tee -a $LOG
+			/bin/ls -ld "$epics_pcas" |& tee -a $LOG
+			echo -e "\nBailing Out..." | tee -a $LOG
+			exit -136
+		fi
+	
+		# Add Any PCAS Base Path to WITH_EPICS configure options...
+		if [[ -n "${epics_pcas}" ]]; then
+			echo -e "\nFound PCAS Base Path, Add to Configure:\n" \
+				| tee -a $LOG
+			echo -e "   --with-pcas=[${epics_pcas}]" \
+				| tee -a $LOG
+			WITH_EPICS="${WITH_EPICS} --with-pcas=${epics_pcas}"
+		fi
+	else
+		echo -e "\nWarning: No Valid PCAS Deployment Link Found in:\n" \
+			| tee -a $LOG
+		echo -e "   [${EPICS_PCAS}]\n" | tee -a $LOG
+		/bin/ls -l "${EPICS_PCAS}" |& tee -a $LOG
+	fi
+
+	# Configure ADARA Build...
+
+	echo -e "\n./configure ${WITH_EPICS}\n" | tee -a $LOG
+	./configure ${WITH_EPICS} |& tee -a $LOG
 
 	configure_ok=$?
 
-	if [ $configure_ok != 0 ]; then
+	if [[ $configure_ok != 0 ]]; then
 		echo -e "\nError Configuring ADARA Software! ($configure_ok)\n" \
 			| tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
@@ -782,7 +1134,7 @@ if [ $need_build == 1 ]; then
 
 	build_ok=$?
 
-	if [ $build_ok != 0 ]; then
+	if [[ $build_ok != 0 ]]; then
 		echo -e "\nError Building Release Tag! ($build_ok)\n" | tee -a $LOG
 		echo "Bailing Out..." | tee -a $LOG
 		exit -15
@@ -951,6 +1303,30 @@ if [ $need_build == 1 ]; then
 		fi
 
 		/bin/ls -l "$tag_archive/adara_fix_ipts" |& tee -a $LOG
+
+	fi
+
+	# SMS ADARA Fix ITEMS Script (if present, added in v1.8.3...)
+
+	if [[ -e sms/adara_fix_ITEMS && -x sms/adara_fix_ITEMS ]]; then
+
+		echo -e -n "\nCopying SMS ADARA Fix ITEMS Script " | tee -a $LOG
+		echo -e "into Archive Release Tag:\n" | tee -a $LOG
+
+		cp -i -p sms/adara_fix_ITEMS "$tag_archive" |& tee -a $LOG
+
+		copy_ok=$?
+
+		if [ $copy_ok != 0 ]; then
+			echo -e -n "\nError Copying ADARA Fix ITEMS Script " \
+				| tee -a $LOG
+			echo -e "into Release Tag Directory! ($copy_ok)\n" \
+				| tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -21
+		fi
+
+		/bin/ls -l "$tag_archive/adara_fix_ITEMS" |& tee -a $LOG
 
 	fi
 
@@ -1162,148 +1538,195 @@ fi
 # Link New Archive Release Tag into Current Working Set for Beamline/STC
 #
 
-# Make sure the Git Config repository has been cloned for deployment
+#
+# DAS 2.*
+#
 
-adara_config="$INSTALL_BASE/$CONFIG"
+if [[ ${DAS} == "2" ]]; then
 
-if [ ! -d "$adara_config" ]; then
+	# Make sure the Git Config repository has been cloned for deployment
 
-	# Clone a fresh copy of the Git Config repository (in /home/controls)
+	adara_config="${INSTALL_BASE}/${CONFIG}"
 
-	echo -e "\nCloning Git Config repository (in $INSTALL_BASE):" \
-		| tee -a $LOG
+	if [ ! -d "${adara_config}" ]; then
 
-	echo "git clone $CONFIG_REPO $adara_config" | tee -a $LOG
-	git clone "$CONFIG_REPO" "$adara_config" |& tee -a $LOG
+		# Clone a fresh copy of the Git Config repository
+		# (in /home/controls)
 
-	clone_ok=$?
-
-	if [ $clone_ok != 0 ]; then
-		echo -e "\nError Cloning Git Config repository! ($clone_ok)\n" \
+		echo -e "\nCloning Git Config repository (in ${INSTALL_BASE}):" \
 			| tee -a $LOG
-		echo "Bailing Out..." | tee -a $LOG
-		exit -27
+
+		echo "git clone ${CONFIG_REPO} ${adara_config}" | tee -a $LOG
+		git clone "${CONFIG_REPO}" "${adara_config}" |& tee -a $LOG
+
+		clone_ok=$?
+
+		if [ $clone_ok != 0 ]; then
+			echo -e -n "\nError Cloning Git Config repository!" \
+				| tee -a $LOG
+			echo -e " ($clone_ok)\n" | tee -a $LOG
+			echo "Bailing Out..." | tee -a $LOG
+			exit -27
+		fi
+
 	fi
 
-fi
+	# Make sure the Proper Beamline/STC Branch is checked out in Config
 
-# Make sure the Proper Beamline/STC Branch is checked out in Config
+	echo -e "\nConfig ${HOST_TYPE} Repository:\n" | tee -a $LOG
 
-echo -e "\nConfig $HOST_TYPE Repository:\n" | tee -a $LOG
+	cd "${adara_config}/"
 
-cd "$adara_config"
+	pwd | tee -a $LOG
 
-pwd | tee -a $LOG
+	/bin/ls -l | tee -a $LOG
 
-/bin/ls -l | tee -a $LOG
+	# Check out the desired Beamline/STC Branch
 
-# Check out the desired Beamline/STC Branch
+	echo -e -n "\nChecking out the Config ${HOST_TYPE} Branch:" \
+		| tee -a $LOG
+	echo -e " $install_branch\n" | tee -a $LOG
 
-echo -e "\nChecking out the Config $HOST_TYPE Branch: $install_branch\n" \
-	| tee -a $LOG
+	echo "git checkout $install_branch" | tee -a $LOG
+	git checkout "$install_branch" |& tee -a $LOG
 
-echo "git checkout $install_branch" | tee -a $LOG
-git checkout "$install_branch" |& tee -a $LOG
+	tag_ok=$?
 
-tag_ok=$?
+	if [ $tag_ok != 0 ]; then
 
-if [ $tag_ok != 0 ]; then
-
-	echo -e \
-		"\nError Checking Out $HOST_TYPE Branch! ($tag_ok)\n" | tee -a $LOG
-
-	echo "Current Local and Remote Branches:" | tee -a $LOG
-	git branch -a |& tee -a $LOG
-
-	echo -e "\nWould you like to Create the Git $HOST_TYPE Install Branch:"
-	echo
-	echo "   $install_branch"
-	echo
-	echo -n "(yes/No/quit)? "
-
-	read mkbranch_ck
-	mkbranch_ck=`echo "$mkbranch_ck" | tr '[:upper:]' '[:lower:]'`
-
-	if [[ "#$mkbranch_ck#" == '#y#' || "#$mkbranch_ck#" == '#yes#' ]]; then
-
-		echo -e "\nCreating New Git $HOST_TYPE Install Branch:" \
+		echo -e -n "\nError Checking Out ${HOST_TYPE} Branch!" \
 			| tee -a $LOG
-		echo | tee -a $LOG
-		echo "   $install_branch" | tee -a $LOG
-		echo | tee -a $LOG
+		echo -e " ($tag_ok)\n" | tee -a $LOG
 
-		echo "git branch $install_branch" | tee -a $LOG
-		git branch "$install_branch" |& tee -a $LOG
-
-		mkbranch_ok=$?
-
-		if [ $mkbranch_ok != 0 ]; then
-			echo -e "\nError Creating $HOST_TYPE Install Branch!" \
-				| tee -a $LOG
-			echo -e " ($mkbranch_ok)\n" | tee -a $LOG
-			echo "   $install_branch" | tee -a $LOG
-			echo "Bailing Out..." | tee -a $LOG
-			exit -28
-		fi
-
-		echo -e -n "\nChecking out New Config $HOST_TYPE Branch: " \
-			| tee -a $LOG
-		echo -e "$install_branch\n" | tee -a $LOG
-
-		echo "git checkout $install_branch" | tee -a $LOG
-		git checkout "$install_branch" |& tee -a $LOG
-
-		newtag_ok=$?
-
-		if [ $newtag_ok != 0 ]; then
-			echo -e "\nError Checking Out New $HOST_TYPE Install Branch!" \
-				| tee -a $LOG
-			echo -e " ($newtag_ok)\n" | tee -a $LOG
-			echo "   $install_branch" | tee -a $LOG
-			echo "Bailing Out..." | tee -a $LOG
-			exit -29
-		fi
-
-		echo -e "\nPushing New Config $HOST_TYPE Branch to Origin:" \
-			| tee -a $LOG
-
-		echo
-		echo "git push origin $install_branch"
-		git push --set-upstream origin "$install_branch"
-
-		pushbranch_ok=$?
-
-		if [ $pushbranch_ok != 0 ]; then
-			echo -e \
-				"\nError Pushing $HOST_TYPE Install Branch to Origin!" \
-				| tee -a $LOG
-			echo -e " ($pushbranch_ok)\n" | tee -a $LOG
-			echo "   $install_branch"
-			echo "Bailing Out..." | tee -a $LOG
-			exit -30
-		fi
-
-		echo -e "\nNew Current Local and Remote Branches:" | tee -a $LOG
+		echo "Current Local and Remote Branches:" | tee -a $LOG
 		git branch -a |& tee -a $LOG
 
-		CHECK_PROCEED
+		echo -e -n "\nWould you like to Create the Git ${HOST_TYPE}"
+		echo -e " Install Branch:"
+		echo
+		echo "   $install_branch"
+		echo
+		echo -n "(yes/No/quit)? "
 
-	elif [[ "#$mkbranch_ck#" == '#n#' || "#$mkbranch_ck#" == '#no#' \
-		|| "#$mkbranch_ck#" == '#q#' || "#$mkbranch_ck#" == '#quit#' ]]; \
-	then
-		echo -e "\nExiting Deploy Script at User's Request." | tee -a $LOG
-		exit 0
+		read mkbranch_ck
+		mkbranch_ck=`echo "$mkbranch_ck" | tr '[:upper:]' '[:lower:]'`
 
-	else
-		echo "Bailing Out..." | tee -a $LOG
-		exit -31
+		if [[ "#$mkbranch_ck#" == '#y#' \
+				|| "#$mkbranch_ck#" == '#yes#' ]]; then
+
+			echo -e "\nCreating New Git ${HOST_TYPE} Install Branch:" \
+				| tee -a $LOG
+			echo | tee -a $LOG
+			echo "   $install_branch" | tee -a $LOG
+			echo | tee -a $LOG
+
+			echo "git branch $install_branch" | tee -a $LOG
+			git branch "$install_branch" |& tee -a $LOG
+
+			mkbranch_ok=$?
+
+			if [ $mkbranch_ok != 0 ]; then
+				echo -e "\nError Creating ${HOST_TYPE} Install Branch!" \
+					| tee -a $LOG
+				echo -e " ($mkbranch_ok)\n" | tee -a $LOG
+				echo "   $install_branch" | tee -a $LOG
+				echo "Bailing Out..." | tee -a $LOG
+				exit -28
+			fi
+
+			echo -e -n "\nChecking out New Config ${HOST_TYPE} Branch: " \
+				| tee -a $LOG
+			echo -e "$install_branch\n" | tee -a $LOG
+
+			echo "git checkout $install_branch" | tee -a $LOG
+			git checkout "$install_branch" |& tee -a $LOG
+
+			newtag_ok=$?
+
+			if [ $newtag_ok != 0 ]; then
+				echo -e -n "\nError Checking Out New ${HOST_TYPE}" \
+					| tee -a $LOG
+				echo -e " Install Branch!" | tee -a $LOG
+				echo -e " ($newtag_ok)\n" | tee -a $LOG
+				echo "   $install_branch" | tee -a $LOG
+				echo "Bailing Out..." | tee -a $LOG
+				exit -29
+			fi
+
+			echo -e "\nPushing New Config ${HOST_TYPE} Branch to Origin:" \
+				| tee -a $LOG
+
+			echo
+			echo "git push origin $install_branch"
+			git push --set-upstream origin "$install_branch"
+
+			pushbranch_ok=$?
+
+			if [ $pushbranch_ok != 0 ]; then
+				echo -e -n "\nError Pushing ${HOST_TYPE} Install Branch" \
+					| tee -a $LOG
+				echo -e " to Origin!" | tee -a $LOG
+				echo -e " ($pushbranch_ok)\n" | tee -a $LOG
+				echo "   $install_branch"
+				echo "Bailing Out..." | tee -a $LOG
+				exit -30
+			fi
+
+			echo -e "\nNew Current Local and Remote Branches:" \
+				| tee -a $LOG
+			git branch -a |& tee -a $LOG
+
+			CHECK_PROCEED
+
+		elif [[ "#$mkbranch_ck#" == '#n#' \
+				|| "#$mkbranch_ck#" == '#no#' \
+				|| "#$mkbranch_ck#" == '#q#' \
+				|| "#$mkbranch_ck#" == '#quit#' ]]; \
+		then
+			echo -e "\nExiting Deploy Script at User's Request." \
+				| tee -a $LOG
+			exit 0
+
+		else
+			echo "Bailing Out..." | tee -a $LOG
+			exit -31
+		fi
+
 	fi
+
+	# Set ADARA current working directory
+	adara_current="${INSTALL_BASE}/${CONFIG}/deploy"
+
+elif [[ ${DAS} == "3" ]]; then
+
+	# Set ADARA Config repository path
+	adara_config="${ADARA_CONFIG}"
+
+	# Set ADARA current working directory
+	adara_current="${ADARA_CONFIG}/deploy"
+
+	# Make sure the Proper Beamline/STC Repository is checked out
+
+	echo -e "\nConfig ${HOST_TYPE} Repository:\n" | tee -a $LOG
+
+	cd "${adara_config}/"
+
+	pwd | tee -a $LOG
+
+	/bin/ls -l | tee -a $LOG
+
+else
+
+	echo -e "\nError: Unknown DAS Installation Layout Type:\n" \
+		| tee -a $LOG
+	echo -e "   DAS Version = [${DAS}]\n" | tee -a $LOG
+	echo "Bailing Out..." | tee -a $LOG
+	exit -31
 
 fi
 
 # Make sure the parent ADARA current working set directory exists
 
-adara_current="$INSTALL_BASE/$CONFIG/deploy"
 adara_current_new=0
 
 if [ ! -d "$adara_current" ]; then
@@ -1447,9 +1870,15 @@ sleep 3
 # Commit the Current Working Set Changes to the Git Config Repository
 #
 
-echo -e \
-	"\nCommitting Current Working Set changes to $install_branch branch." \
-	| tee -a $LOG
+if [[ ${DAS} == "2" ]]; then
+	echo -e -n "\nCommitting Current Working Set changes" \
+		| tee -a $LOG
+	echo -e " to $install_branch branch." | tee -a $LOG
+elif [[ ${DAS} == "3" ]]; then
+	echo -e -n "\nCommitting Current Working Set changes" \
+		| tee -a $LOG
+	echo -e " to PVSD Config Repository." | tee -a $LOG
+fi
 
 pwd | tee -a $LOG
 
@@ -1520,11 +1949,17 @@ fi
 # Document the deployment using the "Config" Git repository
 #
 
-echo -e \
-	"\nDocument Deployment History File for $HOST_TYPE $install_branch." \
-	| tee -a $LOG
+if [[ ${DAS} == "2" ]]; then
+	echo -e -n "\nDocument Deployment History File for ${HOST_TYPE}" \
+		| tee -a $LOG
+	echo -e " $install_branch." | tee -a $LOG
+elif [[ ${DAS} == "3" ]]; then
+	echo -e -n "\nDocument Deployment History File for ${HOST_TYPE}" \
+		| tee -a $LOG
+	echo -e " in PVSD Config Repository." | tee -a $LOG
+fi
 
-cd "$adara_config"
+cd "${adara_config}/"
 
 pwd | tee -a $LOG
 
@@ -1545,7 +1980,11 @@ else
 	need_sms_subdir=1
 fi
 
-deploy_history="$INSTALL_BASE/$CONFIG/$deploy_history_base"
+if [[ ${DAS} == "2" ]]; then
+	deploy_history="${INSTALL_BASE}/${CONFIG}/$deploy_history_base"
+elif [[ ${DAS} == "3" ]]; then
+	deploy_history="${ADARA_CONFIG}/$deploy_history_base"
+fi
 
 # Make sure SMS Sub-Directory exists for Deployment History, as needed...
 
@@ -1557,9 +1996,9 @@ if [ $need_sms_subdir == 1 ]; then
 
 		echo -e "Creating SMS Config Sub-Directory:\n" \
 			| tee -a $LOG
-		echo "   $adara_config/sms" | tee -a $LOG
+		echo "   ${adara_config}/sms" | tee -a $LOG
 
-		mkdir -p "$adara_config/sms" |& tee -a $LOG
+		mkdir -p "${adara_config}/sms" |& tee -a $LOG
 
 		mkdir_ok=$?
 
@@ -1573,7 +2012,7 @@ if [ $need_sms_subdir == 1 ]; then
 
 		echo -e "\nNew SMS Config Sub-Directory to Commit:\n" | tee -a $LOG
 
-		/bin/ls -ld "$adara_config/sms" |& tee -a $LOG
+		/bin/ls -ld "${adara_config}/sms" |& tee -a $LOG
 		echo | tee -a $LOG
 
 		echo "git add sms" | tee -a $LOG
@@ -1600,7 +2039,7 @@ fi
 if [ ! -e "$deploy_history" ]; then
 
 	echo -e -n "\nCreating Deployment History File " | tee -a $LOG
-	echo "for $HOST_TYPE $install_branch." | tee -a $LOG
+	echo "for ${HOST_TYPE} $install_branch." | tee -a $LOG
 	echo -e "\n   $deploy_history\n" | tee -a $LOG
 
 	echo -e "\nADARA $PROG Deployment History ($install_branch)" \
@@ -1616,7 +2055,7 @@ if [ ! -e "$deploy_history" ]; then
 		exit -39
 	fi
 
-	echo -e "$CONFIG_LINE\n" >> "$deploy_history"
+	echo -e "${CONFIG_LINE}\n" >> "$deploy_history"
 
 	echo "git add $deploy_history_base" | tee -a $LOG
 	git add "$deploy_history_base" |& tee -a $LOG
@@ -1657,7 +2096,7 @@ sleep 3
 echo -e "\nAppending Current Deployment to History File:\n" | tee -a $LOG
 echo -e "   $deploy_history\n" | tee -a $LOG
 
-echo -e "$CONFIG_LINE\n" | tee -a $LOG
+echo -e "${CONFIG_LINE}\n" | tee -a $LOG
 
 date | tee -a $LOG
 date >> "$deploy_history"
@@ -1669,9 +2108,9 @@ echo "ADARA/$PROG Deployment by User: $gcos ($userid)." | tee -a $LOG
 echo "ADARA/$PROG Deployment by User: $gcos ($userid)." \
 	>> "$deploy_history"
 
-echo "$HOST_TYPE $install_branch on Host $install_host" | tee -a $LOG
-echo \
-	"$HOST_TYPE $install_branch on Host $install_host" >> "$deploy_history"
+echo "${HOST_TYPE} $install_branch on Host $install_host" | tee -a $LOG
+echo -n "${HOST_TYPE} $install_branch" >> "$deploy_history"
+echo " on Host $install_host" >> "$deploy_history"
 
 echo "Using ADARA Git Repository = $adara_repo" | tee -a $LOG
 echo "Using ADARA Git Repository = $adara_repo" >> "$deploy_history"
@@ -1712,8 +2151,8 @@ echo -e "   $adara_current\n" >> "$deploy_history"
 /bin/ls -l "$adara_current"/ |& tee -a $LOG
 /bin/ls -l "$adara_current"/ >> "$deploy_history"
 
-echo -e "\n$CONFIG_LINE\n" | tee -a $LOG
-echo -e "\n$CONFIG_LINE\n" >> "$deploy_history"
+echo -e "\n${CONFIG_LINE}\n" | tee -a $LOG
+echo -e "\n${CONFIG_LINE}\n" >> "$deploy_history"
 
 # Commit Current Deployment History Additions to Git
 

@@ -1,6 +1,7 @@
 #ifndef __MARKERS_H
 #define __MARKERS_H
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/noncopyable.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/signals2.hpp>

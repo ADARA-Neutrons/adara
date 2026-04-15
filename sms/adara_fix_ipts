@@ -80,17 +80,19 @@ FINDNEXUS="/SNS/software/bin/findnexus"
 
 NXDIFF="/SNS/software/bin/nxDiff"
 
+DEFAULT_STC_HOST_DOMAIN="ornl.gov"
+DEFAULT_STC_HOST_NAME="stc1.${DEFAULT_STC_HOST_DOMAIN}"
+
+SYSTEMD_DIR="/etc/systemd/system"
+
+STC_PORT_HFIR="31420"
+STC_PORT_SNS="31417"
+
 SMS_CONFIG="/SNSlocal/sms/conf/smsd.conf"
 
 SMS_DATA="/SNSlocal/sms/data"
 
-XINETD_DIR="/etc/xinetd.d"
-
 ARCHIVE_PATH="/"
-
-STC1="stc1.ornl.gov"
-STC2="stc2.ornl.gov"
-STC3="stc3.ornl.gov"
 
 TRUNCATE="/usr/bin/truncate"
 Editor="/usr/bin/vim"
@@ -125,7 +127,7 @@ USAGE()
 {
 	echo -e "\nusage: adara_fix_ipts \\"
 	echo "    [--inst=<INST>] [--facility=<SNS|HFIR>] \\"
-	echo "    [--stc1|--stc2|--stc3|--stc_host=<STC_HOST>] \\"
+	echo "    [--stc1|--stc2|--stc3|--stc<N>|--stc_host=<STC_HOST>] \\"
 	echo "    [--stc|--stc_test|--stc_dummy|--stc_hfir|--stc_hfir_test] \\"
 	echo "    [--stc_port=<STCPort>] \\"
 	echo "    [--adara_parser=<${ADARA_PARSER}>] \\"
@@ -241,9 +243,11 @@ CHECK_PROCEED()
 # Parse Command Line Arguments
 #
 
-STC_HOST="${STC1}"
+STC_HOST_NAME="${DEFAULT_STC_HOST_NAME}"
 
-STC_SERVICE="stc_dummy"
+STC_SERVICE_NAME="stc_dummy"
+STC_SERVICE_NAME_SET=0
+
 STC_PORT=""
 
 RUN_NUMBERS=""
@@ -274,36 +278,35 @@ for arg in "$@" ; do
 	elif [[ "#$key#" == '#--facility#' ]]; then
 		FACILITY="$value"
 		echo -e "\nSetting Facility Name to: ${FACILITY}"
-	elif [[ "#$key#" == '#--stc1#' ]]; then
-		STC_HOST="${STC1}"
-		echo -e "\nSetting STC Host to: ${STC_HOST}"
-	elif [[ "#$key#" == '#--stc2#' ]]; then
-		STC_HOST="${STC2}"
-		echo -e "\nSetting STC Host to: ${STC_HOST}"
-	elif [[ "#$key#" == '#--stc3#' ]]; then
-		STC_HOST="${STC3}"
-		echo -e "\nSetting STC Host to: ${STC_HOST}"
+		if [[ ${FACILITY} == "SNS" ]]; then
+			STC_PORT="${STC_PORT_SNS}"
+			echo -e "\nSetting STC Port to: [${STC_PORT}]"
+		elif [[ ${FACILITY} == "HFIR" ]]; then
+			STC_PORT="${STC_PORT_HFIR}"
+			echo -e "\nSetting STC Port to: [${STC_PORT}]"
+		else
+			echo -e "\nERROR: Unknown Facility Keyword \"${FACILITY}\"...!"
+			echo -e "\nCannot Deduce STC Port...!"
+		fi
+	elif [[ "$key" =~ ^--stc[1-9]+ ]]; then
+		name=`echo "${key}" | ${SED} 's/^--//'`
+		STC_HOST_NAME="${name}.${DEFAULT_STC_HOST_DOMAIN}"
+		echo -e "\nSetting STC Host to: ${STC_HOST_NAME}"
 	elif [[ "#$key#" == '#--stc_host#' ]]; then
-		STC_HOST="${value}"
-		echo -e "\nSetting STC Host to: ${STC_HOST}"
-	elif [[ "#$key#" == '#--stc#' ]]; then
-		STC_SERVICE="stc"
-		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
-	elif [[ "#$key#" == '#--stc_test#' ]]; then
-		STC_SERVICE="stc_test"
-		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
-	elif [[ "#$key#" == '#--stc_dummy#' ]]; then
-		STC_SERVICE="stc_dummy"
-		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
-	elif [[ "#$key#" == '#--stc_hfir#' ]]; then
-		STC_SERVICE="stc_hfir"
-		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
-	elif [[ "#$key#" == '#--stc_hfir_test#' ]]; then
-		STC_SERVICE="stc_hfir_test"
-		echo -e "\nSetting STC Service to: ${STC_SERVICE}"
+		STC_HOST_NAME="${value}"
+		echo -e "\nSetting STC Host to: ${STC_HOST_NAME}"
+	elif [[ "#$key#" == '#--stc#' || "#$key#" == '#--stc_test#'
+			|| "#$key#" == '#--stc_dummy#'
+			|| "#$key#" == '#--stc_hfir#'
+			|| "#$key#" == '#--stc_hfir_test#' ]]; then
+		STC_SERVICE_NAME=`echo "${key}" | ${SED} 's/^--//'`
+		echo -e "\nSetting STC Service to: ${STC_SERVICE_NAME}"
+		STC_SERVICE_NAME_SET=1
 	elif [[ "#$key#" == '#--stc_port#' ]]; then
-		STC_PORT="$value"
+		STC_PORT="${value}"
 		echo -e "\nSetting STC Port to: ${STC_PORT}"
+		# Skip Auto STC Port Setting...
+		STC_SERVICE_NAME_SET=0
 	elif [[ "#$key#" == '#--adara_parser#' ]]; then
 		ADARA_PARSER="${value}"
 		echo -e "\nSetting ADARA Parser Path to:\n\t[${ADARA_PARSER}]"
@@ -372,13 +375,14 @@ fi
 # Determine Proper STC Service Port...! ;-D
 #
 
-if [[ -z "${STC_PORT}" ]]; then
+if [[ -z "${STC_PORT}" || ${STC_SERVICE_NAME_SET} == 1 ]]; then
 
-	echo -e "\nContacting STC Host \"${STC_HOST}\" via SSH"
-	echo "to Determine Port for STC \"${STC_SERVICE}\" Service..."
+	echo -e "\nContacting STC Host \"${STC_HOST_NAME}\" via SSH"
+	echo "to Determine Port for STC \"${STC_SERVICE_NAME}\" Service..."
 
-	echo -e \
-		"\n${SSH} ${STC_HOST} ${GREP} port ${XINETD_DIR}/${STC_SERVICE}"
+	echo -e "\n${SSH} ${STC_HOST_NAME} \\"
+	echo -e -n "   ${GREP} ListenStream"
+	echo -e " ${SYSTEMD_DIR}/${STC_SERVICE_NAME}.socket"
 
 	# Set Bash Pipefail Option as Needed...
 	pfck=`set -o | ${GREP} pipefail | ${AWK} '{print $2}'`
@@ -386,14 +390,14 @@ if [[ -z "${STC_PORT}" ]]; then
 		set -o pipefail
 	fi
 
-	STC_PORT=`${SSH} ${STC_HOST} \
-		${GREP} "port" ${XINETD_DIR}/${STC_SERVICE} \
-		| ${AWK} '{print $3}'`
+	STC_PORT=`${SSH} ${STC_HOST_NAME} \
+		${GREP} "ListenStream" ${SYSTEMD_DIR}/${STC_SERVICE_NAME}.socket \
+		| ${AWK} -F "=" '{print $2}'`
 	ckstcport=$?
 
 	if [[ ${ckstcport} != 0 ]]; then
 		echo -e -n "\nERROR Determining STC Port "
-		echo "for \"${STC_SERVICE}\" Service on ${STC_HOST}...!"
+		echo "for \"${STC_SERVICE_NAME}\" Service on ${STC_HOST_NAME}...!"
 		USAGE
 		exit 4
 	fi
@@ -403,8 +407,8 @@ if [[ -z "${STC_PORT}" ]]; then
 		set +o pipefail
 	fi
 
-	echo -e \
-		"\nGot STC Port ${STC_PORT} for STC \"${STC_SERVICE}\" Service."
+	echo -e -n "\nGot STC Port ${STC_PORT}"
+	echo -e " for STC \"${STC_SERVICE_NAME}\" Service."
 fi
 
 #
@@ -416,8 +420,8 @@ echo "to New Proposal [${IPTS_NEW}],"
 
 echo -e "\nby Editing ${SMS_WHICH_DATA_FILE} Data File,"
 
-echo -e -n "\nUsing STC \"${STC_SERVICE}\" Service "
-echo "on \"${STC_HOST}:${STC_PORT}\"."
+echo -e -n "\nUsing STC \"${STC_SERVICE_NAME}\" Service "
+echo "on \"${STC_HOST_NAME}:${STC_PORT}\"."
 
 CHECK_PROCEED
 
@@ -640,8 +644,8 @@ RESUBMIT_RUN()
 		echo "[${SEND_PAUSED_DATA}]"
 	fi
 
-	echo -e -n "\nUsing STC \"${STC_SERVICE}\" Service "
-	echo "on \"${STC_HOST}:${STC_PORT}\"."
+	echo -e -n "\nUsing STC \"${STC_SERVICE_NAME}\" Service "
+	echo "on \"${STC_HOST_NAME}:${STC_PORT}\"."
 
 	if [[ $ERROR_ONLY_PROMPTING == 0 ]]; then
 		CHECK_PROCEED
@@ -649,10 +653,10 @@ RESUBMIT_RUN()
 
 	echo -e -n "\nRunning: ${ADARA_CAT} ${SEND_PAUSED_DATA} "
 	echo "--run=\"${run}\" --dir=\"${rundir}\" \\"
-	echo -e "\t| ${NC} ${STC_HOST} ${STC_PORT}"
+	echo -e "\t| ${NC} ${STC_HOST_NAME} ${STC_PORT}"
 
 	${ADARA_CAT} ${SEND_PAUSED_DATA} --run="${run}" --dir="${rundir}" \
-		| ${NC} ${STC_HOST} ${STC_PORT}
+		| ${NC} ${STC_HOST_NAME} ${STC_PORT}
 	ckstc=$?
 
 	echo
@@ -802,7 +806,7 @@ RESUBMIT_RUN()
 			"Update the Catalog to Remove the Original Data File Location"
 		_ckrmoldcat=$?
 	else
-		_ckrmoldcat=1		# Default to *Updating* the Catalog...
+		_ckrmoldcat=0		# Default to *Updating* the Catalog...
 	fi
 
 	# Did We Already Update the Catalog to Remove the Original Data File?

@@ -5,7 +5,15 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/system/error_code.hpp>
 #include <boost/algorithm/string.hpp>
+
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#endif
 #include <cadef.h>
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+#pragma GCC diagnostic pop
+#endif
+
 #include <syslog.h>
 
 #include "TraceException.h"
@@ -113,9 +121,12 @@ void
 InputAdapter::getDevicesStatus(
         uint32_t &a_partialDeviceCount, uint32_t &a_hungDeviceCount,
         uint32_t &a_inactiveDeviceCount, // via Active Status PV State
-        uint32_t &a_readyPVCount, uint32_t &a_totalPVCount )
+        uint32_t &a_readyPVCount, uint32_t &a_totalPVCount,
+        std::string &a_device_errs )
 {
     boost::lock_guard<boost::recursive_mutex> lock(m_mutex);
+
+    stringstream ss_dev_errs;
 
     a_partialDeviceCount = 0;
     a_hungDeviceCount = 0;
@@ -136,14 +147,45 @@ InputAdapter::getDevicesStatus(
             a_inactiveDeviceCount++;
 
         else if ( hung )
+        {
             a_hungDeviceCount++;
 
+            ss_dev_errs << " [";
+            DeviceDescriptor *desc = idev->second->get_desc();
+            if ( desc != NULL && !(desc->m_name.empty()) )
+            {
+                ss_dev_errs << desc->m_name;
+            }
+            else
+            {
+                ss_dev_errs << "NO_DEVICE_NAME";
+            }
+            ss_dev_errs << ": HUNG]";
+        }
+
         else if ( ready_pvs < total_pvs )
+        {
             a_partialDeviceCount++;
+
+            ss_dev_errs << " [";
+            DeviceDescriptor *desc = idev->second->get_desc();
+            if ( desc != NULL && !(desc->m_name.empty()) )
+            {
+                ss_dev_errs << desc->m_name;
+            }
+            else
+            {
+                ss_dev_errs << "NO_DEVICE_NAME";
+            }
+            ss_dev_errs << ": PARTIAL]";
+        }
 
         a_readyPVCount += ready_pvs;
         a_totalPVCount += total_pvs;
     }
+
+    // Return Accumulated Device Errors String...
+    a_device_errs = ss_dev_errs.str();
 }
 
 
@@ -742,6 +784,32 @@ InputAdapter::parseConfigBuffer( const char* a_buffer, int a_buffer_size,
                                     }
                                     else if ( pvs.size() )
                                     {
+                                        // Ensure No DUPLICATE Device Names
+                                        for (
+                                        vector<DeviceDescriptor*>::iterator
+                                            idev = a_devices.begin();
+                                            idev != a_devices.end();
+                                            ++idev )
+                                        {
+                                            // DUPLICATE Device Name!!
+                                            if ( !dev_name.compare(
+                                                    (*idev)->m_name ) )
+                                            {
+                                                syslog( LOG_ERR,
+                                        "%s: %s::%s(): %s [%s] -> %s = %d",
+                                                    "PVSD ERROR",
+                                                    "InputAdapter",
+                                                    "parseConfigBuffer",
+                                                "DUPLICATE Device Name",
+                                                    dev_name.c_str(),
+                                                    "Device ID", id );
+                                                throw -1;
+                                            }
+                                        }
+
+                                        // NOW Go Ahead and Define Device
+                                        // and Process PVs... ;-D
+
                                         DeviceDescriptor *dev =
                                             new DeviceDescriptor( dev_name,
                                                 m_source, EPICS_PROTOCOL,

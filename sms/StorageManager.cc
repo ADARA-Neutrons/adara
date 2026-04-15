@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.StorageManager"));
+LOGGER("SMS.StorageManager");
 
 #include <string>
 #include <fstream>
@@ -73,7 +73,7 @@ public:
 		if ( poolsize.length() && poolsize.compare("(unset)") ) {
 			try {
 				maxSize = parse_size(poolsize);
-			} catch (std::runtime_error e) {
+			} catch (std::runtime_error &e) {
 				std::string msg("Unable to parse storage pool size: ");
 				msg += e.what();
 				DEBUG("PoolsizePV changed(): " << msg);
@@ -415,6 +415,8 @@ boost::thread StorageManager::m_ioThread;
 
 void StorageManager::config(const boost::property_tree::ptree &conf)
 {
+	LOGGER_INIT();
+
 	m_baseDir = conf.get<std::string>("storage.basedir", "");
 	if (!m_baseDir.length()) {
 		m_baseDir = conf.get<std::string>("sms.basedir");
@@ -456,7 +458,7 @@ void StorageManager::config(const boost::property_tree::ptree &conf)
 		if (m_poolsize.length()) {
 			try {
 				maxSize = parse_size(m_poolsize);
-			} catch (std::runtime_error e) {
+			} catch (std::runtime_error &e) {
 				std::string msg("Unable to parse storage pool size: ");
 				msg += e.what();
 				throw std::runtime_error(msg);
@@ -3140,7 +3142,7 @@ bool StorageManager::parseAutoSaveFile(void)
 				std::pair<std::string, std::string>(
 					pv_time, pv_value_out );
 		}
-		catch (std::runtime_error e) {
+		catch (std::runtime_error &e) {
 			ERROR("parseAutoSaveFile():"
 				<< " Exception Parsing AutoSave File"
 				<< " [" << m_autosave_filename << "]"
@@ -3215,7 +3217,14 @@ bool StorageManager::parseAutoSaveFile(void)
 
 		}
 		catch( boost::filesystem::filesystem_error &e ) {
-			ERROR("parseAutoSaveFile(): Error Rotating SMS AutoSave File "
+			ERROR("parseAutoSaveFile():"
+				<< " Error Rotating SMS AutoSave File "
+				<< ( m_baseDir + "/" + src_asf.str() ) << " to "
+				<< ( m_baseDir + "/" + dst_asf.str() ) << "!");
+		}
+		catch (...) {
+			ERROR("parseAutoSaveFile():"
+				<< " Unknown Exception Rotating SMS AutoSave File "
 				<< ( m_baseDir + "/" + src_asf.str() ) << " to "
 				<< ( m_baseDir + "/" + dst_asf.str() ) << "!");
 		}
@@ -3224,6 +3233,8 @@ bool StorageManager::parseAutoSaveFile(void)
 			<< ( m_baseDir + "/" + src_asf.str() ) << " to "
 			<< ( m_baseDir + "/" + dst_asf.str() ) );
 	}
+
+	DEBUG("parseAutoSaveFile(): All SMS AutoSave Files Rotated.");
 
 	return true;
 }
@@ -3636,7 +3647,7 @@ uint64_t StorageManager::purgeDaily( const std::string &dir,
 	daily_deleted = true;
 	try {
 		fs::remove(fs::path(dir));
-	} catch (fs::filesystem_error e) {
+	} catch (fs::filesystem_error &e) {
 		daily_deleted = false;
 	}
 
@@ -3749,7 +3760,7 @@ static void removeIndexDir(fs::path *indexDir)
 	try {
 		DEBUG("removeIndexDir " << *indexDir);
 		fs::remove_all(*indexDir);
-	} catch (fs::filesystem_error err) {
+	} catch (fs::filesystem_error &err) {
 		WARN("Error removing index: " << err.what());
 	}
 

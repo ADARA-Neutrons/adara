@@ -35,7 +35,7 @@ using namespace std;
 
 
 MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user,
-                        const std::string &a_broker_pass, const std::string &a_config_label, bool a_kiosk, bool a_master )
+                        const std::string &a_broker_pass, const std::string &a_config_label, bool a_kiosk, bool a_main )
     : QMainWindow(0), ui(new Ui::MainWindow),
     m_init(true), m_kiosk(a_kiosk),
     m_refresh_proc_table(false), m_refresh_signal_table(false),
@@ -82,7 +82,7 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
         m_domain += ".";
 
     m_combus = new ADARA::ComBus::Connection( m_domain, "DASMON-GUI",
-        a_master ? 0 : getpid(),
+        a_main ? 0 : getpid(),
         m_broker_uri, m_broker_user, m_broker_pass, "", "" );
 
     updateMainWindowTitle();
@@ -99,31 +99,51 @@ MainWindow::MainWindow( const std::string &a_domain, const std::string &a_broker
     QStringList headers;
     headers << "Monitor ID" << "Count Rate";
     ui->monitorTable->setHorizontalHeaderLabels( headers );
+#if QT_VERSION >= 0x050000
+    ui->monitorTable->horizontalHeader()->setSectionResizeMode( QHeaderView::ResizeToContents );
+#else
     ui->monitorTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+#endif
     ui->monitorTable->horizontalHeader()->show();
 
     headers.clear();
     headers << "Run No." << "Process" << "Status";
     ui->transTable->setHorizontalHeaderLabels( headers );
+#if QT_VERSION >= 0x050000
+    ui->transTable->horizontalHeader()->setSectionResizeMode( QHeaderView::ResizeToContents );
+#else
     ui->transTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+#endif
     ui->transTable->horizontalHeader()->show();
 
     headers.clear();
     headers << "Name" << "Source" << "Level" << "Message";
     ui->alertTable->setHorizontalHeaderLabels( headers );
+#if QT_VERSION >= 0x050000
+    ui->alertTable->horizontalHeader()->setSectionResizeMode( QHeaderView::ResizeToContents );
+#else
     ui->alertTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+#endif
     ui->alertTable->horizontalHeader()->show();
 
     headers.clear();
     headers << "Process" << "Status";
     ui->procStatusTable->setHorizontalHeaderLabels( headers );
+#if QT_VERSION >= 0x050000
+    ui->procStatusTable->horizontalHeader()->setSectionResizeMode( QHeaderView::ResizeToContents );
+#else
     ui->procStatusTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+#endif
     ui->procStatusTable->horizontalHeader()->show();
 
     headers.clear();
     headers << "PV" << "Value" << "Status" << "Timestamp";
     ui->pvTable->setHorizontalHeaderLabels( headers );
+#if QT_VERSION >= 0x050000
+    ui->pvTable->horizontalHeader()->setSectionResizeMode( QHeaderView::ResizeToContents );
+#else
     ui->pvTable->horizontalHeader()->setResizeMode( QHeaderView::ResizeToContents );
+#endif
     ui->pvTable->horizontalHeader()->show();
 
     initHighlightColors();
@@ -801,8 +821,13 @@ MainWindow::updateMainWindowTitle()
     }
 
     // Set the new MainWindow Title
+#if QT_VERSION >= 0x050000
+    setWindowTitle(QApplication::translate("MainWindow",
+        windowTitle.toLatin1().data(), 0));
+#else
     setWindowTitle(QApplication::translate("MainWindow",
         windowTitle.toLatin1().data(), 0, QApplication::UnicodeUTF8));
+#endif
 }
 
 

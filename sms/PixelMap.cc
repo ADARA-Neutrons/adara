@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
+LOGGER("SMS.PixelMap");
 
 #include <fstream>
 #include <utility>
@@ -17,7 +17,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
 #include <string.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAUtils.h"
@@ -25,9 +25,19 @@ static LoggerPtr logger(Logger::getLogger("SMS.PixelMap"));
 #include "SMSControl.h"
 #include "StorageManager.h"
 
-std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+std::unique_ptr<PixelMap::TempMap>
+#else
+std::auto_ptr<PixelMap::TempMap>
+#endif
+	PixelMap::readMap(const std::string &path)
 {
-	std::auto_ptr<TempMap> map(new TempMap);
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+	std::unique_ptr<TempMap>
+#else
+	std::auto_ptr<TempMap>
+#endif
+		map(new TempMap);
 
 	std::set<uint32_t> output_pixels;
 
@@ -226,10 +236,24 @@ std::auto_ptr<PixelMap::TempMap> PixelMap::readMap(const std::string &path)
 			output_pixels.insert(logical);
 
 			map->insert(make_pair(physical, std::make_pair(logical, bank)));
+
+			// Handle "Many-to-One" or Repeated PixelId Sequences...
+			// (_Only_ on the "Logical" Side - We Can't Have One-to-Many!)
+			if ( m_allowNonOneToOnePixelMapping
+					&& ( ( logical + logical_step ) == logical_stop )
+					&& ( ( physical + physical_step ) != physical_stop ) ) {
+				// If the Logical PixelId Sequence is Complete,
+				// But the Physical PixelId Sequence is _Not_ Complete,
+				// Then Simply Reset/Restart the Logical Sequence... ;-D
+				// (Need to Pre-Decrement the Logical Sequence for
+				// the Impending Loop Increment...)
+				logical = logical_start - logical_step;
+			}
 		}
 
 		// Make Sure the Physical and Logical Shorthand Sequence Aligned...
 		// (i.e. Everything Stopped Together... ;-D)
+		// TODO: Do the "Many-to-One" Sequences Need to Perfectly Align?
 		if ( physical != physical_stop || logical != logical_stop ) {
 			std::string msg("Misalignment Error in Pixel Map Shorthand");
 			msg += " - Physical and Logical Sequences";
@@ -283,6 +307,8 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 	uint32_t logical_start = -1, logical_stop = -1;
 	int32_t logical_step = 0;
 
+	bool steps_set = false;
+
 	uint32_t last_physical = -1, last_logical = -1;
 	uint32_t next_physical = -1, next_logical = -1;
 
@@ -315,7 +341,7 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 	// NOTE: This "Alternate" Pixel Mapping Table Packet is effectively
 	// a "Mirror Image" of the Original Pixel Mapping Table Packet,
 	// with "Logical" PixelIds now Swapped with "Physical" PixelIds
-	// Everywhere, in a "Inverted" (ha ha) organizational structure. ;-D
+	// Everywhere, in an "Inverted" (ha ha) organizational structure. ;-D
 
 	// We also pack in One Handy Extra Value _Before_ the Mapping Data,
 	// to Avoid Future Issues - explicitly include the "Number of Banks"!
@@ -358,17 +384,24 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 		logical = it->second.first;
 		bank = it->second.second;
 
-		// If we've found a discontinuity in the physical pixels,
-		// or we changed banks, OR we have _Filled Up_ this section
-		// with the Max Section PixelId Count (*15* bits, 0x7fff = 32767),
+		// If we've found a discontinuity in the physical pixels
+		// or the logical pixels, or we changed banks,
+		// OR we have _Filled Up_ this section with the Max Section
+		// PixelId Count (*15* bits, 0x7fff = 32767),
 		// then we have to start a new section.
 		// -> Capture the "Last Bank" Section... :-D
+		// Note: For Many-to-One Mappings, Always Dump Direct Per Physical!
+		// TODO: Explore Allowing Many-to-One Logical Step == 0 Shorthand?
 		if ( bank != last_bank
-				|| ( physical_step != 0 && physical != next_physical )
-				|| ( logical_step != 0 && logical != next_logical )
+				|| ( steps_set
+					&& ( physical != next_physical
+						|| logical != next_logical ) )
+				|| ( m_allowNonOneToOnePixelMapping
+						&& logical == last_logical )
 				|| entries >= max_section_pixelid_count ) {
 
-			// Skip Unmapped Banks...! Don't Count/Send Unmapped PixelIds...
+			// Skip Unmapped Banks...!
+			// Don't Count/Send Unmapped PixelIds...
 			// No Need to Send These Over the Wire!
 			if ( last_bank != (uint16_t) -1 ) {
 
@@ -476,6 +509,8 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 			logical_stop = -1;
 			logical_step = 0;
 
+			steps_set = false;
+
 			last_physical = -1;
 			last_logical = -1;
 			last_bank = -1;
@@ -496,11 +531,13 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 
 		// Otherwise, Check for New Sequence Step Sizes...
 
-		else if ( physical_step == 0 && logical_step == 0 ) {
+		else if ( !steps_set ) {
 
 			physical_step = physical - last_physical;
 
 			logical_step = logical - last_logical;
+
+			steps_set = true;
 		}
 
 		// Extend the End of the Physical/Logical PixelId Sequence...
@@ -516,8 +553,8 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 		last_logical = logical;
 
 		// Compute Expected Next Physical & Logical PixelIds...
-		
-		if ( physical_step != 0 && logical_step != 0 ) {
+
+		if ( steps_set ) {
 
 			// Prevent Physical or Logical Step "Overflow"...!
 			// (Greater/Less Than 16-bit Integer Space in Packet...)
@@ -582,6 +619,8 @@ boost::shared_array<uint8_t> PixelMap::genAltPacket(TempMap *map,
 				logical_start = logical;
 				logical_stop = logical;
 				logical_step = 0;
+
+				steps_set = false;
 
 				last_physical = physical;
 				last_logical = logical;
@@ -876,7 +915,15 @@ PixelMap::PixelMap(const std::string &path,
 	m_useOrigPixelMappingPkt(useOrigPixelMappingPkt),
 	m_numBanks(0)
 {
-	std::auto_ptr<TempMap> map;
+	LOGGER_INIT();
+
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+	std::unique_ptr<TempMap>
+#else
+	std::auto_ptr<TempMap>
+#endif
+		map;
+
 	TempMap::iterator it, end;
 	std::set<uint32_t> banks;
 	uint32_t max_logical = 0;

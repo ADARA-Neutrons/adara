@@ -1,8 +1,10 @@
 #ifndef __DATA_SOURCE_H
 #define __DATA_SOURCE_H
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/smart_ptr.hpp>
 #include <boost/signals2.hpp>
+
 #include <stdint.h>
 #include <map>
 #include <bitset>

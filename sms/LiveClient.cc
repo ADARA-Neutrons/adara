@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
+LOGGER("SMS.LiveClient");
 
 #include <sstream>
 #include <string>
@@ -11,7 +11,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.LiveClient"));
 #include <sys/sendfile.h>
 #include <stdint.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
@@ -39,12 +39,14 @@ double LiveClient::m_hello_timeout = 30.0;
 
 void LiveClient::config(const boost::property_tree::ptree &conf)
 {
+	LOGGER_INIT();
+
 	m_hello_timeout = conf.get<double>("livestream.hello_timeout", 30.0);
 
 	std::string size = conf.get<std::string>("livestream.maxsend", "2M");
 	try {
 		m_max_send_chunk = parse_size(size);
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		std::string msg("Unable to parse livestream max send size: ");
 		msg += e.what();
 		ERROR("config(): " << msg);
@@ -132,7 +134,7 @@ LiveClient::LiveClient(LiveServer *server, int fd) :
 		throw;
 	}
 
-	ERROR("client " << m_clientName << " ready to connect"
+	DEBUG("client " << m_clientName << " ready to connect"
 		<< " SendPausedData=" << m_send_paused_data);
 
 	try {
@@ -161,7 +163,7 @@ LiveClient::~LiveClient()
 {
 	SMSControl *ctrl = SMSControl::getInstance();
 
-	ERROR("client " << m_clientName << " disconnected");
+	DEBUG("client " << m_clientName << " disconnected");
 
 	if ( m_clientId >= 0 ) {
 		m_pvStatus->disconnected();
@@ -319,7 +321,7 @@ void LiveClient::writable(void)
 			{
 				m_file_fd = f->get_fd();
 			}
-			catch ( std::runtime_error re )
+			catch ( std::runtime_error &re )
 			{
 				std::string cname;
 				StorageContainer::SharedPtr c;
@@ -1015,7 +1017,7 @@ void LiveClient::readable(void)
 			delete this;
 			return;
 		}
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		/* Rate-limited logging of LiveClient read exception? */
 		std::string log_info;
 		if ( RateLimitedLogging::checkLog( RLLHistory_LiveClient,
@@ -1102,7 +1104,7 @@ bool LiveClient::rxPacket( const ADARA::ClientHelloPkt &pkt )
 		ss << "PAUSE_AGNOSTIC";
 	ss << "]";
 
-	ERROR("LiveClient Hello V" << pkt.version()
+	DEBUG("LiveClient Hello V" << pkt.version()
 		<< " Received from " << m_clientName
 		<< ", Requested Start Time = " << pkt.requestedStartTime()
 		<< ", Client Flags = 0x" << std::hex << m_client_flags << std::dec

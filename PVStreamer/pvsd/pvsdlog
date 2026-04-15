@@ -1,4 +1,4 @@
-#!/bin/tcsh
+#!/bin/bash
 
 tail -f /var/log/pvsd.log
 

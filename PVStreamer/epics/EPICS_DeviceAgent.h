@@ -6,11 +6,19 @@
 #include <stdint.h>
 #include <signal.h>
 #include <time.h>
+
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/thread.hpp>
 #include <boost/thread/mutex.hpp>
 #include <boost/thread/condition_variable.hpp>
 
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+#pragma GCC diagnostic ignored "-Wdeprecated-copy"
+#endif
 #include <cadef.h>
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+#pragma GCC diagnostic pop
+#endif
 
 #include "ConfigManager.h"
 #include "StreamService.h"

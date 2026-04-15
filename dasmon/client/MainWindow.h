@@ -17,7 +17,7 @@
 #include <QMutex>
 #include <QLineEdit>
 
-#define DASMON_GUI_VERSION "1.5.5"
+#define DASMON_GUI_VERSION "1.5.6"
 
 
 namespace Ui {
@@ -31,7 +31,7 @@ class MainWindow : public QMainWindow, public ADARA::ComBus::ITopicListener, pub
     Q_OBJECT
 
 public:
-    MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, const std::string &a_config_label, bool a_kiosk, bool a_master );
+    MainWindow( const std::string &a_domain, const std::string &a_broker_uri, const std::string &a_broker_user, const std::string &a_broker_pass, const std::string &a_config_label, bool a_kiosk, bool a_main );
     ~MainWindow();
 
 signals:

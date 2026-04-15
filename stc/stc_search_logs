@@ -1,0 +1,50 @@
+#!/bin/bash
+#
+# STC Search Logs Script
+#
+# Search STC Log Entries for a Specific STC Process ID
+#
+
+AWK="/usr/bin/awk"
+
+USAGE()
+{
+	echo -e "\nusage: stc_search_logs [--num_files=<num>] <pid>"
+	echo
+}
+
+num_files=5
+
+if [[ "$1" =~ --num_files ]]; then
+	num=`echo "$1" | ${AWK} -F = '{print $2}'`
+	if [[ ${num} != "" ]]; then
+		num_files=${num}
+	else
+		echo -e "\nError: Missing Argument to \"--num_files\"...!"
+		USAGE
+		exit -1
+	fi
+	shift
+fi
+
+if [[ $# != 1 ]]; then
+	USAGE
+	exit -1
+fi
+
+pid="$1"
+
+files=`/bin/ls -t -r /var/log/stc.log* | tail -${num_files}`
+
+for log in $files ; do
+
+	gzck=`echo $log | grep '.gz$' | wc | awk '{print $1}'`
+
+	if [[ $gzck == 1 ]]; then
+		zcat "$log" | grep "\[${pid}\]"
+	else
+		grep --text "\[${pid}\]" "$log"
+	fi
+
+done
+

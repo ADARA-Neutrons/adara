@@ -1,11 +1,13 @@
 #ifndef __STORAGE_MANAGER_H
 #define __STORAGE_MANAGER_H
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/property_tree/ptree.hpp>
 #include <boost/smart_ptr.hpp>
 #include <boost/function.hpp>
 #include <boost/signals2.hpp>
 #include <boost/thread.hpp>
+
 #include <stdint.h>
 #include <string>
 #include <list>

@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger( Logger::getLogger("SMS.ComBusSMSMon") );
+LOGGER("SMS.ComBusSMSMon");
 
 #include <string>
 
@@ -9,7 +9,7 @@ static LoggerPtr logger( Logger::getLogger("SMS.ComBusSMSMon") );
 #include <stdint.h>
 #include <string.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "StorageManager.h"
 #include "SMSControl.h"
@@ -69,6 +69,8 @@ ComBusSMSMon::ComBusSMSMon( std::string a_beam_sname,
 	m_comm_thread(0),
 	m_stop(false)
 {
+	LOGGER_INIT();
+
 	// Channel Access Exception Handler Now Installed in commThread()... :-D
 
 	m_commRestart = NULL;

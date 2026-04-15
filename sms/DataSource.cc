@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
+LOGGER("SMS.DataSource");
 
 #include <stdexcept>
 #include <sstream>
@@ -15,8 +15,9 @@ static LoggerPtr logger(Logger::getLogger("SMS.DataSource"));
 #include <fcntl.h>
 #include <time.h>
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/make_shared.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "EPICS.h"
 #include "ADARAUtils.h"
@@ -856,6 +857,8 @@ DataSource::DataSource( const std::string &name,
 	m_max_read_chunk(read_chunk), m_rtdlNoDataThresh(rtdlNoDataThresh),
 	m_save_input_stream(save_input_stream)
 {
+	LOGGER_INIT();
+
 	// Snag an SMSControl Instance Handle _Exactly Once_...! ;-o
 	m_ctrl = SMSControl::getInstance();
 
@@ -1244,7 +1247,7 @@ DataSource::DataSource( const std::string &name,
 		bool parse_ok = true;
 		try {
 			tmp_max_read_chunk = parse_size(value);
-		} catch (std::runtime_error e) {
+		} catch (std::runtime_error &e) {
 			std::string msg("Unable to parse read size for source '");
 			msg += m_name;
 			msg += "': ";
@@ -2061,7 +2064,7 @@ void DataSource::dataReady(void)
 		unsigned int tmp_max_read_chunk;
 		try {
 			tmp_max_read_chunk = parse_size(val);
-		} catch (std::runtime_error e) {
+		} catch (std::runtime_error &e) {
 			std::string msg("Unable to parse read size for source '");
 			msg += m_name;
 			msg += "': ";
@@ -2112,7 +2115,7 @@ void DataSource::dataReady(void)
 			connectionFailed(true, true, IDLE);
 			readOk = false;
 		}
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		/* Rate-limited log of failure */
 		std::string rll_log_info;
 		bool dumpStats = false;
