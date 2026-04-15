@@ -162,8 +162,8 @@ public:
 		m_hexDump(false), m_wordDump(false), m_showEvents(false),
 		m_showVars(true), m_showMults(false), m_showDDP(false),
 		m_lowRate(false), m_showRunInfo(false), m_showGeom(false),
-		m_showFrame(false), m_posixRead(false), m_terse(false),
-		m_catch(false)
+		m_showFrame(false), m_showPixMap(false), 
+		m_posixRead(false), m_terse(false), m_catch(false)
 	{ }
 
 	void parse(int argc, char **argv);
@@ -229,6 +229,7 @@ private:
 	bool m_showRunInfo;
 	bool m_showGeom;
 	bool m_showFrame;
+	bool m_showPixMap;
 	bool m_posixRead;
 	bool m_terse;
 	bool m_catch;
@@ -733,10 +734,16 @@ bool Parser::rxPacket(const ADARA::BeamMonitorPkt &pkt)
 	return false;
 }
 
+// Pixel Mapping Special Banks
+enum SpecialBankIds
+{
+	UNMAPPED_BANK   = 0xffffffff,
+	ERROR_BANK      = 0xfffffffe
+};
+
 bool Parser::rxPacket(const ADARA::PixelMappingAltPkt &pkt)
 {
-	if ( !m_terse ) {
-		// TODO display more fields (check that the table doesn't change)
+	if ( !m_terse || m_showPixMap ) {
 		printf("%u.%09u PIXEL MAP TABLE ALT (0x%x,v%u) [%u bytes]\n"
 			"    numBanks %u\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
@@ -744,16 +751,237 @@ bool Parser::rxPacket(const ADARA::PixelMappingAltPkt &pkt)
 			pkt.numBanks());
 	}
 
+	if ( m_showPixMap )
+	{
+		const uint32_t *rpos = (const uint32_t *) pkt.mappingData();
+		const uint32_t *epos = (const uint32_t *)
+			( pkt.mappingData() + pkt.payload_length()
+				- sizeof(uint32_t) );
+
+		int32_t physical_start, physical_stop;
+		int32_t physical_step;
+
+		int32_t logical_start, logical_stop;
+		int32_t logical_step;
+
+		uint32_t log1, log2;
+
+		uint16_t bank_id;
+		uint16_t is_shorthand;
+		uint16_t pixel_count;
+
+		uint32_t skip_pixel_count = 0;
+		uint32_t tot_pixel_count = 0;
+		uint32_t skip_sections = 0;
+		uint32_t section_count = 0;
+
+		int16_t cnt;
+
+		while ( rpos < epos )
+		{
+			// Base/Starting Physical PixelId
+			physical_start = *rpos++;
+
+			// BankID, 0/1=Direct/Shorthand Bit, Pixel Count...
+			bank_id = (uint16_t)(*rpos >> 16);
+			is_shorthand = (uint16_t)((*rpos & 0x8000) >> 15);
+			pixel_count = (uint16_t)(*rpos & 0x7FFF);
+			printf("    0x%08x:",  *rpos);
+			rpos++;
+
+			printf(" %s=%u/0x%x %s=%u %s=%u %s=%u\n",
+				"phys_start", physical_start, physical_start,
+				"bank", bank_id,
+				"shorthand", is_shorthand,
+				"pix_count", pixel_count);
+
+			// Process Shorthand PixelId Section...
+			if ( is_shorthand )
+			{
+				// Stopping Physical PixelId
+				physical_stop = *rpos++;
+
+				// Base/Starting Logical PixelId
+				logical_start = *rpos++;
+
+				// Physical and Logical Step
+				physical_step = (int16_t)(*rpos >> 16);
+				logical_step = (int16_t)(*rpos & 0xFFFF);
+				rpos++;
+
+				// Stopping Logical PixelId
+				logical_stop = *rpos++;
+
+				printf("        %s %s=%d/%d/%d %s=%d/%d/%d\n",
+					"Shorthand Section",
+					"physical",
+					physical_start, physical_stop, physical_step,
+					"logical",
+					logical_start, logical_stop, logical_step);
+
+                // Check for Pixel Start/Stop/Step Sanity...!
+                if ( physical_step == 0 || logical_step == 0 )
+                {
+                    printf("    %s %s=%d/%d/%d %s=%d/%d/%d:\n",
+						"WHOA! Erroneous PixelId Sequence!",
+                        "physical",
+                        physical_start, physical_stop, physical_step,
+                        "logical",
+                        logical_start, logical_stop, logical_step);
+					printf("        %s - %s\n",
+                        "Zero Step Size in Shorthand Sequence",
+                        "Bail on Packet Parse...!");
+
+                    return false;
+                }
+
+				// Verify Physical PixelId Count Versus Section Count...
+				cnt = ( physical_stop - physical_start + physical_step )
+					/ physical_step;
+				if ( cnt != (int32_t) pixel_count )
+				{
+					printf("            %s: %d != %d - %s\n",
+						"Physical PixelId Count Mismatch",
+						cnt, pixel_count,
+						"Skip Section...");
+
+					// Next Section
+					skip_pixel_count += pixel_count;
+					skip_sections++;
+					continue;
+				}
+
+				// Verify Logical PixelId Count Versus Section Count...
+				cnt = ( logical_stop - logical_start + logical_step )
+					/ logical_step;
+				if ( cnt != (int32_t) pixel_count )
+				{
+					printf("            %s: %d != %d - %s\n",
+						"Logical PixelId Count Mismatch",
+						cnt, pixel_count,
+						"Skip Section...");
+
+					// Next Section
+					skip_pixel_count += pixel_count;
+					skip_sections++;
+					continue;
+				}
+
+				// Note: Assume Physical & Logical Counts Match Each Other
+				// If They Both Match the Same Internal Section Count ;-D
+
+				// Skip Unmapped Sections of Pixel Map...!
+				if ( bank_id == (uint16_t) UNMAPPED_BANK )
+				{
+					printf("            UNMAPPED Bank\n");
+
+					// Next Section
+					skip_pixel_count += pixel_count;
+					skip_sections++;
+					continue;
+				}
+
+				tot_pixel_count += pixel_count;
+			}
+
+			// Process Direct PixelId Section...
+			else
+			{
+				// Skip Unmapped Sections of Pixel Map...!
+				if ( bank_id == (uint16_t) UNMAPPED_BANK )
+				{
+					printf("            UNMAPPED Bank\n");
+
+					// Next Section
+					skip_pixel_count += pixel_count;
+					rpos += pixel_count;
+					skip_sections++;
+					continue;
+				}
+
+				log1 = *rpos++;
+				if ( pixel_count > 1 )
+				{
+					// Advance to "Last" Logical PixelId...
+					rpos += pixel_count - 2;
+					log2 = *rpos++;
+					printf("        logical=%u/0x%x . . . %u/0x%x\n",
+						log1, log1, log2, log2);
+				}
+				else
+				{
+					printf("        logical=%u/0x%x\n", log1, log1);
+				}
+
+				tot_pixel_count += pixel_count;
+			}
+
+			section_count++;
+		}
+
+		printf("    %s, %s Tot=%u Skip=%u, Sections Used=%u Skip=%u\n",
+			"Done with Packet", "PixelIds", 
+			tot_pixel_count, skip_pixel_count,
+			section_count, skip_sections);
+	}
+
 	return false;
 }
 
 bool Parser::rxPacket(const ADARA::PixelMappingPkt &pkt)
 {
-	if ( !m_terse ) {
-		// TODO display more fields (check that the table doesn't change)
+	if ( !m_terse || m_showPixMap ) {
 		printf("%u.%09u PIXEL MAP TABLE (0x%x,v%u) [%u bytes]\n",
 			(uint32_t) (pkt.pulseId() >> 32), (uint32_t) pkt.pulseId(),
 			pkt.base_type(), pkt.version(), pkt.packet_length());
+	}
+
+	if ( m_showPixMap )
+	{
+		const uint32_t *rpos = (const uint32_t *) pkt.mappingData();
+		const uint32_t *epos = (const uint32_t *)
+			( pkt.mappingData() + pkt.payload_length() );
+
+		uint32_t        base_logical;
+		uint16_t        bank_id;
+		uint16_t        pixel_count;
+		uint32_t        phys1, phys2;
+
+		while ( rpos < epos )
+		{
+			base_logical = *rpos++;
+			bank_id = (uint16_t)(*rpos >> 16);
+			pixel_count = (uint16_t)(*rpos & 0xFFFF);
+			rpos++;
+
+			printf("    base_logical=%u/0x%x bank_id=%u pixel_count=%u\n",
+				base_logical, base_logical, bank_id, pixel_count);
+
+			if ( bank_id == (uint16_t) UNMAPPED_BANK )
+			{
+				printf("        UNMAPPED Bank\n");
+				// Next Section
+				rpos += pixel_count;
+				continue;
+			}
+
+			else if ( pixel_count > 0 )
+			{
+				phys1 = *rpos++;
+				if ( pixel_count > 1 )
+				{
+					// Advance to "Last" Physical PixelId...
+					rpos += pixel_count - 2;
+					phys2 = *rpos++;
+					printf("        physical=%u/0x%x . . . %u/0x%x\n",
+						phys1, phys1, phys2, phys2);
+				}
+				else
+				{
+					printf("        physical=%u/0x%x\n", phys1, phys1);
+				}
+			}
+		}
 	}
 
 	return false;
@@ -1388,6 +1616,7 @@ void Parser::parse(int argc, char **argv)
 	("showrun,R", "Show payload of RunInfo packets")
 	("showgeom,G", "Show payload of Geometry packets")
 	("showframe,F", "Show FNA/Frame Data of RTDL packets")
+	("showpixmap,X", "Show Pixel Mapping packet details")
 	("posixread,P", "Use POSIX read() to parse incoming stream")
 	("terse,T", "Terse Mode, Produce no output (except as requested)")
 	("catch,C", "Catch Exceptions, Try to parse past bad packets");
@@ -1407,7 +1636,7 @@ void Parser::parse(int argc, char **argv)
 		po::store(po::command_line_parser(argc, argv).
 			options(cmdline_options).positional(p).run(), vm);
 		po::notify(vm);
-	} catch (po::unknown_option e) {
+	} catch (po::unknown_option &e) {
 		std::cerr << argv[0] << ": " << e.what() << std::endl
 			<< std::endl << opts << std::endl;
 		exit(2);
@@ -1440,6 +1669,7 @@ void Parser::parse(int argc, char **argv)
 	m_showRunInfo = vm.count("showrun");
 	m_showGeom = vm.count("showgeom");
 	m_showFrame = vm.count("showframe");
+	m_showPixMap = vm.count("showpixmap");
 	m_posixRead = vm.count("posixread");
 	m_terse = vm.count("terse");
 	m_catch = vm.count("catch");

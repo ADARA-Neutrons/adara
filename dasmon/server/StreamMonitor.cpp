@@ -29,7 +29,7 @@ namespace DASMON {
 
 #define ADARA_IN_BUF_SIZE 0x100000
 
-
+string WEB_MONITOR_PV = ":MonitorPVs:LIST";
 
 bool PixPairComp( const pair<uint32_t,uint16_t> a, const pair<uint32_t,uint16_t> b )
 {
@@ -933,6 +933,24 @@ StreamMonitor::rxPacket( const ADARA::PixelMappingAltPkt &a_pkt )
                     logical_start, logical_stop, logical_step );
                 usleep(30000); // give syslog a chance...
 #endif
+
+                // Check for Pixel Start/Stop/Step Sanity...!
+                if ( physical_step == 0 || logical_step == 0 )
+                {
+                    syslog( LOG_ERR,
+                        "%s: %s %s=%d/%d/%d %s=%d/%d/%d: %s - %s",
+                        "ADARA::PixelMappingAltPkt",
+                        "WHOA! Erroneous PixelId Sequence!",
+                        "physical",
+                        physical_start, physical_stop, physical_step,
+                        "logical",
+                        logical_start, logical_stop, logical_step,
+                        "Zero Step Size in Shorthand Sequence",
+                        "Bail on Packet Parse...!" );
+                    usleep(30000); // give syslog a chance...
+
+                    return false;
+                }
 
                 // Verify Physical PixelId Count Versus Section Count...
                 cnt = ( physical_stop - physical_start + physical_step )
@@ -2647,6 +2665,10 @@ StreamMonitor::dbThread()
     bool update;
     int  i;
 
+    std::string Monitor_PV_List;
+    std::string Monitor_PV_List_Last = "Not Yet Set";
+    bool Monitor_PV_was_set;
+
     vector<pair<PVInfoLite,uint32_t> >              int_pvs;
     vector<pair<PVInfoLite,uint32_t> >::iterator    iintpv;
     vector<pair<PVInfoLite,double> >                dbl_pvs;
@@ -2706,11 +2728,36 @@ StreamMonitor::dbThread()
 
                 m_mutex.lock();
 
+                Monitor_PV_List.clear();
+
+                Monitor_PV_was_set = false;
+
                 for ( ipvm = m_pvs.begin(); ipvm != m_pvs.end(); ++ipvm )
                 {
                     if ( ipvm->second->m_updated || send_all )
                     {
                         ipvm->second->m_updated = false;
+
+                        // Check for Web Monitor PV List...
+                        if ( (ipvm->second->m_name.find( WEB_MONITOR_PV ))
+                                != std::string::npos )
+                        {
+                            // Note: Monitor PVs List is of the Form:
+                            // "'pv_name1', 'pv_name2', 'pv_name3'"
+
+                            Monitor_PV_List = 
+                                ((PVInfo<string>*)(ipvm->second))->m_value;
+
+                            Monitor_PV_was_set = true;
+
+                            syslog( LOG_ERR,
+                                "Found Web Monitor PV Update - %s = [%s]",
+                                ipvm->second->m_name.c_str(),
+                                Monitor_PV_List.c_str() );
+                            usleep(30000); // give syslog a chance...
+                        }
+
+                        // Handle All the Regular PVs by Type...
                         switch ( ipvm->second->m_type )
                         {
                         case PVT_FLOAT:
@@ -2802,12 +2849,58 @@ StreamMonitor::dbThread()
                 m_db_state = TS_DB_UPDATE;
                 ++m_db_ticker;
 
+                // Send Web Monitor PVs List to database
+                if ( Monitor_PV_was_set
+                        && Monitor_PV_List.compare(
+                            Monitor_PV_List_Last ) )
+                {
+                    // Note: Monitor PVs List is of the Form:
+                    // "'pv_name1', 'pv_name2', 'pv_name3'"
+
+                    sprintf( buf,
+                   "select setInstrumentPVs('%s'::text,ARRAY[%s]::text[])",
+                        m_beam_info.m_beam_sname.c_str(),
+                        Monitor_PV_List.c_str() );
+
+                    syslog( LOG_ERR, "%s - Sending %s Update - buf=[%s]",
+                        "Monitor PV List Changed",
+                        "Web Monitor Status PV List", buf );
+                    usleep(30000); // give syslog a chance...
+
+                    res = PQexec( conn, buf );
+                    if ( !res || PQresultStatus( res ) != PGRES_TUPLES_OK )
+                    {
+                        syslog( LOG_ERR,
+                            "Database Monitor PVs Update Call Failed." );
+                        usleep(30000); // give syslog a chance...
+                        syslog( LOG_ERR, PQresultErrorMessage( res ));
+                        usleep(30000); // give syslog a chance...
+                        syslog( LOG_ERR, buf );
+                        usleep(30000); // give syslog a chance...
+
+                        PQclear( res );
+                        update = false;
+                        ++m_db_ticker;
+                    }
+                    else
+                    {
+                        PQclear( res );
+                        send_all = false;
+                        ++m_db_ticker;
+                    }
+
+                    // Save This Monitor PV List for Next Time...
+                    Monitor_PV_List_Last = Monitor_PV_List;
+                }
+
+                ++m_db_ticker;
+
                 // Send double-value PV updates to database
                 for ( idblpv = dbl_pvs.begin();
                         idblpv != dbl_pvs.end(); ++idblpv )
                 {
                     sprintf( buf,
-                        "select \"pvUpdate\"('%s','%s',%g,%u,%u)",
+                        "select pvUpdate('%s'::text,'%s',%g,%u,%u)",
                         m_beam_info.m_beam_sname.c_str(),
                         idblpv->first.m_name.c_str(),
                         idblpv->second,
@@ -2843,7 +2936,7 @@ StreamMonitor::dbThread()
                         iintpv != int_pvs.end(); ++iintpv )
                 {
                     sprintf( buf,
-                        "select \"pvUpdate\"('%s','%s',%u,%u,%u)",
+                        "select pvUpdate('%s'::text,'%s',%u,%u,%u)",
                         m_beam_info.m_beam_sname.c_str(),
                         iintpv->first.m_name.c_str(),
                         iintpv->second,
@@ -2878,7 +2971,7 @@ StreamMonitor::dbThread()
                 for ( istrpv = str_pvs.begin();
                         istrpv != str_pvs.end(); ++istrpv )
                 {
-                    string cmd_prefix = "select \"pvStringUpdate\"";
+                    string cmd_prefix = "select pvStringUpdate";
 
                     string strpv_value = istrpv->second;
 
@@ -2922,7 +3015,7 @@ StreamMonitor::dbThread()
                     else
                     {
                         sprintf( buf,
-                            "%s('%s','%s','%s',%u,%u)",
+                            "%s('%s'::text,'%s','%s',%u,%u)",
                             cmd_prefix.c_str(),
                             m_beam_info.m_beam_sname.c_str(),
                             istrpv->first.m_name.c_str(),

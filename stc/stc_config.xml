@@ -802,12 +802,27 @@
 	<command>
 		<name>Timepix3Command</name>
 		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_timepix3.py</path>
-		<!-- Imaging Mode Conditional PV Check -->
+		<!-- Image Archiving Mode Conditional PV Check -->
 		<condition>
-			<name>Timepixe3 Imaging Mode</name>
+			<name>Timepix3 Imaging Mode</name>
 			<pattern>CG1D:CS:UE:Timepix3Mode$</pattern>
+			<pattern>BL3:Exp:IM:Timepix3Mode$</pattern>
+			<pattern>BL10:Exp:IM:Timepix3Mode$</pattern>
+			<pattern>BL10:Exp:IM:ImageFileArchive$</pattern>
 			<value>1</value><!-- Timepix3 Imaging Mode Activated -->
 		</condition>
+		<element>
+			<pattern>:ImageFilePath$</pattern>
+			<name>ImageFilePath</name>
+		</element>
+		<element>
+			<pattern>:ConfigTpxFilePath$</pattern>
+			<name>ConfigTpxFilePath</name>
+		</element>
+		<element>
+			<pattern>:ConfigTIFFFilePath$</pattern>
+			<name>ConfigTIFFFilePath</name>
+		</element>
 		<element>
 			<pattern>:MeasTpxFilePath$</pattern>
 			<name>TpxFilePath</name>
@@ -820,6 +835,94 @@
 			<pattern>:Det:N1:TIFF:FileName$</pattern>
 			<name>TIFFFileName</name>
 		</element>
+		<element>
+			<pattern>:Exp:Det$</pattern>
+			<name>DetectorType</name>
+		</element>
+	</command>
+
+	<!-- Pre-Post-Auto-Reduction Command Interface (for Timepix3 Image Files from CG1D) -->
+	<command>
+		<name>MobileTimepix3Command</name>
+		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_mobile_timepix3.py</path>
+		<!-- Imaging Mode Conditional PV Check -->
+		<condition>
+			<name>Timepixe3 Imaging Mode</name>
+			<pattern>:CS:TpxGway:IsMobileTpx3$</pattern>
+			<value>1</value><!-- Mobile Timepix3 Imaging Mode Activated -->
+		</condition>
+		<element>
+			<pattern>:CS:TpxGway:IsMobileTpx3$</pattern>
+			<name>Tpx3IsMobileTpx3</name>
+		</element>
+		<element>
+			<pattern>:CS:TpxGway:FileNameTemplate$</pattern>
+			<name>Tpx3FileNameTemplate</name>
+		</element>
+		<element>
+			<pattern>:CS:TpxGway:FilePath$</pattern>
+			<name>Tpx3FilePath</name>
+		</element>
+		<element>
+			<pattern>:CS:TpxGway:RunNumber$</pattern>
+			<name>Tpx3RunNumber</name>
+		</element>
+		<element>
+			<pattern>:CS:TpxGway:RunNumberOffset$</pattern>
+			<name>Tpx3RunNumberOffset</name>
+		</element>
+		<element>
+			<pattern>:CS:TpxGway:SPICENextScanNumber$</pattern>
+			<name>Tpx3SPICENextScanNumber</name>
+		</element>
+	</command>
+
+	<!-- Pre-Post-Auto-Reduction Command Interface for TAx/HB3 Graffiti -->
+	<command>
+		<name>GraffitiCommand</name>
+		<path>/HFIR/stcdata_hfir/stc_pre_post_graffiti.bash</path>
+		<!-- Graffiti Generation Conditional PV Check -->
+		<condition>
+			<name>Graffiti Generation Mode</name>
+			<pattern>:CS:Graffiti:Generate$</pattern>
+			<value>1</value><!-- Graffiti Data File Generation Activated -->
+		</condition>
+		<element>
+			<pattern>:CS:Graffiti:PVList$</pattern>
+			<name>PVList</name>
+		</element>
+		<element>
+			<pattern>:CS:GraffitiPVs:LIST$</pattern>
+			<name>LIST</name>
+		</element>
+		<element>
+			<pattern>^SampleName$</pattern>
+			<name>SampleName</name>
+		</element>
+		<element>
+			<pattern>^SampleNature$</pattern>
+			<name>SampleNature</name>
+		</element>
+		<element>
+			<pattern>:CS:IPTS:Members$</pattern>
+			<name>Members</name>
+		</element>
+		<element>
+			<pattern>:CS:IPTS:Contact$</pattern>
+			<name>Contact</name>
+		</element>
+	</command>
+
+	<!-- Pre-Post-Auto-Reduction Command Interface for NSE/BL15 Echo -->
+	<command>
+		<name>EchoCommand</name>
+		<path>/TESTING/SNS/stcdata_devel/stc_pre_post_nxs2echo.bash</path>
+		<!-- Echo Data File Generation Conditional PV Check -->
+		<condition>
+			<name>Echo Data File Generation Mode</name>
+			<pattern>:CS:Echo:Generate$</pattern>
+			<value>1</value><!-- Echo Data File Generation Activated -->
+		</condition>
 	</command>
 
 </stc_config>

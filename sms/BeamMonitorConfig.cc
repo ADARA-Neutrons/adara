@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.BeamMonitorConfig"));
+LOGGER("SMS.BeamMonitorConfig");
 
 #include <sstream>
 #include <string>
@@ -9,7 +9,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.BeamMonitorConfig"));
 #include <stdint.h>
 #include <time.h>
 
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "ADARA.h"
 #include "ADARAUtils.h"
@@ -581,6 +581,8 @@ private:
 BeamMonitorConfig::BeamMonitorConfig(
 		const boost::property_tree::ptree & conf)
 {
+	LOGGER_INIT();
+
 	boost::property_tree::ptree::const_iterator it;
 	std::string conf_prefix("monitor ");
 	size_t plen = conf_prefix.length();

@@ -11,7 +11,7 @@
 #include "ADARAPackets.h"
 
 // Global syslog info
-#define STC_VERSION "1.13.3"
+#define STC_VERSION "1.13.6"
 extern pid_t g_pid;
 
 #define STC_DOUBLE_EPSILON (0.00000000000001)
@@ -1200,6 +1200,12 @@ public:
         std::vector<double> a_time_buffer   ///< Duplicate PV Timestamps
     )
     {
+        std::stringstream ssinfo;
+        ssinfo << "devId=" << this->m_device_id
+            << " (" << this->m_device_name << ")";
+        ssinfo << " pvId=" << this->m_pv_id << " (" << this->m_name
+            << " [" << this->m_connection << "]" << ")";
+
         // Go Thru PV Values/Timestamps and Subsume Any Omitted...
 
         typename std::vector<T>::iterator ival =
@@ -1220,10 +1226,11 @@ public:
             // Snag the Rest of the Duplicate's Values/Timestamps...
             if ( ival == this->m_value_buffer.end() )
             {
-                syslog( LOG_ERR, "[%i] %s %s: %s - %s: %s @ %.9lf",
+                syslog( LOG_ERR, "[%i] %s %s: %s - %s %s: %s @ %.9lf",
                     g_pid, "STC Error:", "PVInfo::subsumeValues()",
                     "END of Our Log",
                     "ADD Omitted Value/Timestamp from Duplicate",
+                    ssinfo.str().c_str(),
                     valueToString( *ivalDup ).c_str(),
                     (*itimDup) );
                 give_syslog_a_chance;
@@ -1242,9 +1249,10 @@ public:
             else if ( (*itim) < (*itimDup) - STC_DOUBLE_EPSILON )
             {
                 syslog( LOG_ERR,
-                    "[%i] %s %s: %s: %s @ %.9lf < %.9lf [%lg]",
+                    "[%i] %s %s: %s %s: %s @ %.9lf < %.9lf [%lg]",
                     g_pid, "STC Error:", "PVInfo::subsumeValues()",
                     "Skip Our Value/Timestamp Omitted in Duplicate",
+                    ssinfo.str().c_str(),
                     valueToString( *ival ).c_str(),
                     (*itim), (*itimDup), STC_DOUBLE_EPSILON );
                 give_syslog_a_chance;
@@ -1256,9 +1264,10 @@ public:
             else if ( (*itimDup) < (*itim) - STC_DOUBLE_EPSILON )
             {
                 syslog( LOG_ERR,
-                    "[%i] %s %s: %s: %s @ %.9lf < %.9lf [%lg]",
+                    "[%i] %s %s: %s %s: %s @ %.9lf < %.9lf [%lg]",
                     g_pid, "STC Error:", "PVInfo::subsumeValues()",
                     "ADD Omitted Value/Timestamp from Duplicate",
+                    ssinfo.str().c_str(),
                     valueToString( *ivalDup ).c_str(),
                     (*itimDup), (*itim), STC_DOUBLE_EPSILON );
                 give_syslog_a_chance;
@@ -1282,9 +1291,10 @@ public:
                 if ( this->valuesEqual( *ival, *ivalDup ) )
                 {
                     syslog( LOG_ERR,
-                        "[%i] %s %s: %s: %s @ %.9lf == %s @ %.9lf [%lg]",
+                      "[%i] %s %s: %s %s: %s @ %.9lf == %s @ %.9lf [%lg]",
                         g_pid, "STC Error:", "PVInfo::subsumeValues()",
                         "Skip Past Identical Values",
+                        ssinfo.str().c_str(),
                         valueToString( *ival ).c_str(), (*itim),
                         valueToString( *ivalDup ).c_str(), (*itimDup),
                         STC_DOUBLE_EPSILON );
@@ -1301,10 +1311,11 @@ public:
                 else
                 {
                     syslog( LOG_ERR,
-                    "[%i] %s %s: %s %s: %s @ %.9lf vs %s @ %.9lf [%lg]",
+                    "[%i] %s %s: %s %s %s: %s @ %.9lf vs %s @ %.9lf [%lg]",
                         g_pid, "STC Error:", "PVInfo::subsumeValues()",
                         "WHOA...! Two Different Values at Same Timestamp!",
                         "ADD Other Value/Timestamp from Duplicate Anyway",
+                        ssinfo.str().c_str(),
                         valueToString( *ivalDup ).c_str(), (*itimDup),
                         valueToString( *ival ).c_str(), (*itim),
                         STC_DOUBLE_EPSILON );

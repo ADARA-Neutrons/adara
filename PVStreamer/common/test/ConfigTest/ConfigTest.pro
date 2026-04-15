@@ -42,7 +42,7 @@ HEADERS += \
     ../../../epics/EPICS_InputAdapter.h \
     ../../../epics/EPICS_DeviceAgent.h
 
-LIBS += -lboost_thread-mt -lxml2 -lboost_filesystem  \
+LIBS += -lboost_thread -lxml2 -lboost_filesystem  \
     -L/home/d3s/epics/lib/linux-x86_64 -lCom -lca
 
 OTHER_FILES += \

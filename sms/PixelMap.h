@@ -60,7 +60,13 @@ public:
 	}
 
 private:
-	std::auto_ptr<TempMap> readMap(const std::string &path);
+
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+	std::unique_ptr<TempMap>
+#else
+	std::auto_ptr<TempMap>
+#endif
+		readMap(const std::string &path);
 
 	boost::shared_array<uint8_t> genAltPacket(TempMap *map,
 		uint32_t &packetSize);

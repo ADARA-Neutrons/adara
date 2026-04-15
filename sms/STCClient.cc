@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.STCClient"));
+LOGGER("SMS.STCClient");
 
 #include <string>
 #include <sstream>
@@ -12,6 +12,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.STCClient"));
 #include <sys/socket.h>
 #include <stdint.h>
 
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/bind.hpp>
 
 #include "EPICS.h"
@@ -35,7 +36,7 @@ void STCClient::config(const boost::property_tree::ptree &conf)
 	std::string chunk = conf.get<std::string>("stcclient.maxsend", "2M");
 	try {
 		m_max_send_chunk = parse_size(chunk);
-	} catch (std::runtime_error e) {
+	} catch (std::runtime_error &e) {
 		std::string msg("Unable to parse STC max send: ");
 		msg += e.what();
 		throw std::runtime_error(msg);
@@ -50,6 +51,8 @@ STCClient::STCClient( int fd, StorageContainer::SharedPtr &run,
 	m_read(NULL), m_write(NULL), m_timer(NULL),
 	m_disp(STCClientMgr::CONNECTION_LOSS), m_reason("")
 {
+	LOGGER_INIT();
+
 	INFO("Initiating Translation of " << m_run->runNumber()
 		<< " SendPausedData=" << m_send_paused_data);
 
@@ -299,7 +302,7 @@ void STCClient::writable(void)
 			{
 				m_file_fd = f->get_fd();
 			}
-			catch ( std::runtime_error re )
+			catch ( std::runtime_error &re )
 			{
 				// Decode Any Mode Index from the File Index
 				// (SMS After 1.7.0)
@@ -708,7 +711,7 @@ void STCClient::readable(void)
 				 << " log_info=(" << log_info << ")");
 		}
 	}
-	catch (ADARA::invalid_packet e) {
+	catch (ADARA::invalid_packet &e) {
 		std::stringstream ss;
 		ss << "Got invalid packet from STC: " << e.what();
 		ERROR( ss.str() );

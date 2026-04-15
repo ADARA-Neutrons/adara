@@ -138,6 +138,8 @@ SUMMARY="AdaraMonitorSummary.$$.log"
 
 PREVIOUS="AdaraMonitorPreviousMarker.$$.marker"
 
+PREVIOUS_Existing="no"
+
 ##
 ## Functions:
 ##
@@ -148,11 +150,7 @@ PREVIOUS="AdaraMonitorPreviousMarker.$$.marker"
 
 DO_SUMMARY()
 {
-	echo
-
-	echo -n "Starting Summary: "
-	date
-
+	# Clear Any Existing Summary...
 	/bin/rm "${CACHE_DIR}/${SUMMARY}" > /dev/null 2>&1
 
 	# Leave "Previous" Breadcrumb for Next ADARA Summary... ;-D
@@ -160,18 +158,32 @@ DO_SUMMARY()
 	# Don't Clear Any New Error Logs from _During_ the Summary...! ;-D
 	touch "${CACHE_DIR}/${PREVIOUS}"
 
+	# Make "Previous" Breadcrumb Group Readable, As Needed... ;-D
+	if [[ ${PREVIOUS_Existing} == "no" ]]; then
+		chmod g+w "${CACHE_DIR}/${PREVIOUS}"
+	fi
+
+	# Start New Summary...
+	touch "${CACHE_DIR}/${SUMMARY}"
+	chmod g+w "${CACHE_DIR}/${SUMMARY}"
+
+	echo
+
+	echo -n "Starting Summary: " | tee -a "${CACHE_DIR}/${SUMMARY}"
+	date | tee -a "${CACHE_DIR}/${SUMMARY}"
+
 	# Remove Globbed File List If None Found...
 	shopt -s nullglob
 
 	${ADARA_SUMMARY} --terse --nostdin ${ALTOPT} "${CACHE_DIR}"/*.txt \
-		> "${CACHE_DIR}/${SUMMARY}"
+		>> "${CACHE_DIR}/${SUMMARY}"
 
 	# Restore Normal Shell Globbing...
 	shopt -u nullglob
 
 	LAST_CACHE_STATE=`/bin/ls -ld "${CACHE_DIR}"`
 
-	${CAT} "${CACHE_DIR}/${SUMMARY}"
+	${CAT} "${CACHE_DIR}/${SUMMARY}" | grep -v "Starting Summary:"
 
 	LAST_TIME=`date +"%s"`
 
@@ -197,8 +209,8 @@ DO_SUMMARY()
 	
 	done
 
-	echo -n "Summary Done: "
-	date
+	echo -n "Summary Done: " | tee -a "${CACHE_DIR}/${SUMMARY}"
+	date | tee -a "${CACHE_DIR}/${SUMMARY}"
 
 	if [[ $do_autoexit == 1 ]]; then
 
@@ -338,6 +350,8 @@ DO_CONNECT()
 
 	PREVIOUS="AdaraMonitorPreviousMarker.${_connPid}.marker"
 
+	PREVIOUS_Existing="yes"
+
 	echo -e "\nConnected to ADARA Monitor PID=[${_connPid}]:"
 	echo -e "\n   SUMMARY=[${SUMMARY}]"
 	echo -e "\n   PREVIOUS=[${PREVIOUS}]"
@@ -350,7 +364,11 @@ DO_CONNECT()
 
 	/bin/ls -l "${CACHE_DIR}/${SUMMARY}" | /usr/bin/sed -e "s@ /@\n    /@"
 
+	echo
+
 	${CAT} "${CACHE_DIR}/${SUMMARY}"
+
+	echo
 
 	cknone=`${GREP} "NO ERRORS/FILES" "${CACHE_DIR}/${SUMMARY}" \
 		| ${WC} | ${AWK} '{print $1}'`
@@ -414,7 +432,9 @@ DO_CMD()
 			echo
 			/bin/ls -l "${CACHE_DIR}/${SUMMARY}" \
 				| /usr/bin/sed -e "s@ /@\n    /@"
+			echo
 			/bin/cat "${CACHE_DIR}/${SUMMARY}"
+			echo
 		else
 			echo -e "${_nl}Refreshing ADARA Summary..."
 			DO_SUMMARY

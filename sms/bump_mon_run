@@ -12,10 +12,13 @@ fi
 USAGE()
 {
 	echo -e "\nusage:  bump_mon_run [--beamline=\"BL12MON\"]"
+	echo -e "\t[--instance_id=<0123>]\n"
 	echo -e "\t[--config=\"/SNSlocal/sms-mon/conf/smsd.conf\"]\n"
 }
 
 CONFIG="/SNSlocal/sms-mon/conf/smsd.conf"
+SMS_ID="[NotSet]"
+SMS="SMS"
 BL=""
 
 for arg in "$@" ; do
@@ -23,11 +26,13 @@ for arg in "$@" ; do
 	key=`echo "$arg" | awk -F = '{print $1}'`
 	value=`echo "$arg" | awk -F = '{print $2}'`
 
-	if [ "#$key#" == '#--beamline#' ]; then
+	if [[ "#$key#" == '#--beamline#' ]]; then
 		BL="$value"
-	elif [ "#$key#" == '#--config#' ]; then
+	elif [[ "#$key#" == '#--instance_id#' ]]; then
+		SMS_ID="$value"
+	elif [[ "#$key#" == '#--config#' ]]; then
 		CONFIG="$value"
-	elif [ "#$key#" == '#--help#' ]; then
+	elif [[ "#$key#" == '#--help#' ]]; then
 		USAGE
 		exit 0
 	fi
@@ -44,9 +49,13 @@ if [[ -z "${BL}" ]]; then
 	exit -1
 fi
 
+if [[ ${SMS_ID} != "[NotSet]" && ${SMS_ID} != 0 ]]; then
+	SMS="${SMS}:${SMS_ID}"
+fi
+
 # Are We In A Monitor Run, As Expected...?
-ckrun=`caget ${BL}:SMS:Recording`
-inrun=`echo "${ckrun}" | grep "^${BL}:SMS:Recording" | awk '{print $2}'`
+ckrun=`caget ${BL}:${SMS}:Recording`
+inrun=`echo "${ckrun}" | grep "^${BL}:${SMS}:Recording" | awk '{print $2}'`
 
 do_log=0
 
@@ -57,15 +66,16 @@ if [[ "$inrun" == "true" ]]; then
 	# Try 3 Times, as Needed...
 	cnt=0
 	while [[ $cnt -lt 3 ]]; do
-		stopout=`caput ${BL}:SMS:Recording false`
+		stopout=`caput ${BL}:${SMS}:Recording false`
 		stopck=`echo "${stopout}" | grep '^New' | awk '{print $4}'`
 		if [[ "$stopck" != "false" ]]; then
 			echo -e "\nError Stopping Previous Run...! (stopck=[$stopck])\n"
 			echo -e -n "\nOutput from "
-			echo -e "\"caput ${BL}:SMS:Recording false\" command:"
+			echo -e "\"caput ${BL}:${SMS}:Recording false\" command:"
 			echo -e "\n${stopout}\n"
-			caget -S -a ${BL}:SMS:Recording ${BL}:SMS:RunNumber \
-				${BL}:SMS:Summary ${BL}:SMS:SummaryReason
+			caget -S -a ${BL}:${SMS}:Recording ${BL}:${SMS}:RunNumber \
+				${BL}:${SMS}:Next:RunNumber \
+				${BL}:${SMS}:Summary ${BL}:${SMS}:SummaryReason
 			echo -e "\nRetrying, cnt=$cnt/3..."
 			cnt=$(( $cnt + 1 ))
 			do_log=1
@@ -82,7 +92,7 @@ if [[ "$inrun" == "true" ]]; then
 		exit -2
 	elif [[ $do_log == 1 ]]; then
 		echo -e "\nRun Eventually Stopped:\n"
-		caget -a ${BL}:SMS:Recording
+		caget -a ${BL}:${SMS}:Recording
 		echo
 	fi
 
@@ -96,14 +106,16 @@ fi
 # Try 3 Times, as Needed...
 cnt=0
 while [[ $cnt -lt 3 ]]; do
-	startout=`caput ${BL}:SMS:Recording true`
+	startout=`caput ${BL}:${SMS}:Recording true`
 	startck=`echo "${startout}" | grep '^New' | awk '{print $4}'`
 	if [[ "$startck" != "true" ]]; then
 		echo -e "\nError Starting New Run...! (startck=[$startck])\n"
-		echo -e "\nOutput from \"caput ${BL}:SMS:Recording true\" command:"
+		echo -e \
+			"\nOutput from \"caput ${BL}:${SMS}:Recording true\" command:"
 		echo -e "\n${startout}\n"
-		caget -S -a ${BL}:SMS:Recording ${BL}:SMS:RunNumber \
-			${BL}:SMS:Summary ${BL}:SMS:SummaryReason
+		caget -S -a ${BL}:${SMS}:Recording ${BL}:${SMS}:RunNumber \
+			${BL}:${SMS}:Next:RunNumber \
+			${BL}:${SMS}:Summary ${BL}:${SMS}:SummaryReason
 		echo -e "\nRetrying, cnt=$cnt/3..."
 		cnt=$(( $cnt + 1 ))
 		do_log=1
@@ -119,7 +131,7 @@ if [[ $cnt -ge 3 ]]; then
 	exit -3
 elif [[ $do_log == 1 ]]; then
 	echo -e "\nRun Started:\n"
-	caget -a ${BL}:SMS:Recording
+	caget -a ${BL}:${SMS}:Recording
 	echo
 fi
 

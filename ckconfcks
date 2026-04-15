@@ -11,16 +11,19 @@ CONFCKS="./dasmon/server/confck.dasmon \
 	./stc/confck.stc \
 	./stc/confck.stc-config \
 	./PVStreamer/pvsd/confck.pvsd \
-	./sms/confck.smsd-mon \
 	./sms/confck.smsd \
-	./sms/confck.now"
+	./sms/confck.smsd-mon \
+	./sms/confck.now \
+	./sms/confck.cg1d \
+	./sms/confck.test"
 
 MKSTATLISTS="./dasmon/server/mkstatlist.dasmon \
 	./stc/mkstatlist.stc \
 	./PVStreamer/pvsd/mkstatlist.pvsd \
-	./sms/mkstatlist.smsd-mon \
 	./sms/mkstatlist.smsd \
-	./sms/mkstatlist.now"
+	./sms/mkstatlist.smsd-mon \
+	./sms/mkstatlist.now \
+	./sms/mkstatlist.test"
 
 echo -e -n "\nComparing Git Repo ConfCk/MkStatList Templates"
 echo -e " Versus Deployed in:"

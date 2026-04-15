@@ -48,7 +48,7 @@ LOG_DIR="${PROG}"
 LOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short.log"
 LOGLOGFILE="${LOG_HOME}/${LOG_DIR}/${PROG}.$host_short-log.log"
 
-PVSD_USER="root"
+PVSD_USER="snsdata"
 PVSD="pvsd"
 
 PVSD_LOG="/var/log/pvsd.log"
@@ -166,7 +166,6 @@ SET_ERROR_COUNT()
 	elif [[ $min -eq ${SOS_MIN} ]]; then
 		echo -e -n "${NL}Error Writing Error Count (${ERROR_COUNT})"
 		echo " to PVSD Monitor Log File!"
-		echo -e "\n${ckt}"
 		NL="\n"
 	fi
 }

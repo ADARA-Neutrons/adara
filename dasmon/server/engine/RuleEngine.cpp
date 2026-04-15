@@ -18,7 +18,6 @@ using namespace std;
 
 // Value constructors for support native types
 RuleEngine::Value::Value() : m_type( VT_VOID ), m_int_value( 1 ) {}
-RuleEngine::Value::Value( const RuleEngine::Value &a_src ) : m_type( a_src.m_type ), m_int_value( a_src.m_int_value ) {}
 RuleEngine::Value::Value( bool a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
 RuleEngine::Value::Value( int8_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}
 RuleEngine::Value::Value( int16_t a_value ) : m_type( VT_INT ), m_int_value( (int32_t)a_value ) {}

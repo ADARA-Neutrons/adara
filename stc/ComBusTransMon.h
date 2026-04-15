@@ -22,7 +22,8 @@ public:
         const std::string &a_broker_uri,
         const std::string &a_broker_user,
         const std::string &a_broker_pass,
-        const std::string &a_domain );
+        const std::string &a_domain,
+        bool a_no_msg_wait );
 
     void success( bool a_moved, const std::string &a_nexus_file );
 
@@ -38,6 +39,7 @@ private:
     std::string                 m_broker_uri;
     std::string                 m_broker_user;
     std::string                 m_broker_pass;
+    bool                        m_no_msg_wait;
     boost::thread              *m_comm_thread;
     bool                        m_stop;
     bool                        m_send_to_workflow;

@@ -12,7 +12,7 @@ char *NAMED_RSYSLOG_PIPE = "/etc/rsyslog.pipes/criticalMessages";
 
 char *SYSTEM_PIPE_MAX_SIZE = "/proc/sys/fs/pipe-max-size";
 
-main()
+int main()
 {
 	FILE *fp;
 

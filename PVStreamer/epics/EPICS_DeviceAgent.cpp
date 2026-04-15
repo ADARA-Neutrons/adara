@@ -1360,6 +1360,8 @@ void
 DeviceAgent::epicsConnectionHandler(
         struct connection_handler_args a_args )
 {
+    uint32_t errQueueCount = 0;
+
     try
     {
         // Connection established?
@@ -1588,6 +1590,9 @@ DeviceAgent::epicsConnectionHandler(
                     m_stream_api.getFreePacket( 5000, timeout );
                 if ( pkt )
                 {
+                    // Reset Queue Error Count...
+                    errQueueCount = 0;
+
                     pkt->type = VariableUpdate;
                     pkt->device = ich->second.m_device;
                     pkt->pv = ich->second.m_pv;
@@ -1597,24 +1602,41 @@ DeviceAgent::epicsConnectionHandler(
                 }
                 else
                 {
-                    if ( m_stream_api.getFreeQueueActive() )
+                    // Increment Queue Error Count...
+                    errQueueCount++;
+
+                    if ( errQueueCount < 11 )
                     {
-                        syslog( LOG_ERR, "%s %s: %s %s%s%s [%s = %lu]",
-                            "PVSD ERROR:",
-                            "DeviceAgent::epicsConnectionHandler()",
-                            "No Free Packets!", "VariableUpdate Lost",
-                            deviceStr.c_str(), pvStr.c_str(),
-                            "Filled Queue Size",
-                            (unsigned long)
-                                m_stream_api.getFilledQueueSize() );
-                        usleep(33333); // give syslog a chance...
+                        if ( m_stream_api.getFreeQueueActive() )
+                        {
+                            syslog( LOG_ERR, "%s %s: %s %s%s%s [%s = %lu]",
+                                "PVSD ERROR:",
+                                "DeviceAgent::epicsConnectionHandler()",
+                                "No Free Packets!", "VariableUpdate Lost",
+                                deviceStr.c_str(), pvStr.c_str(),
+                                "Filled Queue Size",
+                                (unsigned long)
+                                    m_stream_api.getFilledQueueSize() );
+                            usleep(33333); // give syslog a chance...
+                        }
+                        else
+                        {
+                            syslog( LOG_ERR, "%s %s: %s %s%s%s",
+                                "PVSD ERROR:",
+                                "DeviceAgent::epicsConnectionHandler()",
+                                "Queue Deactivated,",
+                                "Ignore VariableUpdate",
+                                deviceStr.c_str(), pvStr.c_str() );
+                            usleep(33333); // give syslog a chance...
+                        }
                     }
-                    else
+                    else if ( errQueueCount == 11 )
                     {
-                        syslog( LOG_ERR, "%s %s: %s %s%s%s",
+                        syslog( LOG_ERR, "%s %s: %u %s%s%s",
                             "PVSD ERROR:",
                             "DeviceAgent::epicsConnectionHandler()",
-                            "Queue Deactivated,", "Ignore VariableUpdate",
+                            errQueueCount,
+                            "Queue Error Log Count Exceeded...",
                             deviceStr.c_str(), pvStr.c_str() );
                         usleep(33333); // give syslog a chance...
                     }
@@ -1679,6 +1701,9 @@ DeviceAgent::updateState( const void *a_src, PVState &a_state )
 void
 DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 {
+    uint32_t undefinedDeviceCount = 0;
+    uint32_t errQueueCount = 0;
+
     try
     {
         // Valid status / db record?
@@ -1989,11 +2014,17 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                 // Send value/alarm data if device is fully defined
                 if ( m_defined )
                 {
+                    // Reset Undefined Device Count...
+                    undefinedDeviceCount = 0;
+
                     bool timeout;
                     StreamPacket *pkt =
                         m_stream_api.getFreePacket( 5000, timeout );
                     if ( pkt )
                     {
+                        // Reset Queue Error Count...
+                        errQueueCount = 0;
+
                         pkt->type = VariableUpdate;
                         pkt->device = ich->second.m_device;
                         pkt->pv = ich->second.m_pv;
@@ -2003,6 +2034,9 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                     }
                     else
                     {
+                        // Increment Queue Error Count...
+                        errQueueCount++;
+
                         std::string deviceStr = "";
                         if ( ich->second.m_device != NULL )
                         {
@@ -2018,24 +2052,38 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                                 + ich->second.m_pv->m_connection + ")";
                         }
 
-                        if ( m_stream_api.getFreeQueueActive() )
+                        if ( errQueueCount < 11 )
                         {
-                            syslog( LOG_ERR, "%s %s: %s %s%s [%s = %lu]",
-                                "PVSD ERROR:",
-                                "DeviceAgent::epicsEventHandler()",
-                                "No Free Packets! VariableUpdate Lost",
-                                deviceStr.c_str(), pvStr.c_str(),
-                                "Filled Queue Size",
-                                (unsigned long)
+                            if ( m_stream_api.getFreeQueueActive() )
+                            {
+                                syslog( LOG_ERR,
+                                "%s %s: %s %s%s [%s = %lu]",
+                                    "PVSD ERROR:",
+                                    "DeviceAgent::epicsEventHandler()",
+                                    "No Free Packets! VariableUpdate Lost",
+                                    deviceStr.c_str(), pvStr.c_str(),
+                                    "Filled Queue Size",
+                                    (unsigned long)
                                     m_stream_api.getFilledQueueSize() );
-                            usleep(33333); // give syslog a chance...
+                                usleep(33333); // give syslog a chance...
+                            }
+                            else
+                            {
+                                syslog( LOG_ERR, "%s %s: %s%s%s",
+                                    "PVSD ERROR:",
+                                    "DeviceAgent::epicsEventHandler()",
+                                "Queue Deactivated, Ignore VariableUpdate",
+                                    deviceStr.c_str(), pvStr.c_str() );
+                                usleep(33333); // give syslog a chance...
+                            }
                         }
-                        else
+                        else if ( errQueueCount == 11 )
                         {
-                            syslog( LOG_ERR, "%s %s: %s%s%s",
+                            syslog( LOG_ERR, "%s %s: %u %s%s%s",
                                 "PVSD ERROR:",
                                 "DeviceAgent::epicsEventHandler()",
-                                "Queue Deactivated, Ignore VariableUpdate",
+                                errQueueCount,
+                                "Queue Error Log Count Exceeded...",
                                 deviceStr.c_str(), pvStr.c_str() );
                             usleep(33333); // give syslog a chance...
                         }
@@ -2045,6 +2093,9 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                 // Device Not Yet Defined, Ignoring Value Update...!
                 else
                 {
+                    // Increment Undefined Device Count...
+                    undefinedDeviceCount++;
+
                     std::string deviceStr = "";
                     if ( ich->second.m_device != NULL )
                     {
@@ -2060,12 +2111,37 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
                             + ich->second.m_pv->m_connection + ")";
                     }
 
-                    syslog( LOG_ERR, "%s %s: %s%s%s",
-                        "PVSD ERROR:",
-                        "DeviceAgent::epicsEventHandler()",
+                    if ( errQueueCount < 11 )
+                    {
+                        syslog( LOG_ERR, "%s %s: %s%s%s",
+                            "PVSD ERROR:",
+                            "DeviceAgent::epicsEventHandler()",
                         "Device Not Yet Defined, Ignore VariableUpdate",
-                        deviceStr.c_str(), pvStr.c_str() );
-                    usleep(33333); // give syslog a chance...
+                            deviceStr.c_str(), pvStr.c_str() );
+                        usleep(33333); // give syslog a chance...
+                    }
+                    else if ( errQueueCount == 11 )
+                    {
+                        syslog( LOG_ERR, "%s %s: %u %s%s%s",
+                            "PVSD ERROR:",
+                            "DeviceAgent::epicsEventHandler()",
+                            undefinedDeviceCount,
+                            "Undefined Device Log Count Exceeded...",
+                            deviceStr.c_str(), pvStr.c_str() );
+                        usleep(33333); // give syslog a chance...
+                    }
+                    else if ( errQueueCount > 1000 )
+                    {
+                        syslog( LOG_ERR, "%s %s: %u %s%s%s",
+                            "PVSD ERROR:",
+                            "DeviceAgent::epicsEventHandler()",
+                            undefinedDeviceCount,
+                            "Resetting Undefined Device Log Count...",
+                            deviceStr.c_str(), pvStr.c_str() );
+                        usleep(33333); // give syslog a chance...
+
+                        errQueueCount = 0;
+                    }
                 }
             }
 
@@ -2165,6 +2241,8 @@ DeviceAgent::epicsEventHandler( struct event_handler_args a_args )
 void
 DeviceAgent::sendCurrentValues()
 {
+    uint32_t errQueueCount = 0;
+
     for ( map<chid,ChanInfo>::iterator ich = m_chan_info.begin();
             ich != m_chan_info.end(); ++ich )
     {
@@ -2201,6 +2279,9 @@ DeviceAgent::sendCurrentValues()
         StreamPacket *pkt = m_stream_api.getFreePacket( 5000, timeout );
         if ( pkt )
         {
+            // Reset Queue Error Count...
+            errQueueCount = 0;
+
             pkt->type = VariableUpdate;
             pkt->device = ich->second.m_device;
             pkt->pv = ich->second.m_pv;
@@ -2218,21 +2299,37 @@ DeviceAgent::sendCurrentValues()
         }
         else
         {
-            if ( m_stream_api.getFreeQueueActive() )
+            // Increment Queue Error Count...
+            errQueueCount++;
+
+            if ( errQueueCount < 11 )
             {
-                syslog( LOG_ERR, "%s %s: %s%s%s [%s = %lu]",
-                    "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
-                    "No Free Packets! VariableUpdate Lost for",
-                    deviceStr.c_str(), pvStr.c_str(),
-                    "Filled Queue Size",
-                    (unsigned long) m_stream_api.getFilledQueueSize() );
-                usleep(33333); // give syslog a chance...
+                if ( m_stream_api.getFreeQueueActive() )
+                {
+                    syslog( LOG_ERR, "%s %s: %s%s%s [%s = %lu]",
+                        "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
+                        "No Free Packets! VariableUpdate Lost for",
+                        deviceStr.c_str(), pvStr.c_str(),
+                        "Filled Queue Size",
+                        (unsigned long)
+                            m_stream_api.getFilledQueueSize() );
+                    usleep(33333); // give syslog a chance...
+                }
+                else
+                {
+                    syslog( LOG_ERR, "%s %s: %s%s%s",
+                        "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
+                        "Queue Deactivated, Ignore VariableUpdate for",
+                        deviceStr.c_str(), pvStr.c_str() );
+                    usleep(33333); // give syslog a chance...
+                }
             }
-            else
+            else if ( errQueueCount == 11 )
             {
-                syslog( LOG_ERR, "%s %s: %s%s%s",
+                syslog( LOG_ERR, "%s %s: %u %s%s%s",
                     "PVSD ERROR:", "DeviceAgent::sendCurrentValues()",
-                    "Queue Deactivated, Ignore VariableUpdate for",
+                    errQueueCount,
+                    "Queue Error Log Count Exceeded...",
                     deviceStr.c_str(), pvStr.c_str() );
                 usleep(33333); // give syslog a chance...
             }

@@ -543,6 +543,10 @@ PARSE_LOG()
 	base_app=`echo "$log" | awk '{print $2}' | sed "s/:$//"`
 	#echo "base_app=[$base_app]"
 
+	# Strip Off Any [PID] in the Base Application String... (RHEL9 ;-b)
+	base_app=`echo "$base_app" | awk -F "[][]" '{print $1}'`
+	#echo "PID-stripped base_app=[$base_app]"
+
 	known=0
 
 	# Flag Any "Alternate" or Additional SMSD Apps... (e.g. "-mon")
@@ -569,7 +573,8 @@ PARSE_LOG()
 
 		# Strip Off STC PID and Error Prefix...
 		if [[ "$log" =~ \
-				${base_app}:${S}\[[0-9]+\]${S}STC${S}Error: ]]; then
+				${base_app}[]0-9[]*:${S}\[[0-9]+\]${S}STC${S}Error: ]]; \
+		then
 			pid=`echo "$log" | awk '{print $3}'`
 			log=`echo "$log" | \
 			awk '{for(i=6;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
@@ -1077,7 +1082,7 @@ PARSE_LOG()
 		known=1
 
 		# Strip Off SMS Error Prefix...
-		if [[ "$log" =~ ${base_app}:${S}ERROR ]]; then
+		if [[ "$log" =~ ${base_app}[]0-9[]*:${S}ERROR ]]; then
 			log=`echo "$log" | \
 			awk '{for(i=4;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else
@@ -1622,7 +1627,7 @@ PARSE_LOG()
 		known=1
 
 		# Strip Off PVSD ERROR Prefix...
-		if [[ "$log" =~ ${base_app}:${S}PVSD${S}ERROR ]]; then
+		if [[ "$log" =~ ${base_app}[]0-9[]*:${S}PVSD${S}ERROR ]]; then
 			log=`echo "$log" | \
 			awk '{for(i=5;i<NF;i++)printf("%s ",$(i));printf("%s",$NF);}'`
 		else

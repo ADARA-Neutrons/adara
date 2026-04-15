@@ -3,8 +3,11 @@
 #include <sstream>
 #include <activemq/commands/Command.h>
 #include <decaf/io/EOFException.h>
+
+#define BOOST_BIND_GLOBAL_PLACEHOLDERS // Duh...
 #include <boost/thread/locks.hpp>
 #include <boost/lexical_cast.hpp>
+
 #include <unistd.h>
 #include <cctype>
 #include <string>
@@ -17,11 +20,11 @@
 
 #include <syslog.h>
 
-#elif defined(LOGCXX_LOGGING)
+#elif defined(LOG4C_LOGGING)
 
 #include "../sms/Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("ADARA.ComBus"));
+LOGGER("ADARA.ComBus");
 
 #endif
 
@@ -286,6 +289,10 @@ Connection::Connection( std::string &a_domain,
     m_connection(0), m_session(0),
     m_reconnect_thread(0), m_reconn_retry(2), m_status_thread(0)
 {
+#if defined(LOG4C_LOGGING)
+    LOGGER_INIT();
+#endif
+
     exceptionLog("ComBus Connection() Entry", INFO_LOG);
 
     if ( g_inst )
@@ -1189,11 +1196,19 @@ Connection::postWorkflow( MessageBase &a_msg )
 
         try
         {
-            auto_ptr<cms::Queue> q( m_session->createQueue(
-                "POSTPROCESS.DATA_READY" ));
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+            unique_ptr<cms::Queue>
+#else
+            auto_ptr<cms::Queue>
+#endif
+                q( m_session->createQueue( "POSTPROCESS.DATA_READY" ) );
 
-            auto_ptr<cms::MessageProducer> producer(
-                m_session->createProducer( q.get()) );
+#if defined(__GNUC__) && __GNUC_PREREQ(11,0)
+            unique_ptr<cms::MessageProducer>
+#else
+            auto_ptr<cms::MessageProducer>
+#endif
+                producer( m_session->createProducer( q.get() ) );
 
             cmsmsg = m_session->createTextMessage();
             a_msg.serialize( *cmsmsg );
@@ -1496,7 +1511,7 @@ Connection::exceptionLog( string a_msg, ADARA::ComBus::LogStatus a_status )
             m_log_err_prefix.c_str(), a_msg.c_str() );
     }
 
-#elif defined(LOGCXX_LOGGING)
+#elif defined(LOG4C_LOGGING)
 
     // Log4cxx Logging...
     if ( a_status == INFO_LOG )

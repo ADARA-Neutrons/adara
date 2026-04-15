@@ -1,7 +1,7 @@
 
 #include "Logging.h"
 
-static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
+LOGGER("SMS.LiveServer");
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -10,7 +10,7 @@ static LoggerPtr logger(Logger::getLogger("SMS.LiveServer"));
 #include <netdb.h>
 
 #include <boost/lexical_cast.hpp>
-#include <boost/bind.hpp>
+#include <boost/bind/bind.hpp>
 
 #include "EPICS.h"
 #include "StorageManager.h"
@@ -68,6 +68,8 @@ bool LiveServer::m_send_paused_data = false;
 
 void LiveServer::config(const boost::property_tree::ptree &conf)
 {
+	LOGGER_INIT();
+
 	m_service = conf.get<std::string>("livestream.service", "31415");
 
 	m_host = conf.get<std::string>("livestream.uri", "ANY");

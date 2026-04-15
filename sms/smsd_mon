@@ -7,6 +7,11 @@
 # (and maybe even notify via email or text message on a crash...! :-)
 #
 
+# Source Controls Environment (for ${BL} env setting):
+if [ -e /etc/profile.d/controls.sh ] ; then
+	source /etc/profile.d/controls.sh
+fi
+
 # For Cron Usage - Source Home Shell Environment:
 if [ -e $HOME/.bash_profile ] ; then
 	source $HOME/.bash_profile
@@ -59,6 +64,7 @@ S="[[:space:]]"
 
 ALT="" # for Alternate/Secondary SMS Deployments... ;-D
 ALTLABEL=""
+IGNORE_ALT="-e ${SMSD}-"
 
 # The Minute When We Gasp Our Dying Breath and Beg for Help... ;-D
 SOS_MIN=0
@@ -90,6 +96,7 @@ for arg in "$@" ; do
 		SMSD="smsd${ALT}"
 		SMS="sms${ALT}"
 		SMSD_LOG="/var/log/${SMSD}.log"
+		IGNORE_ALT=""
 	elif [ "#$key#" == '#--help#' ]; then
 		echo -n "usage:  ${PROG} [--no_notify] [--smsd_user=$USER]"
 		echo " [--alt=\"-mon\"]"
@@ -172,7 +179,6 @@ SET_ERROR_COUNT()
 	elif [[ $min -eq ${SOS_MIN} ]]; then
 		echo -e -n "${NL}Error Writing Error Count (${ERROR_COUNT})"
 		echo " to SMS Daemon Monitor Log File!"
-		echo -e "\n${ckt}"
 		NL="\n"
 	fi
 }
@@ -217,7 +223,8 @@ CHECK_ERROR_REPORTING()
 # Get SMS Daemon process status...
 #
 
-status=`ps augxww | grep $SMSD | grep -v -e $PROG -e $TIME -e grep \
+status=`ps augxww | grep $SMSD \
+	| grep -v -e $PROG -e $TIME -e grep $IGNORE_ALT \
 	| grep $SMSD_USER`
 #echo "status=$status"
 
@@ -327,6 +334,7 @@ if [ $do_notify == 1 ]; then
 
 				caget ${WAIT} -a "${prefix}:Recording"
 				caget ${WAIT} "${prefix}:RunNumber"
+				caget ${WAIT} "${prefix}:Next:RunNumber"
 				caget ${WAIT} "${summaryPV}"
 				caget ${WAIT} -S "${prefix}:SummaryReason"
 
@@ -354,6 +362,7 @@ if [ $do_notify == 1 ]; then
 
 					caget ${WAIT} -a "${prefix}:Recording"
 					caget ${WAIT} "${prefix}:RunNumber"
+					caget ${WAIT} "${prefix}:Next:RunNumber"
 					caget ${WAIT} "${summaryPV}"
 					caget ${WAIT} -S "${prefix}:SummaryReason"
 
@@ -376,6 +385,28 @@ if [ $do_notify == 1 ]; then
 			echo " SMS${ALTLABEL} ${SMSD}${ALT} Config File Not Found!"
 			echo -e "\n\t[${SMSD_CONFIG}]\n"
 			/bin/ls -l ${SMSD_CONFIG}
+			NL="\n"
+		fi
+
+	fi
+
+	# Check for Non-Zero "Pending Runs"...! ;-o
+
+	pending_log=`grep "pending runs" /var/log/smsd.log | tail -1`
+
+	pending=`echo "${pending_log}" | awk -F "," '{print $4}' \
+		| awk '{print $1}'`
+
+	if [[ ${pending} -gt 1 ]]; then
+
+		CHECK_ERROR_REPORTING
+		do_report="$?"
+
+		# Report Error...
+		if [[ $do_report == 1 ]]; then
+			echo -e -n "${NL}Error on ${host}:"
+			echo " SMS${ALTLABEL} has ${pending} Pending Runs!"
+			echo -e "\n\t[${pending_log}]\n"
 			NL="\n"
 		fi
 
@@ -418,28 +449,54 @@ cpuT=`echo "$status" | awk '{print $10}'`
 log="$log time=$cpuT"
 
 #
-# Dump SMS Daemon Status Snapshot into Log file...
+# Check on the SMS Local Data Filesystem Usage...
+#
+# (Eminently More Important than checking the Log File Size, lol... ;-D)
 #
 
-if [[ -w "${LOGFILE}" ]]; then
+SMS_DATA="${SMS_HOME}/${SMS}/data/"
 
-	echo -e "$log" >> ${LOGFILE}
+data_usage=`df -h ${SMS_DATA}`
+#echo -e "data_usage:\n${data_usage}"
 
-# Only Whine Once Per Hour If We've Become Disconnected from the Universe...
-elif [[ $min -eq ${SOS_MIN} ]]; then
+data_pct_str=`echo -e "${data_usage}" | tail -1 | awk '{print $(NF-1)}'`
+#echo "data_pct_str=[$data_pct_str]"
 
-	echo -e "${NL}Error: SMS Daemon Monitor Log File Unwritable!"
-	echo -e "\n$log"
-	NL="\n"
+data_pct="${data_pct_str%"%"}"
+#echo "data_pct=[$data_pct]"
+
+# Nominally, We Usually Shoot for 80% Full at Most...
+# -> Check for 85%, to Give Some Head Room for "Other Stuff"
+#    that may Also be Stored Under /SNSlocal/...
+
+if [[ ${data_pct} -ge 85 ]]; then
+
+	# Error for Log file... (Don't Write Now, Else Breaks Error Count!)
+	disk_full="*** Data Filesystem Getting Full at ${data_pct}%!!"
+
+	CHECK_ERROR_REPORTING
+	do_report="$?"
+
+	# Report Error...
+	if [[ $do_report == 1 ]]; then
+
+		echo -e -n "${NL}Error on ${host}: Data Filesystem Getting Full"
+		echo -e " at ${data_pct}% for SMS${ALTLABEL}!\n"
+		echo -e "${data_usage}"
+		NL="\n"
+
+	fi
 
 fi
 
 #
 # Check on the SMS Daemon Log File size/usage...
 #
+# (Done for Hysterical Reasons, Probably Before Log Rotation, Lol... ;-D)
+#
 
-# Only check once or twice per day maybe...?
-if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
+# Check Twice Per Day, 8am and 5pm...
+if [[ ( $hour -eq 8 || $hour -eq 17 ) && $min -eq 0 ]]; then
 
 	log_bytes=`/bin/ls -l $SMSD_LOG | awk '{print $5}'`
 	log_hbytes=`/bin/ls -lh $SMSD_LOG | awk '{print $5}'`
@@ -506,14 +563,6 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 	#		echo "   $SMSD_LOG $log_bytes ($log_hbytes)"
 	#		NL="\n"
 	#	fi
-	#	# Set Error Count for Next Invocation,
-	#	if [[ ${ERROR_COUNT} -gt 0 ]]; then
-	#		SET_ERROR_COUNT
-	#		if [[ ${log_error} != 0 ]]; then
-	#			echo -e "${NL}ErrorCount=${ERROR_COUNT}"
-	#		fi
-	#	fi
-	#	exit -2
 	# fi
 
 	if [[ $pct_used -gt 80 ]]; then
@@ -529,17 +578,35 @@ if [[ ( $hour -eq 10 || $hour -eq 16 ) && $min -eq 0 ]]; then
 			NL="\n"
 		fi
 
-		# Set Error Count for Next Invocation,
-		if [[ ${ERROR_COUNT} -gt 0 ]]; then
-			SET_ERROR_COUNT
-			if [[ ${log_error} != 0 ]]; then
-				echo -e "${NL}ErrorCount=${ERROR_COUNT}"
-			fi
-		fi
-
-		exit -3
-
 	fi
+
+fi
+
+#
+# Dump SMS Daemon Status Snapshot into Log file...
+#
+# (Do This at the Very End, So We Don't Corrupt Any Error Count
+#    at the Tail of the Log file...! ;-D)
+#
+
+if [[ -w "${LOGFILE}" ]]; then
+
+	echo -e "$log" >> ${LOGFILE}
+
+	if [[ -n "${data_usage}" ]]; then
+		echo -e "${data_usage}" >> ${LOGFILE}
+	fi
+
+	if [[ -n "${disk_full}" ]]; then
+		echo -e "${disk_full}" >> ${LOGFILE}
+	fi
+
+# Only Whine Once Per Hour If We've Become Disconnected from the Universe...
+elif [[ $min -eq ${SOS_MIN} ]]; then
+
+	echo -e "${NL}Error: SMS Daemon Monitor Log File Unwritable!"
+	echo -e "\n$log"
+	NL="\n"
 
 fi
 
@@ -554,6 +621,6 @@ if [[ ${ERROR_COUNT} -gt 0 ]]; then
 	if [[ ${log_error} != 0 ]]; then
 		echo -e "${NL}ErrorCount=${ERROR_COUNT}"
 	fi
-	exit -4
+	exit -2
 fi
 
