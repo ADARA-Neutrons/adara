@@ -45,6 +45,37 @@ ADARA:
     You can disable components using --disable-NAME; for more information,
     see ./configure --help.
 
+## Running the parser tests via Pixi
+
+The ADARA parser ships with two test targets that can be built and run
+through the [Pixi](https://pixi.sh) environment defined in `pixi.toml`:
+
+* `parser-test` — smoke build that compiles the parser sources with the
+  same high-warning flags Mantid uses (`-Werror -Wcast-qual -Wconversion`).
+  This catches header regressions that would break the shared parser code.
+* `adara-packet-test` — CxxTest suite (`common/test/ADARAPacketTest.h`)
+  that exercises packet parsing against the binary fixtures in
+  `common/test/ADARAPackets.h`.
+
+Prerequisite: install Pixi once (https://pixi.sh/latest/#installation).
+Then, from the repository root:
+
+    pixi run build-tests   # compile both test binaries
+    pixi run test          # build (if needed) and run both binaries
+
+The `test` task invokes `make check` in `common/test/`, which runs
+`./parser-test` followed by `./adara-packet-test`. A successful run ends
+with:
+
+    Running cxxtest tests (35 tests)...................................OK!
+
+To remove the build artifacts:
+
+    pixi run clean
+
+The same `pixi run test` invocation is what GitHub Actions runs on each
+push and pull request (see `.github/workflows/tests.yml`).
+
 EPICS:
 
     https://epics.anl.gov/download/base/baseR3.14.12.6.tar.gz [EPICS3]

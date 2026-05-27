@@ -13,6 +13,15 @@ hdf5 = "1.14.*" # copied from mantid
 libboost-devel = "1.88.*" # copied from mantid
 log4cpp = "1.1.*" # copied from rhel9
 pkg-config = "*"
+cxxtest = "*"
+poco = "*"
+make = "*"
 
 [target.linux-64.dependencies]
 gxx_linux-64 = "13.*" # copied from mantid
+
+[tasks]
+build-parser = { cmd = "make", cwd = "parser" }
+build-tests  = { cmd = "make all", cwd = "common/test" }
+test         = { cmd = "make check", cwd = "common/test" }
+clean        = { cmd = "(cd common/test && make clean) && rm -f parser/*.o parser/adara-parser" }
