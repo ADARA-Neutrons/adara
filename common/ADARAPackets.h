@@ -358,18 +358,30 @@ public:
   uint32_t runStart() const { return m_fields[1]; }
   uint32_t fileNumber() const { return m_fields[2] & 0xffffff; }
   RunStatus::Enum status() const { return static_cast<RunStatus::Enum>(m_fields[2] >> 24); }
-  uint32_t pauseFileNumber() const {
-    return m_version >= 0x01 ? (m_fields[3] & 0xffffff) : 0;
-  }
-  uint32_t paused() const {
-    return m_version >= 0x01 ? (m_fields[3] >> 24) : 0;
-  }
-  uint32_t addendumFileNumber() const {
-    return m_version >= 0x01 ? (m_fields[4] & 0xffffff) : 0;
-  }
-  uint32_t addendum() const {
-    return m_version >= 0x01 ? (m_fields[4] >> 24) : 0;
-  }
+	uint32_t pauseFileNumber(void) const {
+		if ( m_version >= 0x01 ) {
+			return m_fields[3] & 0xffffff;
+		}
+		else return( 0 );
+	}
+	uint32_t paused(void) const {
+		if ( m_version >= 0x01 ) {
+			return m_fields[3] >> 24;
+		}
+		else return( 0 );
+	}
+	uint32_t addendumFileNumber(void) const {
+		if ( m_version >= 0x01 ) {
+			return m_fields[4] & 0xffffff;
+		}
+		else return( 0 );
+	}
+	uint32_t addendum(void) const {
+		if ( m_version >= 0x01 ) {
+			return m_fields[4] >> 24;
+		}
+		else return( 0 );
+	}
 
 private:
   const uint32_t *m_fields;
